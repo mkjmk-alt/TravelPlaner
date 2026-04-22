@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete } from '@react-google-maps/api';
-import { Search, MapPin, Calendar, Plus, Trash2, Menu, X, Navigation, Star, Globe, Compass, Zap, ArrowRight, Download, RefreshCw } from 'lucide-react';
+import { Search, MapPin, Calendar, Plus, Trash2, Menu, X, Navigation, Star, Globe, Compass, Zap, ArrowRight, Download, RefreshCw, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { allLocations } from './data';
 import './index.css';
@@ -19,28 +19,21 @@ const mapOptions = {
   disableDefaultUI: true,
   zoomControl: true,
   styles: [
-    { elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
-    { elementType: 'labels.text.stroke', stylers: [{ visibility: 'off' }] },
-    { elementType: 'labels.text.fill', stylers: [{ color: '#000000' }] },
-    { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#9d00ff' }, { weight: 8 }] },
-    { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#000000' }] },
-    { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#00fc9a' }] },
-    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#000000' }, { weight: 2 }] },
-    { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#ff4d00' }, { weight: 4 }] },
-    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#00d4ff' }] },
+    { featureType: 'all', elementType: 'geometry.fill', stylers: [{ weight: '2.00' }] },
+    { featureType: 'all', elementType: 'geometry.stroke', stylers: [{ color: '#9c9c9c' }] },
+    { featureType: 'all', elementType: 'labels.text', stylers: [{ visibility: 'on' }] },
+    { featureType: 'landscape', elementType: 'all', stylers: [{ color: '#f2f2f2' }] },
+    { featureType: 'landscape', elementType: 'geometry.fill', stylers: [{ color: '#ffffff' }] },
+    { featureType: 'poi', elementType: 'all', stylers: [{ visibility: 'off' }] },
+    { featureType: 'road', elementType: 'all', stylers: [{ saturation: -100 }, { lightness: 45 }] },
+    { featureType: 'road', elementType: 'geometry.fill', stylers: [{ color: '#eeeeee' }] },
+    { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#7b7b7b' }] },
+    { featureType: 'road', elementType: 'labels.text.stroke', stylers: [{ color: '#ffffff' }] },
+    { featureType: 'road.highway', elementType: 'all', stylers: [{ visibility: 'simplified' }] },
+    { featureType: 'road.arterial', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+    { featureType: 'transit', elementType: 'all', stylers: [{ visibility: 'off' }] },
+    { featureType: 'water', elementType: 'all', stylers: [{ color: '#e7f1ff' }, { visibility: 'on' }] }
   ]
-};
-
-const getCategoryColor = (cat) => {
-  switch (cat) {
-    case 'tour': return 'cat-tour';
-    case 'food': return 'cat-food';
-    case 'korean': return 'cat-korean';
-    case 'noodle': return 'cat-noodle';
-    case 'tart': return 'cat-tart';
-    case 'search': return 'cat-search';
-    default: return 'bg-white';
-  }
 };
 
 function App() {
@@ -54,7 +47,7 @@ function App() {
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [activeCategory, setActiveCategory] = useState('all');
   const [itinerary, setItinerary] = useState(() => {
-    const saved = localStorage.getItem('hk_planner_v5');
+    const saved = localStorage.getItem('hk_planner_v6');
     return saved ? JSON.parse(saved) : [{ day: 1, items: [] }];
   });
   const [searchResult, setSearchResult] = useState(null);
@@ -64,7 +57,7 @@ function App() {
 
   const saveItinerary = (newItinerary) => {
     setItinerary(newItinerary);
-    localStorage.setItem('hk_planner_v5', JSON.stringify(newItinerary));
+    localStorage.setItem('hk_planner_v6', JSON.stringify(newItinerary));
   };
 
   const addToItinerary = (place, dayIndex = 0) => {
@@ -73,7 +66,7 @@ function App() {
       ...place,
       id: Date.now(),
       addedAt: new Date().toISOString(),
-      time: '10:00 AM' // Default time
+      time: '10:00 AM'
     });
     saveItinerary(newItinerary);
   };
@@ -89,7 +82,7 @@ function App() {
   };
 
   const clearAll = () => {
-    if (window.confirm('RESET ALL PLANS?')) {
+    if (window.confirm('Reset all plans?')) {
       saveItinerary([{ day: 1, items: [] }]);
     }
   };
@@ -110,7 +103,7 @@ function App() {
       loc: place.formatted_address,
       cat: 'search',
       desc: place.formatted_address,
-      emoji: '🌍',
+      emoji: '📍',
       type: 'search'
     };
 
@@ -147,13 +140,15 @@ function App() {
 
   if (!isLoaded) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen bg-[#00d4ff]">
-        <div className="neo-card p-16 text-center rotate-3 scale-110">
-          <div className="w-24 h-24 bg-[#ff4d00] border-8 border-black shadow-[8px_8px_0px_#000] flex items-center justify-center mx-auto mb-8 animate-spin">
-            <Zap size={48} color="white" />
-          </div>
-          <h2 className="text-5xl font-black italic">LOADING...</h2>
-        </div>
+      <div className="flex flex-col items-center justify-center h-screen bg-white">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center"
+        >
+          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
+          <p className="text-sm font-semibold text-gray-400 uppercase tracking-widest">Pristine Navigator</p>
+        </motion.div>
       </div>
     );
   }
@@ -164,72 +159,58 @@ function App() {
       <AnimatePresence>
         {sidebarOpen && (
           <motion.aside 
-            initial={{ x: -600 }}
-            animate={{ x: 0 }}
-            exit={{ x: -600 }}
-            className="brutal-sidebar"
+            initial={{ x: -500, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: -500, opacity: 0 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="modern-sidebar"
           >
-            <div className="checkered" />
-            <div className="p-10 flex flex-col h-full bg-white overflow-hidden">
-              <div className="flex items-center justify-between mb-8">
-                <div className="relative">
-                  <h1 className="text-5xl font-black italic tracking-tighter leading-none relative z-10">
-                    WORLD<span className="text-[#9d00ff]">PRO</span>
+            <div className="p-10 flex flex-col h-full bg-white">
+              <div className="flex items-center justify-between mb-10">
+                <div>
+                  <h1 className="text-2xl font-extrabold tracking-tight text-gray-900">
+                    World<span className="text-blue-600">Pro</span>
                   </h1>
-                  <div className="absolute -bottom-2 -right-4 w-full h-4 bg-[#ebf500] -z-0 rotate-1"></div>
+                  <p className="text-[10px] font-bold text-gray-300 uppercase tracking-widest mt-1">Travel Concierge</p>
                 </div>
-                <button onClick={() => setSidebarOpen(false)} className="w-14 h-14 border-4 border-black hover:bg-[#ff4d00] transition-colors flex items-center justify-center">
-                  <X size={32} />
+                <button 
+                  onClick={() => setSidebarOpen(false)} 
+                  className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors text-gray-400"
+                >
+                  <X size={20} />
                 </button>
               </div>
 
-              {/* Multi-Color Tabs */}
-              <div className="brutal-tabs mb-8">
+              {/* Modern Tabs */}
+              <div className="modern-tabs">
                 <button 
                   onClick={() => setActiveTab('explore')}
-                  className={`brutal-tab ${activeTab === 'explore' ? 'active-explore' : 'inactive'}`}
+                  className={`modern-tab ${activeTab === 'explore' ? 'active' : ''}`}
                 >
-                  EXPLORE
+                  Explore
                 </button>
                 <button 
                   onClick={() => setActiveTab('planner')}
-                  className={`brutal-tab ${activeTab === 'planner' ? 'active-planner' : 'inactive'}`}
+                  className={`modern-tab ${activeTab === 'planner' ? 'active' : ''}`}
                 >
-                  PLANNER
+                  Planner
                 </button>
               </div>
 
-              {/* Action Buttons Layer */}
-              <div className="flex gap-4 mb-8">
-                <button onClick={clearAll} className="flex-1 neo-btn text-[10px] bg-[#ff4d00] text-white">
-                  <RefreshCw size={14} className="mr-1" /> RESET
-                </button>
-                <button className="flex-1 neo-btn text-[10px] bg-[#00fc9a]">
-                  <Download size={14} className="mr-1" /> EXPORT
-                </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto pr-4 custom-scroll">
+              <div className="flex-1 overflow-y-auto pr-2 custom-scroll">
                 {activeTab === 'explore' ? (
                   <div className="space-y-8">
-                    <div className="bg-black text-white p-4 border-4 border-black flex justify-between items-center rotate-1">
-                      <h2 className="text-sm font-black tracking-[0.2em] flex items-center gap-2">
-                        <Globe size={20} /> DISCOVERY
-                      </h2>
-                      <span className="text-[10px] bg-[#00fc9a] text-black px-3 py-1 font-black">LIVE</span>
-                    </div>
-
                     <div className="space-y-4">
-                      {/* Filter Input */}
-                      <div className="relative">
+                      {/* Search Bar */}
+                      <div className="relative group">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-blue-500 transition-colors" size={18} />
                         <input 
                           type="text" 
-                          placeholder="SEARCH LIST..."
+                          placeholder="Search locations..."
                           value={sidebarSearch}
                           onChange={(e) => setSidebarSearch(e.target.value)}
-                          className="w-full p-4 border-4 border-black font-black focus:bg-[#ebf500] transition-colors outline-none"
+                          className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl text-sm font-medium focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all border border-transparent focus:border-blue-200"
                         />
-                        <Search className="absolute right-4 top-1/2 -translate-y-1/2 opacity-30" size={18} />
                       </div>
 
                       <div className="flex flex-wrap gap-2">
@@ -237,7 +218,7 @@ function App() {
                           <button
                             key={cat}
                             onClick={() => setActiveCategory(cat)}
-                            className={`px-3 py-1 border-2 border-black font-black text-[9px] uppercase transition-all ${activeCategory === cat ? 'bg-black text-white' : 'bg-white hover:bg-[#f6f6f6]'}`}
+                            className={`pill ${activeCategory === cat ? 'active' : ''}`}
                           >
                             {cat}
                           </button>
@@ -245,7 +226,7 @@ function App() {
                       </div>
                     </div>
 
-                    <div className="space-y-6 pb-10">
+                    <div className="space-y-2 pb-10">
                       {filteredLocations.map((loc) => (
                         <div 
                           key={loc.name}
@@ -254,88 +235,71 @@ function App() {
                             map.panTo({ lat: loc.lat, lng: loc.lng });
                             map.setZoom(17);
                           }}
-                          className={`brutal-item cursor-pointer group ${getCategoryColor(loc.type)} ${selectedPlace?.name === loc.name ? 'ring-8 ring-black' : ''}`}
+                          className={`location-item ${selectedPlace?.name === loc.name ? 'bg-blue-50 ring-1 ring-blue-100' : ''}`}
                         >
-                          <div className="flex justify-between items-center">
-                            <div className="flex items-center gap-4">
-                              <div className="w-14 h-14 bg-white border-4 border-black flex items-center justify-center text-3xl shadow-[4px_4px_0px_#000]">
-                                {loc.emoji}
-                              </div>
-                              <div>
-                                <h3 className="text-xl font-black tracking-tight leading-none">{loc.name}</h3>
-                                <div className="flex items-center gap-2 mt-2">
-                                  <span className="text-[8px] font-black uppercase bg-black text-white px-2 py-0.5">{loc.loc}</span>
-                                  <span className="text-[8px] font-black uppercase border border-black px-1">4.8 ★</span>
-                                </div>
-                              </div>
-                            </div>
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); addToItinerary(loc); }}
-                              className="w-10 h-10 bg-white border-4 border-black flex items-center justify-center hover:bg-black hover:text-white transition-all shadow-[4px_4px_0px_#000]"
-                            >
-                              <Plus size={24} />
-                            </button>
+                          <div className="emoji-box">{loc.emoji}</div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-sm font-bold text-gray-900 truncate">{loc.name}</h3>
+                            <p className="text-[10px] font-medium text-gray-400 mt-1 uppercase tracking-tight">{loc.loc}</p>
                           </div>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); addToItinerary(loc); }}
+                            className="w-8 h-8 rounded-full hover:bg-blue-600 hover:text-white transition-all flex items-center justify-center bg-gray-100 text-gray-400"
+                          >
+                            <Plus size={16} />
+                          </button>
                         </div>
                       ))}
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-10 pb-10">
-                    <div className="flex items-center justify-between border-b-8 border-black pb-6">
-                      <h2 className="text-4xl font-black italic">ITINERARY</h2>
-                      <button onClick={addDay} className="neo-btn bg-[#00fc9a] text-xs">
-                        + DAY
-                      </button>
+                  <div className="space-y-8 pb-10">
+                    <div className="flex items-center justify-between mb-6">
+                      <h2 className="text-xl font-bold text-gray-900">Your Trip</h2>
+                      <div className="flex gap-2">
+                        <button onClick={addDay} className="modern-btn-soft modern-btn px-4 py-2 text-[10px]">
+                          + Day
+                        </button>
+                        <button onClick={clearAll} className="w-8 h-8 rounded-full bg-red-50 text-red-400 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all">
+                          <RefreshCw size={14} />
+                        </button>
+                      </div>
                     </div>
 
                     {itinerary.map((day, dIdx) => (
-                      <div key={dIdx} className="border-8 border-black bg-white mb-8 shadow-[10px_10px_0px_#9d00ff] relative">
-                         <div className="absolute -top-4 -left-4 w-12 h-12 bg-black text-white flex items-center justify-center font-black text-xl rotate-[-10deg] border-4 border-white shadow-[4px_4px_0px_#000]">
-                          {day.day}
-                         </div>
-                        <div className="bg-[#ebf500] border-b-8 border-black p-6 pl-12 flex justify-between items-center">
-                          <h3 className="text-2xl font-black italic">PHASE {day.day}</h3>
-                          <div className="bg-black text-white px-3 py-1 font-black text-[10px] uppercase tracking-widest">{day.items.length} STOPS</div>
+                      <div key={dIdx} className="mb-8 group">
+                        <div className="flex items-center justify-between mb-4 px-2">
+                          <h3 className="text-xs font-extrabold text-gray-400 uppercase tracking-widest">Day {day.day}</h3>
+                          <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-1 rounded-lg">{day.items.length} spots</span>
                         </div>
-                        <div className="p-8 space-y-6">
+                        
+                        <div className="space-y-3">
                           {day.items.length === 0 ? (
-                            <div className="py-12 text-center border-8 border-dashed border-black/5">
-                              <p className="text-[10px] font-black uppercase text-black/20">READY FOR DISCOVERY</p>
+                            <div className="py-10 text-center border-2 border-dashed border-gray-100 rounded-2xl">
+                              <p className="text-[10px] font-bold text-gray-300 uppercase">Empty Grid</p>
                             </div>
                           ) : (
-                            day.items.map((item, idx) => (
-                              <div key={item.id} className="relative">
-                                {idx < day.items.length - 1 && (
-                                  <div className="absolute left-6 top-16 w-1 h-10 bg-black/20" />
-                                )}
-                                <div className={`flex items-center gap-4 border-4 border-black p-4 shadow-[4px_4px_0px_#000] group transition-all hover:translate-x-2 ${getCategoryColor(item.type)}`}>
-                                  <span className="text-2xl">{item.emoji}</span>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center justify-between">
-                                      <h4 className="text-sm font-black uppercase truncate">{item.name}</h4>
-                                      <span className="text-[8px] font-black bg-black text-white px-1">10:00</span>
-                                    </div>
-                                    <p className="text-[8px] font-black uppercase mt-1 opacity-60 flex items-center gap-1">
-                                      <MapPin size={8} /> {item.loc}
-                                    </p>
+                            day.items.map((item) => (
+                              <div key={item.id} className="flex items-center gap-4 p-4 bg-white border border-gray-100 rounded-2xl hover:border-blue-200 transition-all hover:shadow-sm">
+                                <span className="text-xl">{item.emoji}</span>
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="text-[13px] font-bold text-gray-900 truncate leading-tight">{item.name}</h4>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <span className="text-[9px] font-bold text-gray-400 uppercase">{item.cat}</span>
+                                    <span className="w-1 h-1 bg-gray-200 rounded-full"></span>
+                                    <span className="text-[9px] font-bold text-blue-500">10:00 AM</span>
                                   </div>
-                                  <button 
-                                    onClick={() => removeFromItinerary(dIdx, item.id)}
-                                    className="w-8 h-8 bg-white border-4 border-black flex items-center justify-center hover:bg-red-500 hover:text-white transition-all"
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
                                 </div>
+                                <button 
+                                  onClick={() => removeFromItinerary(dIdx, item.id)}
+                                  className="w-8 h-8 rounded-full hover:bg-red-50 text-gray-200 hover:text-red-500 transition-all flex items-center justify-center"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
                               </div>
                             ))
                           )}
                         </div>
-                        {day.items.length > 0 && (
-                          <div className="bg-black text-white p-2 text-[8px] font-black text-center uppercase tracking-widest">
-                            Estimated Travel: 45 MINS
-                          </div>
-                        )}
                       </div>
                     ))}
                   </div>
@@ -351,14 +315,17 @@ function App() {
         {!sidebarOpen && (
           <button 
             onClick={() => setSidebarOpen(true)}
-            className="absolute top-10 left-10 z-[200] w-20 h-20 bg-[#ebf500] border-8 border-black shadow-[8px_8px_0px_#000] flex items-center justify-center hover:-translate-y-1 hover:shadow-[12px_12px_0px_#000] transition-all"
+            className="absolute top-8 left-8 z-[200] w-14 h-14 bg-white border border-gray-100 rounded-2xl shadow-xl flex items-center justify-center hover:scale-105 transition-all text-blue-600"
           >
-            <Menu size={40} />
+            <Menu size={24} />
           </button>
         )}
 
-        {/* Global Search */}
-        <div className="brutal-search-container">
+        {/* Global Clean Search */}
+        <div className="modern-search-bar">
+          <div className="modern-search-icon">
+            <Search size={20} />
+          </div>
           <Autocomplete
             onLoad={(autocomplete) => { autocompleteRef.current = autocomplete; }}
             onPlaceChanged={onPlaceSelected}
@@ -366,13 +333,15 @@ function App() {
           >
             <input 
               type="text" 
-              placeholder="GLOBAL SEARCH..." 
-              className="placeholder:text-black/30"
+              placeholder="Search destination..." 
+              className="placeholder:text-gray-300"
             />
           </Autocomplete>
-          <button className="brutal-search-btn">
-            <Search size={32} />
-          </button>
+          <div className="p-1">
+            <button className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white hover:bg-blue-700 transition-colors">
+              <ChevronRight size={20} />
+            </button>
+          </div>
         </div>
 
         {/* MAP */}
@@ -391,12 +360,14 @@ function App() {
               position={{ lat: loc.lat, lng: loc.lng }}
               onClick={() => setSelectedPlace(loc)}
               icon={{
-                path: window.google?.maps.SymbolPath.CIRCLE,
-                fillColor: loc.type === 'tour' ? '#ebf500' : loc.type === 'food' ? '#ff4d00' : loc.type === 'korean' ? '#00d4ff' : loc.type === 'noodle' ? '#00fc9a' : '#ff85e4',
-                fillOpacity: 1,
-                strokeColor: '#000',
-                strokeWeight: 4,
-                scale: 15
+                url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                  <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="20" cy="20" r="16" fill="white" stroke="%23006ADC" stroke-width="3"/>
+                    <text x="20" y="26" font-size="18" text-anchor="middle">${loc.emoji}</text>
+                  </svg>
+                `)}`,
+                scaledSize: new window.google.maps.Size(40, 40),
+                anchor: new window.google.maps.Point(20, 20)
               }}
             />
           ))}
@@ -405,12 +376,14 @@ function App() {
             <Marker
               position={{ lat: searchResult.lat, lng: searchResult.lng }}
               icon={{
-                path: window.google?.maps.SymbolPath.CIRCLE,
-                fillColor: '#9d00ff',
-                fillOpacity: 1,
-                strokeColor: '#000',
-                strokeWeight: 6,
-                scale: 20
+                url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                  <svg width="50" height="50" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="25" cy="25" r="20" fill="%23006ADC" stroke="white" stroke-width="4"/>
+                    <text x="25" y="32" font-size="22" text-anchor="middle">📍</text>
+                  </svg>
+                `)}`,
+                scaledSize: new window.google.maps.Size(50, 50),
+                anchor: new window.google.maps.Point(25, 25)
               }}
             />
           )}
@@ -421,24 +394,21 @@ function App() {
                 position={{ lat: selectedPlace.lat, lng: selectedPlace.lng }}
                 onCloseClick={() => setSelectedPlace(null)}
               >
-                <div className={`p-8 min-w-[320px] max-w-[400px] border-8 border-black shadow-[12px_12px_0px_#000] ${getCategoryColor(selectedPlace.type)}`}>
-                  <div className="flex items-center gap-6 mb-6">
-                    <div className="w-20 h-20 bg-white border-4 border-black flex items-center justify-center text-5xl shadow-[6px_6px_0px_#000]">
-                      {selectedPlace.emoji}
-                    </div>
-                    <h3 className="text-3xl font-black italic tracking-tighter uppercase leading-none">{selectedPlace.name}</h3>
+                <div className="p-6 min-w-[280px] max-w-[320px] bg-white rounded-3xl">
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="text-4xl">{selectedPlace.emoji}</div>
+                    <h3 className="text-lg font-extrabold text-gray-900 tracking-tight leading-tight">{selectedPlace.name}</h3>
                   </div>
-                  <div className="bg-white border-4 border-black p-3 mb-6 rotate-1">
-                    <p className="text-xs font-black uppercase flex items-center gap-2">
-                      <MapPin size={16} /> {selectedPlace.loc}
-                    </p>
+                  <div className="flex items-center gap-2 mb-4">
+                    <MapPin size={12} className="text-blue-500" />
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">{selectedPlace.loc}</p>
                   </div>
-                  <p className="text-sm font-bold leading-relaxed mb-10 bg-black text-white p-4 border-4 border-black">{selectedPlace.desc}</p>
+                  <p className="text-xs font-medium text-gray-500 leading-relaxed mb-6 border-l-2 border-gray-100 pl-4">{selectedPlace.desc}</p>
                   <button 
                     onClick={() => addToItinerary(selectedPlace)}
-                    className="w-full h-16 bg-white border-4 border-black font-black text-lg uppercase shadow-[8px_8px_0px_#000] hover:-translate-y-1 hover:shadow-[12px_12px_0px_#000] active:translate-y-1 active:shadow-none transition-all flex items-center justify-center gap-3"
+                    className="w-full modern-btn py-4 shadow-lg shadow-blue-100"
                   >
-                    <Plus size={24} /> ADD TO TRIP
+                    Add to Itinerary
                   </button>
                 </div>
               </InfoWindow>
@@ -446,18 +416,22 @@ function App() {
           </AnimatePresence>
         </GoogleMap>
 
-        {/* Global Metrics */}
-        <div className="brutal-metric">
-          <div className="w-20 h-20 bg-black border-4 border-white flex items-center justify-center shadow-[6px_6px_0px_#ff4d00]">
-            <Navigation size={40} color="white" />
+        {/* Minimal Metrics */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="absolute bottom-8 right-8 bg-white/90 backdrop-blur-lg border border-white/50 rounded-3xl px-6 py-4 shadow-2xl flex items-center gap-4"
+        >
+          <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-100">
+            <Globe size={24} />
           </div>
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.6em] mb-1 text-black/60">WORLD TRACKER</p>
-            <h4 className="text-5xl font-black leading-none tracking-tighter">
+            <p className="text-[9px] font-extrabold text-gray-300 uppercase tracking-widest">Total Spots</p>
+            <h4 className="text-2xl font-black text-gray-900 leading-none mt-1">
               {itinerary.reduce((acc, day) => acc + day.items.length, 0)}
             </h4>
           </div>
-        </div>
+        </motion.div>
       </main>
     </div>
   );
