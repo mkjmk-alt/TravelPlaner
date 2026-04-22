@@ -151,9 +151,9 @@ function App() {
           <div className="flex items-center justify-between mb-8">
             <div>
               <h1 className="text-2xl font-bold bg-gradient-to-r from-orange-400 to-amber-500 bg-clip-text text-transparent">
-                HONG KONG PRO
+                WORLD PRO
               </h1>
-              <p className="text-[10px] text-slate-500 mt-1 uppercase tracking-[0.2em] font-black">Travel Designer</p>
+              <p className="text-[10px] text-slate-500 mt-1 uppercase tracking-[0.2em] font-black">Global Travel Designer</p>
             </div>
             <button onClick={() => setSidebarOpen(false)} className="p-2 text-slate-500 hover:text-white transition-colors">
               <X size={20} />
@@ -180,6 +180,10 @@ function App() {
           <div className="flex-1 overflow-y-auto pr-2">
             {activeTab === 'explore' ? (
               <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest">Discovery</h2>
+                  <span className="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-full font-bold">Featured: HK</span>
+                </div>
                 {/* Categories */}
                 <div className="flex flex-wrap gap-2">
                   {['all', 'tour', 'tart', 'food', 'korean', 'noodle'].map(cat => (
@@ -314,7 +318,7 @@ function App() {
               <Search className="text-slate-400 group-focus-within:text-orange-400" size={20} />
               <input 
                 type="text" 
-                placeholder="Search Hong Kong places with Google Maps..." 
+                placeholder="Search any place in the world..." 
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     // This is a bit tricky with Autocomplete component, 
@@ -333,7 +337,7 @@ function App() {
         <GoogleMap
           mapContainerStyle={containerStyle}
           center={HK_CENTER}
-          zoom={13}
+          zoom={3}
           onLoad={onLoad}
           onUnmount={onUnmount}
           options={mapOptions}
