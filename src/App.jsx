@@ -8,7 +8,7 @@ import './index.css';
 // --- CONSTANTS ---
 const HK_CENTER = { lat: 22.2891, lng: 114.1924 }; // Alexandra Hotel
 const MAP_LIBRARIES = ['places'];
-const GOOGLE_MAPS_API_KEY = 'YOUR_GOOGLE_MAPS_API_KEY_HERE'; // User needs to replace this
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
 const containerStyle = {
   width: '100%',
