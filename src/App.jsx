@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete } from '@react-google-maps/api';
-import { Search, MapPin, Calendar, Plus, Trash2, Menu, X, Navigation, Star, Globe, Compass, Zap } from 'lucide-react';
+import { Search, MapPin, Calendar, Plus, Trash2, Menu, X, Navigation, Star, Globe, Compass, Zap, ArrowRight, Download, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { allLocations } from './data';
 import './index.css';
@@ -54,16 +54,17 @@ function App() {
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [activeCategory, setActiveCategory] = useState('all');
   const [itinerary, setItinerary] = useState(() => {
-    const saved = localStorage.getItem('hk_planner_v4');
+    const saved = localStorage.getItem('hk_planner_v5');
     return saved ? JSON.parse(saved) : [{ day: 1, items: [] }];
   });
   const [searchResult, setSearchResult] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState('explore');
+  const [sidebarSearch, setSidebarSearch] = useState('');
 
   const saveItinerary = (newItinerary) => {
     setItinerary(newItinerary);
-    localStorage.setItem('hk_planner_v4', JSON.stringify(newItinerary));
+    localStorage.setItem('hk_planner_v5', JSON.stringify(newItinerary));
   };
 
   const addToItinerary = (place, dayIndex = 0) => {
@@ -71,7 +72,8 @@ function App() {
     newItinerary[dayIndex].items.push({
       ...place,
       id: Date.now(),
-      addedAt: new Date().toISOString()
+      addedAt: new Date().toISOString(),
+      time: '10:00 AM' // Default time
     });
     saveItinerary(newItinerary);
   };
@@ -84,6 +86,12 @@ function App() {
 
   const addDay = () => {
     saveItinerary([...itinerary, { day: itinerary.length + 1, items: [] }]);
+  };
+
+  const clearAll = () => {
+    if (window.confirm('RESET ALL PLANS?')) {
+      saveItinerary([{ day: 1, items: [] }]);
+    }
   };
 
   const autocompleteRef = React.useRef(null);
@@ -115,9 +123,19 @@ function App() {
   };
 
   const filteredLocations = useMemo(() => {
-    if (activeCategory === 'all') return allLocations;
-    return allLocations.filter(loc => loc.type === activeCategory);
-  }, [activeCategory]);
+    let result = allLocations;
+    if (activeCategory !== 'all') {
+      result = result.filter(loc => loc.type === activeCategory);
+    }
+    if (sidebarSearch) {
+      const q = sidebarSearch.toLowerCase();
+      result = result.filter(loc => 
+        loc.name.toLowerCase().includes(q) || 
+        loc.loc.toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [activeCategory, sidebarSearch]);
 
   const onLoad = useCallback(function callback(map) {
     setMap(map);
@@ -152,8 +170,8 @@ function App() {
             className="brutal-sidebar"
           >
             <div className="checkered" />
-            <div className="p-10 flex flex-col h-full bg-white">
-              <div className="flex items-center justify-between mb-10">
+            <div className="p-10 flex flex-col h-full bg-white overflow-hidden">
+              <div className="flex items-center justify-between mb-8">
                 <div className="relative">
                   <h1 className="text-5xl font-black italic tracking-tighter leading-none relative z-10">
                     WORLD<span className="text-[#9d00ff]">PRO</span>
@@ -166,7 +184,7 @@ function App() {
               </div>
 
               {/* Multi-Color Tabs */}
-              <div className="brutal-tabs mb-10">
+              <div className="brutal-tabs mb-8">
                 <button 
                   onClick={() => setActiveTab('explore')}
                   className={`brutal-tab ${activeTab === 'explore' ? 'active-explore' : 'inactive'}`}
@@ -181,29 +199,53 @@ function App() {
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto pr-4">
+              {/* Action Buttons Layer */}
+              <div className="flex gap-4 mb-8">
+                <button onClick={clearAll} className="flex-1 neo-btn text-[10px] bg-[#ff4d00] text-white">
+                  <RefreshCw size={14} className="mr-1" /> RESET
+                </button>
+                <button className="flex-1 neo-btn text-[10px] bg-[#00fc9a]">
+                  <Download size={14} className="mr-1" /> EXPORT
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto pr-4 custom-scroll">
                 {activeTab === 'explore' ? (
-                  <div className="space-y-10">
+                  <div className="space-y-8">
                     <div className="bg-black text-white p-4 border-4 border-black flex justify-between items-center rotate-1">
                       <h2 className="text-sm font-black tracking-[0.2em] flex items-center gap-2">
-                        <Globe size={20} /> DISCOVERY GRID
+                        <Globe size={20} /> DISCOVERY
                       </h2>
-                      <span className="text-[10px] bg-[#00fc9a] text-black px-3 py-1 font-black">FEATURE: HK</span>
+                      <span className="text-[10px] bg-[#00fc9a] text-black px-3 py-1 font-black">LIVE</span>
                     </div>
 
-                    <div className="flex flex-wrap gap-3">
-                      {['all', 'tour', 'tart', 'food', 'korean', 'noodle'].map(cat => (
-                        <button
-                          key={cat}
-                          onClick={() => setActiveCategory(cat)}
-                          className={`px-4 py-2 border-4 border-black font-black text-xs uppercase transition-all ${activeCategory === cat ? 'bg-black text-white shadow-[4px_4px_0px_#ff4d00]' : 'bg-white hover:bg-[#f6f6f6]'}`}
-                        >
-                          {cat}
-                        </button>
-                      ))}
+                    <div className="space-y-4">
+                      {/* Filter Input */}
+                      <div className="relative">
+                        <input 
+                          type="text" 
+                          placeholder="SEARCH LIST..."
+                          value={sidebarSearch}
+                          onChange={(e) => setSidebarSearch(e.target.value)}
+                          className="w-full p-4 border-4 border-black font-black focus:bg-[#ebf500] transition-colors outline-none"
+                        />
+                        <Search className="absolute right-4 top-1/2 -translate-y-1/2 opacity-30" size={18} />
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        {['all', 'tour', 'tart', 'food', 'korean', 'noodle'].map(cat => (
+                          <button
+                            key={cat}
+                            onClick={() => setActiveCategory(cat)}
+                            className={`px-3 py-1 border-2 border-black font-black text-[9px] uppercase transition-all ${activeCategory === cat ? 'bg-black text-white' : 'bg-white hover:bg-[#f6f6f6]'}`}
+                          >
+                            {cat}
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
-                    <div className="space-y-6">
+                    <div className="space-y-6 pb-10">
                       {filteredLocations.map((loc) => (
                         <div 
                           key={loc.name}
@@ -212,23 +254,26 @@ function App() {
                             map.panTo({ lat: loc.lat, lng: loc.lng });
                             map.setZoom(17);
                           }}
-                          className={`brutal-item cursor-pointer group ${getCategoryColor(loc.type)} ${selectedPlace?.name === loc.name ? 'ring-8 ring-black ring-inset' : ''}`}
+                          className={`brutal-item cursor-pointer group ${getCategoryColor(loc.type)} ${selectedPlace?.name === loc.name ? 'ring-8 ring-black' : ''}`}
                         >
                           <div className="flex justify-between items-center">
                             <div className="flex items-center gap-4">
-                              <div className="w-16 h-16 bg-white border-4 border-black flex items-center justify-center text-4xl shadow-[4px_4px_0px_#000]">
+                              <div className="w-14 h-14 bg-white border-4 border-black flex items-center justify-center text-3xl shadow-[4px_4px_0px_#000]">
                                 {loc.emoji}
                               </div>
                               <div>
-                                <h3 className="text-2xl font-black tracking-tight leading-none">{loc.name}</h3>
-                                <p className="text-[10px] font-black uppercase mt-2 bg-black text-white px-2 py-0.5 inline-block">{loc.loc}</p>
+                                <h3 className="text-xl font-black tracking-tight leading-none">{loc.name}</h3>
+                                <div className="flex items-center gap-2 mt-2">
+                                  <span className="text-[8px] font-black uppercase bg-black text-white px-2 py-0.5">{loc.loc}</span>
+                                  <span className="text-[8px] font-black uppercase border border-black px-1">4.8 ★</span>
+                                </div>
                               </div>
                             </div>
                             <button 
                               onClick={(e) => { e.stopPropagation(); addToItinerary(loc); }}
-                              className="w-12 h-12 bg-white border-4 border-black flex items-center justify-center hover:bg-black hover:text-white transition-all shadow-[4px_4px_0px_#000] active:translate-y-1 active:shadow-none"
+                              className="w-10 h-10 bg-white border-4 border-black flex items-center justify-center hover:bg-black hover:text-white transition-all shadow-[4px_4px_0px_#000]"
                             >
-                              <Plus size={28} />
+                              <Plus size={24} />
                             </button>
                           </div>
                         </div>
@@ -236,43 +281,61 @@ function App() {
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-10">
+                  <div className="space-y-10 pb-10">
                     <div className="flex items-center justify-between border-b-8 border-black pb-6">
                       <h2 className="text-4xl font-black italic">ITINERARY</h2>
-                      <button onClick={addDay} className="neo-btn bg-[#00fc9a]">
-                        + ADD DAY
+                      <button onClick={addDay} className="neo-btn bg-[#00fc9a] text-xs">
+                        + DAY
                       </button>
                     </div>
 
                     {itinerary.map((day, dIdx) => (
-                      <div key={dIdx} className="border-8 border-black bg-white mb-8 shadow-[10px_10px_0px_#9d00ff]">
-                        <div className="bg-[#ebf500] border-b-8 border-black p-6 flex justify-between items-center">
-                          <h3 className="text-2xl font-black italic">DAY {day.day}</h3>
-                          <div className="bg-black text-white px-3 py-1 font-black text-xs uppercase tracking-widest">{day.items.length} SPOTS</div>
+                      <div key={dIdx} className="border-8 border-black bg-white mb-8 shadow-[10px_10px_0px_#9d00ff] relative">
+                         <div className="absolute -top-4 -left-4 w-12 h-12 bg-black text-white flex items-center justify-center font-black text-xl rotate-[-10deg] border-4 border-white shadow-[4px_4px_0px_#000]">
+                          {day.day}
+                         </div>
+                        <div className="bg-[#ebf500] border-b-8 border-black p-6 pl-12 flex justify-between items-center">
+                          <h3 className="text-2xl font-black italic">PHASE {day.day}</h3>
+                          <div className="bg-black text-white px-3 py-1 font-black text-[10px] uppercase tracking-widest">{day.items.length} STOPS</div>
                         </div>
-                        <div className="p-8 space-y-4">
+                        <div className="p-8 space-y-6">
                           {day.items.length === 0 ? (
-                            <div className="py-16 text-center border-8 border-dashed border-black/10">
-                              <p className="text-sm font-black uppercase text-black/20">AWAITING ADVENTURE</p>
+                            <div className="py-12 text-center border-8 border-dashed border-black/5">
+                              <p className="text-[10px] font-black uppercase text-black/20">READY FOR DISCOVERY</p>
                             </div>
                           ) : (
-                            day.items.map((item) => (
-                              <div key={item.id} className={`flex items-center gap-6 border-4 border-black p-5 shadow-[4px_4px_0px_#000] group transition-all hover:-translate-y-1 ${getCategoryColor(item.type)}`}>
-                                <span className="text-3xl">{item.emoji}</span>
-                                <div className="flex-1 min-w-0">
-                                  <h4 className="text-lg font-black uppercase truncate leading-none">{item.name}</h4>
-                                  <p className="text-[10px] font-black uppercase mt-1 opacity-70">{item.cat}</p>
+                            day.items.map((item, idx) => (
+                              <div key={item.id} className="relative">
+                                {idx < day.items.length - 1 && (
+                                  <div className="absolute left-6 top-16 w-1 h-10 bg-black/20" />
+                                )}
+                                <div className={`flex items-center gap-4 border-4 border-black p-4 shadow-[4px_4px_0px_#000] group transition-all hover:translate-x-2 ${getCategoryColor(item.type)}`}>
+                                  <span className="text-2xl">{item.emoji}</span>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between">
+                                      <h4 className="text-sm font-black uppercase truncate">{item.name}</h4>
+                                      <span className="text-[8px] font-black bg-black text-white px-1">10:00</span>
+                                    </div>
+                                    <p className="text-[8px] font-black uppercase mt-1 opacity-60 flex items-center gap-1">
+                                      <MapPin size={8} /> {item.loc}
+                                    </p>
+                                  </div>
+                                  <button 
+                                    onClick={() => removeFromItinerary(dIdx, item.id)}
+                                    className="w-8 h-8 bg-white border-4 border-black flex items-center justify-center hover:bg-red-500 hover:text-white transition-all"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
                                 </div>
-                                <button 
-                                  onClick={() => removeFromItinerary(dIdx, item.id)}
-                                  className="w-10 h-10 bg-white border-4 border-black flex items-center justify-center hover:bg-red-500 hover:text-white transition-all opacity-0 group-hover:opacity-100"
-                                >
-                                  <Trash2 size={20} />
-                                </button>
                               </div>
                             ))
                           )}
                         </div>
+                        {day.items.length > 0 && (
+                          <div className="bg-black text-white p-2 text-[8px] font-black text-center uppercase tracking-widest">
+                            Estimated Travel: 45 MINS
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -294,7 +357,7 @@ function App() {
           </button>
         )}
 
-        {/* Global Kaleidoscope Search */}
+        {/* Global Search */}
         <div className="brutal-search-container">
           <Autocomplete
             onLoad={(autocomplete) => { autocompleteRef.current = autocomplete; }}
@@ -303,7 +366,7 @@ function App() {
           >
             <input 
               type="text" 
-              placeholder="SEARCH THE KALEIDOSCOPE..." 
+              placeholder="GLOBAL SEARCH..." 
               className="placeholder:text-black/30"
             />
           </Autocomplete>
