@@ -1,32 +1,31 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete } from '@react-google-maps/api';
-import { Search, MapPin, Plus, Trash2, Menu, X, Globe, Compass, ChevronRight, Settings2, MoreVertical, Calendar } from 'lucide-react';
+import { Search, MapPin, Plus, Trash2, Menu, X, Calendar, Globe, Navigation, ChevronRight, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { allLocations } from './data';
 import './index.css';
 
-// --- CONSTANTS ---
+// --- CONFIGURATION ---
 const HK_CENTER = { lat: 22.2891, lng: 114.1924 };
-const MAP_LIBRARIES = ['places'];
+const MAP_LIBRARIES = ['places']; // Static array to prevent re-renders
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-
-const containerStyle = { width: '100%', height: '100%' };
 
 const mapOptions = {
   disableDefaultUI: true,
   zoomControl: false,
+  clickableIcons: false,
   styles: [
-    { featureType: 'all', elementType: 'geometry.fill', stylers: [{ weight: '2.00' }] },
-    { featureType: 'all', elementType: 'geometry.stroke', stylers: [{ color: '#9c9c9c' }] },
-    { featureType: 'landscape', elementType: 'geometry.fill', stylers: [{ color: '#ffffff' }] },
     { featureType: 'poi', elementType: 'all', stylers: [{ visibility: 'off' }] },
-    { featureType: 'road', elementType: 'geometry.fill', stylers: [{ color: '#f5f5f5' }] },
-    { featureType: 'water', elementType: 'all', stylers: [{ color: '#f0f7ff' }] }
+    { featureType: 'transit', elementType: 'all', stylers: [{ visibility: 'off' }] },
+    { featureType: 'water', elementType: 'all', stylers: [{ color: '#e7f1ff' }] },
+    { featureType: 'landscape', elementType: 'all', stylers: [{ color: '#fcfcfc' }] },
+    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
+    { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#9e9e9e' }] }
   ]
 };
 
 function App() {
-  const { isLoaded } = useJsApiLoader({
+  const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
     libraries: MAP_LIBRARIES
@@ -36,16 +35,18 @@ function App() {
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [activeCategory, setActiveCategory] = useState('all');
   const [itinerary, setItinerary] = useState(() => {
-    const saved = localStorage.getItem('world_pro_v8');
+    const saved = localStorage.getItem('world_travel_pro_v9');
     return saved ? JSON.parse(saved) : [{ day: 1, items: [] }];
   });
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [viewMode, setViewMode] = useState('explore'); 
   const [searchQuery, setSearchQuery] = useState('');
 
+  const autocompleteRef = useRef(null);
+
   const saveItinerary = (newItinerary) => {
     setItinerary(newItinerary);
-    localStorage.setItem('world_pro_v8', JSON.stringify(newItinerary));
+    localStorage.setItem('world_travel_pro_v9', JSON.stringify(newItinerary));
   };
 
   const addToItinerary = (place) => {
@@ -69,54 +70,102 @@ function App() {
     });
   }, [activeCategory, searchQuery]);
 
-  if (!isLoaded) return <div className="h-screen flex items-center justify-center font-medium text-gray-400">Loading Map...</div>;
+  const onPlaceSelected = () => {
+    const autocomplete = autocompleteRef.current;
+    if (!autocomplete) return;
+    const place = autocomplete.getPlace();
+    if (!place.geometry || !place.geometry.location) return;
+
+    const newPlace = {
+      name: place.name,
+      lat: place.geometry.location.lat(),
+      lng: place.geometry.location.lng(),
+      loc: place.formatted_address,
+      cat: 'Search Result',
+      desc: place.formatted_address,
+      emoji: '📍',
+      type: 'search'
+    };
+
+    setSelectedPlace(newPlace);
+    if (map) {
+      map.panTo(place.geometry.location);
+      map.setZoom(16);
+    }
+  };
+
+  // --- RENDERING ---
+
+  if (loadError) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center bg-red-50 text-red-600 p-8 text-center">
+        <Globe size={48} className="mb-4 opacity-50" />
+        <h1 className="text-xl font-bold mb-2">Google Maps Load Error</h1>
+        <p className="text-sm max-w-xs opacity-80">Please check your API Key in the .env file and ensure Billing is enabled on your Google Cloud Console.</p>
+        <code className="mt-4 p-2 bg-red-100 rounded text-[10px]">{loadError.message}</code>
+      </div>
+    );
+  }
+
+  if (!isLoaded) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center bg-white">
+        <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+        <p className="mt-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Waking up the world...</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="relative w-screen h-screen bg-[#f8f9fa] overflow-hidden">
+    <div className="relative w-screen h-screen bg-gray-50 overflow-hidden">
       
-      {/* --- FLOATING SIDEBAR --- */}
+      {/* --- FLOATING UI LAYER (SIDEBAR) --- */}
       <AnimatePresence>
         {sidebarOpen && (
           <motion.aside 
-            initial={{ x: -420, opacity: 0 }}
+            initial={{ x: -450, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -420, opacity: 0 }}
-            className="absolute top-8 left-8 bottom-8 w-[380px] bg-white rounded-[24px] shadow-2xl border border-gray-100 flex flex-col overflow-hidden z-[100]"
+            exit={{ x: -450, opacity: 0 }}
+            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+            className="absolute top-6 left-6 bottom-6 w-[400px] bg-white/95 backdrop-blur-xl rounded-[32px] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] border border-white/50 flex flex-col overflow-hidden z-[1000]"
           >
             {/* Header */}
-            <div className="p-8 pb-4 flex items-center justify-between">
-              <h1 className="text-xl font-bold tracking-tight text-gray-900">WorldPro</h1>
-              <div className="flex gap-1">
+            <div className="p-10 pb-6 flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-black tracking-tight text-gray-900">WorldPro</h1>
+                <p className="text-[10px] font-extrabold text-blue-500 uppercase tracking-[0.3em] mt-1">Travel Hub</p>
+              </div>
+              <div className="flex gap-2">
                 <button 
-                   onClick={() => setViewMode(viewMode === 'explore' ? 'itinerary' : 'explore')} 
-                   className={`p-2 rounded-lg transition-colors ${viewMode === 'itinerary' ? 'bg-blue-50 text-blue-600' : 'text-gray-400 hover:bg-gray-50'}`}
+                  onClick={() => setViewMode(viewMode === 'explore' ? 'itinerary' : 'explore')}
+                  className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all ${viewMode === 'itinerary' ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}`}
                 >
                   <Calendar size={18} />
                 </button>
-                <button onClick={() => setSidebarOpen(false)} className="p-2 hover:bg-gray-50 rounded-lg text-gray-400">
+                <button onClick={() => setSidebarOpen(false)} className="w-10 h-10 rounded-2xl bg-gray-50 text-gray-400 hover:bg-gray-100 flex items-center justify-center transition-all">
                   <X size={18} />
                 </button>
               </div>
             </div>
 
-            {/* Smart Search & Filter */}
-            <div className="px-8 mb-6">
+            {/* Smart Discovery */}
+            <div className="px-10 mb-8">
               <div className="relative group mb-4">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={14} />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
                 <input 
                   type="text" 
-                  placeholder="Find a place..."
+                  placeholder="Find your next destination..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2.5 bg-gray-50 border-none rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+                  className="w-full pl-12 pr-4 py-4 bg-gray-50/50 border-2 border-transparent rounded-2xl text-sm font-semibold focus:bg-white focus:border-blue-100 outline-none transition-all"
                 />
               </div>
-              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
                 {['all', 'tour', 'food', 'tart'].map(cat => (
                   <button
                     key={cat}
                     onClick={() => setActiveCategory(cat)}
-                    className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all ${activeCategory === cat ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}`}
+                    className={`px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${activeCategory === cat ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}`}
                   >
                     {cat}
                   </button>
@@ -124,54 +173,54 @@ function App() {
               </div>
             </div>
 
-            {/* Content Area */}
-            <div className="flex-1 overflow-y-auto px-8 custom-scroll">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-[10px] font-extrabold text-gray-300 uppercase tracking-[0.2em]">
-                  {viewMode === 'explore' ? 'Discovery' : 'Itinerary'}
-                </h2>
-              </div>
-
-              <div className="space-y-1 pb-10">
+            {/* List Content */}
+            <div className="flex-1 overflow-y-auto px-10 custom-scroll">
+              <div className="space-y-2 pb-10">
                 {viewMode === 'explore' ? (
                   filteredLocations.map((loc) => (
-                    <div 
+                    <motion.div 
                       key={loc.name}
+                      layout
                       onClick={() => {
                         setSelectedPlace(loc);
-                        map.panTo({ lat: loc.lat, lng: loc.lng });
-                        map.setZoom(16);
+                        map?.panTo({ lat: loc.lat, lng: loc.lng });
+                        map?.setZoom(16);
                       }}
-                      className="group flex items-center gap-3 p-2.5 hover:bg-gray-50 rounded-xl cursor-pointer transition-colors"
+                      className={`group flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all border-2 ${selectedPlace?.name === loc.name ? 'bg-blue-50 border-blue-100' : 'bg-white border-transparent hover:bg-gray-50'}`}
                     >
-                      <div className="w-9 h-9 bg-white rounded-lg flex items-center justify-center text-lg shadow-sm border border-gray-50">
+                      <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-2xl shadow-sm border border-gray-100">
                         {loc.emoji}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-[13px] font-semibold text-gray-900 truncate">{loc.name}</h3>
-                        <p className="text-[9px] text-gray-400 truncate">{loc.loc}</p>
+                        <h3 className="text-sm font-bold text-gray-900 truncate">{loc.name}</h3>
+                        <p className="text-[10px] font-bold text-gray-300 uppercase truncate mt-1">{loc.loc}</p>
                       </div>
                       <button 
                         onClick={(e) => { e.stopPropagation(); addToItinerary(loc); }}
-                        className="opacity-0 group-hover:opacity-100 p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg"
+                        className="p-2 text-blue-600 bg-white border border-gray-100 rounded-xl shadow-sm opacity-0 group-hover:opacity-100 hover:bg-blue-600 hover:text-white transition-all"
                       >
-                        <Plus size={16} />
+                        <Plus size={18} />
                       </button>
-                    </div>
+                    </motion.div>
                   ))
                 ) : (
                   itinerary[0].items.length === 0 ? (
-                    <p className="text-[10px] text-center text-gray-300 py-20 font-bold uppercase tracking-widest">No plans yet</p>
+                    <div className="py-20 text-center">
+                      <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Navigation size={24} className="text-gray-200" />
+                      </div>
+                      <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">No spots saved yet</p>
+                    </div>
                   ) : (
                     itinerary[0].items.map((item) => (
-                      <div key={item.id} className="flex items-center gap-3 p-3 bg-white border border-gray-50 rounded-xl mb-2 hover:border-blue-100 transition-all">
-                        <div className="text-base">{item.emoji}</div>
+                      <div key={item.id} className="flex items-center gap-4 p-4 bg-white border-2 border-gray-50 rounded-2xl mb-3 hover:border-blue-100 transition-all shadow-sm">
+                        <div className="text-2xl">{item.emoji}</div>
                         <div className="flex-1 min-w-0">
-                          <h3 className="text-xs font-bold text-gray-900 truncate">{item.name}</h3>
-                          <p className="text-[8px] text-gray-400 uppercase font-black">{item.cat}</p>
+                          <h3 className="text-sm font-bold text-gray-900 truncate">{item.name}</h3>
+                          <p className="text-[9px] font-black text-blue-400 uppercase tracking-tighter">{item.cat}</p>
                         </div>
-                        <button onClick={() => removeFromItinerary(item.id)} className="p-1.5 text-gray-200 hover:text-red-500 hover:bg-red-50 rounded-lg">
-                          <Trash2 size={14} />
+                        <button onClick={() => removeFromItinerary(item.id)} className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
+                          <Trash2 size={16} />
                         </button>
                       </div>
                     ))
@@ -180,82 +229,105 @@ function App() {
               </div>
             </div>
 
-            {/* Status Footer */}
-            <div className="p-5 border-t border-gray-50 bg-gray-50/20 flex justify-between items-center">
-              <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest">
-                {itinerary[0].items.length} Spots Pinned
-              </span>
-              <button className="text-[9px] font-black text-gray-300 hover:text-blue-600">SYNCED</button>
+            {/* Footer Stats */}
+            <div className="p-8 border-t border-gray-50 bg-gray-50/30 flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">World Live</span>
+              </div>
+              <span className="text-[10px] font-black text-gray-900">{itinerary[0].items.length} SAVED SPOTS</span>
             </div>
           </motion.aside>
         )}
       </AnimatePresence>
 
-      {/* --- FULL SCREEN MAP --- */}
+      {/* --- MAP CONTENT --- */}
       <main className="absolute inset-0 z-0">
         {!sidebarOpen && (
-          <button onClick={() => setSidebarOpen(true)} className="absolute top-8 left-8 z-[100] w-12 h-12 bg-white rounded-2xl shadow-2xl flex items-center justify-center text-blue-600 hover:scale-105 transition-transform border border-gray-100">
+          <button 
+            onClick={() => setSidebarOpen(true)} 
+            className="absolute top-6 left-6 z-[2000] w-14 h-14 bg-white rounded-2xl shadow-2xl flex items-center justify-center text-blue-600 hover:scale-110 transition-all border border-white"
+          >
             <Menu size={24} />
           </button>
         )}
 
-        {/* Floating Search Bar Overlay */}
-        <div className="absolute top-8 left-1/2 -translate-x-1/2 z-[100] w-full max-w-sm px-4">
-          <div className="bg-white/90 backdrop-blur-lg border border-white/50 rounded-2xl shadow-2xl p-1.5 flex items-center">
-             <div className="flex-1 px-4 text-xs font-bold text-gray-900">
-               <Autocomplete onLoad={() => {}} onPlaceChanged={() => {}}>
-                 <input type="text" placeholder="Search the world..." className="w-full bg-transparent outline-none placeholder:text-gray-300" />
+        {/* Global Search Bar Overlay */}
+        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[2000] w-full max-w-sm px-4">
+          <div className="bg-white/90 backdrop-blur-xl border border-white/50 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.1)] p-2 flex items-center">
+             <div className="flex-1 px-4 text-sm font-bold text-gray-900">
+               <Autocomplete 
+                  onLoad={(a) => { autocompleteRef.current = a; }} 
+                  onPlaceChanged={onPlaceSelected}
+               >
+                 <input 
+                    type="text" 
+                    placeholder="Search the globe..." 
+                    className="w-full bg-transparent outline-none placeholder:text-gray-300" 
+                 />
                </Autocomplete>
              </div>
-             <button className="w-9 h-9 bg-blue-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-blue-100">
-               <Search size={16} />
+             <button className="w-11 h-11 bg-blue-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200">
+               <Search size={20} />
              </button>
           </div>
         </div>
 
-        <GoogleMap
-          mapContainerStyle={containerStyle}
-          center={HK_CENTER}
-          zoom={3}
-          onLoad={(m) => setMap(m)}
-          options={mapOptions}
-          onClick={() => setSelectedPlace(null)}
-        >
-          {filteredLocations.map(loc => (
-            <Marker
-              key={loc.name}
-              position={{ lat: loc.lat, lng: loc.lng }}
-              onClick={() => setSelectedPlace(loc)}
-              icon={{
-                url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-                  <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="14" cy="14" r="12" fill="white" stroke="%23006ADC" stroke-width="2"/>
-                    <text x="14" y="19" font-size="12" text-anchor="middle">${loc.emoji}</text>
-                  </svg>
-                `)}`,
-                scaledSize: new window.google.maps.Size(28, 28),
-                anchor: new window.google.maps.Point(14, 14)
-              }}
-            />
-          ))}
+        {/* THE GOOGLE MAP */}
+        <div style={{ width: '100%', height: '100%' }}>
+          <GoogleMap
+            id="main-google-map"
+            mapContainerStyle={{ width: '100%', height: '100%' }}
+            center={HK_CENTER}
+            zoom={3}
+            onLoad={(m) => setMap(m)}
+            options={mapOptions}
+            onClick={() => setSelectedPlace(null)}
+          >
+            {filteredLocations.map(loc => (
+              <Marker
+                key={loc.name}
+                position={{ lat: loc.lat, lng: loc.lng }}
+                onClick={() => setSelectedPlace(loc)}
+                icon={{
+                  url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                    <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <circle cx="18" cy="18" r="16" fill="white" stroke="%23006ADC" stroke-width="2"/>
+                      <text x="18" y="24" font-size="18" text-anchor="middle">${loc.emoji}</text>
+                    </svg>
+                  `)}`,
+                  scaledSize: new window.google.maps.Size(36, 36),
+                  anchor: new window.google.maps.Point(18, 18)
+                }}
+              />
+            ))}
 
-          <AnimatePresence>
-            {selectedPlace && (
-              <InfoWindow position={{ lat: selectedPlace.lat, lng: selectedPlace.lng }} onCloseClick={() => setSelectedPlace(null)}>
-                <div className="p-4 min-w-[200px]">
-                  <h3 className="text-xs font-bold mb-1">{selectedPlace.name}</h3>
-                  <p className="text-[9px] text-gray-400 mb-3">{selectedPlace.loc}</p>
-                  <button 
-                    onClick={() => addToItinerary(selectedPlace)}
-                    className="w-full py-2 bg-blue-600 text-white rounded-lg text-[10px] font-bold"
-                  >
-                    Add to Trip
-                  </button>
-                </div>
-              </InfoWindow>
-            )}
-          </AnimatePresence>
-        </GoogleMap>
+            <AnimatePresence>
+              {selectedPlace && (
+                <InfoWindow 
+                  position={{ lat: selectedPlace.lat, lng: selectedPlace.lng }} 
+                  onCloseClick={() => setSelectedPlace(null)}
+                >
+                  <div className="p-6 min-w-[280px] font-sans">
+                    <div className="flex items-center gap-4 mb-4">
+                      <span className="text-4xl">{selectedPlace.emoji}</span>
+                      <h3 className="text-lg font-black text-gray-900 tracking-tight leading-tight">{selectedPlace.name}</h3>
+                    </div>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                      <MapPin size={14} className="text-blue-500" /> {selectedPlace.loc}
+                    </p>
+                    <button 
+                      onClick={() => addToItinerary(selectedPlace)}
+                      className="w-full py-4 bg-blue-600 text-white rounded-2xl text-xs font-black shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all"
+                    >
+                      Add to Journey
+                    </button>
+                  </div>
+                </InfoWindow>
+              )}
+            </AnimatePresence>
+          </GoogleMap>
+        </div>
       </main>
     </div>
   );

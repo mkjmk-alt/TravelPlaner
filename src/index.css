@@ -8,10 +8,16 @@
 
 body {
   font-family: 'Inter', sans-serif;
-  background-color: #f8f9fa;
+  background-color: #ffffff;
   color: #1a1c1e;
   overflow: hidden;
   height: 100vh;
+  width: 100vw;
+}
+
+#root {
+  height: 100%;
+  width: 100%;
 }
 
 /* Custom Scrollbar */
@@ -22,15 +28,18 @@ body {
   background: transparent;
 }
 .custom-scroll::-webkit-scrollbar-thumb {
-  background: #eee;
+  background: #f1f1f1;
   border-radius: 10px;
+}
+.custom-scroll::-webkit-scrollbar-thumb:hover {
+  background: #e5e5e5;
 }
 
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
 
-/* Base Classes */
+/* Base Utility */
 .shadow-2xl {
   box-shadow: 0 30px 90px rgba(0, 0, 0, 0.15);
 }
@@ -38,15 +47,38 @@ body {
 /* Map InfoWindow Overrides */
 .gm-style-iw-c {
   padding: 0 !important;
-  border-radius: 12px !important;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.1) !important;
+  border-radius: 24px !important;
+  box-shadow: 0 32px 64px -16px rgba(0,0,0,0.15) !important;
+  border: none !important;
 }
 
 .gm-style-iw-d {
   overflow: hidden !important;
+  padding: 0 !important;
 }
 
 .gm-ui-hover-effect {
-  top: 4px !important;
-  right: 4px !important;
+  top: 12px !important;
+  right: 12px !important;
+  background: #f8f9fa !important;
+  border-radius: 50% !important;
+  width: 24px !important;
+  height: 24px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.gm-style-iw-tc::after {
+  display: none !important;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out;
 }
