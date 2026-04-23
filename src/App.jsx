@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete } from '@react-google-maps/api';
-import { Search, MapPin, Plus, Trash2, Menu, X, Calendar, Globe, Compass, ChevronRight } from 'lucide-react';
+import { Search, MapPin, Plus, Trash2, Menu, X, Calendar, Globe, Compass, ChevronRight, PlusCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { allLocations } from './data';
 import './index.css';
@@ -31,35 +31,46 @@ function App() {
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [activeCategory, setActiveCategory] = useState('all');
   const [itinerary, setItinerary] = useState(() => {
-    const saved = localStorage.getItem('world_pro_v14');
+    const saved = localStorage.getItem('world_pro_v15');
     return saved ? JSON.parse(saved) : [{ day: 1, items: [] }];
   });
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [viewMode, setViewMode] = useState('explore'); 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResult, setSearchResult] = useState(null);
+  const [activeDay, setActiveDay] = useState(1);
 
   const autocompleteRef = useRef(null);
 
   const saveItinerary = (newItinerary) => {
     setItinerary(newItinerary);
-    localStorage.setItem('world_pro_v14', JSON.stringify(newItinerary));
+    localStorage.setItem('world_pro_v15', JSON.stringify(newItinerary));
+  };
+
+  const addDay = () => {
+    const nextDay = itinerary.length + 1;
+    saveItinerary([...itinerary, { day: nextDay, items: [] }]);
+    setActiveDay(nextDay);
   };
 
   const addToItinerary = (place) => {
     const newItinerary = [...itinerary];
-    newItinerary[0].items.push({ 
-      ...place, 
-      id: Date.now(),
-      emoji: place.emoji || '📍' 
-    });
-    saveItinerary(newItinerary);
-    setViewMode('itinerary');
+    const dayIndex = newItinerary.findIndex(d => d.day === activeDay);
+    
+    if (dayIndex !== -1) {
+      newItinerary[dayIndex].items.push({ 
+        ...place, 
+        id: Date.now(),
+        emoji: place.emoji || '📍' 
+      });
+      saveItinerary(newItinerary);
+      setViewMode('itinerary');
+    }
   };
 
-  const removeFromItinerary = (itemId) => {
+  const removeFromItinerary = (dayIndex, itemId) => {
     const newItinerary = [...itinerary];
-    newItinerary[0].items = newItinerary[0].items.filter(i => i.id !== itemId);
+    newItinerary[dayIndex].items = newItinerary[dayIndex].items.filter(i => i.id !== itemId);
     saveItinerary(newItinerary);
   };
 
@@ -97,6 +108,8 @@ function App() {
     });
   }, [activeCategory, searchQuery]);
 
+  const totalSpots = itinerary.reduce((acc, day) => acc + day.items.length, 0);
+
   if (!isLoaded) return <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', color: '#ccc' }}>LOADING WORLD...</div>;
 
   return (
@@ -109,7 +122,7 @@ function App() {
             initial={{ x: -450, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: -450, opacity: 0 }}
-            className="absolute top-6 left-6 bottom-6 w-[380px] bg-white/95 backdrop-blur-2xl rounded-[32px] shadow-2xl border border-white/50 flex flex-col overflow-hidden z-[1000]"
+            className="absolute top-6 left-6 bottom-6 w-[400px] bg-white/95 backdrop-blur-2xl rounded-[32px] shadow-2xl border border-white/50 flex flex-col overflow-hidden z-[1000]"
           >
             {/* Header */}
             <div className="p-10 pb-6 flex items-center justify-between">
@@ -159,30 +172,53 @@ function App() {
                   </>
                 ) : (
                   <>
-                    <h2 className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-4">My Journey</h2>
-                    {itinerary[0].items.length === 0 ? (
-                      <p className="text-xs text-center text-gray-300 py-20 font-bold uppercase tracking-widest">No plans yet. Start searching!</p>
-                    ) : (
-                      itinerary[0].items.map((item) => (
-                        <div key={item.id} className="flex items-center gap-4 p-4 bg-white border-2 border-gray-50 rounded-2xl mb-3 hover:border-blue-100 transition-all shadow-sm">
-                          <div className="text-2xl">{item.emoji}</div>
-                          <div className="flex-1 min-w-0">
-                            <h3 className="text-sm font-bold text-gray-900 truncate">{item.name}</h3>
-                            <p className="text-[9px] font-black text-blue-400 uppercase tracking-tighter">{item.cat}</p>
-                          </div>
-                          <button onClick={() => removeFromItinerary(item.id)} className="p-2 text-gray-200 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
-                            <Trash2 size={16} />
-                          </button>
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-[10px] font-black text-gray-300 uppercase tracking-widest">My Journey</h2>
+                      <button onClick={addDay} className="flex items-center gap-1 text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg hover:bg-blue-100 transition-colors">
+                        <PlusCircle size={12} /> ADD DAY
+                      </button>
+                    </div>
+
+                    {itinerary.map((dayPlan, dIdx) => (
+                      <div key={dayPlan.day} className="mb-8">
+                        <div 
+                          onClick={() => setActiveDay(dayPlan.day)}
+                          className={`flex items-center justify-between mb-3 px-2 py-2 rounded-lg cursor-pointer transition-colors ${activeDay === dayPlan.day ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+                        >
+                          <h3 className={`text-xs font-black uppercase tracking-widest ${activeDay === dayPlan.day ? 'text-blue-600' : 'text-gray-400'}`}>
+                            Day {dayPlan.day} {activeDay === dayPlan.day && '• Active'}
+                          </h3>
+                          <span className="text-[10px] font-bold text-gray-400">{dayPlan.items.length} spots</span>
                         </div>
-                      ))
-                    )}
+
+                        {dayPlan.items.length === 0 ? (
+                          <div className="p-6 border-2 border-dashed border-gray-100 rounded-2xl text-center">
+                            <p className="text-[10px] text-gray-300 font-bold uppercase tracking-widest">Empty</p>
+                          </div>
+                        ) : (
+                          dayPlan.items.map((item) => (
+                            <div key={item.id} className="flex items-center gap-4 p-4 bg-white border-2 border-gray-50 rounded-2xl mb-2 hover:border-blue-100 transition-all shadow-sm">
+                              <div className="text-2xl">{item.emoji}</div>
+                              <div className="flex-1 min-w-0">
+                                <h3 className="text-sm font-bold text-gray-900 truncate">{item.name}</h3>
+                                <p className="text-[9px] font-black text-blue-400 uppercase tracking-tighter">{item.cat}</p>
+                              </div>
+                              <button onClick={() => removeFromItinerary(dIdx, item.id)} className="p-2 text-gray-200 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    ))}
                   </>
                 )}
               </div>
             </div>
 
+            {/* Footer */}
             <div className="p-8 border-t border-gray-50 bg-gray-50/30 flex justify-between items-center">
-              <span className="text-[10px] font-black text-gray-900">{itinerary[0].items.length} SPOTS SAVED</span>
+              <span className="text-[10px] font-black text-gray-900">{totalSpots} SPOTS SAVED</span>
               <button className="text-[10px] font-black text-blue-600 hover:underline">EXPORT PDF</button>
             </div>
           </motion.aside>
@@ -223,6 +259,7 @@ function App() {
           options={mapOptions}
           onClick={() => setSelectedPlace(null)}
         >
+          {/* Default Data Markers */}
           {allLocations.map(loc => (
             <Marker
               key={loc.name}
@@ -241,6 +278,7 @@ function App() {
             />
           ))}
 
+          {/* Dynamic Search Result Marker */}
           {searchResult && (
              <Marker
                 position={{ lat: searchResult.lat, lng: searchResult.lng }}
@@ -269,7 +307,9 @@ function App() {
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6 flex items-center gap-2">
                     <MapPin size={14} className="text-blue-500" /> {selectedPlace.loc}
                   </p>
-                  <button onClick={() => addToItinerary(selectedPlace)} className="w-full py-4 bg-blue-600 text-white rounded-2xl text-xs font-black shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all">Add to Trip</button>
+                  <button onClick={() => addToItinerary(selectedPlace)} className="w-full py-4 bg-blue-600 text-white rounded-2xl text-xs font-black shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all">
+                    Add to Day {activeDay}
+                  </button>
                 </div>
               </InfoWindow>
             )}
