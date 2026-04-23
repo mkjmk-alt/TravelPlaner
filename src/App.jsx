@@ -1,119 +1,226 @@
-import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete } from '@react-google-maps/api';
-import { Search, MapPin, Plus, Trash2, Menu, X, Calendar } from 'lucide-react';
+import { Search, MapPin, Plus, Trash2, Menu, X, Calendar, Globe, Compass, ChevronRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { allLocations } from './data';
 import './index.css';
 
-// --- CONFIG ---
+// --- CONFIGURATION ---
 const HK_CENTER = { lat: 22.2891, lng: 114.1924 };
-const MAP_LIBRARIES = ['places'];
+const MAP_LIBRARIES = ['places']; 
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+
+const mapOptions = {
+  disableDefaultUI: true,
+  zoomControl: false,
+  styles: [
+    { featureType: 'poi', elementType: 'all', stylers: [{ visibility: 'on' }, { lightness: 30 }] },
+    { featureType: 'water', elementType: 'all', stylers: [{ color: '#e7f1ff' }] },
+    { featureType: 'landscape', elementType: 'all', stylers: [{ color: '#ffffff' }] }
+  ]
+};
 
 function App() {
-  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
-    googleMapsApiKey: apiKey,
-    libraries: MAP_LIBRARIES
+    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
+    libraries: MAP_LIBRARIES,
   });
 
   const [map, setMap] = useState(null);
   const [selectedPlace, setSelectedPlace] = useState(null);
-  const [itinerary, setItinerary] = useState([{ day: 1, items: [] }]);
+  const [activeCategory, setActiveCategory] = useState('all');
+  const [itinerary, setItinerary] = useState(() => {
+    const saved = localStorage.getItem('world_pro_v14');
+    return saved ? JSON.parse(saved) : [{ day: 1, items: [] }];
+  });
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [viewMode, setViewMode] = useState('explore'); 
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResult, setSearchResult] = useState(null);
 
-  // 1. Error boundary within component
-  if (loadError) {
-    return (
-      <div style={{ padding: '50px', color: 'red', fontWeight: 'bold', fontFamily: 'sans-serif' }}>
-        <h1>Map Load Error</h1>
-        <p>{loadError.message}</p>
-      </div>
-    );
-  }
+  const autocompleteRef = useRef(null);
 
-  if (!apiKey) {
-    return (
-      <div style={{ padding: '50px', color: 'orange', fontWeight: 'bold', fontFamily: 'sans-serif' }}>
-        <h1>Missing API Key</h1>
-        <p>VITE_GOOGLE_MAPS_API_KEY is not defined in your .env file.</p>
-      </div>
-    );
-  }
+  const saveItinerary = (newItinerary) => {
+    setItinerary(newItinerary);
+    localStorage.setItem('world_pro_v14', JSON.stringify(newItinerary));
+  };
 
-  if (!isLoaded) {
-    return (
-      <div style={{ padding: '50px', fontWeight: 'bold', fontFamily: 'sans-serif' }}>
-        <h1>Connecting to Google Maps...</h1>
-        <p>If this screen stays for more than 5 seconds, please check your internet or console.</p>
-      </div>
-    );
-  }
+  const addToItinerary = (place) => {
+    const newItinerary = [...itinerary];
+    newItinerary[0].items.push({ 
+      ...place, 
+      id: Date.now(),
+      emoji: place.emoji || '📍' 
+    });
+    saveItinerary(newItinerary);
+    setViewMode('itinerary');
+  };
+
+  const removeFromItinerary = (itemId) => {
+    const newItinerary = [...itinerary];
+    newItinerary[0].items = newItinerary[0].items.filter(i => i.id !== itemId);
+    saveItinerary(newItinerary);
+  };
+
+  const onPlaceSelected = () => {
+    const autocomplete = autocompleteRef.current;
+    if (!autocomplete) return;
+    const place = autocomplete.getPlace();
+    if (!place.geometry || !place.geometry.location) return;
+
+    const newPlace = {
+      name: place.name,
+      lat: place.geometry.location.lat(),
+      lng: place.geometry.location.lng(),
+      loc: place.formatted_address,
+      cat: 'Search',
+      desc: place.formatted_address,
+      emoji: '📍',
+      type: 'search'
+    };
+
+    setSearchResult(newPlace);
+    setSelectedPlace(newPlace);
+    if (map) {
+      map.panTo(place.geometry.location);
+      map.setZoom(16);
+    }
+  };
+
+  const filteredLocations = useMemo(() => {
+    return allLocations.filter(loc => {
+      const matchesCat = activeCategory === 'all' || loc.type === activeCategory;
+      const matchesSearch = loc.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                           loc.loc.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesCat && matchesSearch;
+    });
+  }, [activeCategory, searchQuery]);
+
+  if (!isLoaded) return <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', color: '#ccc' }}>LOADING WORLD...</div>;
 
   return (
-    <div style={{ width: '100vw', height: '100vh', position: 'relative', overflow: 'hidden' }}>
-      {/* Sidebar - Solid Minimal Version */}
-      <div style={{
-        position: 'absolute', top: '20px', left: '20px', bottom: '20px', width: '350px',
-        backgroundColor: 'white', zIndex: 1000, borderRadius: '24px', boxShadow: '0 20px 50px rgba(0,0,0,0.1)',
-        padding: '30px', overflowY: 'auto', display: 'flex', flexDirection: 'column'
-      }}>
-        <h1 style={{ fontSize: '24px', fontWeight: '900', marginBottom: '20px', color: '#1a1c1e' }}>TravelPro</h1>
-        
-        <div style={{ marginBottom: '20px' }}>
-          <input 
-            type="text" 
-            placeholder="Find a place..."
-            style={{ width: '100%', padding: '12px 16px', borderRadius: '12px', border: '1px solid #f0f0f0', outline: 'none', backgroundColor: '#f8f9fa' }}
-          />
-        </div>
-
-        <div style={{ flex: 1 }}>
-          <h2 style={{ fontSize: '10px', fontWeight: '900', color: '#ccc', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '15px' }}>Quick Select</h2>
-          {allLocations.map(loc => (
-            <div 
-              key={loc.name}
-              onClick={() => {
-                setSelectedPlace(loc);
-                map?.panTo({ lat: loc.lat, lng: loc.lng });
-                map?.setZoom(16);
-              }}
-              style={{ 
-                padding: '12px', 
-                borderRadius: '12px',
-                marginBottom: '5px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                transition: 'background 0.2s'
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-            >
-              <span style={{ fontSize: '20px' }}>{loc.emoji}</span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#1a1c1e' }}>{loc.name}</div>
-                <div style={{ fontSize: '10px', color: '#999' }}>{loc.loc}</div>
+    <div className="relative w-screen h-screen bg-[#f8f9fa] overflow-hidden font-sans">
+      
+      {/* SIDEBAR UI */}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.aside 
+            initial={{ x: -450, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: -450, opacity: 0 }}
+            className="absolute top-6 left-6 bottom-6 w-[380px] bg-white/95 backdrop-blur-2xl rounded-[32px] shadow-2xl border border-white/50 flex flex-col overflow-hidden z-[1000]"
+          >
+            {/* Header */}
+            <div className="p-10 pb-6 flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-black tracking-tight text-gray-900">WorldPro</h1>
+                <p className="text-[10px] font-extrabold text-blue-500 uppercase tracking-[0.3em] mt-1">Global Travel Planner</p>
+              </div>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setViewMode(viewMode === 'explore' ? 'itinerary' : 'explore')}
+                  className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all ${viewMode === 'itinerary' ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'bg-gray-100 text-gray-400'}`}
+                >
+                  <Calendar size={20} />
+                </button>
+                <button onClick={() => setSidebarOpen(false)} className="w-11 h-11 rounded-2xl bg-gray-100 text-gray-400 flex items-center justify-center transition-all">
+                  <X size={20} />
+                </button>
               </div>
             </div>
-          ))}
-        </div>
-      </div>
 
-      {/* Map Content */}
-      <div style={{ width: '100%', height: '100%' }}>
+            {/* List Content */}
+            <div className="flex-1 overflow-y-auto px-10 custom-scroll">
+              <div className="space-y-2 pb-10">
+                {viewMode === 'explore' ? (
+                  <>
+                    <h2 className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-4">Recommended Spots</h2>
+                    {filteredLocations.map((loc) => (
+                      <div 
+                        key={loc.name}
+                        onClick={() => {
+                          setSelectedPlace(loc);
+                          map?.panTo({ lat: loc.lat, lng: loc.lng });
+                          map?.setZoom(16);
+                        }}
+                        className={`group flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all ${selectedPlace?.name === loc.name ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+                      >
+                        <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-2xl shadow-sm border border-gray-50">{loc.emoji}</div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-sm font-bold text-gray-900 truncate">{loc.name}</h3>
+                          <p className="text-[10px] font-bold text-gray-300 uppercase truncate mt-1">{loc.loc}</p>
+                        </div>
+                        <button onClick={(e) => { e.stopPropagation(); addToItinerary(loc); }} className="p-2 text-blue-600 bg-white border border-gray-100 rounded-xl opacity-0 group-hover:opacity-100 hover:bg-blue-600 hover:text-white transition-all shadow-sm">
+                          <Plus size={18} />
+                        </button>
+                      </div>
+                    ))}
+                  </>
+                ) : (
+                  <>
+                    <h2 className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-4">My Journey</h2>
+                    {itinerary[0].items.length === 0 ? (
+                      <p className="text-xs text-center text-gray-300 py-20 font-bold uppercase tracking-widest">No plans yet. Start searching!</p>
+                    ) : (
+                      itinerary[0].items.map((item) => (
+                        <div key={item.id} className="flex items-center gap-4 p-4 bg-white border-2 border-gray-50 rounded-2xl mb-3 hover:border-blue-100 transition-all shadow-sm">
+                          <div className="text-2xl">{item.emoji}</div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-sm font-bold text-gray-900 truncate">{item.name}</h3>
+                            <p className="text-[9px] font-black text-blue-400 uppercase tracking-tighter">{item.cat}</p>
+                          </div>
+                          <button onClick={() => removeFromItinerary(item.id)} className="p-2 text-gray-200 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="p-8 border-t border-gray-50 bg-gray-50/30 flex justify-between items-center">
+              <span className="text-[10px] font-black text-gray-900">{itinerary[0].items.length} SPOTS SAVED</span>
+              <button className="text-[10px] font-black text-blue-600 hover:underline">EXPORT PDF</button>
+            </div>
+          </motion.aside>
+        )}
+      </AnimatePresence>
+
+      {/* MAP VIEWPORT */}
+      <main className="absolute inset-0 z-0">
+        {!sidebarOpen && (
+          <button onClick={() => setSidebarOpen(true)} className="absolute top-6 left-6 z-[2000] w-14 h-14 bg-white rounded-2xl shadow-2xl flex items-center justify-center text-blue-600 hover:scale-110 transition-all border border-white"><Menu size={24} /></button>
+        )}
+
+        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[2000] w-full max-w-md px-4">
+          <div className="bg-white/90 backdrop-blur-xl border border-white/50 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.1)] p-2 flex items-center">
+             <div className="flex-1 px-4 text-sm font-bold text-gray-900">
+               <Autocomplete 
+                  onLoad={(a) => { autocompleteRef.current = a; }} 
+                  onPlaceChanged={onPlaceSelected}
+               >
+                 <input 
+                    type="text" 
+                    placeholder="Search for any place in the world..." 
+                    className="w-full bg-transparent outline-none placeholder:text-gray-300" 
+                 />
+               </Autocomplete>
+             </div>
+             <button className="w-12 h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200">
+               <Search size={20} />
+             </button>
+          </div>
+        </div>
+
         <GoogleMap
           mapContainerStyle={{ width: '100%', height: '100%' }}
           center={HK_CENTER}
           zoom={3}
           onLoad={(m) => setMap(m)}
-          options={{ 
-            disableDefaultUI: true,
-            styles: [
-              { featureType: 'poi', elementType: 'all', stylers: [{ visibility: 'off' }] },
-              { featureType: 'water', elementType: 'all', stylers: [{ color: '#e7f1ff' }] }
-            ]
-          }}
+          options={mapOptions}
           onClick={() => setSelectedPlace(null)}
         >
           {allLocations.map(loc => (
@@ -121,29 +228,54 @@ function App() {
               key={loc.name}
               position={{ lat: loc.lat, lng: loc.lng }}
               onClick={() => setSelectedPlace(loc)}
+              icon={{
+                url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                  <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="16" cy="16" r="14" fill="white" stroke="%23006ADC" stroke-width="2"/>
+                    <text x="16" y="21" font-size="14" text-anchor="middle">${loc.emoji}</text>
+                  </svg>
+                `)}`,
+                scaledSize: new window.google.maps.Size(32, 32),
+                anchor: new window.google.maps.Point(16, 16)
+              }}
             />
           ))}
 
-          {selectedPlace && (
-            <InfoWindow
-              position={{ lat: selectedPlace.lat, lng: selectedPlace.lng }}
-              onCloseClick={() => setSelectedPlace(null)}
-            >
-              <div style={{ padding: '15px', minWidth: '200px', fontFamily: 'sans-serif' }}>
-                <div style={{ fontSize: '20px', marginBottom: '5px' }}>{selectedPlace.emoji}</div>
-                <h3 style={{ margin: '0 0 5px 0', fontSize: '16px', fontWeight: 'bold' }}>{selectedPlace.name}</h3>
-                <p style={{ margin: 0, fontSize: '12px', color: '#666' }}>{selectedPlace.loc}</p>
-                <button style={{ 
-                  width: '100%', marginTop: '15px', padding: '10px', backgroundColor: '#006adc', 
-                  color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer'
-                }}>
-                  Add to Plan
-                </button>
-              </div>
-            </InfoWindow>
+          {searchResult && (
+             <Marker
+                position={{ lat: searchResult.lat, lng: searchResult.lng }}
+                onClick={() => setSelectedPlace(searchResult)}
+                icon={{
+                  url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                    <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <circle cx="20" cy="20" r="18" fill="%23006ADC" stroke="white" stroke-width="3"/>
+                      <text x="20" y="27" font-size="20" text-anchor="middle">📍</text>
+                    </svg>
+                  `)}`,
+                  scaledSize: new window.google.maps.Size(40, 40),
+                  anchor: new window.google.maps.Point(20, 20)
+                }}
+             />
           )}
+
+          <AnimatePresence>
+            {selectedPlace && (
+              <InfoWindow position={{ lat: selectedPlace.lat, lng: selectedPlace.lng }} onCloseClick={() => setSelectedPlace(null)}>
+                <div className="p-6 min-w-[280px]">
+                  <div className="flex items-center gap-4 mb-4">
+                    <span className="text-4xl">{selectedPlace.emoji}</span>
+                    <h3 className="text-lg font-black text-gray-900 tracking-tight">{selectedPlace.name}</h3>
+                  </div>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                    <MapPin size={14} className="text-blue-500" /> {selectedPlace.loc}
+                  </p>
+                  <button onClick={() => addToItinerary(selectedPlace)} className="w-full py-4 bg-blue-600 text-white rounded-2xl text-xs font-black shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all">Add to Trip</button>
+                </div>
+              </InfoWindow>
+            )}
+          </AnimatePresence>
         </GoogleMap>
-      </div>
+      </main>
     </div>
   );
 }
