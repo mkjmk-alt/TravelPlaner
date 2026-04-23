@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete } from '@react-google-maps/api';
-import { Search, MapPin, Calendar, Plus, Trash2, Menu, X, Navigation, Star, Globe, Compass, Zap, ArrowRight, Download, RefreshCw, ChevronRight } from 'lucide-react';
+import { Search, MapPin, Plus, Trash2, Menu, X, Globe, Compass, ChevronRight, Settings2, MoreVertical, Calendar } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { allLocations } from './data';
 import './index.css';
@@ -10,29 +10,18 @@ const HK_CENTER = { lat: 22.2891, lng: 114.1924 };
 const MAP_LIBRARIES = ['places'];
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
-const containerStyle = {
-  width: '100%',
-  height: '100%'
-};
+const containerStyle = { width: '100%', height: '100%' };
 
 const mapOptions = {
   disableDefaultUI: true,
-  zoomControl: true,
+  zoomControl: false,
   styles: [
     { featureType: 'all', elementType: 'geometry.fill', stylers: [{ weight: '2.00' }] },
     { featureType: 'all', elementType: 'geometry.stroke', stylers: [{ color: '#9c9c9c' }] },
-    { featureType: 'all', elementType: 'labels.text', stylers: [{ visibility: 'on' }] },
-    { featureType: 'landscape', elementType: 'all', stylers: [{ color: '#f2f2f2' }] },
     { featureType: 'landscape', elementType: 'geometry.fill', stylers: [{ color: '#ffffff' }] },
     { featureType: 'poi', elementType: 'all', stylers: [{ visibility: 'off' }] },
-    { featureType: 'road', elementType: 'all', stylers: [{ saturation: -100 }, { lightness: 45 }] },
-    { featureType: 'road', elementType: 'geometry.fill', stylers: [{ color: '#eeeeee' }] },
-    { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#7b7b7b' }] },
-    { featureType: 'road', elementType: 'labels.text.stroke', stylers: [{ color: '#ffffff' }] },
-    { featureType: 'road.highway', elementType: 'all', stylers: [{ visibility: 'simplified' }] },
-    { featureType: 'road.arterial', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
-    { featureType: 'transit', elementType: 'all', stylers: [{ visibility: 'off' }] },
-    { featureType: 'water', elementType: 'all', stylers: [{ color: '#e7f1ff' }, { visibility: 'on' }] }
+    { featureType: 'road', elementType: 'geometry.fill', stylers: [{ color: '#f5f5f5' }] },
+    { featureType: 'water', elementType: 'all', stylers: [{ color: '#f0f7ff' }] }
   ]
 };
 
@@ -47,312 +36,197 @@ function App() {
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [activeCategory, setActiveCategory] = useState('all');
   const [itinerary, setItinerary] = useState(() => {
-    const saved = localStorage.getItem('hk_planner_v6');
+    const saved = localStorage.getItem('world_pro_v7');
     return saved ? JSON.parse(saved) : [{ day: 1, items: [] }];
   });
-  const [searchResult, setSearchResult] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState('explore');
-  const [sidebarSearch, setSidebarSearch] = useState('');
+  const [viewMode, setViewMode] = useState('explore'); // 'explore' or 'itinerary'
+  const [searchQuery, setSearchQuery] = useState('');
 
   const saveItinerary = (newItinerary) => {
     setItinerary(newItinerary);
-    localStorage.setItem('hk_planner_v6', JSON.stringify(newItinerary));
+    localStorage.setItem('world_pro_v7', JSON.stringify(newItinerary));
   };
 
-  const addToItinerary = (place, dayIndex = 0) => {
+  const addToItinerary = (place) => {
     const newItinerary = [...itinerary];
-    newItinerary[dayIndex].items.push({
-      ...place,
-      id: Date.now(),
-      addedAt: new Date().toISOString(),
-      time: '10:00 AM'
-    });
+    // Always add to the first day for simplicity in this optimized UI
+    newItinerary[0].items.push({ ...place, id: Date.now() });
     saveItinerary(newItinerary);
   };
 
-  const removeFromItinerary = (dayIndex, itemId) => {
+  const removeFromItinerary = (itemId) => {
     const newItinerary = [...itinerary];
-    newItinerary[dayIndex].items = newItinerary[dayIndex].items.filter(i => i.id !== itemId);
+    newItinerary[0].items = newItinerary[0].items.filter(i => i.id !== itemId);
     saveItinerary(newItinerary);
-  };
-
-  const addDay = () => {
-    saveItinerary([...itinerary, { day: itinerary.length + 1, items: [] }]);
-  };
-
-  const clearAll = () => {
-    if (window.confirm('Reset all plans?')) {
-      saveItinerary([{ day: 1, items: [] }]);
-    }
-  };
-
-  const autocompleteRef = React.useRef(null);
-
-  const onPlaceSelected = () => {
-    const autocomplete = autocompleteRef.current;
-    if (!autocomplete) return;
-    
-    const place = autocomplete.getPlace();
-    if (!place.geometry || !place.geometry.location) return;
-
-    const newPlace = {
-      name: place.name,
-      lat: place.geometry.location.lat(),
-      lng: place.geometry.location.lng(),
-      loc: place.formatted_address,
-      cat: 'search',
-      desc: place.formatted_address,
-      emoji: '📍',
-      type: 'search'
-    };
-
-    setSearchResult(newPlace);
-    setSelectedPlace(newPlace);
-    if (map) {
-      map.panTo(place.geometry.location);
-      map.setZoom(16);
-    }
   };
 
   const filteredLocations = useMemo(() => {
-    let result = allLocations;
-    if (activeCategory !== 'all') {
-      result = result.filter(loc => loc.type === activeCategory);
-    }
-    if (sidebarSearch) {
-      const q = sidebarSearch.toLowerCase();
-      result = result.filter(loc => 
-        loc.name.toLowerCase().includes(q) || 
-        loc.loc.toLowerCase().includes(q)
-      );
-    }
-    return result;
-  }, [activeCategory, sidebarSearch]);
+    return allLocations.filter(loc => {
+      const matchesCat = activeCategory === 'all' || loc.type === activeCategory;
+      const matchesSearch = loc.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                           loc.loc.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesCat && matchesSearch;
+    });
+  }, [activeCategory, searchQuery]);
 
-  const onLoad = useCallback(function callback(map) {
-    setMap(map);
-  }, []);
-
-  const onUnmount = useCallback(function callback(map) {
-    setMap(null);
-  }, []);
-
-  if (!isLoaded) {
-    return (
-      <div className="flex flex-col items-center justify-center h-screen bg-white">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center"
-        >
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
-          <p className="text-sm font-semibold text-gray-400 uppercase tracking-widest">Pristine Navigator</p>
-        </motion.div>
-      </div>
-    );
-  }
+  if (!isLoaded) return <div className="h-screen flex items-center justify-center font-medium text-gray-400">Loading Map...</div>;
 
   return (
-    <div className="app-shell">
-      {/* --- SIDEBAR --- */}
+    <div className="app-shell bg-[#f8f9fa]">
+      {/* --- MINIMAL SIDEBAR --- */}
       <AnimatePresence>
         {sidebarOpen && (
           <motion.aside 
-            initial={{ x: -500, opacity: 0 }}
+            initial={{ x: -400, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -500, opacity: 0 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="modern-sidebar"
+            exit={{ x: -400, opacity: 0 }}
+            className="w-[400px] h-full bg-white rounded-[24px] shadow-sm border border-gray-100 flex flex-col overflow-hidden z-50"
           >
-            <div className="p-10 flex flex-col h-full bg-white">
-              <div className="flex items-center justify-between mb-10">
-                <div>
-                  <h1 className="text-2xl font-extrabold tracking-tight text-gray-900">
-                    World<span className="text-blue-600">Pro</span>
-                  </h1>
-                  <p className="text-[10px] font-bold text-gray-300 uppercase tracking-widest mt-1">Travel Concierge</p>
-                </div>
-                <button 
-                  onClick={() => setSidebarOpen(false)} 
-                  className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors text-gray-400"
-                >
+            {/* Header */}
+            <div className="p-8 pb-4 flex items-center justify-between">
+              <h1 className="text-xl font-bold tracking-tight text-gray-900">WorldPro</h1>
+              <div className="flex gap-2">
+                <button onClick={() => setViewMode(viewMode === 'explore' ? 'itinerary' : 'explore')} className="p-2 hover:bg-gray-50 rounded-lg text-gray-400">
+                  <Calendar size={20} />
+                </button>
+                <button onClick={() => setSidebarOpen(false)} className="p-2 hover:bg-gray-50 rounded-lg text-gray-400">
                   <X size={20} />
                 </button>
               </div>
+            </div>
 
-              {/* Modern Tabs */}
-              <div className="modern-tabs">
-                <button 
-                  onClick={() => setActiveTab('explore')}
-                  className={`modern-tab ${activeTab === 'explore' ? 'active' : ''}`}
-                >
-                  Explore
-                </button>
-                <button 
-                  onClick={() => setActiveTab('planner')}
-                  className={`modern-tab ${activeTab === 'planner' ? 'active' : ''}`}
-                >
-                  Planner
-                </button>
+            {/* Smart Search & Filter */}
+            <div className="px-8 mb-6">
+              <div className="relative group mb-4">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
+                <input 
+                  type="text" 
+                  placeholder="Find a place..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 bg-gray-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+                />
               </div>
+              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
+                {['all', 'tour', 'food', 'tart'].map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => setActiveCategory(cat)}
+                    className={`px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all ${activeCategory === cat ? 'bg-blue-600 text-white' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-              <div className="flex-1 overflow-y-auto pr-2 custom-scroll">
-                {activeTab === 'explore' ? (
-                  <div className="space-y-8">
-                    <div className="space-y-4">
-                      {/* Search Bar */}
-                      <div className="relative group">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-blue-500 transition-colors" size={18} />
-                        <input 
-                          type="text" 
-                          placeholder="Search locations..."
-                          value={sidebarSearch}
-                          onChange={(e) => setSidebarSearch(e.target.value)}
-                          className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl text-sm font-medium focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all border border-transparent focus:border-blue-200"
-                        />
-                      </div>
-
-                      <div className="flex flex-wrap gap-2">
-                        {['all', 'tour', 'tart', 'food', 'korean', 'noodle'].map(cat => (
-                          <button
-                            key={cat}
-                            onClick={() => setActiveCategory(cat)}
-                            className={`pill ${activeCategory === cat ? 'active' : ''}`}
-                          >
-                            {cat}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="space-y-2 pb-10">
-                      {filteredLocations.map((loc) => (
-                        <div 
-                          key={loc.name}
-                          onClick={() => {
-                            setSelectedPlace(loc);
-                            map.panTo({ lat: loc.lat, lng: loc.lng });
-                            map.setZoom(17);
-                          }}
-                          className={`location-item ${selectedPlace?.name === loc.name ? 'bg-blue-50 ring-1 ring-blue-100' : ''}`}
-                        >
-                          <div className="emoji-box">{loc.emoji}</div>
-                          <div className="flex-1 min-w-0">
-                            <h3 className="text-sm font-bold text-gray-900 truncate">{loc.name}</h3>
-                            <p className="text-[10px] font-medium text-gray-400 mt-1 uppercase tracking-tight">{loc.loc}</p>
-                          </div>
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); addToItinerary(loc); }}
-                            className="w-8 h-8 rounded-full hover:bg-blue-600 hover:text-white transition-all flex items-center justify-center bg-gray-100 text-gray-400"
-                          >
-                            <Plus size={16} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-8 pb-10">
-                    <div className="flex items-center justify-between mb-6">
-                      <h2 className="text-xl font-bold text-gray-900">Your Trip</h2>
-                      <div className="flex gap-2">
-                        <button onClick={addDay} className="modern-btn-soft modern-btn px-4 py-2 text-[10px]">
-                          + Day
-                        </button>
-                        <button onClick={clearAll} className="w-8 h-8 rounded-full bg-red-50 text-red-400 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all">
-                          <RefreshCw size={14} />
-                        </button>
-                      </div>
-                    </div>
-
-                    {itinerary.map((day, dIdx) => (
-                      <div key={dIdx} className="mb-8 group">
-                        <div className="flex items-center justify-between mb-4 px-2">
-                          <h3 className="text-xs font-extrabold text-gray-400 uppercase tracking-widest">Day {day.day}</h3>
-                          <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-1 rounded-lg">{day.items.length} spots</span>
-                        </div>
-                        
-                        <div className="space-y-3">
-                          {day.items.length === 0 ? (
-                            <div className="py-10 text-center border-2 border-dashed border-gray-100 rounded-2xl">
-                              <p className="text-[10px] font-bold text-gray-300 uppercase">Empty Grid</p>
-                            </div>
-                          ) : (
-                            day.items.map((item) => (
-                              <div key={item.id} className="flex items-center gap-4 p-4 bg-white border border-gray-100 rounded-2xl hover:border-blue-200 transition-all hover:shadow-sm">
-                                <span className="text-xl">{item.emoji}</span>
-                                <div className="flex-1 min-w-0">
-                                  <h4 className="text-[13px] font-bold text-gray-900 truncate leading-tight">{item.name}</h4>
-                                  <div className="flex items-center gap-2 mt-1">
-                                    <span className="text-[9px] font-bold text-gray-400 uppercase">{item.cat}</span>
-                                    <span className="w-1 h-1 bg-gray-200 rounded-full"></span>
-                                    <span className="text-[9px] font-bold text-blue-500">10:00 AM</span>
-                                  </div>
-                                </div>
-                                <button 
-                                  onClick={() => removeFromItinerary(dIdx, item.id)}
-                                  className="w-8 h-8 rounded-full hover:bg-red-50 text-gray-200 hover:text-red-500 transition-all flex items-center justify-center"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+            {/* Main Content Area */}
+            <div className="flex-1 overflow-y-auto px-8 custom-scroll">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-[10px] font-extrabold text-gray-300 uppercase tracking-[0.2em]">
+                  {viewMode === 'explore' ? 'Discovery' : 'Your Itinerary'}
+                </h2>
+                {viewMode === 'itinerary' && (
+                   <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
+                     {itinerary[0].items.length} SAVED
+                   </span>
                 )}
               </div>
+
+              <div className="space-y-1 pb-10">
+                {viewMode === 'explore' ? (
+                  filteredLocations.map((loc) => (
+                    <div 
+                      key={loc.name}
+                      onClick={() => {
+                        setSelectedPlace(loc);
+                        map.panTo({ lat: loc.lat, lng: loc.lng });
+                        map.setZoom(16);
+                      }}
+                      className="group flex items-center gap-4 p-3 hover:bg-gray-50 rounded-xl cursor-pointer transition-colors"
+                    >
+                      <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center text-xl shadow-sm border border-gray-50">
+                        {loc.emoji}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-sm font-semibold text-gray-900 truncate">{loc.name}</h3>
+                        <p className="text-[10px] text-gray-400 truncate">{loc.loc}</p>
+                      </div>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); addToItinerary(loc); }}
+                        className="opacity-0 group-hover:opacity-100 p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                      >
+                        <Plus size={18} />
+                      </button>
+                    </div>
+                  ))
+                ) : (
+                  itinerary[0].items.length === 0 ? (
+                    <p className="text-xs text-center text-gray-300 py-20">No saved places yet.</p>
+                  ) : (
+                    itinerary[0].items.map((item) => (
+                      <div key={item.id} className="flex items-center gap-4 p-3 bg-white border border-gray-50 rounded-xl mb-2 hover:border-blue-100 transition-all">
+                        <div className="text-lg">{item.emoji}</div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-sm font-bold text-gray-900 truncate">{item.name}</h3>
+                          <p className="text-[9px] text-gray-400 uppercase font-bold">{item.cat}</p>
+                        </div>
+                        <button onClick={() => removeFromItinerary(item.id)} className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg">
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    ))
+                  )
+                )}
+              </div>
+            </div>
+
+            {/* Bottom Utility Bar */}
+            <div className="p-6 border-t border-gray-50 bg-gray-50/30 flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                 <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Live Sync</span>
+              </div>
+              <button className="text-[10px] font-bold text-gray-400 hover:text-gray-900 transition-colors">
+                SETTINGS
+              </button>
             </div>
           </motion.aside>
         )}
       </AnimatePresence>
 
-      {/* --- MAIN CONTENT --- */}
-      <main className="map-viewport">
+      {/* --- MAP VIEWPORT --- */}
+      <main className="flex-1 relative h-full">
         {!sidebarOpen && (
-          <button 
-            onClick={() => setSidebarOpen(true)}
-            className="absolute top-8 left-8 z-[200] w-14 h-14 bg-white border border-gray-100 rounded-2xl shadow-xl flex items-center justify-center hover:scale-105 transition-all text-blue-600"
-          >
+          <button onClick={() => setSidebarOpen(true)} className="absolute top-8 left-8 z-[100] w-12 h-12 bg-white rounded-xl shadow-xl flex items-center justify-center text-blue-600">
             <Menu size={24} />
           </button>
         )}
 
-        {/* Global Clean Search */}
-        <div className="modern-search-bar">
-          <div className="modern-search-icon">
-            <Search size={20} />
-          </div>
-          <Autocomplete
-            onLoad={(autocomplete) => { autocompleteRef.current = autocomplete; }}
-            onPlaceChanged={onPlaceSelected}
-            className="flex-1"
-          >
-            <input 
-              type="text" 
-              placeholder="Search destination..." 
-              className="placeholder:text-gray-300"
-            />
-          </Autocomplete>
-          <div className="p-1">
-            <button className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white hover:bg-blue-700 transition-colors">
-              <ChevronRight size={20} />
-            </button>
+        {/* Minimal Search Bar Overlay */}
+        <div className="absolute top-8 left-1/2 -translate-x-1/2 z-[100] w-full max-w-md px-4">
+          <div className="bg-white/80 backdrop-blur-md border border-white/50 rounded-2xl shadow-2xl p-2 flex items-center">
+             <div className="flex-1 px-4 text-sm font-medium text-gray-400">
+               <Autocomplete
+                onLoad={(a) => {}}
+                onPlaceChanged={() => {}}
+               >
+                 <input type="text" placeholder="Search the world..." className="w-full bg-transparent outline-none text-gray-900 placeholder:text-gray-300" />
+               </Autocomplete>
+             </div>
+             <button className="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-blue-100">
+               <Search size={18} />
+             </button>
           </div>
         </div>
 
-        {/* MAP */}
         <GoogleMap
           mapContainerStyle={containerStyle}
           center={HK_CENTER}
           zoom={3}
-          onLoad={onLoad}
-          onUnmount={onUnmount}
+          onLoad={(m) => setMap(m)}
           options={mapOptions}
-          onClick={() => setSelectedPlace(null)}
         >
           {filteredLocations.map(loc => (
             <Marker
@@ -361,77 +235,34 @@ function App() {
               onClick={() => setSelectedPlace(loc)}
               icon={{
                 url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-                  <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="20" cy="20" r="16" fill="white" stroke="%23006ADC" stroke-width="3"/>
-                    <text x="20" y="26" font-size="18" text-anchor="middle">${loc.emoji}</text>
+                  <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="16" cy="16" r="14" fill="white" stroke="%23006ADC" stroke-width="2"/>
+                    <text x="16" y="21" font-size="14" text-anchor="middle">${loc.emoji}</text>
                   </svg>
                 `)}`,
-                scaledSize: new window.google.maps.Size(40, 40),
-                anchor: new window.google.maps.Point(20, 20)
+                scaledSize: new window.google.maps.Size(32, 32),
+                anchor: new window.google.maps.Point(16, 16)
               }}
             />
           ))}
 
-          {searchResult && (
-            <Marker
-              position={{ lat: searchResult.lat, lng: searchResult.lng }}
-              icon={{
-                url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-                  <svg width="50" height="50" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="25" cy="25" r="20" fill="%23006ADC" stroke="white" stroke-width="4"/>
-                    <text x="25" y="32" font-size="22" text-anchor="middle">📍</text>
-                  </svg>
-                `)}`,
-                scaledSize: new window.google.maps.Size(50, 50),
-                anchor: new window.google.maps.Point(25, 25)
-              }}
-            />
-          )}
-
           <AnimatePresence>
             {selectedPlace && (
-              <InfoWindow
-                position={{ lat: selectedPlace.lat, lng: selectedPlace.lng }}
-                onCloseClick={() => setSelectedPlace(null)}
-              >
-                <div className="p-6 min-w-[280px] max-w-[320px] bg-white rounded-3xl">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="text-4xl">{selectedPlace.emoji}</div>
-                    <h3 className="text-lg font-extrabold text-gray-900 tracking-tight leading-tight">{selectedPlace.name}</h3>
-                  </div>
-                  <div className="flex items-center gap-2 mb-4">
-                    <MapPin size={12} className="text-blue-500" />
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">{selectedPlace.loc}</p>
-                  </div>
-                  <p className="text-xs font-medium text-gray-500 leading-relaxed mb-6 border-l-2 border-gray-100 pl-4">{selectedPlace.desc}</p>
+              <InfoWindow position={{ lat: selectedPlace.lat, lng: selectedPlace.lng }} onCloseClick={() => setSelectedPlace(null)}>
+                <div className="p-4 min-w-[240px]">
+                  <h3 className="text-sm font-bold mb-1">{selectedPlace.name}</h3>
+                  <p className="text-[10px] text-gray-400 mb-4">{selectedPlace.loc}</p>
                   <button 
                     onClick={() => addToItinerary(selectedPlace)}
-                    className="w-full modern-btn py-4 shadow-lg shadow-blue-100"
+                    className="w-full py-2 bg-blue-600 text-white rounded-lg text-[11px] font-bold shadow-lg shadow-blue-50"
                   >
-                    Add to Itinerary
+                    Add to Trip
                   </button>
                 </div>
               </InfoWindow>
             )}
           </AnimatePresence>
         </GoogleMap>
-
-        {/* Minimal Metrics */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="absolute bottom-8 right-8 bg-white/90 backdrop-blur-lg border border-white/50 rounded-3xl px-6 py-4 shadow-2xl flex items-center gap-4"
-        >
-          <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-100">
-            <Globe size={24} />
-          </div>
-          <div>
-            <p className="text-[9px] font-extrabold text-gray-300 uppercase tracking-widest">Total Spots</p>
-            <h4 className="text-2xl font-black text-gray-900 leading-none mt-1">
-              {itinerary.reduce((acc, day) => acc + day.items.length, 0)}
-            </h4>
-          </div>
-        </motion.div>
       </main>
     </div>
   );
