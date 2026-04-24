@@ -12,9 +12,24 @@ const mapOptions = {
   disableDefaultUI: true,
   zoomControl: false,
   styles: [
-    { featureType: 'poi', elementType: 'all', stylers: [{ visibility: 'on' }, { lightness: 30 }] },
-    { featureType: 'water', elementType: 'all', stylers: [{ color: '#e7f1ff' }] },
-    { featureType: 'landscape', elementType: 'all', stylers: [{ color: '#ffffff' }] }
+    // Water and Land
+    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#eff6ff' }] },
+    { featureType: 'landscape', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
+    
+    // Roads
+    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#f3f4f6' }] },
+    { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#9ca3af' }] },
+    { featureType: 'road', elementType: 'labels.text.stroke', stylers: [{ color: '#ffffff' }] },
+
+    // All POIs (Restaurants, Parks, Stations, etc.) - Light Gray
+    { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#f9fafb' }] },
+    { featureType: 'poi', elementType: 'labels.icon', stylers: [{ saturation: -100 }, { lightness: 15 }] },
+    { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#9ca3af' }] },
+    { featureType: 'poi', elementType: 'labels.text.stroke', stylers: [{ color: '#ffffff', weight: 3 }] },
+
+    // Transit Stations - Light Gray
+    { featureType: 'transit', elementType: 'labels.icon', stylers: [{ saturation: -100 }, { lightness: 10 }] },
+    { featureType: 'transit', elementType: 'labels.text.fill', stylers: [{ color: '#9ca3af' }] }
   ]
 };
 
