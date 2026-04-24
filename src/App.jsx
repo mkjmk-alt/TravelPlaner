@@ -1,6 +1,6 @@
-import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete } from '@react-google-maps/api';
-import { Search, MapPin, Plus, Trash2, Menu, X, Calendar, Compass, ChevronRight, PlusCircle, AlertCircle, Heart, Wallet } from 'lucide-react';
+import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, Plane, Menu, X, Compass, Plus } from 'lucide-react';
 import './index.css';
 
 // --- CONFIGURATION ---
@@ -12,22 +12,15 @@ const mapOptions = {
   disableDefaultUI: true,
   zoomControl: false,
   styles: [
-    // Water and Land
     { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#eff6ff' }] },
     { featureType: 'landscape', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
-    
-    // Roads
     { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#f3f4f6' }] },
     { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#9ca3af' }] },
     { featureType: 'road', elementType: 'labels.text.stroke', stylers: [{ color: '#ffffff' }] },
-
-    // All POIs (Restaurants, Parks, Stations, etc.) - Light Gray
     { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#f9fafb' }] },
     { featureType: 'poi', elementType: 'labels.icon', stylers: [{ saturation: -100 }, { lightness: 15 }] },
     { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#9ca3af' }] },
     { featureType: 'poi', elementType: 'labels.text.stroke', stylers: [{ color: '#ffffff', weight: 3 }] },
-
-    // Transit Stations - Light Gray
     { featureType: 'transit', elementType: 'labels.icon', stylers: [{ saturation: -100 }, { lightness: 10 }] },
     { featureType: 'transit', elementType: 'labels.text.fill', stylers: [{ color: '#9ca3af' }] }
   ]
@@ -43,31 +36,51 @@ function App() {
   const [map, setMap] = useState(null);
   const [selectedPlace, setSelectedPlace] = useState(null);
   
-  // Itinerary State
-  const [itinerary, setItinerary] = useState(() => {
-    const saved = localStorage.getItem('world_pro_v16');
-    return saved ? JSON.parse(saved) : [{ day: 1, items: [] }];
-  });
-
   // Favorites State
   const [favorites, setFavorites] = useState(() => {
     const saved = localStorage.getItem('world_pro_fav_v1');
     return saved ? JSON.parse(saved) : [];
   });
 
-  // Budget State
-  const [budgetSettings, setBudgetSettings] = useState(() => {
-    const saved = localStorage.getItem('world_pro_budget_v1');
-    if (saved && !saved.startsWith('{')) {
-      return { limitKRW: Number(saved), travelCurrency: 'USD' };
+  // --- TRIPS STATE ---
+  const [trips, setTrips] = useState(() => {
+    const savedTrips = localStorage.getItem('world_pro_trips_v1');
+    if (savedTrips) return JSON.parse(savedTrips);
+    
+    const oldItinerary = JSON.parse(localStorage.getItem('world_pro_v16') || '[]');
+    let oldBudget = { limitKRW: 1000000, travelCurrency: 'USD' };
+    try {
+      const budgetRaw = localStorage.getItem('world_pro_budget_v1');
+      if (budgetRaw && budgetRaw.startsWith('{')) oldBudget = JSON.parse(budgetRaw);
+    } catch {}
+    const oldExpenses = JSON.parse(localStorage.getItem('world_pro_expenses_v1') || '[]');
+    
+    if (oldItinerary.length > 0 || oldExpenses.length > 0) {
+      const migratedTrip = {
+        id: Date.now().toString(),
+        name: "My First Trip",
+        itinerary: oldItinerary.length > 0 ? oldItinerary : [{ day: 1, items: [] }],
+        budgetSettings: oldBudget,
+        expenses: oldExpenses,
+        createdAt: Date.now()
+      };
+      localStorage.setItem('world_pro_trips_v1', JSON.stringify([migratedTrip]));
+      return [migratedTrip];
     }
-    return saved ? JSON.parse(saved) : { limitKRW: 1000000, travelCurrency: 'USD' };
+    
+    return [];
   });
 
-  const [expenses, setExpenses] = useState(() => {
-    const saved = localStorage.getItem('world_pro_expenses_v1');
-    return saved ? JSON.parse(saved) : [];
+  const [activeTripId, setActiveTripId] = useState(() => {
+    const savedTrips = JSON.parse(localStorage.getItem('world_pro_trips_v1') || '[]');
+    return savedTrips.length > 0 ? savedTrips[0].id : null;
   });
+
+  // Active Trip Derived State
+  const activeTrip = trips.find(t => t.id === activeTripId);
+  const itinerary = activeTrip?.itinerary || [];
+  const budgetSettings = activeTrip?.budgetSettings || { limitKRW: 1000000, travelCurrency: 'USD' };
+  const expenses = activeTrip?.expenses || [];
 
   const [exchangeRates, setExchangeRates] = useState({});
   const [expenseInput, setExpenseInput] = useState({ desc: '', amount: '', currency: 'KRW', day: 1 });
@@ -92,7 +105,7 @@ function App() {
   }, [exchangeRates]);
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [viewMode, setViewMode] = useState('itinerary'); // 'favorites', 'itinerary', 'budget'
+  const [viewMode, setViewMode] = useState('trips'); // 'trips', 'favorites', 'itinerary', 'budget'
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResult, setSearchResult] = useState(null);
   const [activeDay, setActiveDay] = useState(1);
@@ -137,29 +150,58 @@ function App() {
     }));
   };
 
-  const saveItinerary = (newItinerary) => {
-    setItinerary(newItinerary);
-    localStorage.setItem('world_pro_v16', JSON.stringify(newItinerary));
-  };
-
   const saveFavorites = (newFavs) => {
     setFavorites(newFavs);
     localStorage.setItem('world_pro_fav_v1', JSON.stringify(newFavs));
   };
 
-  // Budget Functions
-  const saveBudgetSettings = (newSettings) => {
-    setBudgetSettings(newSettings);
-    localStorage.setItem('world_pro_budget_v1', JSON.stringify(newSettings));
+  // --- TRIP DATA MUTATORS ---
+  const updateActiveTrip = (updates) => {
+    if (!activeTripId) return;
+    const newTrips = trips.map(t => t.id === activeTripId ? { ...t, ...updates } : t);
+    setTrips(newTrips);
+    localStorage.setItem('world_pro_trips_v1', JSON.stringify(newTrips));
   };
 
-  const saveExpenses = (newExpenses) => {
-    setExpenses(newExpenses);
-    localStorage.setItem('world_pro_expenses_v1', JSON.stringify(newExpenses));
+  const saveItinerary = (newItinerary) => updateActiveTrip({ itinerary: newItinerary });
+  const saveBudgetSettings = (newSettings) => updateActiveTrip({ budgetSettings: newSettings });
+  const saveExpenses = (newExpenses) => updateActiveTrip({ expenses: newExpenses });
+
+  // --- TRIP CRUD ---
+  const createNewTrip = () => {
+    const tripName = prompt("Enter trip name (e.g., '2026 Tokyo'):");
+    if (!tripName) return;
+    
+    const newTrip = {
+      id: Date.now().toString(),
+      name: tripName,
+      itinerary: [{ day: 1, items: [] }],
+      budgetSettings: { limitKRW: 1000000, travelCurrency: 'USD' },
+      expenses: [],
+      createdAt: Date.now()
+    };
+    
+    const newTrips = [...trips, newTrip];
+    setTrips(newTrips);
+    localStorage.setItem('world_pro_trips_v1', JSON.stringify(newTrips));
+    setActiveTripId(newTrip.id);
+    setViewMode('itinerary');
+  };
+
+  const deleteTrip = (id) => {
+    if (window.confirm("Are you sure you want to delete this trip and all its data?")) {
+      const newTrips = trips.filter(t => t.id !== id);
+      setTrips(newTrips);
+      localStorage.setItem('world_pro_trips_v1', JSON.stringify(newTrips));
+      if (activeTripId === id) {
+        setActiveTripId(newTrips.length > 0 ? newTrips[0].id : null);
+        setViewMode('trips');
+      }
+    }
   };
 
   const addExpense = () => {
-    if (!expenseInput.desc || !expenseInput.amount) return;
+    if (!activeTripId || !expenseInput.desc || !expenseInput.amount) return;
     
     let amountKRW = parseFloat(expenseInput.amount);
     
@@ -342,32 +384,90 @@ function App() {
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
               <button 
+                onClick={() => setViewMode('trips')}
+                style={{ width: '44px', height: '44px', borderRadius: '14px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.2s', backgroundColor: viewMode === 'trips' ? '#8b5cf6' : '#f3f4f6', color: viewMode === 'trips' ? 'white' : '#9ca3af' }}
+                title="My Trips"
+              >
+                <Plane size={20} />
+              </button>
+              <button 
                 onClick={() => setViewMode('favorites')}
                 style={{ width: '44px', height: '44px', borderRadius: '14px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.2s', backgroundColor: viewMode === 'favorites' ? '#ef4444' : '#f3f4f6', color: viewMode === 'favorites' ? 'white' : '#9ca3af' }}
                 title="Favorites"
               >
                 <Heart size={20} fill={viewMode === 'favorites' ? "currentColor" : "none"} />
               </button>
-              <button 
-                onClick={() => setViewMode('itinerary')}
-                style={{ width: '44px', height: '44px', borderRadius: '14px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.2s', backgroundColor: viewMode === 'itinerary' ? '#2563eb' : '#f3f4f6', color: viewMode === 'itinerary' ? 'white' : '#9ca3af' }}
-                title="Planner"
-              >
-                <Calendar size={20} />
-              </button>
-              <button 
-                onClick={() => setViewMode('budget')}
-                style={{ width: '44px', height: '44px', borderRadius: '14px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.2s', backgroundColor: viewMode === 'budget' ? '#10b981' : '#f3f4f6', color: viewMode === 'budget' ? 'white' : '#9ca3af' }}
-                title="Budget"
-              >
-                <Wallet size={20} />
-              </button>
+              {activeTripId && (
+                <>
+                  <button 
+                    onClick={() => setViewMode('itinerary')}
+                    style={{ width: '44px', height: '44px', borderRadius: '14px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.2s', backgroundColor: viewMode === 'itinerary' ? '#2563eb' : '#f3f4f6', color: viewMode === 'itinerary' ? 'white' : '#9ca3af' }}
+                    title="Planner"
+                  >
+                    <Calendar size={20} />
+                  </button>
+                  <button 
+                    onClick={() => setViewMode('budget')}
+                    style={{ width: '44px', height: '44px', borderRadius: '14px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.2s', backgroundColor: viewMode === 'budget' ? '#10b981' : '#f3f4f6', color: viewMode === 'budget' ? 'white' : '#9ca3af' }}
+                    title="Budget"
+                  >
+                    <Wallet size={20} />
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
           {/* List Content */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px' }}>
             
+            {/* --- TRIPS MODE --- */}
+            {viewMode === 'trips' && (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+                  <h2 style={{ fontSize: '12px', fontWeight: '900', color: '#8b5cf6', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>My Trips</h2>
+                  <button onClick={createNewTrip} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '800', color: '#8b5cf6', backgroundColor: '#f5f3ff', padding: '8px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer' }}>
+                    <PlusCircle size={14} /> NEW TRIP
+                  </button>
+                </div>
+
+                {trips.length === 0 ? (
+                  <div style={{ padding: '40px 20px', border: '2px dashed #e5e7eb', borderRadius: '16px', textAlign: 'center' }}>
+                    <Plane size={36} color="#d1d5db" style={{ margin: '0 auto 12px auto' }} />
+                    <p style={{ fontSize: '12px', color: '#9ca3af', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>No trips planned yet</p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {trips.map(trip => (
+                      <div 
+                        key={trip.id} 
+                        onClick={() => { setActiveTripId(trip.id); setViewMode('itinerary'); }}
+                        style={{ padding: '20px', backgroundColor: activeTripId === trip.id ? '#f5f3ff' : 'white', border: activeTripId === trip.id ? '2px solid #ddd6fe' : '1px solid #e5e7eb', borderRadius: '16px', cursor: 'pointer', transition: '0.2s' }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                          <h3 style={{ fontSize: '18px', fontWeight: '900', color: '#111827', margin: 0 }}>{trip.name}</h3>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); deleteTrip(trip.id); }}
+                            style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '4px', borderRadius: '8px' }}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                        <div style={{ display: 'flex', gap: '16px', fontSize: '12px', fontWeight: '800', color: '#6b7280' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Calendar size={14} /> {trip.itinerary.length} Days
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Wallet size={14} /> ₩ {trip.expenses.reduce((sum, e) => sum + e.amountKRW, 0).toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
             {/* --- FAVORITES MODE --- */}
             {viewMode === 'favorites' && (
               <>
