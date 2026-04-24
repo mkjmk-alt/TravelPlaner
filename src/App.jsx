@@ -58,7 +58,10 @@ function App() {
   // Budget State
   const [budgetSettings, setBudgetSettings] = useState(() => {
     const saved = localStorage.getItem('world_pro_budget_v1');
-    return saved ? JSON.parse(saved) : { limitKRW: 1000000 };
+    if (saved && !saved.startsWith('{')) {
+      return { limitKRW: Number(saved), travelCurrency: 'USD' };
+    }
+    return saved ? JSON.parse(saved) : { limitKRW: 1000000, travelCurrency: 'USD' };
   });
 
   const [expenses, setExpenses] = useState(() => {
@@ -126,9 +129,9 @@ function App() {
   };
 
   // Budget Functions
-  const saveBudget = (limit) => {
-    setBudgetSettings({ limitKRW: limit });
-    localStorage.setItem('world_pro_budget_v1', JSON.stringify({ limitKRW: limit }));
+  const saveBudgetSettings = (newSettings) => {
+    setBudgetSettings(newSettings);
+    localStorage.setItem('world_pro_budget_v1', JSON.stringify(newSettings));
   };
 
   const saveExpenses = (newExpenses) => {
@@ -142,17 +145,17 @@ function App() {
     let amountKRW = parseFloat(expenseInput.amount);
     
     // Convert to KRW if it's a foreign currency
-    if (expenseInput.currency !== 'KRW' && exchangeRates[expenseInput.currency]) {
+    const currentCurrency = expenseInput.currency || budgetSettings.travelCurrency || 'USD';
+    if (currentCurrency !== 'KRW' && exchangeRates[currentCurrency]) {
       // API returns how much foreign currency 1 KRW buys. 
-      // E.g., 1 KRW = 0.00075 USD. So Amount in KRW = USD Amount / 0.00075
-      amountKRW = parseFloat(expenseInput.amount) / exchangeRates[expenseInput.currency];
+      amountKRW = parseFloat(expenseInput.amount) / exchangeRates[currentCurrency];
     }
 
     const newExpense = {
       id: Date.now(),
       desc: expenseInput.desc,
       amount: parseFloat(expenseInput.amount),
-      currency: expenseInput.currency,
+      currency: currentCurrency,
       amountKRW: Math.round(amountKRW),
       day: parseInt(expenseInput.day)
     };
@@ -462,14 +465,30 @@ function App() {
                       <p style={{ fontSize: '10px', fontWeight: '800', color: '#059669', textTransform: 'uppercase', margin: '0 0 4px 0' }}>Total Spent (KRW)</p>
                       <h3 style={{ fontSize: '24px', fontWeight: '900', color: '#064e3b', margin: 0 }}>₩ {totalSpentKRW.toLocaleString()}</h3>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <p style={{ fontSize: '10px', fontWeight: '800', color: '#34d399', textTransform: 'uppercase', margin: '0 0 4px 0' }}>Budget Limit</p>
-                      <input 
-                        type="number"
-                        value={budgetSettings.limitKRW}
-                        onChange={(e) => saveBudget(Number(e.target.value))}
-                        style={{ fontSize: '14px', fontWeight: '800', color: '#064e3b', backgroundColor: 'transparent', border: 'none', borderBottom: '2px solid #a7f3d0', width: '100px', textAlign: 'right', outline: 'none' }}
-                      />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
+                      <div style={{ textAlign: 'right' }}>
+                        <p style={{ fontSize: '10px', fontWeight: '800', color: '#34d399', textTransform: 'uppercase', margin: '0 0 4px 0' }}>Budget Limit</p>
+                        <input 
+                          type="number"
+                          value={budgetSettings.limitKRW}
+                          onChange={(e) => saveBudgetSettings({ ...budgetSettings, limitKRW: Number(e.target.value) })}
+                          style={{ fontSize: '14px', fontWeight: '800', color: '#064e3b', backgroundColor: 'transparent', border: 'none', borderBottom: '2px solid #a7f3d0', width: '100px', textAlign: 'right', outline: 'none' }}
+                        />
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <p style={{ fontSize: '10px', fontWeight: '800', color: '#34d399', textTransform: 'uppercase', margin: '0 0 4px 0' }}>Local Currency</p>
+                        <select 
+                          value={budgetSettings.travelCurrency}
+                          onChange={(e) => saveBudgetSettings({ ...budgetSettings, travelCurrency: e.target.value })}
+                          style={{ fontSize: '14px', fontWeight: '800', color: '#064e3b', backgroundColor: 'transparent', border: 'none', borderBottom: '2px solid #a7f3d0', width: '100px', textAlign: 'right', outline: 'none', cursor: 'pointer' }}
+                        >
+                          {Object.keys(exchangeRates).length > 0 ? (
+                            Object.keys(exchangeRates).map(code => <option key={`lc-${code}`} value={code}>{code}</option>)
+                          ) : (
+                            <option value="USD">USD</option>
+                          )}
+                        </select>
+                      </div>
                     </div>
                   </div>
                   <div style={{ width: '100%', height: '8px', backgroundColor: '#d1fae5', borderRadius: '4px', overflow: 'hidden' }}>
@@ -492,17 +511,21 @@ function App() {
                       {itinerary.map(d => <option key={`opt-day-${d.day}`} value={d.day}>Day {d.day}</option>)}
                     </select>
                     <select 
-                      value={expenseInput.currency} 
+                      value={expenseInput.currency || budgetSettings.travelCurrency} 
                       onChange={e => setExpenseInput({...expenseInput, currency: e.target.value})}
                       style={{ flex: 1, minWidth: 0, boxSizing: 'border-box', padding: '10px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '12px', fontWeight: '700', outline: 'none' }}
                     >
-                      <option value="KRW">KRW (₩)</option>
-                      <option value="USD">USD ($)</option>
-                      <option value="EUR">EUR (€)</option>
-                      <option value="JPY">JPY (¥)</option>
-                      <option value="HKD">HKD ($)</option>
-                      <option value="GBP">GBP (£)</option>
-                      <option value="CNY">CNY (¥)</option>
+                      <optgroup label="Favorites">
+                        <option value="KRW">🇰🇷 KRW</option>
+                        {budgetSettings.travelCurrency !== 'KRW' && (
+                          <option value={budgetSettings.travelCurrency}>⭐️ {budgetSettings.travelCurrency}</option>
+                        )}
+                      </optgroup>
+                      <optgroup label="All Currencies">
+                        {Object.keys(exchangeRates).map(code => (
+                          <option key={`all-${code}`} value={code}>{code}</option>
+                        ))}
+                      </optgroup>
                     </select>
                   </div>
                   <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
