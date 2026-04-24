@@ -486,7 +486,7 @@ function App() {
                     <select 
                       value={expenseInput.day} 
                       onChange={e => setExpenseInput({...expenseInput, day: e.target.value})}
-                      style={{ padding: '10px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '12px', fontWeight: '700', outline: 'none', flex: 1 }}
+                      style={{ flex: 1, minWidth: 0, boxSizing: 'border-box', padding: '10px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '12px', fontWeight: '700', outline: 'none' }}
                     >
                       <option value={0}>Pre-trip (Flight)</option>
                       {itinerary.map(d => <option key={`opt-day-${d.day}`} value={d.day}>Day {d.day}</option>)}
@@ -494,7 +494,7 @@ function App() {
                     <select 
                       value={expenseInput.currency} 
                       onChange={e => setExpenseInput({...expenseInput, currency: e.target.value})}
-                      style={{ padding: '10px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '12px', fontWeight: '700', outline: 'none', flex: 1 }}
+                      style={{ flex: 1, minWidth: 0, boxSizing: 'border-box', padding: '10px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '12px', fontWeight: '700', outline: 'none' }}
                     >
                       <option value="KRW">KRW (₩)</option>
                       <option value="USD">USD ($)</option>
@@ -511,14 +511,14 @@ function App() {
                       placeholder="What did you buy?" 
                       value={expenseInput.desc}
                       onChange={e => setExpenseInput({...expenseInput, desc: e.target.value})}
-                      style={{ flex: 2, padding: '10px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '12px', fontWeight: '700', outline: 'none' }}
+                      style={{ flex: 2, minWidth: 0, boxSizing: 'border-box', padding: '10px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '12px', fontWeight: '700', outline: 'none' }}
                     />
                     <input 
                       type="number" 
                       placeholder="Amount" 
                       value={expenseInput.amount}
                       onChange={e => setExpenseInput({...expenseInput, amount: e.target.value})}
-                      style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '12px', fontWeight: '700', outline: 'none' }}
+                      style={{ flex: 1, minWidth: 0, boxSizing: 'border-box', padding: '10px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '12px', fontWeight: '700', outline: 'none' }}
                     />
                   </div>
                   <button 
