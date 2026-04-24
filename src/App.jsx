@@ -412,36 +412,45 @@ function App() {
               key={`fav-${fav.name}`}
               position={{ lat: fav.lat, lng: fav.lng }}
               onClick={() => setSelectedPlace(fav)}
+              zIndex={selectedPlace?.name === fav.name ? 1000 : 1}
               icon={{
                 url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-                  <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="16" cy="16" r="14" fill="#ef4444" stroke="white" stroke-width="2"/>
-                    <text x="16" y="21" font-size="14" text-anchor="middle">❤️</text>
+                  <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="18" cy="18" r="16" fill="${selectedPlace?.name === fav.name ? '#fef2f2' : 'white'}" stroke="#ef4444" stroke-width="3"/>
+                    <text x="18" y="24" font-size="16" text-anchor="middle">❤️</text>
                   </svg>
                 `)}`,
-                scaledSize: new window.google.maps.Size(32, 32),
-                anchor: new window.google.maps.Point(16, 16)
+                scaledSize: new window.google.maps.Size(36, 36),
+                anchor: new window.google.maps.Point(18, 18)
               }}
             />
           ))}
 
-          {/* Dynamic Search Result Marker */}
-          {searchResult && searchResult.name !== selectedPlace?.name && (
-             <Marker
-                position={{ lat: searchResult.lat, lng: searchResult.lng }}
-                onClick={() => setSelectedPlace(searchResult)}
+          {/* Dynamic Highlight Marker (Search Result or POI click) */}
+          {[selectedPlace, searchResult].filter(Boolean).map((place, idx) => {
+            if (isFavorite(place)) return null;
+            // Prevent duplicate rendering if selectedPlace and searchResult are the same
+            if (place === searchResult && selectedPlace && selectedPlace.name === searchResult.name) return null;
+
+            return (
+              <Marker
+                key={`highlight-${place.name}-${idx}`}
+                position={{ lat: place.lat, lng: place.lng }}
+                onClick={() => setSelectedPlace(place)}
+                zIndex={place === selectedPlace ? 999 : 998}
                 icon={{
                   url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
                     <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <circle cx="20" cy="20" r="18" fill="%23006ADC" stroke="white" stroke-width="3"/>
-                      <text x="20" y="27" font-size="20" text-anchor="middle">📍</text>
+                      <circle cx="20" cy="20" r="18" fill="white" stroke="#2563eb" stroke-width="3"/>
+                      <text x="20" y="27" font-size="18" text-anchor="middle">📍</text>
                     </svg>
                   `)}`,
                   scaledSize: new window.google.maps.Size(40, 40),
                   anchor: new window.google.maps.Point(20, 20)
                 }}
-             />
-          )}
+              />
+            );
+          })}
 
           {/* Selected Place InfoWindow */}
           {selectedPlace && (
