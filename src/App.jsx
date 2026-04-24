@@ -1,6 +1,6 @@
-import React, { useState, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete } from '@react-google-maps/api';
-import { Search, MapPin, Plus, Trash2, Menu, X, Calendar, Compass, ChevronRight, PlusCircle, AlertCircle, Heart } from 'lucide-react';
+import { Search, MapPin, Plus, Trash2, Menu, X, Calendar, Compass, ChevronRight, PlusCircle, AlertCircle, Heart, Wallet } from 'lucide-react';
 import './index.css';
 
 // --- CONFIGURATION ---
@@ -43,6 +43,7 @@ function App() {
   const [map, setMap] = useState(null);
   const [selectedPlace, setSelectedPlace] = useState(null);
   
+  // Itinerary State
   const [itinerary, setItinerary] = useState(() => {
     const saved = localStorage.getItem('world_pro_v16');
     return saved ? JSON.parse(saved) : [{ day: 1, items: [] }];
@@ -54,8 +55,22 @@ function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
+  // Budget State
+  const [budgetSettings, setBudgetSettings] = useState(() => {
+    const saved = localStorage.getItem('world_pro_budget_v1');
+    return saved ? JSON.parse(saved) : { limitKRW: 1000000 };
+  });
+
+  const [expenses, setExpenses] = useState(() => {
+    const saved = localStorage.getItem('world_pro_expenses_v1');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [exchangeRates, setExchangeRates] = useState({});
+  const [expenseInput, setExpenseInput] = useState({ desc: '', amount: '', currency: 'KRW', day: 1 });
+
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [viewMode, setViewMode] = useState('itinerary'); // 'favorites', 'itinerary'
+  const [viewMode, setViewMode] = useState('itinerary'); // 'favorites', 'itinerary', 'budget'
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResult, setSearchResult] = useState(null);
   const [activeDay, setActiveDay] = useState(1);
@@ -63,11 +78,22 @@ function App() {
 
   const autocompleteRef = useRef(null);
 
+  // Fetch Live Exchange Rates (Base KRW)
+  useEffect(() => {
+    fetch('https://open.er-api.com/v6/latest/KRW')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.rates) {
+          setExchangeRates(data.rates);
+        }
+      })
+      .catch(err => console.error("Exchange rate fetch failed", err));
+  }, []);
+
   const getCountryFromAddress = (address) => {
     if (!address) return 'Unknown';
     const parts = address.split(',');
     let country = parts[parts.length - 1].trim();
-    // Remove digits (like postal codes) if they appear before the country name
     country = country.replace(/^[0-9A-Z-\s]+ /, ''); 
     return country;
   };
@@ -97,6 +123,46 @@ function App() {
   const saveFavorites = (newFavs) => {
     setFavorites(newFavs);
     localStorage.setItem('world_pro_fav_v1', JSON.stringify(newFavs));
+  };
+
+  // Budget Functions
+  const saveBudget = (limit) => {
+    setBudgetSettings({ limitKRW: limit });
+    localStorage.setItem('world_pro_budget_v1', JSON.stringify({ limitKRW: limit }));
+  };
+
+  const saveExpenses = (newExpenses) => {
+    setExpenses(newExpenses);
+    localStorage.setItem('world_pro_expenses_v1', JSON.stringify(newExpenses));
+  };
+
+  const addExpense = () => {
+    if (!expenseInput.desc || !expenseInput.amount) return;
+    
+    let amountKRW = parseFloat(expenseInput.amount);
+    
+    // Convert to KRW if it's a foreign currency
+    if (expenseInput.currency !== 'KRW' && exchangeRates[expenseInput.currency]) {
+      // API returns how much foreign currency 1 KRW buys. 
+      // E.g., 1 KRW = 0.00075 USD. So Amount in KRW = USD Amount / 0.00075
+      amountKRW = parseFloat(expenseInput.amount) / exchangeRates[expenseInput.currency];
+    }
+
+    const newExpense = {
+      id: Date.now(),
+      desc: expenseInput.desc,
+      amount: parseFloat(expenseInput.amount),
+      currency: expenseInput.currency,
+      amountKRW: Math.round(amountKRW),
+      day: parseInt(expenseInput.day)
+    };
+
+    saveExpenses([...expenses, newExpense]);
+    setExpenseInput({ ...expenseInput, desc: '', amount: '' });
+  };
+
+  const deleteExpense = (id) => {
+    saveExpenses(expenses.filter(e => e.id !== id));
   };
 
   const toggleFavorite = (place) => {
@@ -204,6 +270,8 @@ function App() {
   };
 
   const totalSpots = itinerary.reduce((acc, day) => acc + day.items.length, 0);
+  const totalSpentKRW = expenses.reduce((acc, curr) => acc + curr.amountKRW, 0);
+  const budgetProgress = budgetSettings.limitKRW > 0 ? Math.min((totalSpentKRW / budgetSettings.limitKRW) * 100, 100) : 0;
 
   // Robust Error Boundaries
   if (loadError) {
@@ -264,6 +332,13 @@ function App() {
                 title="Planner"
               >
                 <Calendar size={20} />
+              </button>
+              <button 
+                onClick={() => setViewMode('budget')}
+                style={{ width: '44px', height: '44px', borderRadius: '14px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.2s', backgroundColor: viewMode === 'budget' ? '#10b981' : '#f3f4f6', color: viewMode === 'budget' ? 'white' : '#9ca3af' }}
+                title="Budget"
+              >
+                <Wallet size={20} />
               </button>
             </div>
           </div>
@@ -372,6 +447,132 @@ function App() {
                 ))}
               </>
             )}
+
+            {/* --- BUDGET MODE --- */}
+            {viewMode === 'budget' && (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+                  <h2 style={{ fontSize: '12px', fontWeight: '900', color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>Budget & Expenses</h2>
+                </div>
+
+                {/* Progress Card */}
+                <div style={{ backgroundColor: '#ecfdf5', padding: '20px', borderRadius: '16px', marginBottom: '24px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '12px' }}>
+                    <div>
+                      <p style={{ fontSize: '10px', fontWeight: '800', color: '#059669', textTransform: 'uppercase', margin: '0 0 4px 0' }}>Total Spent (KRW)</p>
+                      <h3 style={{ fontSize: '24px', fontWeight: '900', color: '#064e3b', margin: 0 }}>₩ {totalSpentKRW.toLocaleString()}</h3>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <p style={{ fontSize: '10px', fontWeight: '800', color: '#34d399', textTransform: 'uppercase', margin: '0 0 4px 0' }}>Budget Limit</p>
+                      <input 
+                        type="number"
+                        value={budgetSettings.limitKRW}
+                        onChange={(e) => saveBudget(Number(e.target.value))}
+                        style={{ fontSize: '14px', fontWeight: '800', color: '#064e3b', backgroundColor: 'transparent', border: 'none', borderBottom: '2px solid #a7f3d0', width: '100px', textAlign: 'right', outline: 'none' }}
+                      />
+                    </div>
+                  </div>
+                  <div style={{ width: '100%', height: '8px', backgroundColor: '#d1fae5', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{ width: `${budgetProgress}%`, height: '100%', backgroundColor: budgetProgress > 90 ? '#ef4444' : '#10b981', transition: 'width 0.3s ease' }}></div>
+                  </div>
+                  <p style={{ fontSize: '10px', fontWeight: '800', color: budgetProgress > 90 ? '#ef4444' : '#059669', marginTop: '8px', textAlign: 'right' }}>
+                    {budgetProgress.toFixed(1)}% Used
+                  </p>
+                </div>
+
+                {/* Add Expense Form */}
+                <div style={{ padding: '16px', backgroundColor: '#f9fafb', border: '1px solid #f3f4f6', borderRadius: '16px', marginBottom: '24px' }}>
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                    <select 
+                      value={expenseInput.day} 
+                      onChange={e => setExpenseInput({...expenseInput, day: e.target.value})}
+                      style={{ padding: '10px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '12px', fontWeight: '700', outline: 'none', flex: 1 }}
+                    >
+                      <option value={0}>Pre-trip (Flight)</option>
+                      {itinerary.map(d => <option key={`opt-day-${d.day}`} value={d.day}>Day {d.day}</option>)}
+                    </select>
+                    <select 
+                      value={expenseInput.currency} 
+                      onChange={e => setExpenseInput({...expenseInput, currency: e.target.value})}
+                      style={{ padding: '10px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '12px', fontWeight: '700', outline: 'none', flex: 1 }}
+                    >
+                      <option value="KRW">KRW (₩)</option>
+                      <option value="USD">USD ($)</option>
+                      <option value="EUR">EUR (€)</option>
+                      <option value="JPY">JPY (¥)</option>
+                      <option value="HKD">HKD ($)</option>
+                      <option value="GBP">GBP (£)</option>
+                      <option value="CNY">CNY (¥)</option>
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                    <input 
+                      type="text" 
+                      placeholder="What did you buy?" 
+                      value={expenseInput.desc}
+                      onChange={e => setExpenseInput({...expenseInput, desc: e.target.value})}
+                      style={{ flex: 2, padding: '10px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '12px', fontWeight: '700', outline: 'none' }}
+                    />
+                    <input 
+                      type="number" 
+                      placeholder="Amount" 
+                      value={expenseInput.amount}
+                      onChange={e => setExpenseInput({...expenseInput, amount: e.target.value})}
+                      style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '12px', fontWeight: '700', outline: 'none' }}
+                    />
+                  </div>
+                  <button 
+                    onClick={addExpense}
+                    style={{ width: '100%', padding: '12px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 4px 10px rgba(16, 185, 129, 0.2)' }}
+                  >
+                    + ADD EXPENSE
+                  </button>
+                </div>
+
+                {/* Expenses List */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {expenses.length === 0 ? (
+                    <div style={{ padding: '32px 20px', border: '2px dashed #e5e7eb', borderRadius: '16px', textAlign: 'center' }}>
+                      <p style={{ fontSize: '11px', color: '#d1d5db', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>No expenses recorded</p>
+                    </div>
+                  ) : (
+                    [0, ...itinerary.map(d=>d.day)].map(dayNum => {
+                      const dayExpenses = expenses.filter(e => e.day === dayNum);
+                      if (dayExpenses.length === 0) return null;
+                      
+                      return (
+                        <div key={`exp-day-${dayNum}`} style={{ marginBottom: '16px' }}>
+                          <h4 style={{ fontSize: '10px', fontWeight: '900', color: '#9ca3af', textTransform: 'uppercase', marginBottom: '8px' }}>
+                            {dayNum === 0 ? 'Pre-trip (Booking, etc)' : `Day ${dayNum}`}
+                          </h4>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {dayExpenses.map(exp => (
+                              <div key={exp.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+                                <div>
+                                  <h5 style={{ fontSize: '13px', fontWeight: '800', color: '#111827', margin: '0 0 2px 0' }}>{exp.desc}</h5>
+                                  <p style={{ fontSize: '10px', fontWeight: '700', color: '#9ca3af', margin: 0 }}>
+                                    {exp.currency === 'KRW' ? '' : `${exp.amount.toLocaleString()} ${exp.currency}`}
+                                  </p>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                  <span style={{ fontSize: '14px', fontWeight: '900', color: '#059669' }}>
+                                    ₩{exp.amountKRW.toLocaleString()}
+                                  </span>
+                                  <button onClick={() => deleteExpense(exp.id)} style={{ padding: '6px', backgroundColor: '#fef2f2', color: '#ef4444', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </>
+            )}
+
           </div>
 
           {/* Footer */}
