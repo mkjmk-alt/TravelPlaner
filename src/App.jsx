@@ -303,7 +303,21 @@ function App() {
 
   const addDay = () => {
     const nextDay = itinerary.length + 1;
-    saveItinerary([...itinerary, { day: nextDay, items: [] }]);
+    const newItinerary = [...itinerary, { day: nextDay, items: [] }];
+    
+    if (activeTrip && activeTrip.startDate) {
+      try {
+        const date = new Date(activeTrip.startDate + "T00:00:00");
+        date.setDate(date.getDate() + (nextDay - 1));
+        const newEndDate = date.toISOString().split('T')[0];
+        updateActiveTrip({ itinerary: newItinerary, endDate: newEndDate });
+      } catch {
+        saveItinerary(newItinerary);
+      }
+    } else {
+      saveItinerary(newItinerary);
+    }
+    
     setActiveDay(nextDay);
   };
 
