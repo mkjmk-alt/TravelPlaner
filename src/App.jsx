@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete } from '@react-google-maps/api';
-import { Search, MapPin, Plus, Trash2, Menu, X, Calendar, Globe, Compass, ChevronRight, PlusCircle, AlertCircle, Heart } from 'lucide-react';
-import { allLocations } from './data';
+import { Search, MapPin, Plus, Trash2, Menu, X, Calendar, Compass, ChevronRight, PlusCircle, AlertCircle, Heart } from 'lucide-react';
 import './index.css';
 
 // --- CONFIGURATION ---
@@ -28,7 +27,6 @@ function App() {
 
   const [map, setMap] = useState(null);
   const [selectedPlace, setSelectedPlace] = useState(null);
-  const [activeCategory, setActiveCategory] = useState('all');
   
   const [itinerary, setItinerary] = useState(() => {
     const saved = localStorage.getItem('world_pro_v16');
@@ -42,7 +40,7 @@ function App() {
   });
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [viewMode, setViewMode] = useState('explore'); // 'explore', 'favorites', 'itinerary'
+  const [viewMode, setViewMode] = useState('itinerary'); // 'favorites', 'itinerary'
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResult, setSearchResult] = useState(null);
   const [activeDay, setActiveDay] = useState(1);
@@ -132,15 +130,6 @@ function App() {
     }
   };
 
-  const filteredLocations = useMemo(() => {
-    return allLocations.filter(loc => {
-      const matchesCat = activeCategory === 'all' || loc.type === activeCategory;
-      const matchesSearch = loc.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                           loc.loc.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesCat && matchesSearch;
-    });
-  }, [activeCategory, searchQuery]);
-
   const totalSpots = itinerary.reduce((acc, day) => acc + day.items.length, 0);
 
   // Robust Error Boundaries
@@ -190,13 +179,6 @@ function App() {
             </div>
             <div className="flex gap-2">
               <button 
-                onClick={() => setViewMode('explore')}
-                className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all ${viewMode === 'explore' ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
-                title="Recommended"
-              >
-                <Globe size={20} />
-              </button>
-              <button 
                 onClick={() => setViewMode('favorites')}
                 className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all ${viewMode === 'favorites' ? 'bg-red-500 text-white shadow-lg shadow-red-200' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
                 title="Favorites"
@@ -216,33 +198,6 @@ function App() {
           {/* List Content */}
           <div className="flex-1 overflow-y-auto px-10 custom-scroll">
             <div className="space-y-2 pb-10">
-              
-              {/* --- EXPLORE MODE --- */}
-              {viewMode === 'explore' && (
-                <>
-                  <h2 className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-4">Recommended Spots</h2>
-                  {filteredLocations.map((loc) => (
-                    <div 
-                      key={loc.name}
-                      onClick={() => {
-                        setSelectedPlace(loc);
-                        map?.panTo({ lat: loc.lat, lng: loc.lng });
-                        map?.setZoom(18);
-                      }}
-                      className={`group flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all ${selectedPlace?.name === loc.name ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
-                    >
-                      <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-2xl shadow-sm border border-gray-50">{loc.emoji}</div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-sm font-bold text-gray-900 truncate">{loc.name}</h3>
-                        <p className="text-[10px] font-bold text-gray-300 uppercase truncate mt-1">{loc.loc}</p>
-                      </div>
-                      <button onClick={(e) => { e.stopPropagation(); toggleFavorite(loc); }} className={`p-2 rounded-xl border transition-all ${isFavorite(loc) ? 'bg-red-50 border-red-100 text-red-500' : 'bg-white border-gray-100 text-gray-300 opacity-0 group-hover:opacity-100 hover:text-red-500 hover:border-red-100'}`}>
-                        <Heart size={16} fill={isFavorite(loc) ? "currentColor" : "none"} />
-                      </button>
-                    </div>
-                  ))}
-                </>
-              )}
 
               {/* --- FAVORITES MODE --- */}
               {viewMode === 'favorites' && (
@@ -372,27 +327,8 @@ function App() {
           options={mapOptions}
           onClick={() => setSelectedPlace(null)}
         >
-          {/* Default Data Markers */}
-          {allLocations.map(loc => (
-            <Marker
-              key={loc.name}
-              position={{ lat: loc.lat, lng: loc.lng }}
-              onClick={() => setSelectedPlace(loc)}
-              icon={{
-                url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-                  <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="16" cy="16" r="14" fill="${isFavorite(loc) ? '#ef4444' : 'white'}" stroke="${isFavorite(loc) ? 'white' : '#006ADC'}" stroke-width="2"/>
-                    <text x="16" y="21" font-size="14" text-anchor="middle">${loc.emoji}</text>
-                  </svg>
-                `)}`,
-                scaledSize: new window.google.maps.Size(32, 32),
-                anchor: new window.google.maps.Point(16, 16)
-              }}
-            />
-          ))}
-
-          {/* Favorite Markers (if they are search results not in allLocations) */}
-          {favorites.filter(f => !allLocations.some(al => al.name === f.name)).map(fav => (
+          {/* Favorite Markers */}
+          {favorites.map(fav => (
             <Marker
               key={`fav-${fav.name}`}
               position={{ lat: fav.lat, lng: fav.lng }}
