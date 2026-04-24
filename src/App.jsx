@@ -335,21 +335,23 @@ function App() {
         )}
 
         <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[2000] w-full max-w-md px-4" style={{ position: 'absolute', top: '24px', left: '50%', transform: 'translateX(-50%)', zIndex: 2000, width: '100%', maxWidth: '448px' }}>
-          <div className="bg-white/90 backdrop-blur-xl border border-white/50 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.1)] p-2 flex items-center" style={{ backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: '24px', display: 'flex', padding: '8px', boxShadow: '0 20px 50px rgba(0,0,0,0.15)' }}>
-             <div className="flex-1 px-4 text-sm font-bold text-gray-900" style={{ flex: 1, padding: '0 16px' }}>
-               <Autocomplete 
-                  onLoad={(a) => { autocompleteRef.current = a; }} 
-                  onPlaceChanged={onPlaceSelected}
-               >
-                 <input 
-                    type="text" 
-                    placeholder="Search for any place in the world..." 
-                    className="w-full bg-transparent outline-none placeholder:text-gray-400" 
-                    style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontSize: '18px', fontWeight: 'bold', color: '#1f2937' }}
-                 />
-               </Autocomplete>
+          <div className="bg-white/90 backdrop-blur-xl border border-white/50 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.1)] p-2 flex items-center" style={{ backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: '24px', display: 'flex', padding: '8px', boxShadow: '0 20px 50px rgba(0,0,0,0.15)', alignItems: 'center' }}>
+             <div className="flex-1 px-4 text-sm font-bold text-gray-900" style={{ flex: 1, padding: '0 16px', display: 'flex', alignItems: 'center', height: '48px' }}>
+               <div style={{ width: '100%' }}>
+                 <Autocomplete 
+                    onLoad={(a) => { autocompleteRef.current = a; }} 
+                    onPlaceChanged={onPlaceSelected}
+                 >
+                   <input 
+                      type="text" 
+                      placeholder="Search for any place in the world..." 
+                      className="w-full bg-transparent outline-none placeholder:text-gray-400" 
+                      style={{ width: '100%', height: '48px', lineHeight: 'normal', background: 'transparent', border: 'none', outline: 'none', fontSize: '20px', fontWeight: 'bold', color: '#1f2937', padding: 0, margin: 0, display: 'block' }}
+                   />
+                 </Autocomplete>
+               </div>
              </div>
-             <button className="w-12 h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200" style={{ width: '48px', height: '48px', backgroundColor: '#2563eb', color: 'white', borderRadius: '16px', border: 'none', cursor: 'pointer' }}>
+             <button className="w-12 h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200" style={{ width: '48px', height: '48px', backgroundColor: '#2563eb', color: 'white', borderRadius: '16px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                <Search size={20} />
              </button>
           </div>
