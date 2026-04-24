@@ -135,6 +135,17 @@ function App() {
     return country;
   };
 
+  const getActualDateForDay = (startDate, dayNumber) => {
+    if (!startDate) return '';
+    try {
+      const date = new Date(startDate + "T00:00:00");
+      date.setDate(date.getDate() + (dayNumber - 1));
+      return date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric', weekday: 'short' });
+    } catch {
+      return '';
+    }
+  };
+
   const groupedFavorites = useMemo(() => {
     const groups = {};
     favorites.forEach(fav => {
@@ -639,7 +650,12 @@ function App() {
                       style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', padding: '12px 16px', borderRadius: '12px', cursor: 'pointer', backgroundColor: activeDay === dayPlan.day ? '#eff6ff' : 'transparent', border: activeDay === dayPlan.day ? '1px solid #bfdbfe' : '1px solid transparent' }}
                     >
                       <h3 style={{ fontSize: '14px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0, color: activeDay === dayPlan.day ? '#2563eb' : '#9ca3af' }}>
-                        Day {dayPlan.day} {activeDay === dayPlan.day && '• Active'}
+                        Day {dayPlan.day} 
+                        {activeTrip?.startDate && (
+                          <span style={{ fontSize: '11px', fontWeight: '800', color: activeDay === dayPlan.day ? '#60a5fa' : '#d1d5db', marginLeft: '6px' }}>
+                            ({getActualDateForDay(activeTrip.startDate, dayPlan.day)})
+                          </span>
+                        )}
                       </h3>
                       <span style={{ fontSize: '11px', fontWeight: '800', color: '#9ca3af' }}>{dayPlan.items.length} spots</span>
                     </div>
@@ -777,7 +793,7 @@ function App() {
                       return (
                         <div key={`exp-day-${dayNum}`} style={{ marginBottom: '16px' }}>
                           <h4 style={{ fontSize: '10px', fontWeight: '900', color: '#9ca3af', textTransform: 'uppercase', marginBottom: '8px' }}>
-                            {dayNum === 0 ? 'Pre-trip (Booking, etc)' : `Day ${dayNum}`}
+                            {dayNum === 0 ? 'Pre-trip (Booking, etc)' : `Day ${dayNum} ${activeTrip?.startDate ? `(${getActualDateForDay(activeTrip.startDate, dayNum)})` : ''}`}
                           </h4>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             {dayExpenses.map(exp => (
