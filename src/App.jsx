@@ -119,9 +119,16 @@ function App() {
 
     setSearchResult(newPlace);
     setSelectedPlace(newPlace);
+    
     if (map) {
-      map.panTo(place.geometry.location);
-      map.setZoom(16);
+      if (place.geometry.viewport) {
+        // 검색된 장소의 고유 크기(도시, 구역, 건물 등)에 맞춰 완벽하게 줌인
+        map.fitBounds(place.geometry.viewport);
+      } else {
+        // 크기 정보가 없는 경우 매우 가깝게 줌인
+        map.panTo(place.geometry.location);
+        map.setZoom(18);
+      }
     }
   };
 
@@ -220,7 +227,7 @@ function App() {
                       onClick={() => {
                         setSelectedPlace(loc);
                         map?.panTo({ lat: loc.lat, lng: loc.lng });
-                        map?.setZoom(16);
+                        map?.setZoom(18);
                       }}
                       className={`group flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all ${selectedPlace?.name === loc.name ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
                     >
@@ -253,7 +260,7 @@ function App() {
                         onClick={() => {
                           setSelectedPlace(loc);
                           map?.panTo({ lat: loc.lat, lng: loc.lng });
-                          map?.setZoom(16);
+                          map?.setZoom(18);
                         }}
                         className={`group flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all ${selectedPlace?.name === loc.name ? 'bg-red-50' : 'hover:bg-gray-50 border border-transparent hover:border-red-50'}`}
                       >
