@@ -110,6 +110,8 @@ function App() {
   const [searchResult, setSearchResult] = useState(null);
   const [activeDay, setActiveDay] = useState(1);
   const [expandedCountries, setExpandedCountries] = useState({});
+  const [editingTripId, setEditingTripId] = useState(null);
+  const [editTripName, setEditTripName] = useState("");
 
   const autocompleteRef = useRef(null);
 
@@ -169,32 +171,37 @@ function App() {
 
   // --- TRIP CRUD ---
   const createNewTrip = () => {
-    const tripName = prompt("Enter trip name (e.g., '2026 Tokyo'):");
-    if (!tripName) return;
-    
+    const newId = Date.now().toString();
     const newTrip = {
-      id: Date.now().toString(),
-      name: tripName,
+      id: newId,
+      name: "New Trip",
       itinerary: [{ day: 1, items: [] }],
       budgetSettings: { limitKRW: 1000000, travelCurrency: 'USD' },
       expenses: [],
       createdAt: Date.now()
     };
     
-    const newTrips = [...trips, newTrip];
+    const newTrips = [newTrip, ...trips];
     setTrips(newTrips);
     localStorage.setItem('world_pro_trips_v1', JSON.stringify(newTrips));
-    setActiveTripId(newTrip.id);
-    setViewMode('itinerary');
+    
+    // Auto-enter inline edit mode
+    setEditingTripId(newId);
+    setEditTripName("New Trip");
   };
 
-  const renameTrip = (id, currentName) => {
-    const newName = window.prompt("Enter new trip name:", currentName);
-    if (newName && newName.trim() !== "") {
-      const newTrips = trips.map(t => t.id === id ? { ...t, name: newName.trim() } : t);
+  const startRenameTrip = (id, currentName) => {
+    setEditingTripId(id);
+    setEditTripName(currentName);
+  };
+
+  const saveRenameTrip = (id) => {
+    if (editTripName.trim() !== "") {
+      const newTrips = trips.map(t => t.id === id ? { ...t, name: editTripName.trim() } : t);
       setTrips(newTrips);
       localStorage.setItem('world_pro_trips_v1', JSON.stringify(newTrips));
     }
+    setEditingTripId(null);
   };
 
   const deleteTrip = (id) => {
@@ -454,15 +461,29 @@ function App() {
                         style={{ padding: '20px', backgroundColor: activeTripId === trip.id ? '#f5f3ff' : 'white', border: activeTripId === trip.id ? '2px solid #ddd6fe' : '1px solid #e5e7eb', borderRadius: '16px', cursor: 'pointer', transition: '0.2s' }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                          <h3 style={{ fontSize: '18px', fontWeight: '900', color: '#111827', margin: 0 }}>{trip.name}</h3>
+                          {editingTripId === trip.id ? (
+                            <input 
+                              autoFocus
+                              value={editTripName}
+                              onChange={(e) => setEditTripName(e.target.value)}
+                              onBlur={() => saveRenameTrip(trip.id)}
+                              onKeyDown={(e) => { if (e.key === 'Enter') saveRenameTrip(trip.id) }}
+                              style={{ fontSize: '18px', fontWeight: '900', color: '#111827', margin: 0, padding: '4px 8px', border: '2px solid #8b5cf6', borderRadius: '8px', flex: 1, marginRight: '8px', outline: 'none' }}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          ) : (
+                            <h3 style={{ fontSize: '18px', fontWeight: '900', color: '#111827', margin: 0 }}>{trip.name}</h3>
+                          )}
                           <div style={{ display: 'flex', gap: '4px' }}>
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); renameTrip(trip.id, trip.name); }}
-                              style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '4px', borderRadius: '8px' }}
-                              title="Rename Trip"
-                            >
-                              <Edit2 size={16} />
-                            </button>
+                            {editingTripId !== trip.id && (
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); startRenameTrip(trip.id, trip.name); }}
+                                style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '4px', borderRadius: '8px' }}
+                                title="Rename Trip"
+                              >
+                                <Edit2 size={16} />
+                              </button>
+                            )}
                             <button 
                               onClick={(e) => { e.stopPropagation(); deleteTrip(trip.id); }}
                               style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '4px', borderRadius: '8px' }}
