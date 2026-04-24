@@ -754,7 +754,12 @@ function App() {
                     <div style={{ width: `${budgetProgress}%`, height: '100%', backgroundColor: budgetProgress > 90 ? '#ef4444' : '#10b981', transition: 'width 0.3s ease' }}></div>
                   </div>
                   <p style={{ fontSize: '10px', fontWeight: '800', color: budgetProgress > 90 ? '#ef4444' : '#059669', marginTop: '8px', textAlign: 'right' }}>
-                    {budgetProgress.toFixed(1)}% Used
+                    {budgetProgress.toFixed(1)}% 사용됨
+                    <span style={{ marginLeft: '4px', opacity: 0.8 }}>
+                      {budgetSettings.limitKRW - totalSpentKRW >= 0 
+                        ? `(남은 예산: ₩${(budgetSettings.limitKRW - totalSpentKRW).toLocaleString()})`
+                        : `(예산 초과: ₩${Math.abs(budgetSettings.limitKRW - totalSpentKRW).toLocaleString()})`}
+                    </span>
                   </p>
                 </div>
 
