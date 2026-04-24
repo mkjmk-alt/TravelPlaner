@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete } from '@react-google-maps/api';
-import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, Plane, Menu, X, Compass, Plus } from 'lucide-react';
+import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, Plane, Menu, X, Compass, Plus, Edit2 } from 'lucide-react';
 import './index.css';
 
 // --- CONFIGURATION ---
@@ -186,6 +186,15 @@ function App() {
     localStorage.setItem('world_pro_trips_v1', JSON.stringify(newTrips));
     setActiveTripId(newTrip.id);
     setViewMode('itinerary');
+  };
+
+  const renameTrip = (id, currentName) => {
+    const newName = window.prompt("Enter new trip name:", currentName);
+    if (newName && newName.trim() !== "") {
+      const newTrips = trips.map(t => t.id === id ? { ...t, name: newName.trim() } : t);
+      setTrips(newTrips);
+      localStorage.setItem('world_pro_trips_v1', JSON.stringify(newTrips));
+    }
   };
 
   const deleteTrip = (id) => {
@@ -446,12 +455,22 @@ function App() {
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                           <h3 style={{ fontSize: '18px', fontWeight: '900', color: '#111827', margin: 0 }}>{trip.name}</h3>
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); deleteTrip(trip.id); }}
-                            style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '4px', borderRadius: '8px' }}
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                          <div style={{ display: 'flex', gap: '4px' }}>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); renameTrip(trip.id, trip.name); }}
+                              style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '4px', borderRadius: '8px' }}
+                              title="Rename Trip"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); deleteTrip(trip.id); }}
+                              style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '4px', borderRadius: '8px' }}
+                              title="Delete Trip"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
                         </div>
                         <div style={{ display: 'flex', gap: '16px', fontSize: '12px', fontWeight: '800', color: '#6b7280' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
