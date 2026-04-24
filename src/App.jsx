@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete } from '@react-google-maps/api';
-import { Search, MapPin, Plus, Trash2, Menu, X, Calendar, Globe, Compass, ChevronRight, PlusCircle, AlertCircle } from 'lucide-react';
+import { Search, MapPin, Plus, Trash2, Menu, X, Calendar, Globe, Compass, ChevronRight, PlusCircle, AlertCircle, Heart } from 'lucide-react';
 import { allLocations } from './data';
 import './index.css';
 
@@ -29,12 +29,20 @@ function App() {
   const [map, setMap] = useState(null);
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [activeCategory, setActiveCategory] = useState('all');
+  
   const [itinerary, setItinerary] = useState(() => {
     const saved = localStorage.getItem('world_pro_v16');
     return saved ? JSON.parse(saved) : [{ day: 1, items: [] }];
   });
+
+  // Favorites State
+  const [favorites, setFavorites] = useState(() => {
+    const saved = localStorage.getItem('world_pro_fav_v1');
+    return saved ? JSON.parse(saved) : [];
+  });
+
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [viewMode, setViewMode] = useState('explore'); 
+  const [viewMode, setViewMode] = useState('explore'); // 'explore', 'favorites', 'itinerary'
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResult, setSearchResult] = useState(null);
   const [activeDay, setActiveDay] = useState(1);
@@ -44,6 +52,25 @@ function App() {
   const saveItinerary = (newItinerary) => {
     setItinerary(newItinerary);
     localStorage.setItem('world_pro_v16', JSON.stringify(newItinerary));
+  };
+
+  const saveFavorites = (newFavs) => {
+    setFavorites(newFavs);
+    localStorage.setItem('world_pro_fav_v1', JSON.stringify(newFavs));
+  };
+
+  const toggleFavorite = (place) => {
+    const isFav = favorites.some(f => f.name === place.name);
+    if (isFav) {
+      saveFavorites(favorites.filter(f => f.name !== place.name));
+    } else {
+      saveFavorites([...favorites, { ...place, id: Date.now() }]);
+    }
+  };
+
+  const isFavorite = (place) => {
+    if (!place) return false;
+    return favorites.some(f => f.name === place.name);
   };
 
   const addDay = () => {
@@ -84,7 +111,7 @@ function App() {
       lat: place.geometry.location.lat(),
       lng: place.geometry.location.lng(),
       loc: place.formatted_address,
-      cat: 'Search',
+      cat: 'Search Result',
       desc: place.formatted_address,
       emoji: '📍',
       type: 'search'
@@ -142,7 +169,7 @@ function App() {
   return (
     <div className="relative w-screen h-screen bg-[#f8f9fa] overflow-hidden font-sans" style={{ width: '100vw', height: '100vh', position: 'relative' }}>
       
-      {/* SIDEBAR UI - standard conditional rendering without framer-motion */}
+      {/* SIDEBAR UI */}
       {sidebarOpen && (
         <aside 
           className="absolute top-6 left-6 bottom-6 w-[400px] bg-white/95 backdrop-blur-2xl rounded-[32px] shadow-2xl border border-white/50 flex flex-col overflow-hidden z-[1000] transition-all duration-300"
@@ -156,13 +183,25 @@ function App() {
             </div>
             <div className="flex gap-2">
               <button 
-                onClick={() => setViewMode(viewMode === 'explore' ? 'itinerary' : 'explore')}
-                className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all ${viewMode === 'itinerary' ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'bg-gray-100 text-gray-400'}`}
+                onClick={() => setViewMode('explore')}
+                className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all ${viewMode === 'explore' ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                title="Recommended"
+              >
+                <Globe size={20} />
+              </button>
+              <button 
+                onClick={() => setViewMode('favorites')}
+                className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all ${viewMode === 'favorites' ? 'bg-red-500 text-white shadow-lg shadow-red-200' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                title="Favorites"
+              >
+                <Heart size={20} fill={viewMode === 'favorites' ? "currentColor" : "none"} />
+              </button>
+              <button 
+                onClick={() => setViewMode('itinerary')}
+                className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all ${viewMode === 'itinerary' ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                title="Planner"
               >
                 <Calendar size={20} />
-              </button>
-              <button onClick={() => setSidebarOpen(false)} className="w-11 h-11 rounded-2xl bg-gray-100 text-gray-400 flex items-center justify-center transition-all">
-                <X size={20} />
               </button>
             </div>
           </div>
@@ -170,7 +209,9 @@ function App() {
           {/* List Content */}
           <div className="flex-1 overflow-y-auto px-10 custom-scroll">
             <div className="space-y-2 pb-10">
-              {viewMode === 'explore' ? (
+              
+              {/* --- EXPLORE MODE --- */}
+              {viewMode === 'explore' && (
                 <>
                   <h2 className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-4">Recommended Spots</h2>
                   {filteredLocations.map((loc) => (
@@ -188,16 +229,53 @@ function App() {
                         <h3 className="text-sm font-bold text-gray-900 truncate">{loc.name}</h3>
                         <p className="text-[10px] font-bold text-gray-300 uppercase truncate mt-1">{loc.loc}</p>
                       </div>
-                      <button onClick={(e) => { e.stopPropagation(); addToItinerary(loc); }} className="p-2 text-blue-600 bg-white border border-gray-100 rounded-xl opacity-0 group-hover:opacity-100 hover:bg-blue-600 hover:text-white transition-all shadow-sm">
-                        <Plus size={18} />
+                      <button onClick={(e) => { e.stopPropagation(); toggleFavorite(loc); }} className={`p-2 rounded-xl border transition-all ${isFavorite(loc) ? 'bg-red-50 border-red-100 text-red-500' : 'bg-white border-gray-100 text-gray-300 opacity-0 group-hover:opacity-100 hover:text-red-500 hover:border-red-100'}`}>
+                        <Heart size={16} fill={isFavorite(loc) ? "currentColor" : "none"} />
                       </button>
                     </div>
                   ))}
                 </>
-              ) : (
+              )}
+
+              {/* --- FAVORITES MODE --- */}
+              {viewMode === 'favorites' && (
+                <>
+                  <h2 className="text-[10px] font-black text-red-400 uppercase tracking-widest mb-4">Saved Places</h2>
+                  {favorites.length === 0 ? (
+                    <div className="p-6 border-2 border-dashed border-red-100 rounded-2xl text-center">
+                      <Heart size={32} className="mx-auto text-red-100 mb-2" />
+                      <p className="text-[10px] text-gray-300 font-bold uppercase tracking-widest">No places saved yet</p>
+                    </div>
+                  ) : (
+                    favorites.map((loc) => (
+                      <div 
+                        key={`fav-list-${loc.name}`}
+                        onClick={() => {
+                          setSelectedPlace(loc);
+                          map?.panTo({ lat: loc.lat, lng: loc.lng });
+                          map?.setZoom(16);
+                        }}
+                        className={`group flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all ${selectedPlace?.name === loc.name ? 'bg-red-50' : 'hover:bg-gray-50 border border-transparent hover:border-red-50'}`}
+                      >
+                        <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-2xl shadow-sm border border-gray-50">{loc.emoji}</div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-sm font-bold text-gray-900 truncate">{loc.name}</h3>
+                          <p className="text-[10px] font-bold text-gray-300 uppercase truncate mt-1">{loc.loc}</p>
+                        </div>
+                        <button onClick={(e) => { e.stopPropagation(); toggleFavorite(loc); }} className="p-2 bg-red-50 border-red-100 text-red-500 rounded-xl hover:bg-red-100 transition-all">
+                          <Heart size={16} fill="currentColor" />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </>
+              )}
+
+              {/* --- ITINERARY MODE --- */}
+              {viewMode === 'itinerary' && (
                 <>
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-[10px] font-black text-gray-300 uppercase tracking-widest">My Journey</h2>
+                    <h2 className="text-[10px] font-black text-blue-400 uppercase tracking-widest">My Planner</h2>
                     <button onClick={addDay} className="flex items-center gap-1 text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg hover:bg-blue-100 transition-colors">
                       <PlusCircle size={12} /> ADD DAY
                     </button>
@@ -242,8 +320,8 @@ function App() {
 
           {/* Footer */}
           <div className="p-8 border-t border-gray-50 bg-gray-50/30 flex justify-between items-center">
-            <span className="text-[10px] font-black text-gray-900">{totalSpots} SPOTS SAVED</span>
-            <button className="text-[10px] font-black text-blue-600 hover:underline">EXPORT PDF</button>
+            <span className="text-[10px] font-black text-gray-900">{favorites.length} SAVED • {totalSpots} PLANNED</span>
+            <button onClick={() => setSidebarOpen(false)} className="text-[10px] font-black text-gray-400 hover:text-gray-900">CLOSE</button>
           </div>
         </aside>
       )}
@@ -251,11 +329,13 @@ function App() {
       {/* MAP VIEWPORT */}
       <main className="absolute inset-0 z-0" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}>
         {!sidebarOpen && (
-          <button onClick={() => setSidebarOpen(true)} className="absolute top-6 left-6 z-[2000] w-14 h-14 bg-white rounded-2xl shadow-2xl flex items-center justify-center text-blue-600 hover:scale-110 transition-all border border-white" style={{ position: 'absolute', top: '24px', left: '24px', zIndex: 2000, width: '56px', height: '56px', backgroundColor: 'white', borderRadius: '16px' }}><Menu size={24} /></button>
+          <button onClick={() => setSidebarOpen(true)} className="absolute top-6 left-6 z-[2000] w-14 h-14 bg-white rounded-2xl shadow-2xl flex items-center justify-center text-blue-600 hover:scale-110 transition-all border border-white" style={{ position: 'absolute', top: '24px', left: '24px', zIndex: 2000, width: '56px', height: '56px', backgroundColor: 'white', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
+            <Menu size={24} />
+          </button>
         )}
 
         <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[2000] w-full max-w-md px-4" style={{ position: 'absolute', top: '24px', left: '50%', transform: 'translateX(-50%)', zIndex: 2000, width: '100%', maxWidth: '448px' }}>
-          <div className="bg-white/90 backdrop-blur-xl border border-white/50 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.1)] p-2 flex items-center" style={{ backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: '24px', display: 'flex', padding: '8px', boxShadow: '0 20px 50px rgba(0,0,0,0.1)' }}>
+          <div className="bg-white/90 backdrop-blur-xl border border-white/50 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.1)] p-2 flex items-center" style={{ backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: '24px', display: 'flex', padding: '8px', boxShadow: '0 20px 50px rgba(0,0,0,0.15)' }}>
              <div className="flex-1 px-4 text-sm font-bold text-gray-900" style={{ flex: 1, padding: '0 16px' }}>
                <Autocomplete 
                   onLoad={(a) => { autocompleteRef.current = a; }} 
@@ -264,11 +344,12 @@ function App() {
                  <input 
                     type="text" 
                     placeholder="Search for any place in the world..." 
-                    className="w-full bg-transparent outline-none placeholder:text-gray-300" 
+                    className="w-full bg-transparent outline-none placeholder:text-gray-400" 
+                    style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none' }}
                  />
                </Autocomplete>
              </div>
-             <button className="w-12 h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200">
+             <button className="w-12 h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200" style={{ width: '48px', height: '48px', backgroundColor: '#2563eb', color: 'white', borderRadius: '16px', border: 'none', cursor: 'pointer' }}>
                <Search size={20} />
              </button>
           </div>
@@ -291,7 +372,7 @@ function App() {
               icon={{
                 url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
                   <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="16" cy="16" r="14" fill="white" stroke="%23006ADC" stroke-width="2"/>
+                    <circle cx="16" cy="16" r="14" fill="${isFavorite(loc) ? '#ef4444' : 'white'}" stroke="${isFavorite(loc) ? 'white' : '#006ADC'}" stroke-width="2"/>
                     <text x="16" y="21" font-size="14" text-anchor="middle">${loc.emoji}</text>
                   </svg>
                 `)}`,
@@ -301,8 +382,27 @@ function App() {
             />
           ))}
 
+          {/* Favorite Markers (if they are search results not in allLocations) */}
+          {favorites.filter(f => !allLocations.some(al => al.name === f.name)).map(fav => (
+            <Marker
+              key={`fav-${fav.name}`}
+              position={{ lat: fav.lat, lng: fav.lng }}
+              onClick={() => setSelectedPlace(fav)}
+              icon={{
+                url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                  <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="16" cy="16" r="14" fill="#ef4444" stroke="white" stroke-width="2"/>
+                    <text x="16" y="21" font-size="14" text-anchor="middle">❤️</text>
+                  </svg>
+                `)}`,
+                scaledSize: new window.google.maps.Size(32, 32),
+                anchor: new window.google.maps.Point(16, 16)
+              }}
+            />
+          ))}
+
           {/* Dynamic Search Result Marker */}
-          {searchResult && (
+          {searchResult && searchResult.name !== selectedPlace?.name && (
              <Marker
                 position={{ lat: searchResult.lat, lng: searchResult.lng }}
                 onClick={() => setSelectedPlace(searchResult)}
@@ -319,20 +419,37 @@ function App() {
              />
           )}
 
-          {/* Conditionally rendered InfoWindow without framer-motion */}
+          {/* Selected Place InfoWindow */}
           {selectedPlace && (
             <InfoWindow position={{ lat: selectedPlace.lat, lng: selectedPlace.lng }} onCloseClick={() => setSelectedPlace(null)}>
-              <div className="p-6 min-w-[280px]">
-                <div className="flex items-center gap-4 mb-4">
-                  <span className="text-4xl">{selectedPlace.emoji}</span>
-                  <h3 className="text-lg font-black text-gray-900 tracking-tight">{selectedPlace.name}</h3>
+              <div className="p-6 min-w-[280px]" style={{ padding: '20px', minWidth: '280px', fontFamily: 'sans-serif' }}>
+                <div className="flex items-center justify-between mb-4" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span className="text-4xl" style={{ fontSize: '36px' }}>{selectedPlace.emoji}</span>
+                    <h3 className="text-lg font-black text-gray-900 tracking-tight" style={{ fontSize: '18px', fontWeight: '900', margin: 0, color: '#111827' }}>{selectedPlace.name}</h3>
+                  </div>
                 </div>
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6 flex items-center gap-2" style={{ fontSize: '10px', fontWeight: '900', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <MapPin size={14} className="text-blue-500" /> {selectedPlace.loc}
                 </p>
-                <button onClick={() => addToItinerary(selectedPlace)} className="w-full py-4 bg-blue-600 text-white rounded-2xl text-xs font-black shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all">
-                  Add to Day {activeDay}
-                </button>
+                
+                <div className="flex gap-2" style={{ display: 'flex', gap: '8px' }}>
+                  <button 
+                    onClick={() => addToItinerary(selectedPlace)} 
+                    className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-xs font-black shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all"
+                    style={{ flex: 1, padding: '12px', backgroundColor: '#2563eb', color: 'white', borderRadius: '12px', fontSize: '12px', fontWeight: '900', border: 'none', cursor: 'pointer' }}
+                  >
+                    Add to Day {activeDay}
+                  </button>
+                  <button 
+                    onClick={() => toggleFavorite(selectedPlace)} 
+                    className={`p-3 rounded-xl border-2 transition-all ${isFavorite(selectedPlace) ? 'bg-red-50 border-red-100 text-red-500' : 'bg-white border-gray-100 text-gray-400'}`}
+                    style={{ padding: '12px', borderRadius: '12px', border: `2px solid ${isFavorite(selectedPlace) ? '#fee2e2' : '#f3f4f6'}`, backgroundColor: isFavorite(selectedPlace) ? '#fef2f2' : 'white', color: isFavorite(selectedPlace) ? '#ef4444' : '#9ca3af', cursor: 'pointer' }}
+                  >
+                    <Heart size={20} fill={isFavorite(selectedPlace) ? "currentColor" : "none"} />
+                  </button>
+                </div>
               </div>
             </InfoWindow>
           )}
