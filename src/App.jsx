@@ -634,17 +634,10 @@ function App() {
                       onChange={e => setExpenseInput({...expenseInput, currency: e.target.value})}
                       style={{ flex: 1, minWidth: 0, boxSizing: 'border-box', padding: '10px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '12px', fontWeight: '700', outline: 'none' }}
                     >
-                      <optgroup label="Favorites">
-                        <option value="KRW">🇰🇷 대한민국 원 (KRW)</option>
-                        {budgetSettings.travelCurrency !== 'KRW' && (
-                          <option value={budgetSettings.travelCurrency}>⭐️ {getCurrencyNameKO(budgetSettings.travelCurrency)} ({budgetSettings.travelCurrency})</option>
-                        )}
-                      </optgroup>
-                      <optgroup label="All Currencies">
-                        {sortedCurrencies.map(c => (
-                          <option key={`all-${c.code}`} value={c.code}>{c.name} ({c.code})</option>
-                        ))}
-                      </optgroup>
+                      <option value="KRW">🇰🇷 대한민국 원 (KRW)</option>
+                      {budgetSettings.travelCurrency !== 'KRW' && (
+                        <option value={budgetSettings.travelCurrency}>⭐️ {getCurrencyNameKO(budgetSettings.travelCurrency)} ({budgetSettings.travelCurrency})</option>
+                      )}
                     </select>
                   </div>
                   <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
