@@ -72,6 +72,25 @@ function App() {
   const [exchangeRates, setExchangeRates] = useState({});
   const [expenseInput, setExpenseInput] = useState({ desc: '', amount: '', currency: 'KRW', day: 1 });
 
+  // Natively translate and sort currencies
+  const getCurrencyNameKO = (code) => {
+    try {
+      return new Intl.DisplayNames(['ko'], { type: 'currency' }).of(code) || code;
+    } catch {
+      return code;
+    }
+  };
+
+  const sortedCurrencies = useMemo(() => {
+    if (Object.keys(exchangeRates).length === 0) return [];
+    const list = Object.keys(exchangeRates).map(code => ({
+      code,
+      name: getCurrencyNameKO(code)
+    }));
+    list.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+    return list;
+  }, [exchangeRates]);
+
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [viewMode, setViewMode] = useState('itinerary'); // 'favorites', 'itinerary', 'budget'
   const [searchQuery, setSearchQuery] = useState('');
@@ -480,12 +499,12 @@ function App() {
                         <select 
                           value={budgetSettings.travelCurrency}
                           onChange={(e) => saveBudgetSettings({ ...budgetSettings, travelCurrency: e.target.value })}
-                          style={{ fontSize: '14px', fontWeight: '800', color: '#064e3b', backgroundColor: 'transparent', border: 'none', borderBottom: '2px solid #a7f3d0', width: '100px', textAlign: 'right', outline: 'none', cursor: 'pointer' }}
+                          style={{ fontSize: '14px', fontWeight: '800', color: '#064e3b', backgroundColor: 'transparent', border: 'none', borderBottom: '2px solid #a7f3d0', width: '130px', textAlign: 'right', outline: 'none', cursor: 'pointer', textOverflow: 'ellipsis' }}
                         >
-                          {Object.keys(exchangeRates).length > 0 ? (
-                            Object.keys(exchangeRates).map(code => <option key={`lc-${code}`} value={code}>{code}</option>)
+                          {sortedCurrencies.length > 0 ? (
+                            sortedCurrencies.map(c => <option key={`lc-${c.code}`} value={c.code}>{c.name} ({c.code})</option>)
                           ) : (
-                            <option value="USD">USD</option>
+                            <option value="USD">미국 달러 (USD)</option>
                           )}
                         </select>
                       </div>
@@ -516,14 +535,14 @@ function App() {
                       style={{ flex: 1, minWidth: 0, boxSizing: 'border-box', padding: '10px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '12px', fontWeight: '700', outline: 'none' }}
                     >
                       <optgroup label="Favorites">
-                        <option value="KRW">🇰🇷 KRW</option>
+                        <option value="KRW">🇰🇷 대한민국 원 (KRW)</option>
                         {budgetSettings.travelCurrency !== 'KRW' && (
-                          <option value={budgetSettings.travelCurrency}>⭐️ {budgetSettings.travelCurrency}</option>
+                          <option value={budgetSettings.travelCurrency}>⭐️ {getCurrencyNameKO(budgetSettings.travelCurrency)} ({budgetSettings.travelCurrency})</option>
                         )}
                       </optgroup>
                       <optgroup label="All Currencies">
-                        {Object.keys(exchangeRates).map(code => (
-                          <option key={`all-${code}`} value={code}>{code}</option>
+                        {sortedCurrencies.map(c => (
+                          <option key={`all-${c.code}`} value={c.code}>{c.name} ({c.code})</option>
                         ))}
                       </optgroup>
                     </select>
