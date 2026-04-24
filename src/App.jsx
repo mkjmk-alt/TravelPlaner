@@ -140,15 +140,16 @@ function App() {
   }
 
   return (
-    <div className="relative w-screen h-screen bg-[#f8f9fa] overflow-hidden font-sans">
+    <div className="relative w-screen h-screen bg-[#f8f9fa] overflow-hidden font-sans" style={{ width: '100vw', height: '100vh', position: 'relative' }}>
       
       {/* SIDEBAR UI - standard conditional rendering without framer-motion */}
       {sidebarOpen && (
         <aside 
           className="absolute top-6 left-6 bottom-6 w-[400px] bg-white/95 backdrop-blur-2xl rounded-[32px] shadow-2xl border border-white/50 flex flex-col overflow-hidden z-[1000] transition-all duration-300"
+          style={{ position: 'absolute', top: '24px', left: '24px', bottom: '24px', width: '400px', backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: '32px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', zIndex: 1000, display: 'flex', flexDirection: 'column' }}
         >
           {/* Header */}
-          <div className="p-10 pb-6 flex items-center justify-between">
+          <div className="p-10 pb-6 flex items-center justify-between" style={{ padding: '40px 40px 24px 40px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <h1 className="text-2xl font-black tracking-tight text-gray-900">WorldPro</h1>
               <p className="text-[10px] font-extrabold text-blue-500 uppercase tracking-[0.3em] mt-1">Global Travel Planner</p>
@@ -248,14 +249,14 @@ function App() {
       )}
 
       {/* MAP VIEWPORT */}
-      <main className="absolute inset-0 z-0">
+      <main className="absolute inset-0 z-0" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}>
         {!sidebarOpen && (
-          <button onClick={() => setSidebarOpen(true)} className="absolute top-6 left-6 z-[2000] w-14 h-14 bg-white rounded-2xl shadow-2xl flex items-center justify-center text-blue-600 hover:scale-110 transition-all border border-white"><Menu size={24} /></button>
+          <button onClick={() => setSidebarOpen(true)} className="absolute top-6 left-6 z-[2000] w-14 h-14 bg-white rounded-2xl shadow-2xl flex items-center justify-center text-blue-600 hover:scale-110 transition-all border border-white" style={{ position: 'absolute', top: '24px', left: '24px', zIndex: 2000, width: '56px', height: '56px', backgroundColor: 'white', borderRadius: '16px' }}><Menu size={24} /></button>
         )}
 
-        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[2000] w-full max-w-md px-4">
-          <div className="bg-white/90 backdrop-blur-xl border border-white/50 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.1)] p-2 flex items-center">
-             <div className="flex-1 px-4 text-sm font-bold text-gray-900">
+        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[2000] w-full max-w-md px-4" style={{ position: 'absolute', top: '24px', left: '50%', transform: 'translateX(-50%)', zIndex: 2000, width: '100%', maxWidth: '448px' }}>
+          <div className="bg-white/90 backdrop-blur-xl border border-white/50 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.1)] p-2 flex items-center" style={{ backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: '24px', display: 'flex', padding: '8px', boxShadow: '0 20px 50px rgba(0,0,0,0.1)' }}>
+             <div className="flex-1 px-4 text-sm font-bold text-gray-900" style={{ flex: 1, padding: '0 16px' }}>
                <Autocomplete 
                   onLoad={(a) => { autocompleteRef.current = a; }} 
                   onPlaceChanged={onPlaceSelected}
