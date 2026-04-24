@@ -345,7 +345,7 @@ function App() {
                     type="text" 
                     placeholder="Search for any place in the world..." 
                     className="w-full bg-transparent outline-none placeholder:text-gray-400" 
-                    style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none' }}
+                    style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontSize: '18px', fontWeight: 'bold', color: '#1f2937' }}
                  />
                </Autocomplete>
              </div>
