@@ -44,8 +44,35 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResult, setSearchResult] = useState(null);
   const [activeDay, setActiveDay] = useState(1);
+  const [expandedCountries, setExpandedCountries] = useState({});
 
   const autocompleteRef = useRef(null);
+
+  const getCountryFromAddress = (address) => {
+    if (!address) return 'Unknown';
+    const parts = address.split(',');
+    let country = parts[parts.length - 1].trim();
+    // Remove digits (like postal codes) if they appear before the country name
+    country = country.replace(/^[0-9A-Z-\s]+ /, ''); 
+    return country;
+  };
+
+  const groupedFavorites = useMemo(() => {
+    const groups = {};
+    favorites.forEach(fav => {
+      const country = getCountryFromAddress(fav.loc);
+      if (!groups[country]) groups[country] = [];
+      groups[country].push(fav);
+    });
+    return groups;
+  }, [favorites]);
+
+  const toggleCountry = (country) => {
+    setExpandedCountries(prev => ({
+      ...prev,
+      [country]: !prev[country]
+    }));
+  };
 
   const saveItinerary = (newItinerary) => {
     setItinerary(newItinerary);
@@ -202,31 +229,52 @@ function App() {
               {/* --- FAVORITES MODE --- */}
               {viewMode === 'favorites' && (
                 <>
-                  <h2 className="text-[10px] font-black text-red-400 uppercase tracking-widest mb-4">Saved Places</h2>
-                  {favorites.length === 0 ? (
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-[10px] font-black text-red-400 uppercase tracking-widest">Saved Places</h2>
+                  </div>
+                  {Object.keys(groupedFavorites).length === 0 ? (
                     <div className="p-6 border-2 border-dashed border-red-100 rounded-2xl text-center">
                       <Heart size={32} className="mx-auto text-red-100 mb-2" />
                       <p className="text-[10px] text-gray-300 font-bold uppercase tracking-widest">No places saved yet</p>
                     </div>
                   ) : (
-                    favorites.map((loc) => (
-                      <div 
-                        key={`fav-list-${loc.name}`}
-                        onClick={() => {
-                          setSelectedPlace(loc);
-                          map?.panTo({ lat: loc.lat, lng: loc.lng });
-                          map?.setZoom(18);
-                        }}
-                        className={`group flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all ${selectedPlace?.name === loc.name ? 'bg-red-50' : 'hover:bg-gray-50 border border-transparent hover:border-red-50'}`}
-                      >
-                        <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-2xl shadow-sm border border-gray-50">{loc.emoji}</div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-sm font-bold text-gray-900 truncate">{loc.name}</h3>
-                          <p className="text-[10px] font-bold text-gray-300 uppercase truncate mt-1">{loc.loc}</p>
+                    Object.entries(groupedFavorites).map(([country, places]) => (
+                      <div key={`country-${country}`} className="mb-4">
+                        <div 
+                          onClick={() => toggleCountry(country)}
+                          className="flex items-center justify-between p-3 bg-red-50 rounded-xl cursor-pointer hover:bg-red-100 transition-colors"
+                        >
+                          <h3 className="text-sm font-black text-red-500 tracking-tight">{country}</h3>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold text-red-400">{places.length} spots</span>
+                            <ChevronRight size={16} className={`text-red-400 transition-transform ${expandedCountries[country] ? 'rotate-90' : ''}`} />
+                          </div>
                         </div>
-                        <button onClick={(e) => { e.stopPropagation(); toggleFavorite(loc); }} className="p-2 bg-red-50 border-red-100 text-red-500 rounded-xl hover:bg-red-100 transition-all">
-                          <Heart size={16} fill="currentColor" />
-                        </button>
+
+                        {expandedCountries[country] && (
+                          <div className="mt-2 pl-2 space-y-2 border-l-2 border-red-50 ml-2">
+                            {places.map((loc) => (
+                              <div 
+                                key={`fav-list-${loc.name}`}
+                                onClick={() => {
+                                  setSelectedPlace(loc);
+                                  map?.panTo({ lat: loc.lat, lng: loc.lng });
+                                  map?.setZoom(18);
+                                }}
+                                className={`group flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all ${selectedPlace?.name === loc.name ? 'bg-red-50' : 'hover:bg-gray-50 border border-transparent hover:border-red-50'}`}
+                              >
+                                <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-xl shadow-sm border border-gray-50">{loc.emoji}</div>
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="text-xs font-bold text-gray-900 truncate">{loc.name}</h3>
+                                  <p className="text-[9px] font-bold text-gray-400 uppercase truncate mt-0.5">{loc.loc}</p>
+                                </div>
+                                <button onClick={(e) => { e.stopPropagation(); toggleFavorite(loc); }} className="p-2 bg-red-50 border-red-100 text-red-500 rounded-xl hover:bg-red-100 transition-all opacity-0 group-hover:opacity-100">
+                                  <Heart size={14} fill="currentColor" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     ))
                   )}
