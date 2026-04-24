@@ -234,7 +234,7 @@ function App() {
   };
 
   const deleteTrip = (id) => {
-    if (window.confirm("Are you sure you want to delete this trip and all its data?")) {
+    if (window.confirm("정말로 이 여행과 관련된 모든 일정 및 지출 내역을 삭제하시겠습니까?")) {
       const newTrips = trips.filter(t => t.id !== id);
       setTrips(newTrips);
       localStorage.setItem('world_pro_trips_v1', JSON.stringify(newTrips));
@@ -271,7 +271,9 @@ function App() {
   };
 
   const deleteExpense = (id) => {
-    saveExpenses(expenses.filter(e => e.id !== id));
+    if (window.confirm("정말로 이 지출 내역을 삭제하시겠습니까?")) {
+      saveExpenses(expenses.filter(e => e.id !== id));
+    }
   };
 
   const toggleFavorite = (place) => {
@@ -310,9 +312,11 @@ function App() {
   };
 
   const removeFromItinerary = (dayIndex, itemId) => {
-    const newItinerary = [...itinerary];
-    newItinerary[dayIndex].items = newItinerary[dayIndex].items.filter(i => i.id !== itemId);
-    saveItinerary(newItinerary);
+    if (window.confirm("정말로 이 장소를 일정에서 삭제하시겠습니까?")) {
+      const newItinerary = [...itinerary];
+      newItinerary[dayIndex].items = newItinerary[dayIndex].items.filter(i => i.id !== itemId);
+      saveItinerary(newItinerary);
+    }
   };
 
   const onPlaceSelected = () => {
