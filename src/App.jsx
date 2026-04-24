@@ -147,13 +147,44 @@ function App() {
     
     if (map) {
       if (place.geometry.viewport) {
-        // 검색된 장소의 고유 크기(도시, 구역, 건물 등)에 맞춰 완벽하게 줌인
         map.fitBounds(place.geometry.viewport);
       } else {
-        // 크기 정보가 없는 경우 매우 가깝게 줌인
         map.panTo(place.geometry.location);
         map.setZoom(18);
       }
+    }
+  };
+
+  const fetchPlaceDetails = (placeId) => {
+    if (!map || !window.google) return;
+    const service = new window.google.maps.places.PlacesService(map);
+    service.getDetails(
+      { placeId, fields: ['name', 'geometry', 'formatted_address'] },
+      (place, status) => {
+        if (status === window.google.maps.places.PlacesServiceStatus.OK && place.geometry && place.geometry.location) {
+          const newPlace = {
+            name: place.name,
+            lat: place.geometry.location.lat(),
+            lng: place.geometry.location.lng(),
+            loc: place.formatted_address || 'Selected from Map',
+            cat: 'Map Selection',
+            desc: place.formatted_address || '',
+            emoji: '📍',
+            type: 'poi'
+          };
+          setSearchResult(newPlace);
+          setSelectedPlace(newPlace);
+        }
+      }
+    );
+  };
+
+  const onMapClick = (e) => {
+    if (e.placeId) {
+      e.stop(); // Prevent the default Google Maps InfoWindow from opening
+      fetchPlaceDetails(e.placeId);
+    } else {
+      setSelectedPlace(null);
     }
   };
 
@@ -373,7 +404,7 @@ function App() {
           zoom={3}
           onLoad={(m) => setMap(m)}
           options={mapOptions}
-          onClick={() => setSelectedPlace(null)}
+          onClick={onMapClick}
         >
           {/* Favorite Markers */}
           {favorites.map(fav => (
