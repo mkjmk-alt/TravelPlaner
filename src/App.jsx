@@ -111,7 +111,7 @@ function App() {
   const [activeDay, setActiveDay] = useState(1);
   const [expandedCountries, setExpandedCountries] = useState({});
   const [editingTripId, setEditingTripId] = useState(null);
-  const [editTripName, setEditTripName] = useState("");
+  const [editTripData, setEditTripData] = useState({ name: "", startDate: "", endDate: "" });
 
   const autocompleteRef = useRef(null);
 
@@ -172,9 +172,12 @@ function App() {
   // --- TRIP CRUD ---
   const createNewTrip = () => {
     const newId = Date.now().toString();
+    const today = new Date().toISOString().split('T')[0];
     const newTrip = {
       id: newId,
       name: "New Trip",
+      startDate: today,
+      endDate: today,
       itinerary: [{ day: 1, items: [] }],
       budgetSettings: { limitKRW: 1000000, travelCurrency: 'USD' },
       expenses: [],
@@ -187,17 +190,43 @@ function App() {
     
     // Auto-enter inline edit mode
     setEditingTripId(newId);
-    setEditTripName("New Trip");
+    setEditTripData({ name: "New Trip", startDate: today, endDate: today });
   };
 
-  const startRenameTrip = (id, currentName) => {
-    setEditingTripId(id);
-    setEditTripName(currentName);
+  const startRenameTrip = (trip) => {
+    setEditingTripId(trip.id);
+    setEditTripData({ name: trip.name, startDate: trip.startDate || "", endDate: trip.endDate || "" });
   };
 
   const saveRenameTrip = (id) => {
-    if (editTripName.trim() !== "") {
-      const newTrips = trips.map(t => t.id === id ? { ...t, name: editTripName.trim() } : t);
+    if (editTripData.name.trim() !== "") {
+      const { name, startDate, endDate } = editTripData;
+      let newItinerary = null;
+      
+      if (startDate && endDate) {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        if (start <= end) {
+          const diffTime = Math.abs(end - start);
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+          
+          if (diffDays > 0 && diffDays <= 100) {
+             newItinerary = Array.from({length: diffDays}, (_, i) => ({ day: i + 1, items: [] }));
+          }
+        }
+      }
+
+      const newTrips = trips.map(t => {
+        if (t.id === id) {
+          const tripToUpdate = { ...t, name: name.trim(), startDate, endDate };
+          if (newItinerary) {
+             // Merge to avoid losing existing itinerary items
+             tripToUpdate.itinerary = newItinerary.map((newDay, index) => t.itinerary[index] || newDay);
+          }
+          return tripToUpdate;
+        }
+        return t;
+      });
       setTrips(newTrips);
       localStorage.setItem('world_pro_trips_v1', JSON.stringify(newTrips));
     }
@@ -462,45 +491,71 @@ function App() {
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                           {editingTripId === trip.id ? (
-                            <input 
-                              autoFocus
-                              value={editTripName}
-                              onChange={(e) => setEditTripName(e.target.value)}
-                              onBlur={() => saveRenameTrip(trip.id)}
-                              onKeyDown={(e) => { if (e.key === 'Enter') saveRenameTrip(trip.id) }}
-                              style={{ fontSize: '18px', fontWeight: '900', color: '#111827', margin: 0, padding: '4px 8px', border: '2px solid #8b5cf6', borderRadius: '8px', flex: 1, marginRight: '8px', outline: 'none' }}
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          ) : (
-                            <h3 style={{ fontSize: '18px', fontWeight: '900', color: '#111827', margin: 0 }}>{trip.name}</h3>
-                          )}
-                          <div style={{ display: 'flex', gap: '4px' }}>
-                            {editingTripId !== trip.id && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+                              <input 
+                                autoFocus
+                                value={editTripData.name}
+                                onChange={(e) => setEditTripData({...editTripData, name: e.target.value})}
+                                style={{ fontSize: '18px', fontWeight: '900', color: '#111827', margin: 0, padding: '8px 12px', border: '2px solid #8b5cf6', borderRadius: '10px', outline: 'none' }}
+                                onClick={(e) => e.stopPropagation()}
+                                placeholder="Trip Name"
+                              />
+                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <input 
+                                  type="date"
+                                  value={editTripData.startDate}
+                                  onChange={(e) => setEditTripData({...editTripData, startDate: e.target.value})}
+                                  style={{ flex: 1, padding: '8px', borderRadius: '10px', border: '1px solid #d1d5db', fontSize: '12px', fontWeight: 'bold', outline: 'none', color: '#4b5563' }}
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                                <span style={{ fontSize: '12px', color: '#9ca3af', fontWeight: '800' }}>~</span>
+                                <input 
+                                  type="date"
+                                  value={editTripData.endDate}
+                                  onChange={(e) => setEditTripData({...editTripData, endDate: e.target.value})}
+                                  style={{ flex: 1, padding: '8px', borderRadius: '10px', border: '1px solid #d1d5db', fontSize: '12px', fontWeight: 'bold', outline: 'none', color: '#4b5563' }}
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              </div>
                               <button 
-                                onClick={(e) => { e.stopPropagation(); startRenameTrip(trip.id, trip.name); }}
-                                style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '4px', borderRadius: '8px' }}
-                                title="Rename Trip"
+                                onClick={(e) => { e.stopPropagation(); saveRenameTrip(trip.id); }}
+                                style={{ padding: '10px', backgroundColor: '#8b5cf6', color: 'white', border: 'none', borderRadius: '10px', fontWeight: '900', cursor: 'pointer', marginTop: '4px' }}
                               >
-                                <Edit2 size={16} />
+                                SAVE TRIP
                               </button>
-                            )}
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); deleteTrip(trip.id); }}
-                              style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '4px', borderRadius: '8px' }}
-                              title="Delete Trip"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
+                            </div>
+                          ) : (
+                            <>
+                              <h3 style={{ fontSize: '18px', fontWeight: '900', color: '#111827', margin: 0 }}>{trip.name}</h3>
+                              <div style={{ display: 'flex', gap: '4px' }}>
+                                <button 
+                                  onClick={(e) => { e.stopPropagation(); startRenameTrip(trip); }}
+                                  style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '4px', borderRadius: '8px' }}
+                                  title="Edit Trip"
+                                >
+                                  <Edit2 size={16} />
+                                </button>
+                                <button 
+                                  onClick={(e) => { e.stopPropagation(); deleteTrip(trip.id); }}
+                                  style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '4px', borderRadius: '8px' }}
+                                  title="Delete Trip"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </>
+                          )}
                         </div>
-                        <div style={{ display: 'flex', gap: '16px', fontSize: '12px', fontWeight: '800', color: '#6b7280' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <Calendar size={14} /> {trip.itinerary.length} Days
+                        {editingTripId !== trip.id && (
+                          <div style={{ display: 'flex', gap: '16px', fontSize: '12px', fontWeight: '800', color: '#6b7280' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <Calendar size={14} /> {trip.startDate ? `${trip.startDate} ~ ${trip.endDate}` : `${trip.itinerary.length} Days`}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <Wallet size={14} /> ₩ {trip.expenses.reduce((sum, e) => sum + e.amountKRW, 0).toLocaleString()}
+                            </div>
                           </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <Wallet size={14} /> ₩ {trip.expenses.reduce((sum, e) => sum + e.amountKRW, 0).toLocaleString()}
-                          </div>
-                        </div>
+                        )}
                       </div>
                     ))}
                   </div>
