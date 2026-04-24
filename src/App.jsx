@@ -112,6 +112,7 @@ function App() {
   const [expandedCountries, setExpandedCountries] = useState({});
   const [editingTripId, setEditingTripId] = useState(null);
   const [editTripData, setEditTripData] = useState({ name: "", startDate: "", endDate: "" });
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
   const autocompleteRef = useRef(null);
 
@@ -244,15 +245,26 @@ function App() {
     setEditingTripId(null);
   };
 
+  const handleInlineDelete = (e, id, deleteAction) => {
+    e.stopPropagation();
+    if (confirmDeleteId === id) {
+      deleteAction();
+      setConfirmDeleteId(null);
+    } else {
+      setConfirmDeleteId(id);
+      setTimeout(() => {
+        setConfirmDeleteId((current) => current === id ? null : current);
+      }, 3000);
+    }
+  };
+
   const deleteTrip = (id) => {
-    if (window.confirm("정말로 이 여행과 관련된 모든 일정 및 지출 내역을 삭제하시겠습니까?")) {
-      const newTrips = trips.filter(t => t.id !== id);
-      setTrips(newTrips);
-      localStorage.setItem('world_pro_trips_v1', JSON.stringify(newTrips));
-      if (activeTripId === id) {
-        setActiveTripId(newTrips.length > 0 ? newTrips[0].id : null);
-        setViewMode('trips');
-      }
+    const newTrips = trips.filter(t => t.id !== id);
+    setTrips(newTrips);
+    localStorage.setItem('world_pro_trips_v1', JSON.stringify(newTrips));
+    if (activeTripId === id) {
+      setActiveTripId(newTrips.length > 0 ? newTrips[0].id : null);
+      setViewMode('trips');
     }
   };
 
@@ -282,9 +294,7 @@ function App() {
   };
 
   const deleteExpense = (id) => {
-    if (window.confirm("정말로 이 지출 내역을 삭제하시겠습니까?")) {
-      saveExpenses(expenses.filter(e => e.id !== id));
-    }
+    saveExpenses(expenses.filter(e => e.id !== id));
   };
 
   const toggleFavorite = (place) => {
@@ -337,11 +347,9 @@ function App() {
   };
 
   const removeFromItinerary = (dayIndex, itemId) => {
-    if (window.confirm("정말로 이 장소를 일정에서 삭제하시겠습니까?")) {
-      const newItinerary = [...itinerary];
-      newItinerary[dayIndex].items = newItinerary[dayIndex].items.filter(i => i.id !== itemId);
-      saveItinerary(newItinerary);
-    }
+    const newItinerary = [...itinerary];
+    newItinerary[dayIndex].items = newItinerary[dayIndex].items.filter(i => i.id !== itemId);
+    saveItinerary(newItinerary);
   };
 
   const onPlaceSelected = () => {
@@ -565,11 +573,11 @@ function App() {
                                   <Edit2 size={16} />
                                 </button>
                                 <button 
-                                  onClick={(e) => { e.stopPropagation(); deleteTrip(trip.id); }}
-                                  style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '4px', borderRadius: '8px' }}
+                                  onClick={(e) => handleInlineDelete(e, `trip-${trip.id}`, () => deleteTrip(trip.id))}
+                                  style={{ background: confirmDeleteId === `trip-${trip.id}` ? '#ef4444' : 'none', border: 'none', color: confirmDeleteId === `trip-${trip.id}` ? 'white' : '#f87171', cursor: 'pointer', padding: confirmDeleteId === `trip-${trip.id}` ? '4px 8px' : '4px', borderRadius: '8px', fontSize: '11px', fontWeight: '800' }}
                                   title="Delete Trip"
                                 >
-                                  <Trash2 size={16} />
+                                  {confirmDeleteId === `trip-${trip.id}` ? '확인' : <Trash2 size={16} />}
                                 </button>
                               </div>
                             </>
@@ -687,8 +695,11 @@ function App() {
                               <h3 style={{ fontSize: '14px', fontWeight: '800', color: '#111827', margin: '0 0 4px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</h3>
                               <p style={{ fontSize: '10px', fontWeight: '900', color: '#60a5fa', textTransform: 'uppercase', margin: 0, letterSpacing: '0.05em' }}>{item.cat}</p>
                             </div>
-                            <button onClick={() => removeFromItinerary(dIdx, item.id)} style={{ padding: '10px', color: '#ef4444', backgroundColor: '#fef2f2', border: 'none', borderRadius: '10px', cursor: 'pointer', flexShrink: 0 }}>
-                              <Trash2 size={18} />
+                            <button 
+                              onClick={(e) => handleInlineDelete(e, `itin-${item.id}`, () => removeFromItinerary(dIdx, item.id))} 
+                              style={{ padding: confirmDeleteId === `itin-${item.id}` ? '10px 14px' : '10px', color: confirmDeleteId === `itin-${item.id}` ? 'white' : '#ef4444', backgroundColor: confirmDeleteId === `itin-${item.id}` ? '#ef4444' : '#fef2f2', border: 'none', borderRadius: '10px', cursor: 'pointer', flexShrink: 0, fontSize: '12px', fontWeight: '800' }}
+                            >
+                              {confirmDeleteId === `itin-${item.id}` ? '확인' : <Trash2 size={18} />}
                             </button>
                           </div>
                         ))}
@@ -822,8 +833,11 @@ function App() {
                                   <span style={{ fontSize: '14px', fontWeight: '900', color: '#059669' }}>
                                     ₩{exp.amountKRW.toLocaleString()}
                                   </span>
-                                  <button onClick={() => deleteExpense(exp.id)} style={{ padding: '6px', backgroundColor: '#fef2f2', color: '#ef4444', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
-                                    <Trash2 size={14} />
+                                  <button 
+                                    onClick={(e) => handleInlineDelete(e, `exp-${exp.id}`, () => deleteExpense(exp.id))} 
+                                    style={{ padding: confirmDeleteId === `exp-${exp.id}` ? '6px 10px' : '6px', backgroundColor: confirmDeleteId === `exp-${exp.id}` ? '#ef4444' : '#fef2f2', color: confirmDeleteId === `exp-${exp.id}` ? 'white' : '#ef4444', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '11px', fontWeight: '800' }}
+                                  >
+                                    {confirmDeleteId === `exp-${exp.id}` ? '확인' : <Trash2 size={14} />}
                                   </button>
                                 </div>
                               </div>
