@@ -610,72 +610,81 @@ function App() {
         <aside className="sidebar-container">
 
           {/* Header */}
-          <div style={{ padding: '32px 32px 24px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #f3f4f6' }}>
-            <div>
-              <h1 style={{ fontSize: '28px', fontWeight: '900', color: '#111827', margin: 0, letterSpacing: '-0.05em' }}>WorldPro</h1>
-              <p style={{ fontSize: '10px', fontWeight: '800', color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.2em', margin: '4px 0 0 0' }}>Global Travel Planner</p>
+          <div style={{ padding: '24px 32px', borderBottom: '1px solid #f3f4f6', backgroundColor: 'white' }}>
+            {/* Row 1: Logo & Auth */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <div>
+                <h1 style={{ fontSize: '24px', fontWeight: '900', color: '#111827', margin: 0, letterSpacing: '-0.05em' }}>WorldPro</h1>
+                <p style={{ fontSize: '9px', fontWeight: '800', color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.15em', margin: '2px 0 0 0' }}>Global Travel Planner</p>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {session ? (
+                  <button onClick={() => supabase.auth.signOut()} style={{ background: '#f3f4f6', border: 'none', color: '#6b7280', fontWeight: '800', fontSize: '10px', cursor: 'pointer', padding: '8px 12px', borderRadius: '10px' }}>LOGOUT</button>
+                ) : (
+                  <button onClick={() => supabase.auth.signInWithOAuth({ provider: 'google' })} style={{ background: 'white', border: '1px solid #e5e7eb', color: '#4b5563', padding: '8px 12px', borderRadius: '10px', fontWeight: '800', fontSize: '10px', cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <img src="https://www.google.com/favicon.ico" width="12" height="12" alt="Google" />
+                    LOGIN
+                  </button>
+                )}
+              </div>
             </div>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              {session ? (
-                <button onClick={() => supabase.auth.signOut()} style={{ background: 'none', border: 'none', color: '#9ca3af', fontWeight: '800', fontSize: '10px', cursor: 'pointer', marginRight: '4px' }}>LOGOUT</button>
-              ) : (
-                <button onClick={() => supabase.auth.signInWithOAuth({ provider: 'google' })} style={{ background: 'white', border: '1px solid #e5e7eb', color: '#4b5563', padding: '6px 10px', borderRadius: '8px', fontWeight: '800', fontSize: '10px', cursor: 'pointer', marginRight: '4px', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <img src="https://www.google.com/favicon.ico" width="12" height="12" alt="Google" />
-                  LOGIN
-                </button>
-              )}
 
-              {activeTripId && activeTrip && (
-                <div style={{ marginRight: '8px' }}>
-                  {activeTrip.sharedId ? (
-                    <button 
-                      onClick={() => copyToClipboard(activeTrip.sharedId, activeTrip.id)}
-                      style={{ padding: '8px 12px', backgroundColor: '#f3f4f6', borderRadius: '12px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#6b7280', fontWeight: '900' }}
-                    >
-                      {copiedId === activeTrip.id ? <Check size={14} color="#10b981" /> : <Copy size={14} />}
-                      {copiedId === activeTrip.id ? "COPIED" : "CODE"}
-                    </button>
-                  ) : (
-                    <button 
-                      onClick={() => shareTrip(activeTrip.id)}
-                      style={{ padding: '8px 12px', backgroundColor: '#f5f3ff', borderRadius: '12px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#8b5cf6', fontWeight: '900' }}
-                    >
-                      <Share2 size={14} /> SHARE
-                    </button>
-                  )}
-                </div>
-              )}
-              <button 
-                onClick={() => setViewMode('trips')}
-                style={{ width: '44px', height: '44px', borderRadius: '14px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.2s', backgroundColor: viewMode === 'trips' ? '#8b5cf6' : '#f3f4f6', color: viewMode === 'trips' ? 'white' : '#9ca3af' }}
-                title="My Trips"
-              >
-                <Plane size={20} />
-              </button>
-              <button 
-                onClick={() => setViewMode('favorites')}
-                style={{ width: '44px', height: '44px', borderRadius: '14px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.2s', backgroundColor: viewMode === 'favorites' ? '#ef4444' : '#f3f4f6', color: viewMode === 'favorites' ? 'white' : '#9ca3af' }}
-                title="Favorites"
-              >
-                <Heart size={20} fill={viewMode === 'favorites' ? "currentColor" : "none"} />
-              </button>
+            {/* Row 2: Navigation Tabs & Share Actions */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '6px', paddingRight: '12px', borderRight: '1px solid #f3f4f6' }}>
+                <button 
+                  onClick={() => setViewMode('trips')}
+                  style={{ width: '40px', height: '40px', borderRadius: '12px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.2s', backgroundColor: viewMode === 'trips' ? '#8b5cf6' : '#f3f4f6', color: viewMode === 'trips' ? 'white' : '#9ca3af' }}
+                  title="My Trips"
+                >
+                  <Plane size={18} />
+                </button>
+                <button 
+                  onClick={() => setViewMode('favorites')}
+                  style={{ width: '40px', height: '40px', borderRadius: '12px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.2s', backgroundColor: viewMode === 'favorites' ? '#ef4444' : '#f3f4f6', color: viewMode === 'favorites' ? 'white' : '#9ca3af' }}
+                  title="Favorites"
+                >
+                  <Heart size={18} fill={viewMode === 'favorites' ? "currentColor" : "none"} />
+                </button>
+              </div>
+
               {activeTripId && (
-                <>
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flex: 1 }}>
                   <button 
                     onClick={() => setViewMode('itinerary')}
-                    style={{ width: '44px', height: '44px', borderRadius: '14px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.2s', backgroundColor: viewMode === 'itinerary' ? '#2563eb' : '#f3f4f6', color: viewMode === 'itinerary' ? 'white' : '#9ca3af' }}
+                    style={{ width: '40px', height: '40px', borderRadius: '12px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.2s', backgroundColor: viewMode === 'itinerary' ? '#2563eb' : '#f3f4f6', color: viewMode === 'itinerary' ? 'white' : '#9ca3af' }}
                     title="Planner"
                   >
-                    <Calendar size={20} />
+                    <Calendar size={18} />
                   </button>
                   <button 
                     onClick={() => setViewMode('budget')}
-                    style={{ width: '44px', height: '44px', borderRadius: '14px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.2s', backgroundColor: viewMode === 'budget' ? '#10b981' : '#f3f4f6', color: viewMode === 'budget' ? 'white' : '#9ca3af' }}
+                    style={{ width: '40px', height: '40px', borderRadius: '12px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.2s', backgroundColor: viewMode === 'budget' ? '#10b981' : '#f3f4f6', color: viewMode === 'budget' ? 'white' : '#9ca3af' }}
                     title="Budget"
                   >
-                    <Wallet size={20} />
+                    <Wallet size={18} />
                   </button>
-                </>
+                  
+                  {/* Share Action */}
+                  <div style={{ marginLeft: 'auto' }}>
+                    {activeTrip?.sharedId ? (
+                      <button 
+                        onClick={() => copyToClipboard(activeTrip.sharedId, activeTrip.id)}
+                        style={{ height: '40px', padding: '0 12px', backgroundColor: '#f3f4f6', borderRadius: '12px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#6b7280', fontWeight: '900' }}
+                      >
+                        {copiedId === activeTrip.id ? <Check size={14} color="#10b981" /> : <Copy size={14} />}
+                        {copiedId === activeTrip.id ? "CODE" : "CODE"}
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={() => shareTrip(activeTrip.id)}
+                        style={{ height: '40px', padding: '0 12px', backgroundColor: '#f5f3ff', borderRadius: '12px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#8b5cf6', fontWeight: '900' }}
+                      >
+                        <Share2 size={14} /> SHARE
+                      </button>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
           </div>
