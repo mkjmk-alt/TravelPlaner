@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete, Polyline } from '@react-google-maps/api';
 import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import './index.css';
@@ -235,6 +235,12 @@ function App() {
     });
     return groups;
   }, [favorites]);
+
+  const polylinePath = useMemo(() => {
+    const dayPlan = itinerary.find(d => d.day === activeDay);
+    if (!dayPlan || dayPlan.items.length < 2) return [];
+    return dayPlan.items.map(item => ({ lat: item.lat, lng: item.lng }));
+  }, [itinerary, activeDay]);
 
   const toggleCountry = (country) => {
     setExpandedCountries(prev => ({
@@ -1183,6 +1189,49 @@ function App() {
                 `)}`,
                 scaledSize: new window.google.maps.Size(32, 32),
                 anchor: new window.google.maps.Point(16, 16)
+              }}
+            />
+          ))}
+
+          {/* Route Path (Polyline) */}
+          {polylinePath.length > 0 && (
+            <Polyline
+              path={polylinePath}
+              options={{
+                strokeColor: '#3b82f6',
+                strokeOpacity: 0.8,
+                strokeWeight: 4,
+                icons: [
+                  {
+                    icon: { path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW, scale: 3, fillOpacity: 1, strokeColor: '#3b82f6' },
+                    offset: '50%',
+                    repeat: '100px'
+                  }
+                ],
+              }}
+            />
+          )}
+
+          {/* Itinerary Markers (for active day) */}
+          {itinerary.find(d => d.day === activeDay)?.items.map((item, idx) => (
+            <Marker
+              key={`itin-mark-${item.id}`}
+              position={{ lat: item.lat, lng: item.lng }}
+              label={{
+                text: `${idx + 1}`,
+                color: 'white',
+                fontSize: '14px',
+                fontWeight: '900'
+              }}
+              onClick={() => setSelectedPlace(item)}
+              icon={{
+                url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                  <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="20" cy="20" r="16" fill="#3b82f6" stroke="white" stroke-width="3"/>
+                  </svg>
+                `)}`,
+                scaledSize: new window.google.maps.Size(40, 40),
+                anchor: new window.google.maps.Point(20, 20)
               }}
             />
           ))}
