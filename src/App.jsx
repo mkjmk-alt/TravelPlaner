@@ -750,7 +750,7 @@ function App() {
                             <>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', gap: '8px' }}>
                           <h3 style={{ fontSize: '18px', fontWeight: '900', color: '#111827', margin: 0, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{trip.name}</h3>
-                          <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                          <div style={{ display: 'flex', gap: '4px', flexShrink: 0, alignItems: 'center' }}>
                             {trip.sharedId && (
                               <button 
                                 onClick={(e) => { e.stopPropagation(); copyToClipboard(trip.sharedId, trip.id); }}
@@ -770,24 +770,22 @@ function App() {
                                 <Share2 size={12} /> SHARE
                               </button>
                             )}
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); startRenameTrip(trip); }}
+                              style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '4px', borderRadius: '8px' }}
+                              title="Edit Trip"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                            <button 
+                              onClick={(e) => handleInlineDelete(e, `trip-${trip.id}`, () => deleteTrip(trip.id))}
+                              style={{ background: confirmDeleteId === `trip-${trip.id}` ? '#ef4444' : 'none', border: 'none', color: confirmDeleteId === `trip-${trip.id}` ? 'white' : '#f87171', cursor: 'pointer', padding: confirmDeleteId === `trip-${trip.id}` ? '4px 8px' : '4px', borderRadius: '8px', fontSize: '11px', fontWeight: '800' }}
+                              title="Delete Trip"
+                            >
+                              {confirmDeleteId === `trip-${trip.id}` ? '확인' : <Trash2 size={16} />}
+                            </button>
                           </div>
                         </div>
-
-                                <button 
-                                  onClick={(e) => { e.stopPropagation(); startRenameTrip(trip); }}
-                                  style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '4px', borderRadius: '8px' }}
-                                  title="Edit Trip"
-                                >
-                                  <Edit2 size={16} />
-                                </button>
-                                <button 
-                                  onClick={(e) => handleInlineDelete(e, `trip-${trip.id}`, () => deleteTrip(trip.id))}
-                                  style={{ background: confirmDeleteId === `trip-${trip.id}` ? '#ef4444' : 'none', border: 'none', color: confirmDeleteId === `trip-${trip.id}` ? 'white' : '#f87171', cursor: 'pointer', padding: confirmDeleteId === `trip-${trip.id}` ? '4px 8px' : '4px', borderRadius: '8px', fontSize: '11px', fontWeight: '800' }}
-                                  title="Delete Trip"
-                                >
-                                  {confirmDeleteId === `trip-${trip.id}` ? '확인' : <Trash2 size={16} />}
-                                </button>
-                              </div>
                             </>
                           )}
                         </div>
