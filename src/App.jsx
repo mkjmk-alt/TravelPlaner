@@ -257,7 +257,17 @@ function App() {
     
     // 1. Sync to private user_state
     if (session?.user?.id) {
-      await supabase.from('user_state').upsert({ user_id: session.user.id, key: 'world_pro_trips_v1', value: newTrips }).catch(console.error);
+      try {
+        const { error } = await supabase
+          .from('user_state')
+          .upsert(
+            { user_id: session.user.id, key: 'world_pro_trips_v1', value: newTrips },
+            { onConflict: 'user_id,key' }
+          );
+        if (error) throw error;
+      } catch (err) {
+        console.error("Cloud sync failed:", err);
+      }
     }
 
     // 2. Sync individual shared trips to shared_trips table
@@ -411,9 +421,11 @@ function App() {
     }
   };
 
-  const deleteTrip = (id) => {
+  const deleteTrip = async (id) => {
     const newTrips = trips.filter(t => t.id !== id);
-    syncTripsToCloud(newTrips);
+    // Wait for cloud sync to finish before any UI navigation
+    await syncTripsToCloud(newTrips);
+    
     if (activeTripId === id) {
       setActiveTripId(newTrips.length > 0 ? newTrips[0].id : null);
       setViewMode('trips');
