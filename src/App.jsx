@@ -356,7 +356,12 @@ function App() {
     if (activeTrip.startDate) {
       const startDateObj = new Date(activeTrip.startDate + "T00:00:00");
       startDateObj.setDate(startDateObj.getDate() + (totalDays - 1));
-      newEndDate = startDateObj.toISOString().split('T')[0];
+      
+      // Construct YYYY-MM-DD manually using local date methods to avoid UTC shift
+      const y = startDateObj.getFullYear();
+      const m = String(startDateObj.getMonth() + 1).padStart(2, '0');
+      const d = String(startDateObj.getDate()).padStart(2, '0');
+      newEndDate = `${y}-${m}-${d}`;
     }
     
     await updateActiveTrip({ 
@@ -410,25 +415,24 @@ function App() {
         if (start <= end) {
           const diffTime = Math.abs(end - start);
           const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-          
           if (diffDays > 0 && diffDays <= 100) {
              newItinerary = Array.from({length: diffDays}, (_, i) => ({ day: i + 1, items: [] }));
           }
         }
       }
 
-      const newTrips = trips.map(t => {
+      const nextTrips = trips.map(t => {
         if (t.id === id) {
           const tripToUpdate = { ...t, name: name.trim(), startDate, endDate };
           if (newItinerary) {
-             // Merge to avoid losing existing itinerary items
-             tripToUpdate.itinerary = newItinerary.map((newDay, index) => t.itinerary[index] || newDay);
+             tripToUpdate.itinerary = newItinerary.map((newDay, idx) => t.itinerary[idx] || newDay);
           }
           return tripToUpdate;
         }
         return t;
       });
-      syncTripsToCloud(newTrips);
+      
+      syncTripsToCloud(nextTrips);
     }
     setEditingTripId(null);
   };
