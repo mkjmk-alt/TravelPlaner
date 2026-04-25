@@ -464,23 +464,29 @@ function App() {
   };
 
   const addDay = () => {
-    const nextDay = itinerary.length + 1;
-    const newItinerary = [...itinerary, { day: nextDay, items: [] }];
+    if (!activeTrip) return;
     
-    if (activeTrip && activeTrip.startDate) {
+    const newItinerary = [...itinerary, { day: itinerary.length + 1, items: [] }];
+    const totalDays = newItinerary.length;
+    let newEndDate = activeTrip.endDate;
+    
+    if (activeTrip.startDate) {
       try {
-        const date = new Date(activeTrip.startDate + "T00:00:00");
-        date.setDate(date.getDate() + (nextDay - 1));
-        const newEndDate = date.toISOString().split('T')[0];
-        updateActiveTrip({ itinerary: newItinerary, endDate: newEndDate });
-      } catch {
-        saveItinerary(newItinerary);
+        const startDateObj = new Date(activeTrip.startDate + "T00:00:00");
+        // End date is Start Date + (Total Days - 1)
+        startDateObj.setDate(startDateObj.getDate() + (totalDays - 1));
+        newEndDate = startDateObj.toISOString().split('T')[0];
+      } catch (e) {
+        console.error("Date calculation error", e);
       }
-    } else {
-      saveItinerary(newItinerary);
     }
     
-    setActiveDay(nextDay);
+    updateActiveTrip({ 
+      itinerary: newItinerary, 
+      endDate: newEndDate 
+    });
+    
+    setActiveDay(totalDays);
   };
 
   const addToItinerary = (place) => {
