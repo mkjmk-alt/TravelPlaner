@@ -336,10 +336,35 @@ function App() {
   };
 
   // --- TRIP DATA MUTATORS ---
-  const updateActiveTrip = (updates) => {
+  const updateActiveTrip = async (updates) => {
     if (!activeTripId) return;
-    const newTrips = trips.map(t => t.id === activeTripId ? { ...t, ...updates } : t);
-    syncTripsToCloud(newTrips);
+    
+    // Calculate new state array based on existing state
+    const nextTrips = trips.map(t => t.id === activeTripId ? { ...t, ...updates } : t);
+    
+    // Sync to cloud and update local state
+    await syncTripsToCloud(nextTrips);
+  };
+
+  const addDay = async () => {
+    if (!activeTrip) return;
+    
+    const newItinerary = [...itinerary, { day: itinerary.length + 1, items: [] }];
+    const totalDays = newItinerary.length;
+    let newEndDate = activeTrip.endDate;
+    
+    if (activeTrip.startDate) {
+      const startDateObj = new Date(activeTrip.startDate + "T00:00:00");
+      startDateObj.setDate(startDateObj.getDate() + (totalDays - 1));
+      newEndDate = startDateObj.toISOString().split('T')[0];
+    }
+    
+    await updateActiveTrip({ 
+      itinerary: newItinerary, 
+      endDate: newEndDate 
+    });
+    
+    setActiveDay(totalDays);
   };
 
   const saveItinerary = (newItinerary) => updateActiveTrip({ itinerary: newItinerary });
@@ -473,32 +498,6 @@ function App() {
   const isFavorite = (place) => {
     if (!place) return false;
     return favorites.some(f => f.name === place.name);
-  };
-
-  const addDay = () => {
-    if (!activeTrip) return;
-    
-    const newItinerary = [...itinerary, { day: itinerary.length + 1, items: [] }];
-    const totalDays = newItinerary.length;
-    let newEndDate = activeTrip.endDate;
-    
-    if (activeTrip.startDate) {
-      try {
-        const startDateObj = new Date(activeTrip.startDate + "T00:00:00");
-        // End date is Start Date + (Total Days - 1)
-        startDateObj.setDate(startDateObj.getDate() + (totalDays - 1));
-        newEndDate = startDateObj.toISOString().split('T')[0];
-      } catch (e) {
-        console.error("Date calculation error", e);
-      }
-    }
-    
-    updateActiveTrip({ 
-      itinerary: newItinerary, 
-      endDate: newEndDate 
-    });
-    
-    setActiveDay(totalDays);
   };
 
   const addToItinerary = (place) => {
