@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete } from '@react-google-maps/api';
-import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, Plane, Menu, X, Compass, Plus, Edit2 } from 'lucide-react';
+import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import './index.css';
 
@@ -45,6 +45,7 @@ function App() {
   const [editingTripId, setEditingTripId] = useState(null);
   const [editTripData, setEditTripData] = useState({ name: "", startDate: "", endDate: "" });
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [copiedId, setCopiedId] = useState(null);
   const [map, setMap] = useState(null);
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [isLoadingDB, setIsLoadingDB] = useState(true);
@@ -146,6 +147,29 @@ function App() {
     initCloudDB();
   }, [session]);
 
+  // --- REALTIME SYNC FOR SHARED TRIPS ---
+  useEffect(() => {
+    const sharedIds = trips.filter(t => t.sharedId).map(t => t.sharedId);
+    if (sharedIds.length === 0) return;
+
+    // Listen for any changes in the shared_trips table
+    const channel = supabase
+      .channel('shared-trips-sync')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'shared_trips' }, payload => {
+        const sharedId = payload.new.id;
+        const updatedData = payload.new.trip_data;
+        
+        setTrips(prev => prev.map(t => 
+          t.sharedId === sharedId ? { ...updatedData, sharedId } : t
+        ));
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [trips.filter(t => t.sharedId).length]);
+
   // Exchange Rates
   useEffect(() => {
     fetch('https://open.er-api.com/v6/latest/KRW')
@@ -230,9 +254,75 @@ function App() {
   const syncTripsToCloud = async (newTrips) => {
     setTrips(newTrips);
     localStorage.setItem('world_pro_trips_v1', JSON.stringify(newTrips));
+    
+    // 1. Sync to private user_state
     if (session?.user?.id) {
       await supabase.from('user_state').upsert({ user_id: session.user.id, key: 'world_pro_trips_v1', value: newTrips }).catch(console.error);
     }
+
+    // 2. Sync individual shared trips to shared_trips table
+    for (const trip of newTrips) {
+      if (trip.sharedId) {
+        await supabase.from('shared_trips').update({ trip_data: trip }).eq('id', trip.sharedId).catch(console.error);
+      }
+    }
+  };
+
+  const shareTrip = async (tripId) => {
+    const trip = trips.find(t => t.id === tripId);
+    if (!trip || trip.sharedId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('shared_trips')
+        .insert({ trip_data: trip })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const newTrips = trips.map(t => t.id === tripId ? { ...t, sharedId: data.id } : t);
+      await syncTripsToCloud(newTrips);
+      alert(`공유가 시작되었습니다! 코드를 친구에게 전달하세요.\n코드: ${data.id}`);
+    } catch (err) {
+      console.error("Sharing failed:", err);
+      alert("공유에 실패했습니다.");
+    }
+  };
+
+  const joinSharedTrip = async () => {
+    const code = prompt("친구에게 받은 공유 코드를 입력하세요:");
+    if (!code || code.trim().length < 10) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('shared_trips')
+        .select('*')
+        .eq('id', code.trim())
+        .single();
+
+      if (error || !data) throw new Error("Invalid Code");
+
+      if (trips.some(t => t.sharedId === data.id)) {
+        alert("이미 목록에 있는 일정입니다.");
+        return;
+      }
+
+      const joinedTrip = { ...data.trip_data, sharedId: data.id };
+      const newTrips = [joinedTrip, ...trips];
+      await syncTripsToCloud(newTrips);
+      setActiveTripId(joinedTrip.id);
+      setViewMode('itinerary');
+      alert(`'${joinedTrip.name}' 일정에 참여했습니다!`);
+    } catch (err) {
+      alert("올바른 공유 코드를 입력해 주세요.");
+    }
+  };
+
+  const copyToClipboard = (text, id) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
   };
 
   // --- TRIP DATA MUTATORS ---
@@ -513,14 +603,12 @@ function App() {
 
 
   return (
-    <div className="relative w-screen h-screen bg-[#f8f9fa] overflow-hidden font-sans" style={{ width: '100vw', height: '100vh', position: 'relative', fontFamily: '"Inter", "Roboto", sans-serif' }}>
+    <div className="app-container">
       
       {/* SIDEBAR UI */}
       {sidebarOpen && (
-        <aside 
-          className="absolute top-6 left-6 bottom-6 w-[400px] bg-white/95 backdrop-blur-2xl rounded-[32px] shadow-2xl border border-white/50 flex flex-col overflow-hidden z-[1000] transition-all duration-300"
-          style={{ position: 'absolute', top: '24px', left: '24px', bottom: '24px', width: '420px', backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: '24px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', border: '1px solid rgba(255,255,255,0.8)', zIndex: 1000, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
-        >
+        <aside className="sidebar-container">
+
           {/* Header */}
           <div style={{ padding: '32px 32px 24px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #f3f4f6' }}>
             <div>
@@ -535,6 +623,27 @@ function App() {
                   <img src="https://www.google.com/favicon.ico" width="12" height="12" alt="Google" />
                   LOGIN
                 </button>
+              )}
+
+              {activeTripId && activeTrip && (
+                <div style={{ marginRight: '8px' }}>
+                  {activeTrip.sharedId ? (
+                    <button 
+                      onClick={() => copyToClipboard(activeTrip.sharedId, activeTrip.id)}
+                      style={{ padding: '8px 12px', backgroundColor: '#f3f4f6', borderRadius: '12px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#6b7280', fontWeight: '900' }}
+                    >
+                      {copiedId === activeTrip.id ? <Check size={14} color="#10b981" /> : <Copy size={14} />}
+                      {copiedId === activeTrip.id ? "COPIED" : "CODE"}
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => shareTrip(activeTrip.id)}
+                      style={{ padding: '8px 12px', backgroundColor: '#f5f3ff', borderRadius: '12px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#8b5cf6', fontWeight: '900' }}
+                    >
+                      <Share2 size={14} /> SHARE
+                    </button>
+                  )}
+                </div>
               )}
               <button 
                 onClick={() => setViewMode('trips')}
@@ -579,9 +688,14 @@ function App() {
               <>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
                   <h2 style={{ fontSize: '12px', fontWeight: '900', color: '#8b5cf6', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>My Trips</h2>
-                  <button onClick={createNewTrip} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '800', color: '#8b5cf6', backgroundColor: '#f5f3ff', padding: '8px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer' }}>
-                    <PlusCircle size={14} /> NEW TRIP
-                  </button>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button onClick={joinSharedTrip} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '800', color: '#10b981', backgroundColor: '#ecfdf5', padding: '8px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer' }}>
+                      <Users size={14} /> JOIN
+                    </button>
+                    <button onClick={createNewTrip} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '800', color: '#8b5cf6', backgroundColor: '#f5f3ff', padding: '8px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer' }}>
+                      <PlusCircle size={14} /> NEW TRIP
+                    </button>
+                  </div>
                 </div>
 
                 {trips.length === 0 ? (
@@ -634,8 +748,31 @@ function App() {
                             </div>
                           ) : (
                             <>
-                              <h3 style={{ fontSize: '18px', fontWeight: '900', color: '#111827', margin: 0 }}>{trip.name}</h3>
-                              <div style={{ display: 'flex', gap: '4px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', gap: '8px' }}>
+                          <h3 style={{ fontSize: '18px', fontWeight: '900', color: '#111827', margin: 0, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{trip.name}</h3>
+                          <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                            {trip.sharedId && (
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); copyToClipboard(trip.sharedId, trip.id); }}
+                                style={{ padding: '6px 8px', backgroundColor: '#f3f4f6', borderRadius: '8px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: '#6b7280', fontWeight: '800' }}
+                                title="Copy Share Code"
+                              >
+                                {copiedId === trip.id ? <Check size={12} color="#10b981" /> : <Copy size={12} />}
+                                {copiedId === trip.id ? "CODE" : "CODE"}
+                              </button>
+                            )}
+                            {!trip.sharedId && (
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); shareTrip(trip.id); }}
+                                style={{ padding: '6px 8px', backgroundColor: '#f5f3ff', borderRadius: '8px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: '#8b5cf6', fontWeight: '800' }}
+                                title="Share Trip"
+                              >
+                                <Share2 size={12} /> SHARE
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
                                 <button 
                                   onClick={(e) => { e.stopPropagation(); startRenameTrip(trip); }}
                                   style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '4px', borderRadius: '8px' }}
@@ -956,7 +1093,8 @@ function App() {
       )}
 
       {/* MAP VIEWPORT */}
-      <main className="absolute inset-0 z-0" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}>
+      <div className="map-wrapper">
+
         {!sidebarOpen && (
           <button onClick={() => setSidebarOpen(true)} className="absolute top-6 left-6 z-[2000] w-14 h-14 bg-white rounded-2xl shadow-2xl flex items-center justify-center text-blue-600 hover:scale-110 transition-all border border-white" style={{ position: 'absolute', top: '24px', left: '24px', zIndex: 2000, width: '56px', height: '56px', backgroundColor: 'white', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', cursor: 'pointer', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb' }}>
             <Menu size={24} />
@@ -1066,7 +1204,8 @@ function App() {
             </InfoWindow>
           )}
         </GoogleMap>
-      </main>
+      </div>
+
     </div>
   );
 }
