@@ -12,6 +12,7 @@ const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 const mapOptions = {
   disableDefaultUI: true,
   zoomControl: false,
+  gestureHandling: 'greedy',
   styles: [
     { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#eff6ff' }] },
     { featureType: 'landscape', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
