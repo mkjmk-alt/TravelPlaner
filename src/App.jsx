@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete } from '@react-google-maps/api';
 import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, Plane, Menu, X, Compass, Plus, Edit2 } from 'lucide-react';
+import { supabase } from './supabaseClient';
 import './index.css';
 
 // --- CONFIGURATION ---
@@ -75,6 +76,48 @@ function App() {
     const savedTrips = JSON.parse(localStorage.getItem('world_pro_trips_v1') || '[]');
     return savedTrips.length > 0 ? savedTrips[0].id : null;
   });
+
+  const [isLoadingDB, setIsLoadingDB] = useState(true);
+
+  useEffect(() => {
+    async function initCloudDB() {
+      try {
+        const { data, error } = await supabase.from('app_state').select('*');
+        if (error) throw error;
+        
+        let cloudTrips = null;
+        let cloudFavs = null;
+        
+        if (data && data.length > 0) {
+          const tripsRow = data.find(r => r.key === 'world_pro_trips_v1');
+          if (tripsRow) cloudTrips = tripsRow.value;
+          
+          const favsRow = data.find(r => r.key === 'world_pro_fav_v1');
+          if (favsRow) cloudFavs = favsRow.value;
+        }
+
+        if (!cloudTrips && trips.length > 0) {
+          await supabase.from('app_state').upsert({ key: 'world_pro_trips_v1', value: trips });
+        } else if (cloudTrips) {
+          setTrips(cloudTrips);
+          localStorage.setItem('world_pro_trips_v1', JSON.stringify(cloudTrips));
+          if (!activeTripId && cloudTrips.length > 0) setActiveTripId(cloudTrips[0].id);
+        }
+
+        if (!cloudFavs && favorites.length > 0) {
+          await supabase.from('app_state').upsert({ key: 'world_pro_fav_v1', value: favorites });
+        } else if (cloudFavs) {
+          setFavorites(cloudFavs);
+          localStorage.setItem('world_pro_fav_v1', JSON.stringify(cloudFavs));
+        }
+      } catch (err) {
+        console.error("Supabase sync failed:", err);
+      } finally {
+        setIsLoadingDB(false);
+      }
+    }
+    initCloudDB();
+  }, []);
 
   // Active Trip Derived State
   const activeTrip = trips.find(t => t.id === activeTripId);
@@ -164,17 +207,23 @@ function App() {
     }));
   };
 
-  const saveFavorites = (newFavs) => {
+  const saveFavorites = async (newFavs) => {
     setFavorites(newFavs);
     localStorage.setItem('world_pro_fav_v1', JSON.stringify(newFavs));
+    await supabase.from('app_state').upsert({ key: 'world_pro_fav_v1', value: newFavs }).catch(console.error);
+  };
+
+  const syncTripsToCloud = async (newTrips) => {
+    setTrips(newTrips);
+    localStorage.setItem('world_pro_trips_v1', JSON.stringify(newTrips));
+    await supabase.from('app_state').upsert({ key: 'world_pro_trips_v1', value: newTrips }).catch(console.error);
   };
 
   // --- TRIP DATA MUTATORS ---
   const updateActiveTrip = (updates) => {
     if (!activeTripId) return;
     const newTrips = trips.map(t => t.id === activeTripId ? { ...t, ...updates } : t);
-    setTrips(newTrips);
-    localStorage.setItem('world_pro_trips_v1', JSON.stringify(newTrips));
+    syncTripsToCloud(newTrips);
   };
 
   const saveItinerary = (newItinerary) => updateActiveTrip({ itinerary: newItinerary });
@@ -197,8 +246,7 @@ function App() {
     };
     
     const newTrips = [newTrip, ...trips];
-    setTrips(newTrips);
-    localStorage.setItem('world_pro_trips_v1', JSON.stringify(newTrips));
+    syncTripsToCloud(newTrips);
     
     // Auto-enter inline edit mode
     setEditingTripId(newId);
@@ -239,8 +287,7 @@ function App() {
         }
         return t;
       });
-      setTrips(newTrips);
-      localStorage.setItem('world_pro_trips_v1', JSON.stringify(newTrips));
+      syncTripsToCloud(newTrips);
     }
     setEditingTripId(null);
   };
@@ -260,8 +307,7 @@ function App() {
 
   const deleteTrip = (id) => {
     const newTrips = trips.filter(t => t.id !== id);
-    setTrips(newTrips);
-    localStorage.setItem('world_pro_trips_v1', JSON.stringify(newTrips));
+    syncTripsToCloud(newTrips);
     if (activeTripId === id) {
       setActiveTripId(newTrips.length > 0 ? newTrips[0].id : null);
       setViewMode('trips');
