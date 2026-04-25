@@ -801,7 +801,15 @@ function App() {
                         {editingTripId !== trip.id && (
                           <div style={{ display: 'flex', gap: '16px', fontSize: '12px', fontWeight: '800', color: '#6b7280' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <Calendar size={14} /> {trip.startDate ? `${trip.startDate} ~ ${trip.endDate}` : `${trip.itinerary.length} Days`}
+                              <Calendar size={14} /> 
+                              {trip.startDate ? (
+                                <>
+                                  <span style={{ color: '#111827' }}>{trip.startDate} ~ {trip.endDate}</span>
+                                  <span style={{ color: '#9ca3af', marginLeft: '4px' }}>({trip.itinerary.length} {trip.itinerary.length === 1 ? 'Day' : 'Days'})</span>
+                                </>
+                              ) : (
+                                <span style={{ color: '#111827' }}>{trip.itinerary.length} {trip.itinerary.length === 1 ? 'Day' : 'Days'}</span>
+                              )}
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <Wallet size={14} /> ₩ {trip.expenses.reduce((sum, e) => sum + e.amountKRW, 0).toLocaleString()}
