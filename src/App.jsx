@@ -642,9 +642,27 @@ function App() {
                                 <h3 style={{ fontSize: '14px', fontWeight: '800', color: '#111827', margin: '0 0 4px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{loc.name}</h3>
                                 <p style={{ fontSize: '11px', fontWeight: '700', color: '#9ca3af', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{loc.loc}</p>
                               </div>
-                              <button onClick={(e) => { e.stopPropagation(); toggleFavorite(loc); }} style={{ padding: '10px', backgroundColor: '#fef2f2', border: 'none', color: '#ef4444', borderRadius: '10px', cursor: 'pointer', flexShrink: 0 }}>
-                                <Heart size={18} fill="currentColor" />
-                              </button>
+                              <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                                {activeTripId && (
+                                  <button 
+                                    onClick={(e) => { 
+                                      e.stopPropagation(); 
+                                      addToItinerary(loc);
+                                    }} 
+                                    style={{ padding: '10px', backgroundColor: '#eff6ff', border: 'none', color: '#3b82f6', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                    title={`Day ${activeDay} 일정에 추가`}
+                                  >
+                                    <Plus size={18} />
+                                  </button>
+                                )}
+                                <button 
+                                  onClick={(e) => { e.stopPropagation(); toggleFavorite(loc); }} 
+                                  style={{ padding: '10px', backgroundColor: '#fef2f2', border: 'none', color: '#ef4444', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                  title="즐겨찾기에서 제거"
+                                >
+                                  <Heart size={18} fill="currentColor" />
+                                </button>
+                              </div>
                             </div>
                           ))}
                         </div>
