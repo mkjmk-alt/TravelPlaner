@@ -34,16 +34,27 @@ function App() {
     libraries: MAP_LIBRARIES,
   });
 
+  // --- GLOBAL UI & AUTH STATE ---
+  const [session, setSession] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [viewMode, setViewMode] = useState('trips');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResult, setSearchResult] = useState(null);
+  const [activeDay, setActiveDay] = useState(1);
+  const [expandedCountries, setExpandedCountries] = useState({});
+  const [editingTripId, setEditingTripId] = useState(null);
+  const [editTripData, setEditTripData] = useState({ name: "", startDate: "", endDate: "" });
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [map, setMap] = useState(null);
   const [selectedPlace, setSelectedPlace] = useState(null);
-  
-  // Favorites State
+  const [isLoadingDB, setIsLoadingDB] = useState(true);
+
+  // --- DATA STATE ---
   const [favorites, setFavorites] = useState(() => {
     const saved = localStorage.getItem('world_pro_fav_v1');
     return saved ? JSON.parse(saved) : [];
   });
 
-  // --- TRIPS STATE ---
   const [trips, setTrips] = useState(() => {
     const savedTrips = localStorage.getItem('world_pro_trips_v1');
     if (savedTrips) return JSON.parse(savedTrips);
@@ -68,7 +79,6 @@ function App() {
       localStorage.setItem('world_pro_trips_v1', JSON.stringify([migratedTrip]));
       return [migratedTrip];
     }
-    
     return [];
   });
 
@@ -77,13 +87,26 @@ function App() {
     return savedTrips.length > 0 ? savedTrips[0].id : null;
   });
 
-  const [isLoadingDB, setIsLoadingDB] = useState(true);
+  const [exchangeRates, setExchangeRates] = useState({});
+  const [expenseInput, setExpenseInput] = useState({ desc: '', amount: '', currency: '', day: 1 });
 
+  const autocompleteRef = useRef(null);
+
+  // --- EFFECTS ---
+  
+  // Auth listener
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setSession(session));
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Cloud Sync Initialization
   useEffect(() => {
     async function initCloudDB() {
       if (!session) {
         setIsLoadingDB(false);
-        return; // Guest mode relies solely on localStorage initialization
+        return;
       }
       try {
         const { data, error } = await supabase.from('user_state').select('*').eq('user_id', session.user.id);
@@ -123,14 +146,23 @@ function App() {
     initCloudDB();
   }, [session]);
 
-  // Active Trip Derived State
+  // Exchange Rates
+  useEffect(() => {
+    fetch('https://open.er-api.com/v6/latest/KRW')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.rates) {
+          setExchangeRates(data.rates);
+        }
+      })
+      .catch(err => console.error("Exchange rate fetch failed", err));
+  }, []);
+
+  // --- DERIVED STATE ---
   const activeTrip = trips.find(t => t.id === activeTripId);
   const itinerary = activeTrip?.itinerary || [];
   const budgetSettings = activeTrip?.budgetSettings || { limitKRW: 1000000, travelCurrency: 'USD' };
   const expenses = activeTrip?.expenses || [];
-
-  const [exchangeRates, setExchangeRates] = useState({});
-  const [expenseInput, setExpenseInput] = useState({ desc: '', amount: '', currency: '', day: 1 });
 
   // Natively translate and sort currencies
   const getCurrencyNameKO = (code) => {
@@ -150,38 +182,6 @@ function App() {
     list.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
     return list;
   }, [exchangeRates]);
-
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [viewMode, setViewMode] = useState('trips'); // 'trips', 'favorites', 'itinerary', 'budget'
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResult, setSearchResult] = useState(null);
-  const [activeDay, setActiveDay] = useState(1);
-  const [expandedCountries, setExpandedCountries] = useState({});
-  const [editingTripId, setEditingTripId] = useState(null);
-  const [editTripData, setEditTripData] = useState({ name: "", startDate: "", endDate: "" });
-  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
-
-  const [session, setSession] = useState(null);
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setSession(session));
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const autocompleteRef = useRef(null);
-
-  // Fetch Live Exchange Rates (Base KRW)
-  useEffect(() => {
-    fetch('https://open.er-api.com/v6/latest/KRW')
-      .then(res => res.json())
-      .then(data => {
-        if (data && data.rates) {
-          setExchangeRates(data.rates);
-        }
-      })
-      .catch(err => console.error("Exchange rate fetch failed", err));
-  }, []);
 
   const getCountryFromAddress = (address) => {
     if (!address) return 'Unknown';
