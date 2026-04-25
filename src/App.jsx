@@ -83,7 +83,7 @@ function App() {
   const expenses = activeTrip?.expenses || [];
 
   const [exchangeRates, setExchangeRates] = useState({});
-  const [expenseInput, setExpenseInput] = useState({ desc: '', amount: '', currency: 'KRW', day: 1 });
+  const [expenseInput, setExpenseInput] = useState({ desc: '', amount: '', currency: '', day: 1 });
 
   // Natively translate and sort currencies
   const getCurrencyNameKO = (code) => {
@@ -797,10 +797,10 @@ function App() {
                       onChange={e => setExpenseInput({...expenseInput, currency: e.target.value})}
                       style={{ flex: 1, minWidth: 0, boxSizing: 'border-box', padding: '10px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '12px', fontWeight: '700', outline: 'none' }}
                     >
-                      <option value="KRW">🇰🇷 대한민국 원 (KRW)</option>
                       {budgetSettings.travelCurrency !== 'KRW' && (
                         <option value={budgetSettings.travelCurrency}>⭐️ {getCurrencyNameKO(budgetSettings.travelCurrency)} ({budgetSettings.travelCurrency})</option>
                       )}
+                      <option value="KRW">🇰🇷 대한민국 원 (KRW)</option>
                     </select>
                   </div>
                   <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
