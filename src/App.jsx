@@ -80,9 +80,10 @@ function App() {
   const [isLoadingDB, setIsLoadingDB] = useState(true);
 
   useEffect(() => {
+    if (!session) return;
     async function initCloudDB() {
       try {
-        const { data, error } = await supabase.from('app_state').select('*');
+        const { data, error } = await supabase.from('user_state').select('*').eq('user_id', session.user.id);
         if (error) throw error;
         
         let cloudTrips = null;
@@ -97,7 +98,7 @@ function App() {
         }
 
         if (!cloudTrips && trips.length > 0) {
-          await supabase.from('app_state').upsert({ key: 'world_pro_trips_v1', value: trips });
+          await supabase.from('user_state').upsert({ user_id: session.user.id, key: 'world_pro_trips_v1', value: trips });
         } else if (cloudTrips) {
           setTrips(cloudTrips);
           localStorage.setItem('world_pro_trips_v1', JSON.stringify(cloudTrips));
@@ -105,7 +106,7 @@ function App() {
         }
 
         if (!cloudFavs && favorites.length > 0) {
-          await supabase.from('app_state').upsert({ key: 'world_pro_fav_v1', value: favorites });
+          await supabase.from('user_state').upsert({ user_id: session.user.id, key: 'world_pro_fav_v1', value: favorites });
         } else if (cloudFavs) {
           setFavorites(cloudFavs);
           localStorage.setItem('world_pro_fav_v1', JSON.stringify(cloudFavs));
@@ -117,7 +118,7 @@ function App() {
       }
     }
     initCloudDB();
-  }, []);
+  }, [session]);
 
   // Active Trip Derived State
   const activeTrip = trips.find(t => t.id === activeTripId);
@@ -156,6 +157,18 @@ function App() {
   const [editingTripId, setEditingTripId] = useState(null);
   const [editTripData, setEditTripData] = useState({ name: "", startDate: "", endDate: "" });
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+
+  const [session, setSession] = useState(null);
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [isLoginView, setIsLoginView] = useState(true);
+  const [authError, setAuthError] = useState('');
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setSession(session));
+    return () => subscription.unsubscribe();
+  }, []);
 
   const autocompleteRef = useRef(null);
 
@@ -210,13 +223,17 @@ function App() {
   const saveFavorites = async (newFavs) => {
     setFavorites(newFavs);
     localStorage.setItem('world_pro_fav_v1', JSON.stringify(newFavs));
-    await supabase.from('app_state').upsert({ key: 'world_pro_fav_v1', value: newFavs }).catch(console.error);
+    if (session?.user?.id) {
+      await supabase.from('user_state').upsert({ user_id: session.user.id, key: 'world_pro_fav_v1', value: newFavs }).catch(console.error);
+    }
   };
 
   const syncTripsToCloud = async (newTrips) => {
     setTrips(newTrips);
     localStorage.setItem('world_pro_trips_v1', JSON.stringify(newTrips));
-    await supabase.from('app_state').upsert({ key: 'world_pro_trips_v1', value: newTrips }).catch(console.error);
+    if (session?.user?.id) {
+      await supabase.from('user_state').upsert({ user_id: session.user.id, key: 'world_pro_trips_v1', value: newTrips }).catch(console.error);
+    }
   };
 
   // --- TRIP DATA MUTATORS ---
@@ -495,6 +512,38 @@ function App() {
     );
   }
 
+  if (!session) {
+    return (
+      <div style={{ display: 'flex', height: '100vh', justifyContent: 'center', alignItems: 'center', backgroundColor: '#f3f4f6', fontFamily: '"Inter", "Roboto", sans-serif' }}>
+        <div style={{ backgroundColor: 'white', padding: '40px', borderRadius: '24px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', width: '400px' }}>
+          <h1 style={{ fontSize: '28px', fontWeight: '900', color: '#111827', margin: '0 0 8px 0', textAlign: 'center' }}>WorldPro</h1>
+          <p style={{ textAlign: 'center', color: '#6b7280', marginBottom: '24px', fontSize: '14px', fontWeight: 'bold' }}>
+            {isLoginView ? 'Welcome back! Please login.' : 'Create your account.'}
+          </p>
+          {authError && <div style={{ color: '#ef4444', fontSize: '12px', fontWeight: 'bold', marginBottom: '16px', textAlign: 'center', padding: '8px', backgroundColor: '#fef2f2', borderRadius: '8px' }}>{authError}</div>}
+          <input type="email" placeholder="Email" value={authEmail} onChange={e => setAuthEmail(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', padding: '12px', marginBottom: '12px', borderRadius: '12px', border: '2px solid #e5e7eb', outline: 'none', fontWeight: 'bold' }} />
+          <input type="password" placeholder="Password" value={authPassword} onChange={e => setAuthPassword(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', padding: '12px', marginBottom: '24px', borderRadius: '12px', border: '2px solid #e5e7eb', outline: 'none', fontWeight: 'bold' }} />
+          <button 
+            onClick={async () => {
+              setAuthError('');
+              const { error } = isLoginView ? await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword }) : await supabase.auth.signUp({ email: authEmail, password: authPassword });
+              if (error) setAuthError(error.message);
+              else if (!isLoginView) setAuthError("회원가입 성공! 이제 로그인해주세요.");
+            }}
+            style={{ width: '100%', padding: '14px', backgroundColor: '#8b5cf6', color: 'white', border: 'none', borderRadius: '12px', fontWeight: '900', fontSize: '16px', cursor: 'pointer', marginBottom: '16px' }}
+          >
+            {isLoginView ? 'Login' : 'Sign Up'}
+          </button>
+          <div style={{ textAlign: 'center' }}>
+            <button onClick={() => { setIsLoginView(!isLoginView); setAuthError(''); }} style={{ background: 'none', border: 'none', color: '#8b5cf6', fontWeight: 'bold', cursor: 'pointer', fontSize: '14px' }}>
+              {isLoginView ? "Don't have an account? Sign Up" : "Already have an account? Login"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="relative w-screen h-screen bg-[#f8f9fa] overflow-hidden font-sans" style={{ width: '100vw', height: '100vh', position: 'relative', fontFamily: '"Inter", "Roboto", sans-serif' }}>
       
@@ -510,7 +559,8 @@ function App() {
               <h1 style={{ fontSize: '28px', fontWeight: '900', color: '#111827', margin: 0, letterSpacing: '-0.05em' }}>WorldPro</h1>
               <p style={{ fontSize: '10px', fontWeight: '800', color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.2em', margin: '4px 0 0 0' }}>Global Travel Planner</p>
             </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button onClick={() => supabase.auth.signOut()} style={{ background: 'none', border: 'none', color: '#9ca3af', fontWeight: '800', fontSize: '10px', cursor: 'pointer', marginRight: '4px' }}>LOGOUT</button>
               <button 
                 onClick={() => setViewMode('trips')}
                 style={{ width: '44px', height: '44px', borderRadius: '14px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.2s', backgroundColor: viewMode === 'trips' ? '#8b5cf6' : '#f3f4f6', color: viewMode === 'trips' ? 'white' : '#9ca3af' }}
