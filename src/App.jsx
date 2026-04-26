@@ -786,7 +786,10 @@ function App() {
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                           {editingTripId === trip.id ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+                            <div 
+                              onClick={(e) => e.stopPropagation()} 
+                              style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}
+                            >
                               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                   <label style={{ fontSize: '10px', fontWeight: '900', color: '#9ca3af' }}>COUNTRY</label>
