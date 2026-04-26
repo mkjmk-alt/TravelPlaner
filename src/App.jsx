@@ -51,6 +51,7 @@ function App() {
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [isLoadingDB, setIsLoadingDB] = useState(true);
   const [showShareToast, setShowShareToast] = useState(false);
+  const [hasTriggeredToast, setHasTriggeredToast] = useState(false);
 
   // --- DATA STATE ---
   const [favorites, setFavorites] = useState(() => {
@@ -302,6 +303,7 @@ function App() {
       const newTrips = trips.map(t => t.id === tripId ? { ...t, sharedId: data.id } : t);
       await syncTripsToCloud(newTrips);
       copyToClipboard(data.id, tripId);
+      setHasTriggeredToast(true);
       setShowShareToast(true);
       setTimeout(() => setShowShareToast(false), 5000);
     } catch (err) {
@@ -342,6 +344,7 @@ function App() {
   const copyToClipboard = (text, id) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
+    setHasTriggeredToast(true);
     setShowShareToast(true);
     setTimeout(() => {
       setCopiedId(null);
@@ -1123,43 +1126,46 @@ function App() {
       )}
 
       {/* Share Toast Notification */}
-      <div style={{ 
-        position: 'fixed', 
-        bottom: '32px', 
-        left: '50%', 
-        transform: `translateX(-50%) translateY(${showShareToast ? '0' : '100px'})`, 
-        opacity: showShareToast ? 1 : 0,
-        zIndex: 10000,
-        transition: 'all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-        pointerEvents: showShareToast ? 'auto' : 'none'
-      }}>
+      {hasTriggeredToast && (
         <div style={{ 
-          backgroundColor: 'rgba(17, 24, 39, 0.9)', 
-          backdropFilter: 'blur(12px)', 
-          color: 'white', 
-          padding: '16px 24px', 
-          borderRadius: '20px', 
-          boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '16px',
-          minWidth: '320px'
+          position: 'fixed', 
+          bottom: '32px', 
+          left: '50%', 
+          transform: `translateX(-50%) translateY(${showShareToast ? '0' : '100px'})`, 
+          opacity: showShareToast ? 1 : 0,
+          visibility: showShareToast ? 'visible' : 'hidden',
+          zIndex: 10000,
+          transition: 'all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+          pointerEvents: showShareToast ? 'auto' : 'none'
         }}>
-          <div style={{ width: '40px', height: '40px', backgroundColor: '#8b5cf6', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <Users size={20} color="white" />
+          <div style={{ 
+            backgroundColor: 'rgba(17, 24, 39, 0.9)', 
+            backdropFilter: 'blur(12px)', 
+            color: 'white', 
+            padding: '16px 24px', 
+            borderRadius: '20px', 
+            boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '16px',
+            minWidth: '320px'
+          }}>
+            <div style={{ width: '40px', height: '40px', backgroundColor: '#8b5cf6', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Users size={20} color="white" />
+            </div>
+            <div>
+              <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: '900', color: '#a78bfa' }}>Code Copied!</h4>
+              <p style={{ margin: 0, fontSize: '12px', fontWeight: '700', color: '#d1d5db', lineHeight: 1.4 }}>이 코드를 친구에게 전달하면<br/>실시간으로 함께 일정을 짤 수 있습니다! 🤝</p>
+            </div>
+            <button 
+              onClick={() => setShowShareToast(false)}
+              style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#4b5563', cursor: 'pointer', padding: '4px' }}
+            >
+              <X size={18} />
+            </button>
           </div>
-          <div>
-            <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: '900', color: '#a78bfa' }}>Code Copied!</h4>
-            <p style={{ margin: 0, fontSize: '12px', fontWeight: '700', color: '#d1d5db', lineHeight: 1.4 }}>이 코드를 친구에게 전달하면<br/>실시간으로 함께 일정을 짤 수 있습니다! 🤝</p>
-          </div>
-          <button 
-            onClick={() => setShowShareToast(false)}
-            style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#4b5563', cursor: 'pointer', padding: '4px' }}
-          >
-            <X size={18} />
-          </button>
         </div>
-      </div>
+      )}
 
       {/* MAP VIEWPORT */}
       <div className="map-wrapper">
