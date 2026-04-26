@@ -10,23 +10,36 @@ const MAP_LIBRARIES = ['places'];
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
 const countryToCurrency = {
-  "홍콩": "HKD",
+  "대한민국": "KRW",
   "일본": "JPY",
+  "홍콩": "HKD",
+  "마카오": "MOP",
+  "대만": "TWD",
+  "중국": "CNY",
   "태국": "THB",
   "베트남": "VND",
-  "대만": "TWD",
+  "싱가포르": "SGD",
+  "필리핀": "PHP",
+  "말레이시아": "MYR",
+  "인도네시아": "IDR",
+  "몽골": "MNT",
   "미국": "USD",
+  "괌/사이판": "USD",
+  "캐나다": "CAD",
+  "호주": "AUD",
+  "뉴질랜드": "NZD",
   "영국": "GBP",
   "프랑스": "EUR",
   "독일": "EUR",
   "이탈리아": "EUR",
   "스페인": "EUR",
-  "싱가포르": "SGD",
-  "필리핀": "PHP",
-  "말레이시아": "MYR",
-  "인도네시아": "IDR",
-  "호주": "AUD",
-  "캐나다": "CAD"
+  "포르투갈": "EUR",
+  "네덜란드": "EUR",
+  "스위스": "CHF",
+  "오스트리아": "EUR",
+  "체코": "CZK",
+  "헝가리": "HUF",
+  "터키": "TRY"
 };
 
 const mapOptions = {
@@ -793,16 +806,20 @@ function App() {
                               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                   <label style={{ fontSize: '10px', fontWeight: '900', color: '#9ca3af' }}>COUNTRY</label>
-                                  <select 
-                                    value={editTripData.country}
-                                    onChange={(e) => setEditTripData({ ...editTripData, country: e.target.value, currency: countryToCurrency[e.target.value] || 'KRW' })}
-                                    style={{ padding: '10px', border: '1px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', fontWeight: '700', outline: 'none' }}
-                                  >
-                                    <option value="">나라 선택</option>
-                                    {Object.keys(countryToCurrency).sort().map(c => (
-                                      <option key={c} value={c}>{c}</option>
-                                    ))}
-                                  </select>
+                                    <select 
+                                      value={editTripData.country}
+                                      onChange={(e) => setEditTripData({ ...editTripData, country: e.target.value, currency: countryToCurrency[e.target.value] || 'KRW' })}
+                                      style={{ padding: '10px', border: '1px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', fontWeight: '700', outline: 'none' }}
+                                    >
+                                      <option value="">나라 선택</option>
+                                      <option value="대한민국">대한민국</option>
+                                      {Object.keys(countryToCurrency)
+                                        .filter(c => c !== "대한민국")
+                                        .sort()
+                                        .map(c => (
+                                          <option key={c} value={c}>{c}</option>
+                                      ))}
+                                    </select>
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                   <label style={{ fontSize: '10px', fontWeight: '900', color: '#9ca3af' }}>NAME</label>
