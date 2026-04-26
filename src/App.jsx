@@ -321,7 +321,15 @@ function App() {
     // 2. Sync individual shared trips to shared_trips table
     for (const trip of newTrips) {
       if (trip.sharedId) {
-        await supabase.from('shared_trips').update({ trip_data: trip }).eq('id', trip.sharedId).catch(console.error);
+        try {
+          const { error } = await supabase
+            .from('shared_trips')
+            .update({ trip_data: trip })
+            .eq('id', trip.sharedId);
+          if (error) throw error;
+        } catch (err) {
+          console.error("Shared trip update failed:", err);
+        }
       }
     }
   };
