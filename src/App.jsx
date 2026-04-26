@@ -803,13 +803,14 @@ function App() {
                               onClick={(e) => e.stopPropagation()} 
                               style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}
                             >
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                  <label style={{ fontSize: '10px', fontWeight: '900', color: '#9ca3af' }}>COUNTRY</label>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                                  <div style={{ flex: '1 1 140px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <label style={{ fontSize: '10px', fontWeight: '900', color: '#9ca3af' }}>COUNTRY</label>
                                     <select 
                                       value={editTripData.country}
                                       onChange={(e) => setEditTripData({ ...editTripData, country: e.target.value, currency: countryToCurrency[e.target.value] || 'KRW' })}
-                                      style={{ padding: '10px', border: '1px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', fontWeight: '700', outline: 'none' }}
+                                      style={{ width: '100%', padding: '10px', border: '1px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', fontWeight: '700', outline: 'none', boxSizing: 'border-box' }}
                                     >
                                       <option value="">나라 선택</option>
                                       <option value="대한민국">대한민국</option>
@@ -820,36 +821,37 @@ function App() {
                                           <option key={c} value={c}>{c}</option>
                                       ))}
                                     </select>
+                                  </div>
+                                  <div style={{ flex: '1 1 140px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <label style={{ fontSize: '10px', fontWeight: '900', color: '#9ca3af' }}>NAME</label>
+                                    <input 
+                                      type="text" 
+                                      value={editTripData.name} 
+                                      onChange={(e) => setEditTripData({ ...editTripData, name: e.target.value })}
+                                      placeholder="Trip Name"
+                                      style={{ width: '100%', padding: '10px', border: '1px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', fontWeight: '700', outline: 'none', boxSizing: 'border-box' }}
+                                    />
+                                  </div>
                                 </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                  <label style={{ fontSize: '10px', fontWeight: '900', color: '#9ca3af' }}>NAME</label>
-                                  <input 
-                                    type="text" 
-                                    value={editTripData.name} 
-                                    onChange={(e) => setEditTripData({ ...editTripData, name: e.target.value })}
-                                    placeholder="Trip Name"
-                                    style={{ padding: '10px', border: '1px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', fontWeight: '700', outline: 'none' }}
-                                  />
-                                </div>
-                              </div>
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                  <label style={{ fontSize: '10px', fontWeight: '900', color: '#9ca3af' }}>START DATE</label>
-                                  <input 
-                                    type="date" 
-                                    value={editTripData.startDate} 
-                                    onChange={(e) => setEditTripData({ ...editTripData, startDate: e.target.value })}
-                                    style={{ padding: '10px', border: '1px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', fontWeight: '700', outline: 'none' }}
-                                  />
-                                </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                  <label style={{ fontSize: '10px', fontWeight: '900', color: '#9ca3af' }}>END DATE</label>
-                                  <input 
-                                    type="date" 
-                                    value={editTripData.endDate} 
-                                    onChange={(e) => setEditTripData({ ...editTripData, endDate: e.target.value })}
-                                    style={{ padding: '10px', border: '1px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', fontWeight: '700', outline: 'none' }}
-                                  />
+                                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                                  <div style={{ flex: '1 1 140px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <label style={{ fontSize: '10px', fontWeight: '900', color: '#9ca3af' }}>START DATE</label>
+                                    <input 
+                                      type="date" 
+                                      value={editTripData.startDate} 
+                                      onChange={(e) => setEditTripData({ ...editTripData, startDate: e.target.value })}
+                                      style={{ width: '100%', padding: '10px', border: '1px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', fontWeight: '700', outline: 'none', boxSizing: 'border-box' }}
+                                    />
+                                  </div>
+                                  <div style={{ flex: '1 1 140px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <label style={{ fontSize: '10px', fontWeight: '900', color: '#9ca3af' }}>END DATE</label>
+                                    <input 
+                                      type="date" 
+                                      value={editTripData.endDate} 
+                                      onChange={(e) => setEditTripData({ ...editTripData, endDate: e.target.value })}
+                                      style={{ width: '100%', padding: '10px', border: '1px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', fontWeight: '700', outline: 'none', boxSizing: 'border-box' }}
+                                    />
+                                  </div>
                                 </div>
                               </div>
                               <button 
