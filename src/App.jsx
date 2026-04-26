@@ -693,24 +693,16 @@ function App() {
                     <Wallet size={18} />
                   </button>
                   
-                  {/* Share Action */}
+                  {/* Unified Invite Action */}
                   <div style={{ marginLeft: 'auto' }}>
-                    {activeTrip?.sharedId ? (
-                      <button 
-                        onClick={() => copyToClipboard(activeTrip.sharedId, activeTrip.id)}
-                        style={{ height: '40px', padding: '0 12px', backgroundColor: '#f3f4f6', borderRadius: '12px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#6b7280', fontWeight: '900' }}
-                      >
-                        {copiedId === activeTrip.id ? <Check size={14} color="#10b981" /> : <Copy size={14} />}
-                        {copiedId === activeTrip.id ? "CODE" : "CODE"}
-                      </button>
-                    ) : (
-                      <button 
-                        onClick={() => shareTrip(activeTrip.id)}
-                        style={{ height: '40px', padding: '0 12px', backgroundColor: '#f5f3ff', borderRadius: '12px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#8b5cf6', fontWeight: '900' }}
-                      >
-                        <Share2 size={14} /> SHARE
-                      </button>
-                    )}
+                    <button 
+                      onClick={() => activeTrip?.sharedId ? copyToClipboard(activeTrip.sharedId, activeTrip.id) : shareTrip(activeTrip.id)}
+                      style={{ height: '40px', padding: '0 12px', backgroundColor: activeTrip?.sharedId ? '#f3f4f6' : '#f5f3ff', borderRadius: '12px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: activeTrip?.sharedId ? '#6b7280' : '#8b5cf6', fontWeight: '900' }}
+                      title={activeTrip?.sharedId ? "초대 코드 복사" : "친구 초대하기"}
+                    >
+                      {copiedId === activeTrip?.id ? <Check size={14} color="#10b981" /> : (activeTrip?.sharedId ? <Users size={14} /> : <Share2 size={14} />)}
+                      {copiedId === activeTrip?.id ? "COPIED" : (activeTrip?.sharedId ? "INVITED" : "INVITE")}
+                    </button>
                   </div>
                 </div>
               )}
@@ -788,25 +780,13 @@ function App() {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', gap: '8px' }}>
                           <h3 style={{ fontSize: '18px', fontWeight: '900', color: '#111827', margin: 0, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{trip.name}</h3>
                           <div style={{ display: 'flex', gap: '4px', flexShrink: 0, alignItems: 'center' }}>
-                            {trip.sharedId && (
-                              <button 
-                                onClick={(e) => { e.stopPropagation(); copyToClipboard(trip.sharedId, trip.id); }}
-                                style={{ padding: '6px 8px', backgroundColor: '#f3f4f6', borderRadius: '8px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: '#6b7280', fontWeight: '800' }}
-                                title="Copy Share Code"
-                              >
-                                {copiedId === trip.id ? <Check size={12} color="#10b981" /> : <Copy size={12} />}
-                                {copiedId === trip.id ? "CODE" : "CODE"}
-                              </button>
-                            )}
-                            {!trip.sharedId && (
-                              <button 
-                                onClick={(e) => { e.stopPropagation(); shareTrip(trip.id); }}
-                                style={{ padding: '6px 8px', backgroundColor: '#f5f3ff', borderRadius: '8px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: '#8b5cf6', fontWeight: '800' }}
-                                title="Share Trip"
-                              >
-                                <Share2 size={12} /> SHARE
-                              </button>
-                            )}
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); trip.sharedId ? copyToClipboard(trip.sharedId, trip.id) : shareTrip(trip.id); }}
+                              style={{ width: '32px', height: '32px', borderRadius: '8px', border: 'none', backgroundColor: trip.sharedId ? '#f3f4f6' : '#f5f3ff', color: trip.sharedId ? '#6b7280' : '#8b5cf6', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                              title={trip.sharedId ? "초대 코드 복사" : "친구 초대하기"}
+                            >
+                              {copiedId === trip.id ? <Check size={14} color="#10b981" /> : (trip.sharedId ? <Users size={14} /> : <Share2 size={14} />)}
+                            </button>
                             <button 
                               onClick={(e) => { e.stopPropagation(); startRenameTrip(trip); }}
                               style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '4px', borderRadius: '8px' }}
