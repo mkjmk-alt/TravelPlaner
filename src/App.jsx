@@ -817,9 +817,9 @@ function App() {
                           )}
                         </div>
                         {editingTripId !== trip.id && (
-                          <div style={{ display: 'flex', gap: '16px', fontSize: '12px', fontWeight: '800', color: '#6b7280' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <Calendar size={14} /> 
+                          <div style={{ display: 'flex', gap: '12px', fontSize: '11px', fontWeight: '800', color: '#6b7280', flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
+                              <Calendar size={13} color="#9ca3af" /> 
                               {trip.startDate ? (
                                 <>
                                   <span style={{ color: '#111827' }}>{trip.startDate} ~ {trip.endDate}</span>
@@ -829,8 +829,9 @@ function App() {
                                 <span style={{ color: '#111827' }}>{trip.itinerary.length} {trip.itinerary.length === 1 ? 'Day' : 'Days'}</span>
                               )}
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <Wallet size={14} /> ₩ {trip.expenses.reduce((sum, e) => sum + e.amountKRW, 0).toLocaleString()}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
+                              <Wallet size={13} color="#9ca3af" /> 
+                              <span style={{ color: '#111827' }}>₩ {trip.expenses.reduce((sum, e) => sum + e.amountKRW, 0).toLocaleString()}</span>
                             </div>
                           </div>
                         )}
@@ -1186,9 +1187,9 @@ function App() {
                  >
                    <input 
                       type="text" 
-                      placeholder="Search for any place in the world..." 
+                      placeholder="Search destination..." 
                       className="w-full bg-transparent outline-none placeholder:text-gray-400" 
-                      style={{ width: '100%', height: '48px', lineHeight: 'normal', background: 'transparent', border: 'none', outline: 'none', fontSize: '20px', fontWeight: 'bold', color: '#1f2937', padding: 0, margin: 0, display: 'block' }}
+                      style={{ width: '100%', height: '48px', lineHeight: 'normal', background: 'transparent', border: 'none', outline: 'none', fontSize: '16px', fontWeight: 'bold', color: '#1f2937', padding: 0, margin: 0, display: 'block' }}
                    />
                  </Autocomplete>
                </div>
