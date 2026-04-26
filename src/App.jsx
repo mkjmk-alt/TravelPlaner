@@ -328,7 +328,11 @@ function App() {
 
   const shareTrip = async (tripId) => {
     const trip = trips.find(t => t.id === tripId);
-    if (!trip || trip.sharedId) return;
+    if (!trip) return;
+    if (trip.sharedId) {
+      copyToClipboard(trip.sharedId, tripId);
+      return;
+    }
 
     try {
       const { data, error } = await supabase
@@ -337,17 +341,21 @@ function App() {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase insert error:", error);
+        throw new Error(error.message || "Database insert failed");
+      }
 
       const newTrips = trips.map(t => t.id === tripId ? { ...t, sharedId: data.id } : t);
       await syncTripsToCloud(newTrips);
       copyToClipboard(data.id, tripId);
+      
       setHasTriggeredToast(true);
       setShowShareToast(true);
       setTimeout(() => setShowShareToast(false), 5000);
     } catch (err) {
-      console.error("Sharing failed:", err);
-      alert("공유에 실패했습니다.");
+      console.error("Sharing failed detail:", err);
+      alert(`공유에 실패했습니다: ${err.message || "네트워크나 데이터베이스 설정을 확인해주세요."}`);
     }
   };
 
@@ -381,14 +389,36 @@ function App() {
   };
 
   const copyToClipboard = (text, id) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setHasTriggeredToast(true);
-    setShowShareToast(true);
-    setTimeout(() => {
-      setCopiedId(null);
-      setShowShareToast(false);
-    }, 5000);
+    if (!text) return;
+    
+    const performCopy = async () => {
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          // Fallback for non-secure contexts
+          const textArea = document.createElement("textarea");
+          textArea.value = text;
+          document.body.appendChild(textArea);
+          textArea.select();
+          document.execCommand("copy");
+          document.body.removeChild(textArea);
+        }
+        
+        setCopiedId(id);
+        setHasTriggeredToast(true);
+        setShowShareToast(true);
+        setTimeout(() => {
+          setCopiedId(null);
+          setShowShareToast(false);
+        }, 5000);
+      } catch (err) {
+        console.error("Copy failed:", err);
+        alert("초대 코드 복사에 실패했습니다. 수동으로 복사해주세요: " + text);
+      }
+    };
+
+    performCopy();
   };
 
   // --- TRIP DATA MUTATORS ---
