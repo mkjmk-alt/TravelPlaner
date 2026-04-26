@@ -161,7 +161,7 @@ function App() {
         }
 
         if (!cloudTrips && trips.length > 0) {
-          await supabase.from('user_state').upsert({ user_id: session.user.id, key: 'world_pro_trips_v1', value: trips });
+          await supabase.from('user_state').upsert({ user_id: session.user.id, key: 'world_pro_trips_v1', value: trips }, { onConflict: 'user_id,key' });
         } else if (cloudTrips) {
           setTrips(cloudTrips);
           localStorage.setItem('world_pro_trips_v1', JSON.stringify(cloudTrips));
@@ -169,7 +169,7 @@ function App() {
         }
 
         if (!cloudFavs && favorites.length > 0) {
-          await supabase.from('user_state').upsert({ user_id: session.user.id, key: 'world_pro_fav_v1', value: favorites });
+          await supabase.from('user_state').upsert({ user_id: session.user.id, key: 'world_pro_fav_v1', value: favorites }, { onConflict: 'user_id,key' });
         } else if (cloudFavs) {
           setFavorites(cloudFavs);
           localStorage.setItem('world_pro_fav_v1', JSON.stringify(cloudFavs));
@@ -289,7 +289,13 @@ function App() {
     setFavorites(newFavs);
     localStorage.setItem('world_pro_fav_v1', JSON.stringify(newFavs));
     if (session?.user?.id) {
-      await supabase.from('user_state').upsert({ user_id: session.user.id, key: 'world_pro_fav_v1', value: newFavs }).catch(console.error);
+      await supabase
+        .from('user_state')
+        .upsert(
+          { user_id: session.user.id, key: 'world_pro_fav_v1', value: newFavs },
+          { onConflict: 'user_id,key' }
+        )
+        .catch(console.error);
     }
   };
 
