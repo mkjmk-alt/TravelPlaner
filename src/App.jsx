@@ -9,6 +9,26 @@ const HK_CENTER = { lat: 22.2891, lng: 114.1924 };
 const MAP_LIBRARIES = ['places']; 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
+const countryToCurrency = {
+  "홍콩": "HKD",
+  "일본": "JPY",
+  "태국": "THB",
+  "베트남": "VND",
+  "대만": "TWD",
+  "미국": "USD",
+  "영국": "GBP",
+  "프랑스": "EUR",
+  "독일": "EUR",
+  "이탈리아": "EUR",
+  "스페인": "EUR",
+  "싱가포르": "SGD",
+  "필리핀": "PHP",
+  "말레이시아": "MYR",
+  "인도네시아": "IDR",
+  "호주": "AUD",
+  "캐나다": "CAD"
+};
+
 const mapOptions = {
   disableDefaultUI: true,
   zoomControl: false,
@@ -44,7 +64,7 @@ function App() {
   const [activeDay, setActiveDay] = useState(1);
   const [expandedCountries, setExpandedCountries] = useState({});
   const [editingTripId, setEditingTripId] = useState(null);
-  const [editTripData, setEditTripData] = useState({ name: "", startDate: "", endDate: "" });
+  const [editTripData, setEditTripData] = useState({ name: "", startDate: "", endDate: "", country: "" });
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
   const [map, setMap] = useState(null);
@@ -400,6 +420,7 @@ function App() {
     const newTrip = {
       id: newId,
       name: "New Trip",
+      country: "",
       startDate: today,
       endDate: today,
       itinerary: [{ day: 1, items: [] }],
@@ -413,18 +434,28 @@ function App() {
     
     // Auto-enter inline edit mode
     setEditingTripId(newId);
-    setEditTripData({ name: "New Trip", startDate: today, endDate: today });
+    setEditTripData({ name: "New Trip", startDate: today, endDate: today, country: "" });
   };
 
   const startRenameTrip = (trip) => {
     setEditingTripId(trip.id);
-    setEditTripData({ name: trip.name, startDate: trip.startDate || "", endDate: trip.endDate || "" });
+    setEditTripData({ 
+      name: trip.name, 
+      startDate: trip.startDate || "", 
+      endDate: trip.endDate || "",
+      country: trip.country || ""
+    });
   };
 
   const saveRenameTrip = (id) => {
     if (editTripData.name.trim() !== "") {
-      const { name, startDate, endDate } = editTripData;
+      const { name, startDate, endDate, country } = editTripData;
       let newItinerary = null;
+      let travelCurrency = null;
+      
+      if (country && countryToCurrency[country]) {
+        travelCurrency = countryToCurrency[country];
+      }
       
       if (startDate && endDate) {
         const start = new Date(startDate);
@@ -440,9 +471,12 @@ function App() {
 
       const nextTrips = trips.map(t => {
         if (t.id === id) {
-          const tripToUpdate = { ...t, name: name.trim(), startDate, endDate };
+          const tripToUpdate = { ...t, name: name.trim(), startDate, endDate, country };
           if (newItinerary) {
              tripToUpdate.itinerary = newItinerary.map((newDay, idx) => t.itinerary[idx] || newDay);
+          }
+          if (travelCurrency) {
+            tripToUpdate.budgetSettings = { ...t.budgetSettings, travelCurrency };
           }
           return tripToUpdate;
         }
@@ -753,36 +787,56 @@ function App() {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                           {editingTripId === trip.id ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
-                              <input 
-                                autoFocus
-                                value={editTripData.name}
-                                onChange={(e) => setEditTripData({...editTripData, name: e.target.value})}
-                                style={{ fontSize: '18px', fontWeight: '900', color: '#111827', margin: 0, padding: '8px 12px', border: '2px solid #8b5cf6', borderRadius: '10px', outline: 'none' }}
-                                onClick={(e) => e.stopPropagation()}
-                                placeholder="Trip Name"
-                              />
-                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                <input 
-                                  type="date"
-                                  value={editTripData.startDate}
-                                  onChange={(e) => setEditTripData({...editTripData, startDate: e.target.value})}
-                                  style={{ flex: 1, padding: '8px', borderRadius: '10px', border: '1px solid #d1d5db', fontSize: '12px', fontWeight: 'bold', outline: 'none', color: '#4b5563' }}
-                                  onClick={(e) => e.stopPropagation()}
-                                />
-                                <span style={{ fontSize: '12px', color: '#9ca3af', fontWeight: '800' }}>~</span>
-                                <input 
-                                  type="date"
-                                  value={editTripData.endDate}
-                                  onChange={(e) => setEditTripData({...editTripData, endDate: e.target.value})}
-                                  style={{ flex: 1, padding: '8px', borderRadius: '10px', border: '1px solid #d1d5db', fontSize: '12px', fontWeight: 'bold', outline: 'none', color: '#4b5563' }}
-                                  onClick={(e) => e.stopPropagation()}
-                                />
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  <label style={{ fontSize: '10px', fontWeight: '900', color: '#9ca3af' }}>COUNTRY</label>
+                                  <select 
+                                    value={editTripData.country}
+                                    onChange={(e) => setEditTripData({ ...editTripData, country: e.target.value, currency: countryToCurrency[e.target.value] || 'KRW' })}
+                                    style={{ padding: '10px', border: '1px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', fontWeight: '700', outline: 'none' }}
+                                  >
+                                    <option value="">나라 선택</option>
+                                    {Object.keys(countryToCurrency).sort().map(c => (
+                                      <option key={c} value={c}>{c}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  <label style={{ fontSize: '10px', fontWeight: '900', color: '#9ca3af' }}>NAME</label>
+                                  <input 
+                                    type="text" 
+                                    value={editTripData.name} 
+                                    onChange={(e) => setEditTripData({ ...editTripData, name: e.target.value })}
+                                    placeholder="Trip Name"
+                                    style={{ padding: '10px', border: '1px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', fontWeight: '700', outline: 'none' }}
+                                  />
+                                </div>
+                              </div>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  <label style={{ fontSize: '10px', fontWeight: '900', color: '#9ca3af' }}>START DATE</label>
+                                  <input 
+                                    type="date" 
+                                    value={editTripData.startDate} 
+                                    onChange={(e) => setEditTripData({ ...editTripData, startDate: e.target.value })}
+                                    style={{ padding: '10px', border: '1px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', fontWeight: '700', outline: 'none' }}
+                                  />
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  <label style={{ fontSize: '10px', fontWeight: '900', color: '#9ca3af' }}>END DATE</label>
+                                  <input 
+                                    type="date" 
+                                    value={editTripData.endDate} 
+                                    onChange={(e) => setEditTripData({ ...editTripData, endDate: e.target.value })}
+                                    style={{ padding: '10px', border: '1px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', fontWeight: '700', outline: 'none' }}
+                                  />
+                                </div>
                               </div>
                               <button 
                                 onClick={(e) => { e.stopPropagation(); saveRenameTrip(trip.id); }}
-                                style={{ padding: '10px', backgroundColor: '#8b5cf6', color: 'white', border: 'none', borderRadius: '10px', fontWeight: '900', cursor: 'pointer', marginTop: '4px' }}
+                                style={{ padding: '12px', backgroundColor: '#8b5cf6', color: 'white', border: 'none', borderRadius: '12px', fontWeight: '900', cursor: 'pointer', marginTop: '8px', boxShadow: '0 4px 12px rgba(139, 92, 246, 0.2)' }}
                               >
-                                SAVE TRIP
+                                SAVE TRIP DETAILS
                               </button>
                             </div>
                           ) : (
@@ -926,45 +980,98 @@ function App() {
                 </div>
 
                 {itinerary.map((dayPlan, dIdx) => (
-                  <div key={dayPlan.day} style={{ marginBottom: '32px' }}>
+                  <div 
+                    key={dayPlan.day} 
+                    style={{ 
+                      backgroundColor: 'white', 
+                      borderRadius: '24px', 
+                      border: '1px solid #f3f4f6', 
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+                      overflow: 'hidden',
+                      marginBottom: '32px'
+                    }}
+                  >
+                    {/* Day Header */}
                     <div 
                       onClick={() => setActiveDay(dayPlan.day)}
-                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', padding: '12px 16px', borderRadius: '12px', cursor: 'pointer', backgroundColor: activeDay === dayPlan.day ? '#eff6ff' : 'transparent', border: activeDay === dayPlan.day ? '1px solid #bfdbfe' : '1px solid transparent' }}
+                      style={{ 
+                        padding: '20px 24px', 
+                        backgroundColor: activeDay === dayPlan.day ? '#eff6ff' : '#f9fafb', 
+                        borderBottom: '1px solid #f3f4f6', 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                      }}
                     >
-                      <h3 style={{ fontSize: '14px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0, color: activeDay === dayPlan.day ? '#2563eb' : '#9ca3af' }}>
-                        Day {dayPlan.day} 
-                        {activeTrip?.startDate && (
-                          <span style={{ fontSize: '11px', fontWeight: '800', color: activeDay === dayPlan.day ? '#60a5fa' : '#d1d5db', marginLeft: '6px' }}>
-                            ({getActualDateForDay(activeTrip.startDate, dayPlan.day)})
-                          </span>
-                        )}
-                      </h3>
-                      <span style={{ fontSize: '11px', fontWeight: '800', color: '#9ca3af' }}>{dayPlan.items.length} spots</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ 
+                          width: '40px', 
+                          height: '40px', 
+                          backgroundColor: activeDay === dayPlan.day ? '#2563eb' : '#9ca3af', 
+                          borderRadius: '12px', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center',
+                          color: 'white',
+                          fontWeight: '900',
+                          fontSize: '14px',
+                          transition: 'background-color 0.2s'
+                        }}>
+                          {dayPlan.day}
+                        </div>
+                        <div>
+                          <h3 style={{ fontSize: '16px', fontWeight: '900', color: '#111827', margin: 0 }}>Day {dayPlan.day}</h3>
+                          <p style={{ fontSize: '12px', fontWeight: '700', color: activeDay === dayPlan.day ? '#3b82f6' : '#9ca3af', margin: 0 }}>
+                            {getActualDateForDay(activeTrip?.startDate, dayPlan.day)}
+                          </p>
+                        </div>
+                      </div>
+                      <span style={{ fontSize: '11px', fontWeight: '900', color: activeDay === dayPlan.day ? '#3b82f6' : '#9ca3af', backgroundColor: activeDay === dayPlan.day ? '#dbeafe' : '#f3f4f6', padding: '4px 10px', borderRadius: '8px' }}>
+                        {dayPlan.items.length} SPOTS
+                      </span>
                     </div>
 
-                    {dayPlan.items.length === 0 ? (
-                      <div style={{ padding: '32px 20px', border: '2px dashed #e5e7eb', borderRadius: '16px', textAlign: 'center' }}>
-                        <p style={{ fontSize: '11px', color: '#d1d5db', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>No places planned</p>
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        {dayPlan.items.map((item) => (
-                          <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px', backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-                            <div style={{ fontSize: '28px', flexShrink: 0 }}>{item.emoji}</div>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <h3 style={{ fontSize: '14px', fontWeight: '800', color: '#111827', margin: '0 0 4px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</h3>
-                              <p style={{ fontSize: '10px', fontWeight: '900', color: '#60a5fa', textTransform: 'uppercase', margin: 0, letterSpacing: '0.05em' }}>{item.cat}</p>
-                            </div>
-                            <button 
-                              onClick={(e) => handleInlineDelete(e, `itin-${item.id}`, () => removeFromItinerary(dIdx, item.id))} 
-                              style={{ padding: confirmDeleteId === `itin-${item.id}` ? '10px 14px' : '10px', color: confirmDeleteId === `itin-${item.id}` ? 'white' : '#ef4444', backgroundColor: confirmDeleteId === `itin-${item.id}` ? '#ef4444' : '#fef2f2', border: 'none', borderRadius: '10px', cursor: 'pointer', flexShrink: 0, fontSize: '12px', fontWeight: '800' }}
+                    {/* Day Items List */}
+                    <div style={{ padding: '24px' }}>
+                      {dayPlan.items.length === 0 ? (
+                        <div style={{ padding: '32px', textAlign: 'center', border: '2px dashed #f3f4f6', borderRadius: '16px' }}>
+                          <p style={{ fontSize: '13px', color: '#d1d5db', fontWeight: '700', margin: 0 }}>이 날의 일정을 추가해 보세요!</p>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                          {dayPlan.items.map((item) => (
+                            <div 
+                              key={item.id} 
+                              style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '16px', 
+                                padding: '16px', 
+                                backgroundColor: 'white', 
+                                border: '1px solid #f3f4f6',
+                                borderRadius: '16px',
+                                transition: 'all 0.2s',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                              }}
                             >
-                              {confirmDeleteId === `itin-${item.id}` ? '확인' : <Trash2 size={18} />}
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                              <div style={{ fontSize: '24px', width: '48px', height: '48px', backgroundColor: '#f9fafb', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{item.emoji}</div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <h4 style={{ fontSize: '15px', fontWeight: '900', color: '#111827', margin: '0 0 2px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</h4>
+                                <p style={{ fontSize: '12px', color: '#6b7280', margin: 0, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.02em' }}>{item.cat}</p>
+                              </div>
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); handleInlineDelete(e, `itin-${item.id}`, () => removeFromItinerary(dIdx, item.id)); }}
+                                style={{ padding: confirmDeleteId === `itin-${item.id}` ? '10px 14px' : '10px', color: confirmDeleteId === `itin-${item.id}` ? 'white' : '#f87171', backgroundColor: confirmDeleteId === `itin-${item.id}` ? '#ef4444' : 'transparent', border: 'none', borderRadius: '10px', cursor: 'pointer', flexShrink: 0 }}
+                              >
+                                {confirmDeleteId === `itin-${item.id}` ? '확인' : <Trash2 size={18} />}
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
               </>
