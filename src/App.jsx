@@ -66,6 +66,8 @@ function App() {
     id: 'google-map-script',
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
     libraries: MAP_LIBRARIES,
+    language: 'ko',
+    region: 'KR'
   });
 
   // --- GLOBAL UI & AUTH STATE ---
