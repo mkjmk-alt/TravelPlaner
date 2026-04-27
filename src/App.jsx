@@ -1058,7 +1058,7 @@ function App() {
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
                               <Wallet size={13} color="#9ca3af" /> 
-                              <span style={{ color: '#111827' }}>₩ {trip.expenses.reduce((sum, e) => sum + e.amountKRW, 0).toLocaleString()}</span>
+                              <span style={{ color: '#111827' }}>₩ {(trip.expenses || []).reduce((sum, e) => sum + (e.amountKRW || 0), 0).toLocaleString()}</span>
                             </div>
                           </div>
                         )}
