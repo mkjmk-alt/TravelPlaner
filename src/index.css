@@ -133,6 +133,11 @@ body {
 
   .map-wrapper {
     height: 45%;
+    transition: height 0.3s ease-in-out;
+  }
+
+  .sidebar-closed .map-wrapper {
+    height: 100%;
   }
 }
 
@@ -140,4 +145,14 @@ body {
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+.mobile-only-flex {
+  display: none !important;
+}
+
+@media (max-width: 768px) {
+  .mobile-only-flex {
+    display: flex !important;
+  }
 }

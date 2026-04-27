@@ -852,7 +852,7 @@ function App() {
 
 
   return (
-    <div className="app-container">
+    <div className={`app-container ${!sidebarOpen ? 'sidebar-closed' : ''}`}>
       
       {/* SIDEBAR UI */}
       {sidebarOpen && (
@@ -875,6 +875,15 @@ function App() {
                     LOGIN
                   </button>
                 )}
+                <button 
+                  onClick={() => setSidebarOpen(false)}
+                  style={{ background: '#fef2f2', border: 'none', color: '#ef4444', padding: '8px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  className="mobile-only-flex"
+                  title="Hide Sidebar"
+                >
+                  <ChevronDown size={18} />
+                </button>
+              </div>
               </div>
             </div>
 
@@ -1695,6 +1704,21 @@ function App() {
           )}
         </GoogleMap>
       </div>
+
+      {!sidebarOpen && (
+        <button 
+          onClick={() => setSidebarOpen(true)}
+          style={{ 
+            position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)', 
+            zIndex: 1100, backgroundColor: '#111827', color: 'white', border: 'none', 
+            padding: '12px 24px', borderRadius: '30px', fontWeight: '900', fontSize: '13px',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', gap: '8px',
+            cursor: 'pointer', animation: 'fadeIn 0.3s ease'
+          }}
+        >
+          <Menu size={16} /> SHOW MENU
+        </button>
+      )}
     {/* === SLIDESHOW MODAL === */}
     {showSlideshow && allPhotos.length > 0 && (
       <div style={{
