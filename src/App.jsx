@@ -1559,8 +1559,6 @@ function App() {
           </div>
         </div>
       )}
-        </aside>
-      )}
 
       {/* MAP VIEWPORT */}
       <div className="map-wrapper">
