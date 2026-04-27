@@ -249,27 +249,32 @@ function App() {
   const getCountryFromAddress = (address) => {
     if (!address) return '기타';
     
-    // Check if the address contains any of our known countries first
+    // 1. Check for South Korea specific keywords (provinces, cities)
+    const krKeywords = ['강원', '경기', '서울', '인천', '부산', '대구', '광주', '대전', '울산', '세종', '충북', '충남', '전북', '전남', '경북', '경남', '제주', '대한민국'];
+    if (krKeywords.some(k => address.includes(k))) return '대한민국';
+
+    // 2. Check if the address contains any of our known countries
     const knownCountries = Object.keys(countryToCurrency);
     for (const c of knownCountries) {
       if (address.includes(c)) return c;
     }
 
+    // 3. Fallback to parsing by comma
     const parts = address.split(',').map(p => p.trim());
     let country = parts[parts.length - 1];
     
     // Clean up common noise (postal codes, Plus Codes, etc.)
-    country = country.replace(/[0-9]{5,}/g, '') // Remove long numbers (postal codes)
-                     .replace(/[A-Z0-9]{4}\+[A-Z0-9]{2,}/g, '') // Remove Plus Codes
+    country = country.replace(/[0-9]{5,}/g, '') 
+                     .replace(/[A-Z0-9]{4}\+[A-Z0-9]{2,}/g, '') 
                      .trim();
     
-    // If it's still too long or messy, try the first part if it's a known country
     if (country.length > 10 || !country) {
       const firstPart = parts[0].split(' ')[0];
       if (knownCountries.includes(firstPart)) return firstPart;
+      return '기타';
     }
 
-    return country || '기타';
+    return country;
   };
 
   const getActualDateForDay = (startDate, dayNumber) => {
