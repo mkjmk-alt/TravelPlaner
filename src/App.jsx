@@ -165,24 +165,19 @@ function App() {
         if (!cloudTrips && trips.length > 0) {
           await supabase.from('user_state').upsert({ user_id: session.user.id, key: 'world_pro_trips_v1', value: trips }, { onConflict: 'user_id,key' });
         } else if (cloudTrips) {
-          // Merge trips if needed, but for now prioritize cloud for trips consistency
           setTrips(cloudTrips);
           localStorage.setItem('world_pro_trips_v1', JSON.stringify(cloudTrips));
           if (!activeTripId && cloudTrips.length > 0) setActiveTripId(cloudTrips[0].id);
         }
 
         if (!cloudFavs && favorites.length > 0) {
+          // Initial sync from local to cloud
           await supabase.from('user_state').upsert({ user_id: session.user.id, key: 'world_pro_fav_v1', value: favorites }, { onConflict: 'user_id,key' });
         } else if (cloudFavs) {
-          // Smart Merge: Don't lose local favorites that haven't synced yet
-          setFavorites(prev => {
-            const merged = [...cloudFavs];
-            prev.forEach(local => {
-              if (!merged.some(c => c.name === local.name)) merged.push(local);
-            });
-            localStorage.setItem('world_pro_fav_v1', JSON.stringify(merged));
-            return merged;
-          });
+          // Cloud exists, so it's our Source of Truth.
+          // This prevents deleted items from coming back.
+          setFavorites(cloudFavs);
+          localStorage.setItem('world_pro_fav_v1', JSON.stringify(cloudFavs));
         }
       } catch (err) {
         console.error("Supabase sync failed:", err);
