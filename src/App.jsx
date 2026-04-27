@@ -1296,13 +1296,27 @@ function App() {
                                     <button 
                                       onClick={(e) => { 
                                         e.stopPropagation(); 
-                                        const isKoreaAddress = ['대한민국', '강원', '경기', '서울', '인천', '부산', '대구', '광주', '대전', '울산', '세종', '충북', '충남', '전북', '전남', '경북', '경남', '제주'].some(k => item.loc?.includes(k));
                                         const isKoreaTrip = activeTrip?.country === '대한민국';
+                                        const isKoreaAddress = ['대한민국', '강원', '경기', '서울', '인천', '부산', '대구', '광주', '대전', '울산', '세종', '충북', '충남', '전북', '전남', '경북', '경남', '제주'].some(k => item.loc?.includes(k));
                                         
-                                        if (isKoreaAddress || isKoreaTrip) {
+                                        // 한국 여행이거나 주소에 한국 지명이 포함된 경우에만 네이버 지도 사용
+                                        if (isKoreaTrip || isKoreaAddress) {
                                           window.open(`https://map.naver.com/v5/search/${encodeURIComponent(item.name)}?c=${item.lng},${item.lat},15,0,0,0,dh&isCorrectAnswer=true`, '_blank');
                                         } else {
-                                          window.open(`https://www.google.com/maps/dir/?api=1&destination=${item.lat},${item.lng}&destination_place_id=${item.placeId || ''}`, '_blank');
+                                          // 해외인 경우 구글 지도
+                                          const googleUrl = `https://www.google.com/maps/dir/?api=1&destination=${item.lat},${item.lng}&destination_place_id=${item.placeId || ''}`;
+                                          
+                                          // 아이폰/iOS인 경우 구글 지도 앱 호출 시도
+                                          if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+                                            const appUrl = `comgooglemaps://?daddr=${item.lat},${item.lng}&directionsmode=walking`;
+                                            window.location.href = appUrl;
+                                            // 앱이 없는 경우를 대비해 약간의 지연 후 웹으로 연결 (iOS 특성상 앱이 없으면 아무 일도 안 일어남)
+                                            setTimeout(() => {
+                                              window.open(googleUrl, '_blank');
+                                            }, 500);
+                                          } else {
+                                            window.open(googleUrl, '_blank');
+                                          }
                                         }
                                       }}
                                       style={{ padding: '10px', color: '#3b82f6', backgroundColor: '#eff6ff', border: 'none', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
