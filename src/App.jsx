@@ -188,7 +188,8 @@ function App() {
 
   // --- REALTIME SYNC FOR SHARED TRIPS ---
   useEffect(() => {
-    const sharedIds = trips.filter(t => t.sharedId).map(t => t.sharedId);
+    const safeTrips = trips || [];
+    const sharedIds = safeTrips.filter(t => t.sharedId).map(t => t.sharedId);
     if (sharedIds.length === 0) return;
 
     // Listen for any changes in the shared_trips table
@@ -198,7 +199,7 @@ function App() {
         const sharedId = payload.new.id;
         const updatedData = payload.new.trip_data;
         
-        setTrips(prev => prev.map(t => 
+        setTrips(prev => (prev || []).map(t => 
           t.sharedId === sharedId ? { ...updatedData, sharedId } : t
         ));
       })
@@ -207,7 +208,7 @@ function App() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [trips.filter(t => t.sharedId).length]);
+  }, [(trips || []).filter(t => t.sharedId).length]);
 
   // Exchange Rates
   useEffect(() => {
@@ -222,7 +223,7 @@ function App() {
   }, []);
 
   // --- DERIVED STATE ---
-  const activeTrip = trips.find(t => t.id === activeTripId);
+  const activeTrip = (trips || []).find(t => t.id === activeTripId);
   const itinerary = activeTrip?.itinerary || [];
   const budgetSettings = activeTrip?.budgetSettings || { limitKRW: 1000000, travelCurrency: 'USD' };
   const expenses = activeTrip?.expenses || [];
@@ -372,7 +373,7 @@ function App() {
   };
 
   const shareTrip = async (tripId) => {
-    const trip = trips.find(t => t.id === tripId);
+    const trip = (trips || []).find(t => t.id === tripId);
     if (!trip) return;
     if (trip.sharedId) {
       copyToClipboard(trip.sharedId, tripId);
@@ -417,13 +418,13 @@ function App() {
 
       if (error || !data) throw new Error("Invalid Code");
 
-      if (trips.some(t => t.sharedId === data.id)) {
+      if ((trips || []).some(t => t.sharedId === data.id)) {
         alert("이미 목록에 있는 일정입니다.");
         return;
       }
 
       const joinedTrip = { ...data.trip_data, sharedId: data.id };
-      const newTrips = [joinedTrip, ...trips];
+      const newTrips = [joinedTrip, ...(trips || [])];
       await syncTripsToCloud(newTrips);
       setActiveTripId(joinedTrip.id);
       setViewMode('itinerary');
@@ -471,7 +472,7 @@ function App() {
     if (!activeTripId) return;
     
     // Calculate new state array based on existing state
-    const nextTrips = trips.map(t => t.id === activeTripId ? { ...t, ...updates } : t);
+    const nextTrips = (trips || []).map(t => t.id === activeTripId ? { ...t, ...updates } : t);
     
     // Sync to cloud and update local state
     await syncTripsToCloud(nextTrips);
@@ -563,7 +564,7 @@ function App() {
         }
       }
 
-      const nextTrips = trips.map(t => {
+      const nextTrips = (trips || []).map(t => {
         if (t.id === id) {
           const tripToUpdate = { ...t, name: name.trim(), startDate, endDate, country };
           if (newItinerary) {
@@ -596,7 +597,7 @@ function App() {
   };
 
   const deleteTrip = async (id) => {
-    const newTrips = trips.filter(t => t.id !== id);
+    const newTrips = (trips || []).filter(t => t.id !== id);
     // Wait for cloud sync to finish before any UI navigation
     await syncTripsToCloud(newTrips);
     
@@ -636,17 +637,19 @@ function App() {
   };
 
   const toggleFavorite = (place) => {
-    const isFav = favorites.some(f => f.name === place.name);
+    if (!place) return;
+    const safeFavs = favorites || [];
+    const isFav = safeFavs.some(f => f.name === place.name);
     const nextFavs = isFav 
-      ? favorites.filter(f => f.name !== place.name)
-      : [...favorites, { ...place, id: Date.now() }];
+      ? safeFavs.filter(f => f.name !== place.name)
+      : [...safeFavs, { ...place, id: Date.now() }];
     
     syncFavoritesToCloud(nextFavs);
   };
 
   const isFavorite = (place) => {
     if (!place) return false;
-    return favorites.some(f => f.name === place.name);
+    return (favorites || []).some(f => f.name === place.name);
   };
 
   const addToItinerary = (place) => {
@@ -865,14 +868,14 @@ function App() {
                   </div>
                 </div>
 
-                {trips.length === 0 ? (
+                {(trips || []).length === 0 ? (
                   <div style={{ padding: '40px 20px', border: '2px dashed #e5e7eb', borderRadius: '16px', textAlign: 'center' }}>
                     <Plane size={36} color="#d1d5db" style={{ margin: '0 auto 12px auto' }} />
                     <p style={{ fontSize: '12px', color: '#9ca3af', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>No trips planned yet</p>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {trips.map(trip => (
+                    {(trips || []).map(trip => (
                       <div 
                         key={trip.id} 
                         onClick={() => { setActiveTripId(trip.id); setViewMode('itinerary'); }}
@@ -1390,7 +1393,7 @@ function App() {
 
           {/* Footer */}
         <div style={{ padding: '24px 32px', borderTop: '1px solid #f3f4f6', backgroundColor: '#f9fafb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '11px', fontWeight: '900', color: '#111827', letterSpacing: '0.05em' }}>{favorites.length} SAVED • {totalSpots} PLANNED</span>
+            <span style={{ fontSize: '11px', fontWeight: '900', color: '#111827', letterSpacing: '0.05em' }}>{(favorites || []).length} SAVED • {totalSpots} PLANNED</span>
             <button onClick={() => setSidebarOpen(false)} style={{ fontSize: '11px', fontWeight: '900', color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer', letterSpacing: '0.05em' }}>CLOSE</button>
           </div>
         </aside>
@@ -1479,7 +1482,7 @@ function App() {
           onClick={onMapClick}
         >
           {/* Favorite Markers */}
-          {favorites.map(fav => (
+          {(favorites || []).map(fav => (
             <Marker
               key={`fav-${fav.name}`}
               position={{ lat: fav.lat, lng: fav.lng }}
