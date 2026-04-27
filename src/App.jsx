@@ -305,8 +305,8 @@ function App() {
 
   const polylinePath = useMemo(() => {
     const dayPlan = itinerary.find(d => d.day === activeDay);
-    if (!dayPlan || dayPlan.items.length < 2) return [];
-    return dayPlan.items.map(item => ({ lat: item.lat, lng: item.lng }));
+    if (!dayPlan || (dayPlan.items || []).length < 2) return [];
+    return (dayPlan.items || []).map(item => ({ lat: item.lat, lng: item.lng }));
   }, [itinerary, activeDay]);
 
   const toggleCountry = (country) => {
@@ -803,8 +803,8 @@ function App() {
     }
   };
 
-  const totalSpots = itinerary.reduce((acc, day) => acc + day.items.length, 0);
-  const totalSpentKRW = expenses.reduce((acc, curr) => acc + curr.amountKRW, 0);
+  const totalSpots = (itinerary || []).reduce((acc, day) => acc + (day.items || []).length, 0);
+  const totalSpentKRW = (expenses || []).reduce((acc, curr) => acc + (curr.amountKRW || 0), 0);
   const budgetProgress = budgetSettings.limitKRW > 0 ? Math.min((totalSpentKRW / budgetSettings.limitKRW) * 100, 100) : 0;
 
   // Robust Error Boundaries
@@ -1050,10 +1050,10 @@ function App() {
                               {trip.startDate ? (
                                 <>
                                   <span style={{ color: '#111827' }}>{trip.startDate} ~ {trip.endDate}</span>
-                                  <span style={{ color: '#9ca3af', marginLeft: '4px' }}>({trip.itinerary.length} {trip.itinerary.length === 1 ? 'Day' : 'Days'})</span>
+                                  <span style={{ color: '#9ca3af', marginLeft: '4px' }}>({(trip.itinerary || []).length} {(trip.itinerary || []).length === 1 ? 'Day' : 'Days'})</span>
                                 </>
                               ) : (
-                                <span style={{ color: '#111827' }}>{trip.itinerary.length} {trip.itinerary.length === 1 ? 'Day' : 'Days'}</span>
+                                <span style={{ color: '#111827' }}>{(trip.itinerary || []).length} {(trip.itinerary || []).length === 1 ? 'Day' : 'Days'}</span>
                               )}
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
