@@ -933,9 +933,9 @@ function App() {
                       {copiedId === activeTrip?.id ? "COPIED" : (activeTrip?.sharedId ? "INVITED" : "INVITE")}
                     </button>
                   </div>
-                </div>
+                )}
+              </div>
             </div>
-          </div>
 
           {/* List Content */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px' }}>
