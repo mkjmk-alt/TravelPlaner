@@ -308,18 +308,28 @@ function App() {
     }));
   };
 
-  const saveFavorites = async (newFavs) => {
+  const syncFavoritesToCloud = async (newFavs) => {
     setFavorites(newFavs);
     localStorage.setItem('world_pro_fav_v1', JSON.stringify(newFavs));
+    
     if (session?.user?.id) {
-      await supabase
-        .from('user_state')
-        .upsert(
-          { user_id: session.user.id, key: 'world_pro_fav_v1', value: newFavs },
-          { onConflict: 'user_id,key' }
-        )
-        .catch(console.error);
+      try {
+        const { error } = await supabase
+          .from('user_state')
+          .upsert(
+            { user_id: session.user.id, key: 'world_pro_fav_v1', value: newFavs },
+            { onConflict: 'user_id,key' }
+          );
+        if (error) throw error;
+        console.log("Favorites synced to cloud successfully.");
+      } catch (err) {
+        console.error("Favorites cloud sync failed:", err);
+      }
     }
+  };
+
+  const saveFavorites = (newFavs) => {
+    syncFavoritesToCloud(newFavs);
   };
 
   const syncTripsToCloud = async (newTrips) => {
@@ -622,16 +632,12 @@ function App() {
   };
 
   const toggleFavorite = (place) => {
-    setFavorites(prev => {
-      const isFav = prev.some(f => f.name === place.name);
-      const nextFavs = isFav 
-        ? prev.filter(f => f.name !== place.name)
-        : [...prev, { ...place, id: Date.now() }];
-      
-      // Persist nextFavs
-      saveFavorites(nextFavs);
-      return nextFavs;
-    });
+    const isFav = favorites.some(f => f.name === place.name);
+    const nextFavs = isFav 
+      ? favorites.filter(f => f.name !== place.name)
+      : [...favorites, { ...place, id: Date.now() }];
+    
+    syncFavoritesToCloud(nextFavs);
   };
 
   const isFavorite = (place) => {
