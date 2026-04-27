@@ -1169,36 +1169,6 @@ function App() {
                                     <p style={{ fontSize: '12px', color: '#6b7280', margin: 0, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.02em' }}>{item.cat}</p>
                                   </div>
                                   <div style={{ display: 'flex', gap: '4px' }}>
-                                    <label style={{ cursor: 'pointer', padding: '10px', color: item.image ? '#2563eb' : '#9ca3af', backgroundColor: item.image ? '#eff6ff' : 'transparent', borderRadius: '10px' }}>
-                                      <Camera size={18} />
-                                      <input 
-                                        type="file" 
-                                        accept="image/*" 
-                                        style={{ display: 'none' }} 
-                                        onChange={(e) => {
-                                          const file = e.target.files[0];
-                                          if (file) {
-                                            const reader = new FileReader();
-                                            reader.onloadend = () => {
-                                              const newTrips = trips.map(t => {
-                                                if (t.id === activeTripId) {
-                                                  const newItin = t.itinerary.map(day => {
-                                                    if (day.day === dayPlan.day) {
-                                                      return { ...day, items: day.items.map(it => it.id === item.id ? { ...it, image: reader.result } : it) };
-                                                    }
-                                                    return day;
-                                                  });
-                                                  return { ...t, itinerary: newItin };
-                                                }
-                                                return t;
-                                              });
-                                              syncTripsToCloud(newTrips);
-                                            };
-                                            reader.readAsDataURL(file);
-                                          }
-                                        }}
-                                      />
-                                    </label>
                                     <button 
                                       onClick={(e) => { e.stopPropagation(); handleInlineDelete(e, `itin-${item.id}`, () => removeFromItinerary(dIdx, item.id)); }}
                                       style={{ padding: confirmDeleteId === `itin-${item.id}` ? '10px 14px' : '10px', color: confirmDeleteId === `itin-${item.id}` ? 'white' : '#f87171', backgroundColor: confirmDeleteId === `itin-${item.id}` ? '#ef4444' : 'transparent', border: 'none', borderRadius: '10px', cursor: 'pointer', flexShrink: 0 }}
@@ -1208,31 +1178,6 @@ function App() {
                                   </div>
                                 </div>
 
-                                {item.image && (
-                                  <div style={{ position: 'relative', width: '100%', height: '160px', borderRadius: '14px', overflow: 'hidden', backgroundColor: '#f3f4f6' }}>
-                                    <img src={item.image} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                    <button 
-                                      onClick={() => {
-                                        const newTrips = trips.map(t => {
-                                          if (t.id === activeTripId) {
-                                            const newItin = t.itinerary.map(day => {
-                                              if (day.day === dayPlan.day) {
-                                                return { ...day, items: day.items.map(it => it.id === item.id ? { ...it, image: null } : it) };
-                                              }
-                                              return day;
-                                            });
-                                            return { ...t, itinerary: newItin };
-                                          }
-                                          return t;
-                                        });
-                                        syncTripsToCloud(newTrips);
-                                      }}
-                                      style={{ position: 'absolute', top: '8px', right: '8px', backgroundColor: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '8px', padding: '6px', cursor: 'pointer' }}
-                                    >
-                                      <X size={14} />
-                                    </button>
-                                  </div>
-                                )}
                               </div>
                           ))}
                         </div>
