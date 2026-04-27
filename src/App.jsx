@@ -1172,7 +1172,15 @@ function App() {
                                     <button 
                                       onClick={(e) => { 
                                         e.stopPropagation(); 
-                                        window.open(`https://www.google.com/maps/dir/?api=1&destination=${item.lat},${item.lng}&destination_place_id=${item.placeId || ''}`, '_blank');
+                                        const isKorea = ['대한민국', '강원', '경기', '서울', '인천', '부산', '대구', '광주', '대전', '울산', '세종', '충북', '충남', '전북', '전남', '경북', '경남', '제주'].some(k => item.loc?.includes(k));
+                                        
+                                        if (isKorea) {
+                                          // Naver Maps Search with coordinates
+                                          window.open(`https://map.naver.com/v5/search/${encodeURIComponent(item.name)}?c=${item.lng},${item.lat},15,0,0,0,dh`, '_blank');
+                                        } else {
+                                          // Google Maps Directions
+                                          window.open(`https://www.google.com/maps/dir/?api=1&destination=${item.lat},${item.lng}&destination_place_id=${item.placeId || ''}`, '_blank');
+                                        }
                                       }}
                                       style={{ padding: '10px', color: '#3b82f6', backgroundColor: '#eff6ff', border: 'none', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                       title="길찾기"
