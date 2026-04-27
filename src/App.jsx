@@ -1175,8 +1175,9 @@ function App() {
                                         const isKorea = ['대한민국', '강원', '경기', '서울', '인천', '부산', '대구', '광주', '대전', '울산', '세종', '충북', '충남', '전북', '전남', '경북', '경남', '제주'].some(k => item.loc?.includes(k));
                                         
                                         if (isKorea) {
-                                          // Naver Maps Search with coordinates
-                                          window.open(`https://map.naver.com/v5/search/${encodeURIComponent(item.name)}?c=${item.lng},${item.lat},15,0,0,0,dh`, '_blank');
+                                          // Naver Maps Directions from Current Location
+                                          // URL Format: https://map.naver.com/v5/directions/-,,/{LAT},{LNG},{NAME},,,/{MODE}
+                                          window.open(`https://map.naver.com/v5/directions/-,,/${item.lat},${item.lng},${encodeURIComponent(item.name)},,,/WALK`, '_blank');
                                         } else {
                                           // Google Maps Directions
                                           window.open(`https://www.google.com/maps/dir/?api=1&destination=${item.lat},${item.lng}&destination_place_id=${item.placeId || ''}`, '_blank');
