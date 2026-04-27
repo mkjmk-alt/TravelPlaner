@@ -933,7 +933,8 @@ function App() {
                       {copiedId === activeTrip?.id ? "COPIED" : (activeTrip?.sharedId ? "INVITED" : "INVITE")}
                     </button>
                   </div>
-                )}
+                </div>
+              )}
               </div>
             </div>
 
