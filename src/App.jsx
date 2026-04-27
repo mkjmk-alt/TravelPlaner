@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete, Polyline } from '@react-google-maps/api';
-import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronLeft, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Camera, Play, Image } from 'lucide-react';
+import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Camera, Play, Image } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import './index.css';
 
@@ -674,6 +674,19 @@ function App() {
     }
   };
 
+  const moveTrip = async (id, direction) => {
+    const index = (trips || []).findIndex(t => t.id === id);
+    if (index === -1) return;
+    if (direction === 'up' && index === 0) return;
+    if (direction === 'down' && index === (trips || []).length - 1) return;
+
+    const newTrips = [...(trips || [])];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    [newTrips[index], newTrips[targetIndex]] = [newTrips[targetIndex], newTrips[index]];
+    
+    await syncTripsToCloud(newTrips);
+  };
+
   const addExpense = () => {
     if (!activeTripId || !expenseInput.desc || !expenseInput.amount) return;
     
@@ -1017,6 +1030,22 @@ function App() {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', gap: '8px' }}>
                           <h3 style={{ fontSize: '18px', fontWeight: '900', color: '#111827', margin: 0, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{trip.name}</h3>
                           <div style={{ display: 'flex', gap: '4px', flexShrink: 0, alignItems: 'center' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); moveTrip(trip.id, 'up'); }}
+                                style={{ background: 'none', border: 'none', color: (trips || []).indexOf(trip) === 0 ? '#e5e7eb' : '#9ca3af', cursor: (trips || []).indexOf(trip) === 0 ? 'default' : 'pointer', padding: '2px' }}
+                                disabled={(trips || []).indexOf(trip) === 0}
+                              >
+                                <ChevronUp size={14} />
+                              </button>
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); moveTrip(trip.id, 'down'); }}
+                                style={{ background: 'none', border: 'none', color: (trips || []).indexOf(trip) === (trips || []).length - 1 ? '#e5e7eb' : '#9ca3af', cursor: (trips || []).indexOf(trip) === (trips || []).length - 1 ? 'default' : 'pointer', padding: '2px' }}
+                                disabled={(trips || []).indexOf(trip) === (trips || []).length - 1}
+                              >
+                                <ChevronDown size={14} />
+                              </button>
+                            </div>
                             <button 
                               onClick={(e) => { e.stopPropagation(); trip.sharedId ? copyToClipboard(trip.sharedId, trip.id) : shareTrip(trip.id); }}
                               style={{ width: '32px', height: '32px', borderRadius: '8px', border: 'none', backgroundColor: trip.sharedId ? '#f3f4f6' : '#f5f3ff', color: trip.sharedId ? '#6b7280' : '#8b5cf6', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
