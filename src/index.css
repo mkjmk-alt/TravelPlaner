@@ -135,3 +135,9 @@ body {
     height: 45%;
   }
 }
+
+/* Slideshow Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

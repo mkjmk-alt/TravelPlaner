@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete, Polyline } from '@react-google-maps/api';
-import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check } from 'lucide-react';
+import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronLeft, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Camera, Play, Image } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import './index.css';
 
@@ -87,6 +87,9 @@ function App() {
   const [isLoadingDB, setIsLoadingDB] = useState(true);
   const [showShareToast, setShowShareToast] = useState(false);
   const [hasTriggeredToast, setHasTriggeredToast] = useState(false);
+  const [showSlideshow, setShowSlideshow] = useState(false);
+  const [slideshowIndex, setSlideshowIndex] = useState(0);
+  const slideshowTimerRef = useRef(null);
 
   // --- DATA STATE ---
   const [favorites, setFavorites] = useState(() => {
@@ -477,6 +480,70 @@ function App() {
     // Sync to cloud and update local state
     await syncTripsToCloud(nextTrips);
   };
+
+  // --- PHOTO HELPERS ---
+  const handlePhotoUpload = (file, dayNumber, itemId) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const nextTrips = (trips || []).map(t => {
+        if (t.id === activeTripId) {
+          const newItin = (t.itinerary || []).map(day => {
+            if (day.day === dayNumber) {
+              return { ...day, items: day.items.map(it => it.id === itemId ? { ...it, image: reader.result } : it) };
+            }
+            return day;
+          });
+          return { ...t, itinerary: newItin };
+        }
+        return t;
+      });
+      syncTripsToCloud(nextTrips);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePhotoDelete = (dayNumber, itemId) => {
+    const nextTrips = (trips || []).map(t => {
+      if (t.id === activeTripId) {
+        const newItin = (t.itinerary || []).map(day => {
+          if (day.day === dayNumber) {
+            return { ...day, items: day.items.map(it => it.id === itemId ? { ...it, image: null } : it) };
+          }
+          return day;
+        });
+        return { ...t, itinerary: newItin };
+      }
+      return t;
+    });
+    syncTripsToCloud(nextTrips);
+  };
+
+  // Collect all photos for slideshow
+  const allPhotos = useMemo(() => {
+    if (!activeTrip?.itinerary) return [];
+    const photos = [];
+    (activeTrip.itinerary || []).forEach(day => {
+      (day.items || []).forEach(item => {
+        if (item.image) {
+          photos.push({ image: item.image, name: item.name, emoji: item.emoji, day: day.day, cat: item.cat });
+        }
+      });
+    });
+    return photos;
+  }, [activeTrip]);
+
+  // Slideshow auto-play
+  useEffect(() => {
+    if (showSlideshow && allPhotos.length > 1) {
+      slideshowTimerRef.current = setInterval(() => {
+        setSlideshowIndex(prev => (prev + 1) % allPhotos.length);
+      }, 4000);
+    }
+    return () => {
+      if (slideshowTimerRef.current) clearInterval(slideshowTimerRef.current);
+    };
+  }, [showSlideshow, allPhotos.length]);
 
   const addDay = async () => {
     if (!activeTrip) return;
@@ -1080,9 +1147,19 @@ function App() {
               <>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
                   <h2 style={{ fontSize: '12px', fontWeight: '900', color: '#3b82f6', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>My Planner</h2>
-                  <button onClick={addDay} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '800', color: '#2563eb', backgroundColor: '#eff6ff', padding: '8px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer' }}>
-                    <PlusCircle size={14} /> ADD DAY
-                  </button>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    {allPhotos.length > 0 && (
+                      <button 
+                        onClick={() => { setSlideshowIndex(0); setShowSlideshow(true); }} 
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '800', color: '#8b5cf6', backgroundColor: '#f5f3ff', padding: '8px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer' }}
+                      >
+                        <Play size={14} /> MOVIE ({allPhotos.length})
+                      </button>
+                    )}
+                    <button onClick={addDay} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '800', color: '#2563eb', backgroundColor: '#eff6ff', padding: '8px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer' }}>
+                      <PlusCircle size={14} /> ADD DAY
+                    </button>
+                  </div>
                 </div>
 
                 {(itinerary || []).map((dayPlan, dIdx) => (
@@ -1169,6 +1246,15 @@ function App() {
                                     <p style={{ fontSize: '12px', color: '#6b7280', margin: 0, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.02em' }}>{item.cat}</p>
                                   </div>
                                   <div style={{ display: 'flex', gap: '4px' }}>
+                                    <label style={{ cursor: 'pointer', padding: '10px', color: item.image ? '#8b5cf6' : '#9ca3af', backgroundColor: item.image ? '#f5f3ff' : 'transparent', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="사진 추가">
+                                      <Camera size={18} />
+                                      <input 
+                                        type="file" 
+                                        accept="image/*" 
+                                        style={{ display: 'none' }} 
+                                        onChange={(e) => { handlePhotoUpload(e.target.files[0], dayPlan.day, item.id); e.target.value = ''; }}
+                                      />
+                                    </label>
                                     <button 
                                       onClick={(e) => { 
                                         e.stopPropagation(); 
@@ -1176,10 +1262,8 @@ function App() {
                                         const isKoreaTrip = activeTrip?.country === '대한민국';
                                         
                                         if (isKoreaAddress || isKoreaTrip) {
-                                          // Naver Maps Search with focus and coords - Most stable way to show place + directions button
                                           window.open(`https://map.naver.com/v5/search/${encodeURIComponent(item.name)}?c=${item.lng},${item.lat},15,0,0,0,dh&isCorrectAnswer=true`, '_blank');
                                         } else {
-                                          // Google Maps Directions for Global
                                           window.open(`https://www.google.com/maps/dir/?api=1&destination=${item.lat},${item.lng}&destination_place_id=${item.placeId || ''}`, '_blank');
                                         }
                                       }}
@@ -1196,6 +1280,27 @@ function App() {
                                     </button>
                                   </div>
                                 </div>
+
+                                {/* Photo Display */}
+                                {item.image && (
+                                  <div style={{ position: 'relative', width: '100%', height: '180px', borderRadius: '16px', overflow: 'hidden', backgroundColor: '#f3f4f6' }}>
+                                    <img src={item.image} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    <div style={{ 
+                                      position: 'absolute', bottom: 0, left: 0, right: 0, 
+                                      background: 'linear-gradient(transparent, rgba(0,0,0,0.6))', 
+                                      padding: '24px 16px 12px', 
+                                      display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' 
+                                    }}>
+                                      <span style={{ color: 'white', fontSize: '13px', fontWeight: '800', textShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>{item.emoji} {item.name}</span>
+                                    </div>
+                                    <button 
+                                      onClick={() => handlePhotoDelete(dayPlan.day, item.id)}
+                                      style={{ position: 'absolute', top: '8px', right: '8px', backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', color: 'white', border: 'none', borderRadius: '10px', padding: '6px', cursor: 'pointer', display: 'flex' }}
+                                    >
+                                      <X size={14} />
+                                    </button>
+                                  </div>
+                                )}
 
                               </div>
                           ))}
@@ -1561,6 +1666,82 @@ function App() {
           )}
         </GoogleMap>
       </div>
+    {/* === SLIDESHOW MODAL === */}
+    {showSlideshow && allPhotos.length > 0 && (
+      <div style={{
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999,
+        backgroundColor: '#000', display: 'flex', flexDirection: 'column',
+        animation: 'fadeIn 0.5s ease'
+      }}>
+        {/* Photo */}
+        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+          <img
+            key={slideshowIndex}
+            src={allPhotos[slideshowIndex]?.image}
+            alt={allPhotos[slideshowIndex]?.name}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', animation: 'fadeIn 1s ease' }}
+          />
+          {/* Gradient overlay */}
+          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(transparent 0%, rgba(0,0,0,0.8) 100%)', padding: '60px 32px 32px' }}>
+            <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.15em', margin: '0 0 8px 0' }}>
+              DAY {allPhotos[slideshowIndex]?.day} · {allPhotos[slideshowIndex]?.cat}
+            </p>
+            <h2 style={{ color: 'white', fontSize: '24px', fontWeight: '900', margin: '0 0 4px 0', textShadow: '0 2px 8px rgba(0,0,0,0.5)' }}>
+              {allPhotos[slideshowIndex]?.emoji} {allPhotos[slideshowIndex]?.name}
+            </h2>
+            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '700', margin: 0 }}>
+              {activeTrip?.name}
+            </p>
+          </div>
+          {/* Top bar */}
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'linear-gradient(rgba(0,0,0,0.5), transparent)' }}>
+            <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px', fontWeight: '800', letterSpacing: '0.1em' }}>
+              {slideshowIndex + 1} / {allPhotos.length}
+            </span>
+            <button 
+              onClick={() => setShowSlideshow(false)} 
+              style={{ backgroundColor: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)', color: 'white', border: 'none', borderRadius: '12px', padding: '8px 16px', cursor: 'pointer', fontWeight: '800', fontSize: '12px' }}
+            >
+              닫기
+            </button>
+          </div>
+          {/* Nav buttons */}
+          {allPhotos.length > 1 && (
+            <>
+              <button 
+                onClick={() => setSlideshowIndex(prev => (prev - 1 + allPhotos.length) % allPhotos.length)}
+                style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', backgroundColor: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)', color: 'white', border: 'none', borderRadius: '50%', width: '44px', height: '44px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <ChevronLeft size={22} />
+              </button>
+              <button 
+                onClick={() => setSlideshowIndex(prev => (prev + 1) % allPhotos.length)}
+                style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', backgroundColor: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)', color: 'white', border: 'none', borderRadius: '50%', width: '44px', height: '44px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <ChevronRight size={22} />
+              </button>
+            </>
+          )}
+          {/* Progress dots */}
+          <div style={{ position: 'absolute', bottom: '120px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '6px' }}>
+            {allPhotos.map((_, i) => (
+              <div 
+                key={i} 
+                onClick={() => setSlideshowIndex(i)}
+                style={{ 
+                  width: i === slideshowIndex ? '24px' : '8px', 
+                  height: '8px', 
+                  borderRadius: '4px', 
+                  backgroundColor: i === slideshowIndex ? 'white' : 'rgba(255,255,255,0.3)', 
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease' 
+                }} 
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    )}
 
     </div>
   );
