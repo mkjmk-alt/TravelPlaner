@@ -1170,6 +1170,16 @@ function App() {
                                   </div>
                                   <div style={{ display: 'flex', gap: '4px' }}>
                                     <button 
+                                      onClick={(e) => { 
+                                        e.stopPropagation(); 
+                                        window.open(`https://www.google.com/maps/dir/?api=1&destination=${item.lat},${item.lng}&destination_place_id=${item.placeId || ''}`, '_blank');
+                                      }}
+                                      style={{ padding: '10px', color: '#3b82f6', backgroundColor: '#eff6ff', border: 'none', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                      title="길찾기"
+                                    >
+                                      <Navigation size={18} />
+                                    </button>
+                                    <button 
                                       onClick={(e) => { e.stopPropagation(); handleInlineDelete(e, `itin-${item.id}`, () => removeFromItinerary(dIdx, item.id)); }}
                                       style={{ padding: confirmDeleteId === `itin-${item.id}` ? '10px 14px' : '10px', color: confirmDeleteId === `itin-${item.id}` ? 'white' : '#f87171', backgroundColor: confirmDeleteId === `itin-${item.id}` ? '#ef4444' : 'transparent', border: 'none', borderRadius: '10px', cursor: 'pointer', flexShrink: 0 }}
                                     >
