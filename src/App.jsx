@@ -162,22 +162,20 @@ function App() {
           if (favsRow) cloudFavs = favsRow.value;
         }
 
-        if (!cloudTrips && trips.length > 0) {
-          await supabase.from('user_state').upsert({ user_id: session.user.id, key: 'world_pro_trips_v1', value: trips }, { onConflict: 'user_id,key' });
+        if (!cloudTrips && (trips || []).length > 0) {
+          await supabase.from('user_state').upsert({ user_id: session.user.id, key: 'world_pro_trips_v1', value: trips || [] }, { onConflict: 'user_id,key' });
         } else if (cloudTrips) {
-          setTrips(cloudTrips);
-          localStorage.setItem('world_pro_trips_v1', JSON.stringify(cloudTrips));
-          if (!activeTripId && cloudTrips.length > 0) setActiveTripId(cloudTrips[0].id);
+          setTrips(cloudTrips || []);
+          localStorage.setItem('world_pro_trips_v1', JSON.stringify(cloudTrips || []));
+          if (!activeTripId && (cloudTrips || []).length > 0) setActiveTripId(cloudTrips[0].id);
         }
 
-        if (!cloudFavs && favorites.length > 0) {
+        if (!cloudFavs && (favorites || []).length > 0) {
           // Initial sync from local to cloud
-          await supabase.from('user_state').upsert({ user_id: session.user.id, key: 'world_pro_fav_v1', value: favorites }, { onConflict: 'user_id,key' });
+          await supabase.from('user_state').upsert({ user_id: session.user.id, key: 'world_pro_fav_v1', value: favorites || [] }, { onConflict: 'user_id,key' });
         } else if (cloudFavs) {
-          // Cloud exists, so it's our Source of Truth.
-          // This prevents deleted items from coming back.
-          setFavorites(cloudFavs);
-          localStorage.setItem('world_pro_fav_v1', JSON.stringify(cloudFavs));
+          setFavorites(cloudFavs || []);
+          localStorage.setItem('world_pro_fav_v1', JSON.stringify(cloudFavs || []));
         }
       } catch (err) {
         console.error("Supabase sync failed:", err);
@@ -287,7 +285,8 @@ function App() {
 
   const groupedFavorites = useMemo(() => {
     const groups = {};
-    favorites.forEach(fav => {
+    (favorites || []).forEach(fav => {
+      if (!fav || !fav.loc) return;
       const country = getCountryFromAddress(fav.loc);
       if (!groups[country]) groups[country] = [];
       groups[country].push(fav);
@@ -309,19 +308,19 @@ function App() {
   };
 
   const syncFavoritesToCloud = async (newFavs) => {
-    setFavorites(newFavs);
-    localStorage.setItem('world_pro_fav_v1', JSON.stringify(newFavs));
+    const safeFavs = newFavs || [];
+    setFavorites(safeFavs);
+    localStorage.setItem('world_pro_fav_v1', JSON.stringify(safeFavs));
     
     if (session?.user?.id) {
       try {
         const { error } = await supabase
           .from('user_state')
           .upsert(
-            { user_id: session.user.id, key: 'world_pro_fav_v1', value: newFavs },
+            { user_id: session.user.id, key: 'world_pro_fav_v1', value: safeFavs },
             { onConflict: 'user_id,key' }
           );
         if (error) throw error;
-        console.log("Favorites synced to cloud successfully.");
       } catch (err) {
         console.error("Favorites cloud sync failed:", err);
       }
