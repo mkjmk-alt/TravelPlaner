@@ -884,7 +884,6 @@ function App() {
                   <ChevronDown size={18} />
                 </button>
               </div>
-              </div>
             </div>
 
             {/* Row 2: Navigation Tabs & Share Actions */}
@@ -935,7 +934,6 @@ function App() {
                     </button>
                   </div>
                 </div>
-              )}
             </div>
           </div>
 
@@ -1560,6 +1558,8 @@ function App() {
             </button>
           </div>
         </div>
+      )}
+        </aside>
       )}
 
       {/* MAP VIEWPORT */}
