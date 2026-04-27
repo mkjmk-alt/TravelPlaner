@@ -246,11 +246,29 @@ function App() {
   }, [exchangeRates]);
 
   const getCountryFromAddress = (address) => {
-    if (!address) return 'Unknown';
-    const parts = address.split(',');
-    let country = parts[parts.length - 1].trim();
-    country = country.replace(/^[0-9A-Z-\s]+ /, ''); 
-    return country;
+    if (!address) return '기타';
+    
+    // Check if the address contains any of our known countries first
+    const knownCountries = Object.keys(countryToCurrency);
+    for (const c of knownCountries) {
+      if (address.includes(c)) return c;
+    }
+
+    const parts = address.split(',').map(p => p.trim());
+    let country = parts[parts.length - 1];
+    
+    // Clean up common noise (postal codes, Plus Codes, etc.)
+    country = country.replace(/[0-9]{5,}/g, '') // Remove long numbers (postal codes)
+                     .replace(/[A-Z0-9]{4}\+[A-Z0-9]{2,}/g, '') // Remove Plus Codes
+                     .trim();
+    
+    // If it's still too long or messy, try the first part if it's a known country
+    if (country.length > 10 || !country) {
+      const firstPart = parts[0].split(' ')[0];
+      if (knownCountries.includes(firstPart)) return firstPart;
+    }
+
+    return country || '기타';
   };
 
   const getActualDateForDay = (startDate, dayNumber) => {
