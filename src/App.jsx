@@ -1078,9 +1078,9 @@ function App() {
                   </button>
                 </div>
 
-                {itinerary.map((dayPlan, dIdx) => (
+                {(itinerary || []).map((dayPlan, dIdx) => (
                   <div 
-                    key={dayPlan.day} 
+                    key={dayPlan?.day || dIdx} 
                     style={{ 
                       backgroundColor: 'white', 
                       borderRadius: '24px', 
@@ -1092,10 +1092,10 @@ function App() {
                   >
                     {/* Day Header */}
                     <div 
-                      onClick={() => setActiveDay(dayPlan.day)}
+                      onClick={() => dayPlan?.day && setActiveDay(dayPlan.day)}
                       style={{ 
                         padding: '20px 24px', 
-                        backgroundColor: activeDay === dayPlan.day ? '#eff6ff' : '#f9fafb', 
+                        backgroundColor: activeDay === dayPlan?.day ? '#eff6ff' : '#f9fafb', 
                         borderBottom: '1px solid #f3f4f6', 
                         display: 'flex', 
                         justifyContent: 'space-between', 
@@ -1108,7 +1108,7 @@ function App() {
                         <div style={{ 
                           width: '40px', 
                           height: '40px', 
-                          backgroundColor: activeDay === dayPlan.day ? '#2563eb' : '#9ca3af', 
+                          backgroundColor: activeDay === dayPlan?.day ? '#2563eb' : '#9ca3af', 
                           borderRadius: '12px', 
                           display: 'flex', 
                           alignItems: 'center', 
@@ -1118,29 +1118,29 @@ function App() {
                           fontSize: '14px',
                           transition: 'background-color 0.2s'
                         }}>
-                          {dayPlan.day}
+                          {dayPlan?.day}
                         </div>
                         <div>
-                          <h3 style={{ fontSize: '16px', fontWeight: '900', color: '#111827', margin: 0 }}>Day {dayPlan.day}</h3>
-                          <p style={{ fontSize: '12px', fontWeight: '700', color: activeDay === dayPlan.day ? '#3b82f6' : '#9ca3af', margin: 0 }}>
-                            {getActualDateForDay(activeTrip?.startDate, dayPlan.day)}
+                          <h3 style={{ fontSize: '16px', fontWeight: '900', color: '#111827', margin: 0 }}>Day {dayPlan?.day}</h3>
+                          <p style={{ fontSize: '12px', fontWeight: '700', color: activeDay === dayPlan?.day ? '#3b82f6' : '#9ca3af', margin: 0 }}>
+                            {getActualDateForDay(activeTrip?.startDate, dayPlan?.day)}
                           </p>
                         </div>
                       </div>
-                      <span style={{ fontSize: '11px', fontWeight: '900', color: activeDay === dayPlan.day ? '#3b82f6' : '#9ca3af', backgroundColor: activeDay === dayPlan.day ? '#dbeafe' : '#f3f4f6', padding: '4px 10px', borderRadius: '8px' }}>
-                        {dayPlan.items.length} SPOTS
+                      <span style={{ fontSize: '11px', fontWeight: '900', color: activeDay === dayPlan?.day ? '#3b82f6' : '#9ca3af', backgroundColor: activeDay === dayPlan?.day ? '#dbeafe' : '#f3f4f6', padding: '4px 10px', borderRadius: '8px' }}>
+                        {(dayPlan?.items || []).length} SPOTS
                       </span>
                     </div>
 
                     {/* Day Items List */}
                     <div style={{ padding: '24px' }}>
-                      {dayPlan.items.length === 0 ? (
+                      {(!dayPlan?.items || dayPlan.items.length === 0) ? (
                         <div style={{ padding: '32px', textAlign: 'center', border: '2px dashed #f3f4f6', borderRadius: '16px' }}>
                           <p style={{ fontSize: '13px', color: '#d1d5db', fontWeight: '700', margin: 0 }}>이 날의 일정을 추가해 보세요!</p>
                         </div>
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                          {dayPlan.items.map((item) => (
+                          {dayPlan.items.map((item, iIdx) => (
                               <div 
                                 key={item.id} 
                                 style={{ 
