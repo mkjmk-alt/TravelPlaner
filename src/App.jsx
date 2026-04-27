@@ -165,6 +165,7 @@ function App() {
         if (!cloudTrips && trips.length > 0) {
           await supabase.from('user_state').upsert({ user_id: session.user.id, key: 'world_pro_trips_v1', value: trips }, { onConflict: 'user_id,key' });
         } else if (cloudTrips) {
+          // Merge trips if needed, but for now prioritize cloud for trips consistency
           setTrips(cloudTrips);
           localStorage.setItem('world_pro_trips_v1', JSON.stringify(cloudTrips));
           if (!activeTripId && cloudTrips.length > 0) setActiveTripId(cloudTrips[0].id);
@@ -173,8 +174,15 @@ function App() {
         if (!cloudFavs && favorites.length > 0) {
           await supabase.from('user_state').upsert({ user_id: session.user.id, key: 'world_pro_fav_v1', value: favorites }, { onConflict: 'user_id,key' });
         } else if (cloudFavs) {
-          setFavorites(cloudFavs);
-          localStorage.setItem('world_pro_fav_v1', JSON.stringify(cloudFavs));
+          // Smart Merge: Don't lose local favorites that haven't synced yet
+          setFavorites(prev => {
+            const merged = [...cloudFavs];
+            prev.forEach(local => {
+              if (!merged.some(c => c.name === local.name)) merged.push(local);
+            });
+            localStorage.setItem('world_pro_fav_v1', JSON.stringify(merged));
+            return merged;
+          });
         }
       } catch (err) {
         console.error("Supabase sync failed:", err);
@@ -619,12 +627,16 @@ function App() {
   };
 
   const toggleFavorite = (place) => {
-    const isFav = favorites.some(f => f.name === place.name);
-    if (isFav) {
-      saveFavorites(favorites.filter(f => f.name !== place.name));
-    } else {
-      saveFavorites([...favorites, { ...place, id: Date.now() }]);
-    }
+    setFavorites(prev => {
+      const isFav = prev.some(f => f.name === place.name);
+      const nextFavs = isFav 
+        ? prev.filter(f => f.name !== place.name)
+        : [...prev, { ...place, id: Date.now() }];
+      
+      // Persist nextFavs
+      saveFavorites(nextFavs);
+      return nextFavs;
+    });
   };
 
   const isFavorite = (place) => {
