@@ -1300,7 +1300,22 @@ function App() {
                                         
                                         // 한국 여행이거나 주소에 한국 지명이 포함된 경우에만 네이버 지도 사용
                                         if (isKoreaTrip || isKoreaAddress) {
-                                          window.open(`https://map.naver.com/v5/search/${encodeURIComponent(item.name)}?c=${item.lng},${item.lat},15,0,0,0,dh&isCorrectAnswer=true`, '_blank');
+                                          const destName = encodeURIComponent(item.name);
+                                          const dlat = item.lat;
+                                          const dlng = item.lng;
+                                          
+                                          if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+                                            // iOS: nmap 앱 딥링크로 길찾기 실행
+                                            const nMapAppUrl = `nmap://route/public?dlat=${dlat}&dlng=${dlng}&dname=${destName}&appname=worldpro`;
+                                            const webFallback = `https://map.naver.com/v5/directions/-/${destName},${dlng},${dlat}/transit?c=${dlng},${dlat},15,0,0,0,dh`;
+                                            window.location.href = nMapAppUrl;
+                                            setTimeout(() => {
+                                              window.open(webFallback, '_blank');
+                                            }, 1500);
+                                          } else {
+                                            // 안드로이드/데스크톱: 네이버 지도 웹 길찾기
+                                            window.open(`https://map.naver.com/v5/directions/-/${destName},${dlng},${dlat}/transit?c=${dlng},${dlat},15,0,0,0,dh`, '_blank');
+                                          }
                                         } else {
                                           // 해외인 경우 구글 지도
                                           const googleUrl = `https://www.google.com/maps/dir/?api=1&destination=${item.lat},${item.lng}&destination_place_id=${item.placeId || ''}`;
