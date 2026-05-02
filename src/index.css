@@ -151,8 +151,22 @@ body {
   display: none !important;
 }
 
+.drag-handle {
+  display: none;
+  width: 40px;
+  height: 4px;
+  background-color: #e5e7eb;
+  border-radius: 2px;
+  margin: 12px auto;
+  flex-shrink: 0;
+}
+
 @media (max-width: 768px) {
   .mobile-only-flex {
     display: flex !important;
+  }
+  
+  .drag-handle {
+    display: block;
   }
 }
