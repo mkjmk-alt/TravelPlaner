@@ -816,7 +816,6 @@ function App() {
       lat: place.geometry.location.lat(),
       lng: place.geometry.location.lng(),
       loc: place.formatted_address,
-      cat: 'Search Result',
       desc: place.formatted_address,
       emoji: '📍',
       type: 'search'
@@ -847,8 +846,7 @@ function App() {
             lat: place.geometry.location.lat(),
             lng: place.geometry.location.lng(),
             loc: place.formatted_address || 'Selected from Map',
-            cat: 'Map Selection',
-            desc: place.formatted_address || '',
+            desc: place.formatted_address || 'Selected from Map',
             emoji: '📍',
             type: 'poi'
           };
@@ -1399,7 +1397,6 @@ function App() {
                                       <h4 style={{ fontSize: '15px', fontWeight: '900', color: '#111827', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</h4>
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                      <p style={{ fontSize: '12px', color: '#6b7280', margin: 0, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.02em' }}>{item.cat}</p>
                                       <input 
                                         type="time" 
                                         value={item.time || ''} 
@@ -1878,7 +1875,7 @@ function App() {
           {/* Gradient overlay */}
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(transparent 0%, rgba(0,0,0,0.8) 100%)', padding: '60px 32px 32px' }}>
             <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.15em', margin: '0 0 8px 0' }}>
-              DAY {allPhotos[slideshowIndex]?.day} · {allPhotos[slideshowIndex]?.cat}
+              DAY {allPhotos[slideshowIndex]?.day}
             </p>
             <h2 style={{ color: 'white', fontSize: '24px', fontWeight: '900', margin: '0 0 4px 0', textShadow: '0 2px 8px rgba(0,0,0,0.5)' }}>
               {allPhotos[slideshowIndex]?.emoji} {allPhotos[slideshowIndex]?.name}
