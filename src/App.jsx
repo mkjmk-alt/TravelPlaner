@@ -952,7 +952,11 @@ function App() {
           transform: sidebarOpen ? `translateY(${dragOffset}px)` : `translateY(calc(100% - 60px + ${dragOffset}px))`
         }}
       >
-        <div className="drag-handle"></div>
+        <div 
+          className="drag-handle" 
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          style={{ cursor: 'pointer' }}
+        ></div>
 
           {/* Header */}
           <div style={{ padding: '24px 32px', borderBottom: '1px solid #f3f4f6', backgroundColor: 'white' }}>
@@ -971,14 +975,6 @@ function App() {
                     LOGIN
                   </button>
                 )}
-                <button 
-                  onClick={() => setSidebarOpen(false)}
-                  style={{ background: '#fef2f2', border: 'none', color: '#ef4444', padding: '8px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                  className="mobile-only-flex"
-                  title="Hide Sidebar"
-                >
-                  <ChevronDown size={18} />
-                </button>
               </div>
             </div>
 
