@@ -73,6 +73,39 @@ function App() {
   // --- GLOBAL UI & AUTH STATE ---
   const [session, setSession] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState(0);
+  const [touchStartY, setTouchStartY] = useState(0);
+
+  const onTouchStart = (e) => {
+    const target = e.target;
+    if (target.closest('.drag-handle') || target.closest('.sidebar-header')) {
+      setIsDragging(true);
+      setTouchStartY(e.touches[0].clientY);
+    }
+  };
+
+  const onTouchMove = (e) => {
+    if (!isDragging) return;
+    const currentY = e.touches[0].clientY;
+    const diff = currentY - touchStartY;
+    if (sidebarOpen) {
+      if (diff > 0) setDragOffset(diff);
+    } else {
+      if (diff < 0) setDragOffset(diff);
+    }
+  };
+
+  const onTouchEnd = () => {
+    if (!isDragging) return;
+    setIsDragging(false);
+    if (sidebarOpen) {
+      if (dragOffset > 100) setSidebarOpen(false);
+    } else {
+      if (dragOffset < -100) setSidebarOpen(true);
+    }
+    setDragOffset(0);
+  };
   const [viewMode, setViewMode] = useState('trips');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResult, setSearchResult] = useState(null);
@@ -854,9 +887,72 @@ function App() {
   return (
     <div className={`app-container ${!sidebarOpen ? 'sidebar-closed' : ''}`}>
       
+      {/* GLOBAL SEARCH BAR */}
+      <div className="search-bar-container" style={{ 
+        position: 'fixed', 
+        top: '20px', 
+        left: '50%', 
+        transform: 'translateX(-50%)', 
+        zIndex: 3000, 
+        width: 'calc(100% - 32px)', 
+        maxWidth: '448px',
+        pointerEvents: 'none'
+      }}>
+        <div className="search-bar-inner" style={{ 
+          backgroundColor: 'rgba(255,255,255,0.95)', 
+          backdropFilter: 'blur(20px)',
+          borderRadius: '24px', 
+          display: 'flex', 
+          padding: '8px', 
+          boxShadow: '0 20px 50px rgba(0,0,0,0.15)', 
+          alignItems: 'center',
+          border: '1px solid rgba(255,255,255,0.8)',
+          pointerEvents: 'auto'
+        }}>
+           <div style={{ flex: 1, padding: '0 16px', display: 'flex', alignItems: 'center', height: '48px' }}>
+             <div style={{ width: '100%' }}>
+               <Autocomplete 
+                  onLoad={(a) => { autocompleteRef.current = a; }} 
+                  onPlaceChanged={onPlaceSelected}
+               >
+                 <input 
+                    type="text" 
+                    placeholder="어디로 떠나시나요?" 
+                    style={{ 
+                      width: '100%', 
+                      height: '48px', 
+                      lineHeight: 'normal', 
+                      background: 'transparent', 
+                      border: 'none', 
+                      outline: 'none', 
+                      fontSize: '16px', 
+                      fontWeight: 'bold', 
+                      color: '#1f2937', 
+                      padding: 0, 
+                      margin: 0, 
+                      display: 'block' 
+                    }}
+                 />
+               </Autocomplete>
+             </div>
+           </div>
+           <button style={{ width: '48px', height: '48px', backgroundColor: '#2563eb', color: 'white', borderRadius: '16px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)' }}>
+             <Search size={20} />
+           </button>
+        </div>
+      </div>
+
       {/* SIDEBAR UI */}
-      {sidebarOpen && (
-        <aside className="sidebar-container">
+      <aside 
+        className={`sidebar-container ${!sidebarOpen ? 'closed' : ''} ${isDragging ? 'dragging' : ''}`}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        style={{
+          transform: sidebarOpen ? `translateY(${dragOffset}px)` : `translateY(calc(100% - 60px + ${dragOffset}px))`
+        }}
+      >
+        <div className="drag-handle"></div>
 
           {/* Header */}
           <div style={{ padding: '24px 32px', borderBottom: '1px solid #f3f4f6', backgroundColor: 'white' }}>
@@ -1532,7 +1628,6 @@ function App() {
             <button onClick={() => setSidebarOpen(false)} style={{ fontSize: '11px', fontWeight: '900', color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer', letterSpacing: '0.05em' }}>CLOSE</button>
           </div>
         </aside>
-      )}
 
       {/* Share Toast Notification */}
       {hasTriggeredToast && (
@@ -1578,35 +1673,11 @@ function App() {
 
       {/* MAP VIEWPORT */}
       <div className="map-wrapper">
-
         {!sidebarOpen && (
           <button onClick={() => setSidebarOpen(true)} className="absolute top-6 left-6 z-[2000] w-14 h-14 bg-white rounded-2xl shadow-2xl flex items-center justify-center text-blue-600 hover:scale-110 transition-all border border-white" style={{ position: 'absolute', top: '24px', left: '24px', zIndex: 2000, width: '56px', height: '56px', backgroundColor: 'white', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', cursor: 'pointer', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb' }}>
             <Menu size={24} />
           </button>
         )}
-
-        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[2000] w-full max-w-md px-4" style={{ position: 'absolute', top: '24px', left: '50%', transform: 'translateX(-50%)', zIndex: 2000, width: '100%', maxWidth: '448px' }}>
-          <div className="bg-white/90 backdrop-blur-xl border border-white/50 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.1)] p-2 flex items-center" style={{ backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: '24px', display: 'flex', padding: '8px', boxShadow: '0 20px 50px rgba(0,0,0,0.15)', alignItems: 'center' }}>
-             <div className="flex-1 px-4 text-sm font-bold text-gray-900" style={{ flex: 1, padding: '0 16px', display: 'flex', alignItems: 'center', height: '48px' }}>
-               <div style={{ width: '100%' }}>
-                 <Autocomplete 
-                    onLoad={(a) => { autocompleteRef.current = a; }} 
-                    onPlaceChanged={onPlaceSelected}
-                 >
-                   <input 
-                      type="text" 
-                      placeholder="Search destination..." 
-                      className="w-full bg-transparent outline-none placeholder:text-gray-400" 
-                      style={{ width: '100%', height: '48px', lineHeight: 'normal', background: 'transparent', border: 'none', outline: 'none', fontSize: '16px', fontWeight: 'bold', color: '#1f2937', padding: 0, margin: 0, display: 'block' }}
-                   />
-                 </Autocomplete>
-               </div>
-             </div>
-             <button className="w-12 h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200" style={{ width: '48px', height: '48px', backgroundColor: '#2563eb', color: 'white', borderRadius: '16px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-               <Search size={20} />
-             </button>
-          </div>
-        </div>
 
         <GoogleMap
           mapContainerStyle={{ width: '100%', height: '100%' }}
