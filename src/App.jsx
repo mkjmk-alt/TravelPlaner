@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete, Polyline } from '@react-google-maps/api';
-import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Camera, Play, Image } from 'lucide-react';
+import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Camera, Play, Image, Clock } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import './index.css';
 
@@ -59,6 +59,78 @@ const mapOptions = {
     { featureType: 'transit', elementType: 'labels.icon', stylers: [{ saturation: -100 }, { lightness: 10 }] },
     { featureType: 'transit', elementType: 'labels.text.fill', stylers: [{ color: '#9ca3af' }] }
   ]
+};
+
+const TimeSlider = ({ value, onChange, compact = false }) => {
+  const [h, m] = (value || '09:00').split(':').map(Number);
+  const totalMins = h * 60 + m;
+
+  const handleChange = (e) => {
+    const val = parseInt(e.target.value);
+    const hh = Math.floor(val / 60).toString().padStart(2, '0');
+    const mm = (val % 60).toString().padStart(2, '0');
+    onChange(`${hh}:${mm}`);
+  };
+
+  const adjustMins = (offset) => {
+    let newVal = totalMins + offset;
+    if (newVal < 0) newVal = 0;
+    if (newVal >= 1440) newVal = 1439;
+    const hh = Math.floor(newVal / 60).toString().padStart(2, '0');
+    const mm = (newVal % 60).toString().padStart(2, '0');
+    onChange(`${hh}:${mm}`);
+  };
+
+  if (compact) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#f9fafb', padding: '4px 8px', borderRadius: '10px' }}>
+        <Clock size={12} color="#9ca3af" />
+        <span style={{ fontSize: '12px', fontWeight: '800', color: '#111827', minWidth: '40px' }}>{value || '09:00'}</span>
+        <input 
+          type="range" 
+          min="0" 
+          max="1439" 
+          step="15" 
+          value={totalMins} 
+          onChange={handleChange}
+          style={{ width: '60px', height: '4px', accentColor: '#2563eb', cursor: 'pointer' }}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Clock size={14} color="#2563eb" />
+          <span style={{ fontSize: '16px', fontWeight: '900', color: '#111827' }}>{value || '09:00'}</span>
+        </div>
+        <div style={{ display: 'flex', gap: '4px' }}>
+          <button onClick={() => adjustMins(-30)} style={{ padding: '6px 10px', backgroundColor: '#f3f4f6', border: 'none', borderRadius: '8px', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}>-30m</button>
+          <button onClick={() => adjustMins(30)} style={{ padding: '6px 10px', backgroundColor: '#f3f4f6', border: 'none', borderRadius: '8px', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}>+30m</button>
+        </div>
+      </div>
+      <input 
+        type="range" 
+        min="0" 
+        max="1439" 
+        step="10" 
+        value={totalMins} 
+        onChange={handleChange}
+        style={{ 
+          width: '100%', 
+          height: '6px',
+          accentColor: '#2563eb', 
+          cursor: 'pointer',
+          appearance: 'none',
+          backgroundColor: '#e5e7eb',
+          borderRadius: '3px',
+          outline: 'none'
+        }}
+      />
+    </div>
+  );
 };
 
 function App() {
@@ -771,14 +843,35 @@ function App() {
     const dayIndex = newItinerary.findIndex(d => d.day === activeDay);
     
     if (dayIndex !== -1) {
+      let finalTime = itineraryTime;
+      
+      // Option 2: Smart Default Logic
+      if (!finalTime) {
+        const dayItems = newItinerary[dayIndex].items;
+        const itemsWithTime = dayItems.filter(it => it.time);
+        
+        if (itemsWithTime.length > 0) {
+          const lastItem = itemsWithTime[itemsWithTime.length - 1];
+          const [h, m] = lastItem.time.split(':').map(Number);
+          let totalMins = h * 60 + m + 90; // Suggest 1.5 hours later
+          if (totalMins >= 1440) totalMins = totalMins - 1440;
+          
+          const hh = Math.floor(totalMins / 60).toString().padStart(2, '0');
+          const mm = (totalMins % 60).toString().padStart(2, '0');
+          finalTime = `${hh}:${mm}`;
+        } else {
+          finalTime = '09:00'; // Initial default
+        }
+      }
+
       newItinerary[dayIndex].items.push({ 
         ...place, 
         id: Date.now(),
         emoji: place.emoji || '📍',
-        time: itineraryTime || ''
+        time: finalTime
       });
       saveItinerary(newItinerary);
-      setItineraryTime(''); // Reset after adding
+      setItineraryTime(''); 
       setViewMode('itinerary');
     }
   };
@@ -1397,11 +1490,10 @@ function App() {
                                       <h4 style={{ fontSize: '15px', fontWeight: '900', color: '#111827', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</h4>
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                      <input 
-                                        type="time" 
-                                        value={item.time || ''} 
-                                        onChange={(e) => updateItineraryItemTime(dayPlan.day, item.id, e.target.value)}
-                                        style={{ fontSize: '11px', border: 'none', backgroundColor: '#f9fafb', padding: '2px 4px', borderRadius: '4px', color: '#6b7280', fontWeight: '700', outline: 'none' }}
+                                      <TimeSlider 
+                                        value={item.time} 
+                                        onChange={(newTime) => updateItineraryItemTime(dayPlan.day, item.id, newTime)}
+                                        compact={true}
                                       />
                                     </div>
                                   </div>
@@ -1811,14 +1903,12 @@ function App() {
                   </div>
                 </div>
 
-                {/* Time Picker */}
-                <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: '#f9fafb', padding: '10px 14px', borderRadius: '12px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: '900', color: '#9ca3af', textTransform: 'uppercase' }}>Arrival Time</div>
-                  <input 
-                    type="time" 
-                    value={itineraryTime} 
-                    onChange={(e) => setItineraryTime(e.target.value)}
-                    style={{ flex: 1, border: 'none', background: 'transparent', fontSize: '14px', fontWeight: '900', color: '#111827', outline: 'none' }}
+                {/* Option 3: Time Slider in InfoWindow */}
+                <div style={{ marginBottom: '20px', backgroundColor: '#f9fafb', padding: '16px', borderRadius: '16px' }}>
+                  <div style={{ fontSize: '10px', fontWeight: '900', color: '#9ca3af', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.05em' }}>Arrival Time</div>
+                  <TimeSlider 
+                    value={itineraryTime || '09:00'} 
+                    onChange={(val) => setItineraryTime(val)} 
                   />
                 </div>
                 
