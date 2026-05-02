@@ -122,6 +122,7 @@ function App() {
   const [hasTriggeredToast, setHasTriggeredToast] = useState(false);
   const [showSlideshow, setShowSlideshow] = useState(false);
   const [slideshowIndex, setSlideshowIndex] = useState(0);
+  const [itineraryTime, setItineraryTime] = useState('');
   const slideshowTimerRef = useRef(null);
 
   // --- DATA STATE ---
@@ -773,11 +774,29 @@ function App() {
       newItinerary[dayIndex].items.push({ 
         ...place, 
         id: Date.now(),
-        emoji: place.emoji || '📍' 
+        emoji: place.emoji || '📍',
+        time: itineraryTime || ''
       });
       saveItinerary(newItinerary);
+      setItineraryTime(''); // Reset after adding
       setViewMode('itinerary');
     }
+  };
+
+  const updateItineraryItemTime = (dayNumber, itemId, newTime) => {
+    const nextTrips = (trips || []).map(t => {
+      if (t.id === activeTripId) {
+        const newItin = (t.itinerary || []).map(day => {
+          if (day.day === dayNumber) {
+            return { ...day, items: day.items.map(it => it.id === itemId ? { ...it, time: newTime } : it) };
+          }
+          return day;
+        });
+        return { ...t, itinerary: newItin };
+      }
+      return t;
+    });
+    syncTripsToCloud(nextTrips);
   };
 
   const removeFromItinerary = (dayIndex, itemId) => {
@@ -1371,8 +1390,23 @@ function App() {
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                                   <div style={{ fontSize: '24px', width: '48px', height: '48px', backgroundColor: '#f9fafb', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{item.emoji}</div>
                                   <div style={{ flex: 1, minWidth: 0 }}>
-                                    <h4 style={{ fontSize: '15px', fontWeight: '900', color: '#111827', margin: '0 0 2px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</h4>
-                                    <p style={{ fontSize: '12px', color: '#6b7280', margin: 0, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.02em' }}>{item.cat}</p>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                                      {item.time && (
+                                        <span style={{ fontSize: '11px', fontWeight: '900', color: '#2563eb', backgroundColor: '#eff6ff', padding: '2px 6px', borderRadius: '6px' }}>
+                                          {item.time}
+                                        </span>
+                                      )}
+                                      <h4 style={{ fontSize: '15px', fontWeight: '900', color: '#111827', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</h4>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                      <p style={{ fontSize: '12px', color: '#6b7280', margin: 0, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.02em' }}>{item.cat}</p>
+                                      <input 
+                                        type="time" 
+                                        value={item.time || ''} 
+                                        onChange={(e) => updateItineraryItemTime(dayPlan.day, item.id, e.target.value)}
+                                        style={{ fontSize: '11px', border: 'none', backgroundColor: '#f9fafb', padding: '2px 4px', borderRadius: '4px', color: '#6b7280', fontWeight: '700', outline: 'none' }}
+                                      />
+                                    </div>
                                   </div>
                                   <div style={{ display: 'flex', gap: '4px' }}>
                                     <label style={{ cursor: 'pointer', padding: '10px', color: item.image ? '#8b5cf6' : '#9ca3af', backgroundColor: item.image ? '#f5f3ff' : 'transparent', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="사진 추가">
@@ -1778,6 +1812,17 @@ function App() {
                       <span style={{ overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{selectedPlace.loc}</span>
                     </p>
                   </div>
+                </div>
+
+                {/* Time Picker */}
+                <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: '#f9fafb', padding: '10px 14px', borderRadius: '12px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: '900', color: '#9ca3af', textTransform: 'uppercase' }}>Arrival Time</div>
+                  <input 
+                    type="time" 
+                    value={itineraryTime} 
+                    onChange={(e) => setItineraryTime(e.target.value)}
+                    style={{ flex: 1, border: 'none', background: 'transparent', fontSize: '14px', fontWeight: '900', color: '#111827', outline: 'none' }}
+                  />
                 </div>
                 
                 <div style={{ display: 'flex', gap: '10px' }}>
