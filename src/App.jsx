@@ -881,7 +881,37 @@ function App() {
       if (t.id === activeTripId) {
         const newItin = (t.itinerary || []).map(day => {
           if (day.day === dayNumber) {
-            return { ...day, items: day.items.map(it => it.id === itemId ? { ...it, time: newTime } : it) };
+            const updatedItems = day.items.map(it => it.id === itemId ? { ...it, time: newTime } : it);
+            // Option 1: Auto-sort by time chronologically
+            updatedItems.sort((a, b) => {
+              if (!a.time) return 1;
+              if (!b.time) return -1;
+              return a.time.localeCompare(b.time);
+            });
+            return { ...day, items: updatedItems };
+          }
+          return day;
+        });
+        return { ...t, itinerary: newItin };
+      }
+      return t;
+    });
+    syncTripsToCloud(nextTrips);
+  };
+
+  const moveItineraryItem = (dayNumber, itemId, direction) => {
+    const nextTrips = (trips || []).map(t => {
+      if (t.id === activeTripId) {
+        const newItin = (t.itinerary || []).map(day => {
+          if (day.day === dayNumber) {
+            const items = [...day.items];
+            const index = items.findIndex(it => it.id === itemId);
+            if (index === -1) return day;
+            const newIndex = direction === 'up' ? index - 1 : index + 1;
+            if (newIndex >= 0 && newIndex < items.length) {
+              [items[index], items[newIndex]] = [items[newIndex], items[index]];
+            }
+            return { ...day, items };
           }
           return day;
         });
@@ -1498,6 +1528,22 @@ function App() {
                                     </div>
                                   </div>
                                   <div style={{ display: 'flex', gap: '4px' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginRight: '4px' }}>
+                                      <button 
+                                        onClick={() => moveItineraryItem(dayPlan.day, item.id, 'up')}
+                                        style={{ background: 'none', border: 'none', color: iIdx === 0 ? '#e5e7eb' : '#9ca3af', cursor: iIdx === 0 ? 'default' : 'pointer', padding: '2px' }}
+                                        disabled={iIdx === 0}
+                                      >
+                                        <ChevronUp size={14} />
+                                      </button>
+                                      <button 
+                                        onClick={() => moveItineraryItem(dayPlan.day, item.id, 'down')}
+                                        style={{ background: 'none', border: 'none', color: iIdx === dayPlan.items.length - 1 ? '#e5e7eb' : '#9ca3af', cursor: iIdx === dayPlan.items.length - 1 ? 'default' : 'pointer', padding: '2px' }}
+                                        disabled={iIdx === dayPlan.items.length - 1}
+                                      >
+                                        <ChevronDown size={14} />
+                                      </button>
+                                    </div>
                                     <label style={{ cursor: 'pointer', padding: '10px', color: item.image ? '#8b5cf6' : '#9ca3af', backgroundColor: item.image ? '#f5f3ff' : 'transparent', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="사진 추가">
                                       <Camera size={18} />
                                       <input 
