@@ -1803,6 +1803,7 @@ function App() {
       {!sidebarOpen && (
         <button 
           onClick={() => setSidebarOpen(true)}
+          className="desktop-only"
           style={{ 
             position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)', 
             zIndex: 1100, backgroundColor: '#111827', color: 'white', border: 'none', 

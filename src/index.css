@@ -161,6 +161,10 @@ body {
   flex-shrink: 0;
 }
 
+.desktop-only {
+  display: flex !important;
+}
+
 @media (max-width: 768px) {
   .mobile-only-flex {
     display: flex !important;
@@ -168,5 +172,9 @@ body {
   
   .drag-handle {
     display: block;
+  }
+
+  .desktop-only {
+    display: none !important;
   }
 }
