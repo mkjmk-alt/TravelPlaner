@@ -1525,7 +1525,9 @@ function App() {
                                           {item.time}
                                         </span>
                                       )}
-                                      <h4 style={{ fontSize: '15px', fontWeight: '900', color: '#111827', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</h4>
+                                      <h4 style={{ fontSize: '18px', fontWeight: '900', color: '#000000', margin: 0, wordBreak: 'break-all' }}>
+                                        {item.name || '장소 이름 정보 없음'}
+                                      </h4>
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#eff6ff', padding: '6px 12px', borderRadius: '12px', border: '1px solid #dbeafe' }}>
