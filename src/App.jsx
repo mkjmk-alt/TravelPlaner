@@ -1520,21 +1520,17 @@ function App() {
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                   <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                                      <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
-                                        <h4 style={{ 
-                                          fontSize: (item.name?.length > 15 ? '13px' : item.name?.length > 10 ? '15px' : '17px'), 
-                                          fontWeight: '900', 
-                                          color: '#000000', 
-                                          margin: 0, 
-                                          whiteSpace: 'nowrap',
-                                          display: 'inline-block',
-                                          animation: item.name?.length > 18 ? 'marquee 10s linear infinite' : 'none',
-                                          paddingRight: item.name?.length > 18 ? '50px' : '0'
-                                        }}>
-                                          {item.name || '장소 이름 정보 없음'}
-                                          {item.name?.length > 18 && <span style={{ marginLeft: '50px' }}>{item.name}</span>}
-                                        </h4>
-                                      </div>
+                                      <h4 style={{ 
+                                        fontSize: (item.name?.length > 15 ? '12px' : item.name?.length > 10 ? '14px' : '17px'), 
+                                        fontWeight: '900', 
+                                        color: '#000000', 
+                                        margin: 0, 
+                                        whiteSpace: 'nowrap',
+                                        flexShrink: 1,
+                                        transition: 'font-size 0.2s ease'
+                                      }}>
+                                        {item.name || '장소 이름 정보 없음'}
+                                      </h4>
                                       <div 
                                         onClick={() => setEditingTimeItem({ day: dayPlan.day, id: item.id, time: item.time || '09:00', name: item.name })}
                                         style={{ 
@@ -2177,10 +2173,6 @@ function App() {
         @keyframes slideUp {
           from { transform: translateY(20px); opacity: 0; }
           to { transform: translateY(0); opacity: 1; }
-        }
-        @keyframes marquee {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
         }
       `}</style>
     </div>
