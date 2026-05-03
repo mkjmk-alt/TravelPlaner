@@ -49,8 +49,15 @@ const PremiumTimeInput = ({ value, onChange, label }) => {
   
   const adjustTime = (type, amount) => {
     let [h, m] = timeValue.split(':').map(Number);
-    if (type === 'h') h = (h + amount + 24) % 24;
-    else m = (m + amount + 60) % 60;
+    if (type === 'h') {
+      h = (h + amount + 24) % 24;
+    } else {
+      // Calculate using total minutes to handle hour overflow/underflow
+      let totalMinutes = h * 60 + m + amount;
+      totalMinutes = (totalMinutes + 1440) % 1440; // Handle 24h wrap around
+      h = Math.floor(totalMinutes / 60);
+      m = totalMinutes % 60;
+    }
     
     const newH = h.toString().padStart(2, '0');
     const newM = m.toString().padStart(2, '0');
