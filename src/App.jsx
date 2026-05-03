@@ -43,10 +43,12 @@ const countryToCurrency = {
 };
 
 const PremiumTimeInput = ({ value, onChange, label }) => {
-  const [hh, mm] = (value || '09:00').split(':');
+  // Ensure we always have a valid time format even if value is empty
+  const timeValue = value && value.includes(':') ? value : '09:00';
+  const [hh, mm] = timeValue.split(':');
   
   const adjustTime = (type, amount) => {
-    let [h, m] = (value || '09:00').split(':').map(Number);
+    const [h, m] = timeValue.split(':').map(Number);
     if (type === 'h') h = (h + amount + 24) % 24;
     else m = (m + amount + 60) % 60;
     
@@ -1526,13 +1528,13 @@ function App() {
                                       <h4 style={{ fontSize: '15px', fontWeight: '900', color: '#111827', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</h4>
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#f8fafc', padding: '4px 10px', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
-                                        <Clock size={12} color="#3b82f6" />
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#eff6ff', padding: '6px 12px', borderRadius: '12px', border: '1px solid #dbeafe' }}>
+                                        <Clock size={12} color="#2563eb" />
                                         <input 
                                           type="time" 
                                           value={item.time || '09:00'} 
                                           onChange={(e) => updateItineraryItemTime(dayPlan.day, item.id, e.target.value)}
-                                          style={{ border: 'none', background: 'transparent', fontSize: '13px', fontWeight: '900', color: '#1e293b', outline: 'none', width: '75px', fontVariantNumeric: 'tabular-nums' }}
+                                          style={{ border: 'none', background: 'transparent', fontSize: '14px', fontWeight: '900', color: '#1e3a8a', outline: 'none', width: '80px', fontVariantNumeric: 'tabular-nums' }}
                                         />
                                       </div>
                                     </div>
