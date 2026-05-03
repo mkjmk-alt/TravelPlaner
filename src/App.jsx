@@ -1520,7 +1520,15 @@ function App() {
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                   <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                                      <h4 style={{ fontSize: '18px', fontWeight: '900', color: '#000000', margin: 0, wordBreak: 'break-word', flex: 1 }}>
+                                      <h4 style={{ 
+                                        fontSize: (item.name?.length > 15 ? '12px' : item.name?.length > 10 ? '14px' : '17px'), 
+                                        fontWeight: '900', 
+                                        color: '#000000', 
+                                        margin: 0, 
+                                        whiteSpace: 'nowrap',
+                                        flexShrink: 1,
+                                        transition: 'font-size 0.2s ease'
+                                      }}>
                                         {item.name || '장소 이름 정보 없음'}
                                       </h4>
                                       <div 
