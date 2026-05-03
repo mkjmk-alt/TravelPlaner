@@ -1516,11 +1516,10 @@ function App() {
                                   boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
                                 }}
                               >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                                  <div style={{ fontSize: '24px', width: '48px', height: '48px', backgroundColor: '#f9fafb', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{item.emoji}</div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                   <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                                      <h4 style={{ fontSize: '17px', fontWeight: '900', color: '#000000', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '60%' }}>
+                                      <h4 style={{ fontSize: '18px', fontWeight: '900', color: '#000000', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '70%' }}>
                                         {item.name || '장소 이름 정보 없음'}
                                       </h4>
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#eff6ff', padding: '4px 10px', borderRadius: '10px', border: '1px solid #dbeafe', flexShrink: 0 }}>
