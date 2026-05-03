@@ -1518,8 +1518,9 @@ function App() {
                               >
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                   <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', backgroundColor: '#eff6ff', padding: '4px 8px', borderRadius: '8px', border: '1px solid #dbeafe', transition: 'all 0.2s' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
+                                      <h4 style={{ fontSize: '16px', fontWeight: '900', color: '#111827', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</h4>
+                                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', backgroundColor: '#eff6ff', padding: '4px 8px', borderRadius: '8px', border: '1px solid #dbeafe', transition: 'all 0.2s', flexShrink: 0 }}>
                                         <Clock size={12} color="#2563eb" style={{ marginRight: '4px' }} />
                                         <input 
                                           type="time" 
@@ -1528,7 +1529,6 @@ function App() {
                                           style={{ border: 'none', background: 'transparent', fontSize: '12px', fontWeight: '900', color: '#2563eb', outline: 'none', width: '70px', cursor: 'pointer', fontVariantNumeric: 'tabular-nums' }}
                                         />
                                       </div>
-                                      <h4 style={{ fontSize: '16px', fontWeight: '900', color: '#111827', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</h4>
                                     </div>
                                   </div>
                                   <div style={{ display: 'flex', gap: '4px' }}>
