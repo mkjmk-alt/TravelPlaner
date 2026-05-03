@@ -1522,13 +1522,52 @@ function App() {
                                       <h4 style={{ fontSize: '18px', fontWeight: '900', color: '#000000', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '70%' }}>
                                         {item.name || '장소 이름 정보 없음'}
                                       </h4>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#eff6ff', padding: '4px 10px', borderRadius: '10px', border: '1px solid #dbeafe', flexShrink: 0 }}>
-                                        <Clock size={12} color="#2563eb" />
+                                      <div 
+                                        style={{ 
+                                          display: 'flex', 
+                                          alignItems: 'center', 
+                                          gap: '4px', 
+                                          backgroundColor: '#f1f5f9', 
+                                          padding: '2px 8px', 
+                                          borderRadius: '6px', 
+                                          border: '1px solid #e2e8f0', 
+                                          flexShrink: 0,
+                                          cursor: 'pointer'
+                                        }}
+                                      >
+                                        <Clock size={10} color="#64748b" />
                                         <input 
-                                          type="time" 
+                                          type="text" 
                                           value={item.time || '09:00'} 
-                                          onChange={(e) => updateItineraryItemTime(dayPlan.day, item.id, e.target.value)}
-                                          style={{ border: 'none', background: 'transparent', fontSize: '13px', fontWeight: '900', color: '#1e3a8a', outline: 'none', width: '70px', cursor: 'pointer', fontVariantNumeric: 'tabular-nums' }}
+                                          onChange={(e) => {
+                                            const val = e.target.value;
+                                            // Simple validation for HH:mm while typing
+                                            if (/^([0-1]?[0-9]|2[0-3])?:?([0-5]?[0-9])?$/.test(val) || val === '') {
+                                              updateItineraryItemTime(dayPlan.day, item.id, val);
+                                            }
+                                          }}
+                                          onBlur={(e) => {
+                                            // Format on blur if incomplete
+                                            let val = e.target.value;
+                                            if (!val.includes(':')) val = val.padStart(2, '0') + ':00';
+                                            if (val.length < 5) {
+                                              const [h, m] = val.split(':');
+                                              val = (h || '09').padStart(2, '0') + ':' + (m || '00').padEnd(2, '0');
+                                            }
+                                            updateItineraryItemTime(dayPlan.day, item.id, val);
+                                          }}
+                                          style={{ 
+                                            border: 'none', 
+                                            background: 'transparent', 
+                                            fontSize: '11px', 
+                                            fontWeight: '800', 
+                                            color: '#475569', 
+                                            outline: 'none', 
+                                            width: '38px', 
+                                            textAlign: 'center',
+                                            fontVariantNumeric: 'tabular-nums',
+                                            padding: 0
+                                          }}
                                         />
                                       </div>
                                     </div>
