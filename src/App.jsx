@@ -42,6 +42,83 @@ const countryToCurrency = {
   "터키": "TRY"
 };
 
+const PremiumTimeInput = ({ value, onChange, label }) => {
+  const [hh, mm] = (value || '09:00').split(':');
+  
+  const adjustTime = (type, amount) => {
+    let [h, m] = (value || '09:00').split(':').map(Number);
+    if (type === 'h') h = (h + amount + 24) % 24;
+    else m = (m + amount + 60) % 60;
+    
+    const newH = h.toString().padStart(2, '0');
+    const newM = m.toString().padStart(2, '0');
+    onChange(`${newH}:${newM}`);
+  };
+
+  const setNow = () => {
+    const now = new Date();
+    const h = now.getHours().toString().padStart(2, '0');
+    const m = now.getMinutes().toString().padStart(2, '0');
+    onChange(`${h}:${m}`);
+  };
+
+  return (
+    <div style={{ width: '100%', marginBottom: '20px' }}>
+      {label && <div style={{ fontSize: '10px', fontWeight: '900', color: '#9ca3af', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.05em' }}>{label}</div>}
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'space-between',
+        backgroundColor: 'white',
+        padding: '14px',
+        borderRadius: '20px',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.04)',
+        border: '1px solid #f1f5f9'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+            <button onClick={() => adjustTime('h', 1)} style={{ border: 'none', background: 'none', color: '#cbd5e1', cursor: 'pointer', padding: '2px' }}><ChevronUp size={14} /></button>
+            <div style={{ fontSize: '26px', fontWeight: '900', color: '#0f172a', width: '36px', textAlign: 'center', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>{hh}</div>
+            <button onClick={() => adjustTime('h', -1)} style={{ border: 'none', background: 'none', color: '#cbd5e1', cursor: 'pointer', padding: '2px' }}><ChevronDown size={14} /></button>
+          </div>
+          
+          <div style={{ fontSize: '20px', fontWeight: '900', color: '#e2e8f0', marginTop: '2px' }}>:</div>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+            <button onClick={() => adjustTime('m', 5)} style={{ border: 'none', background: 'none', color: '#cbd5e1', cursor: 'pointer', padding: '2px' }}><ChevronUp size={14} /></button>
+            <div style={{ fontSize: '26px', fontWeight: '900', color: '#0f172a', width: '36px', textAlign: 'center', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>{mm}</div>
+            <button onClick={() => adjustTime('m', -5)} style={{ border: 'none', background: 'none', color: '#cbd5e1', cursor: 'pointer', padding: '2px' }}><ChevronDown size={14} /></button>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <button 
+            onClick={setNow}
+            style={{ 
+              padding: '6px 12px', 
+              backgroundColor: '#f8fafc', 
+              color: '#64748b', 
+              border: '1px solid #e2e8f0', 
+              borderRadius: '10px', 
+              fontSize: '10px', 
+              fontWeight: '900', 
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            NOW
+          </button>
+          <div style={{ display: 'flex', gap: '4px' }}>
+            <button onClick={() => adjustTime('m', -30)} style={{ width: '36px', height: '32px', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '8px', fontSize: '10px', fontWeight: '900', color: '#94a3b8', cursor: 'pointer' }}>-30</button>
+            <button onClick={() => adjustTime('m', 30)} style={{ width: '36px', height: '32px', backgroundColor: '#eff6ff', border: 'none', borderRadius: '8px', fontSize: '10px', fontWeight: '900', color: '#3b82f6', cursor: 'pointer' }}>+30</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
 const mapOptions = {
   disableDefaultUI: true,
   zoomControl: false,
@@ -1449,13 +1526,13 @@ function App() {
                                       <h4 style={{ fontSize: '15px', fontWeight: '900', color: '#111827', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</h4>
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#f9fafb', padding: '4px 8px', borderRadius: '10px' }}>
-                                        <Clock size={12} color="#9ca3af" />
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#f8fafc', padding: '4px 10px', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
+                                        <Clock size={12} color="#3b82f6" />
                                         <input 
                                           type="time" 
                                           value={item.time || '09:00'} 
                                           onChange={(e) => updateItineraryItemTime(dayPlan.day, item.id, e.target.value)}
-                                          style={{ border: 'none', background: 'transparent', fontSize: '12px', fontWeight: '800', color: '#111827', outline: 'none', width: '70px' }}
+                                          style={{ border: 'none', background: 'transparent', fontSize: '13px', fontWeight: '900', color: '#1e293b', outline: 'none', width: '75px', fontVariantNumeric: 'tabular-nums' }}
                                         />
                                       </div>
                                     </div>
@@ -1882,46 +1959,11 @@ function App() {
                   </div>
                 </div>
 
-                <div style={{ marginBottom: '20px', backgroundColor: '#f9fafb', padding: '16px', borderRadius: '16px' }}>
-                  <div style={{ fontSize: '10px', fontWeight: '900', color: '#9ca3af', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.05em' }}>Arrival Time</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center' }}>
-                      <Clock size={16} color="#2563eb" style={{ position: 'absolute', left: '12px' }} />
-                      <input 
-                        type="time" 
-                        value={itineraryTime || '09:00'} 
-                        onChange={(e) => setItineraryTime(e.target.value)}
-                        style={{ width: '100%', border: 'none', background: 'white', padding: '12px 12px 12px 38px', borderRadius: '12px', fontSize: '15px', fontWeight: '900', color: '#111827', outline: 'none' }}
-                      />
-                    </div>
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                      <button 
-                        onClick={() => {
-                          const [h, m] = (itineraryTime || '09:00').split(':').map(Number);
-                          let total = Math.max(0, h * 60 + m - 30);
-                          const hh = Math.floor(total / 60).toString().padStart(2, '0');
-                          const mm = (total % 60).toString().padStart(2, '0');
-                          setItineraryTime(`${hh}:${mm}`);
-                        }}
-                        style={{ padding: '12px 10px', backgroundColor: '#f3f4f6', border: 'none', borderRadius: '12px', fontSize: '11px', fontWeight: '900', cursor: 'pointer', color: '#6b7280' }}
-                      >
-                        -30m
-                      </button>
-                      <button 
-                        onClick={() => {
-                          const [h, m] = (itineraryTime || '09:00').split(':').map(Number);
-                          let total = Math.min(1439, h * 60 + m + 30);
-                          const hh = Math.floor(total / 60).toString().padStart(2, '0');
-                          const mm = (total % 60).toString().padStart(2, '0');
-                          setItineraryTime(`${hh}:${mm}`);
-                        }}
-                        style={{ padding: '12px 10px', backgroundColor: '#f3f4f6', border: 'none', borderRadius: '12px', fontSize: '11px', fontWeight: '900', cursor: 'pointer', color: '#6b7280' }}
-                      >
-                        +30m
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                <PremiumTimeInput 
+                  label="Arrival Time"
+                  value={itineraryTime || '09:00'} 
+                  onChange={(val) => setItineraryTime(val)} 
+                />
                 
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <button 
