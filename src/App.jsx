@@ -1519,24 +1519,17 @@ function App() {
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                                   <div style={{ fontSize: '24px', width: '48px', height: '48px', backgroundColor: '#f9fafb', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{item.emoji}</div>
                                   <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
-                                      {item.time && (
-                                        <span style={{ fontSize: '11px', fontWeight: '900', color: '#2563eb', backgroundColor: '#eff6ff', padding: '2px 6px', borderRadius: '6px' }}>
-                                          {item.time}
-                                        </span>
-                                      )}
-                                      <h4 style={{ fontSize: '18px', fontWeight: '900', color: '#000000', margin: 0, wordBreak: 'break-all' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                                      <h4 style={{ fontSize: '17px', fontWeight: '900', color: '#000000', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '60%' }}>
                                         {item.name || '장소 이름 정보 없음'}
                                       </h4>
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#eff6ff', padding: '6px 12px', borderRadius: '12px', border: '1px solid #dbeafe' }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#eff6ff', padding: '4px 10px', borderRadius: '10px', border: '1px solid #dbeafe', flexShrink: 0 }}>
                                         <Clock size={12} color="#2563eb" />
                                         <input 
                                           type="time" 
                                           value={item.time || '09:00'} 
                                           onChange={(e) => updateItineraryItemTime(dayPlan.day, item.id, e.target.value)}
-                                          style={{ border: 'none', background: 'transparent', fontSize: '14px', fontWeight: '900', color: '#1e3a8a', outline: 'none', width: '80px', fontVariantNumeric: 'tabular-nums' }}
+                                          style={{ border: 'none', background: 'transparent', fontSize: '13px', fontWeight: '900', color: '#1e3a8a', outline: 'none', width: '70px', cursor: 'pointer', fontVariantNumeric: 'tabular-nums' }}
                                         />
                                       </div>
                                     </div>
