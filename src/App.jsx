@@ -61,77 +61,6 @@ const mapOptions = {
   ]
 };
 
-const TimeSlider = ({ value, onChange, compact = false }) => {
-  const [h, m] = (value || '09:00').split(':').map(Number);
-  const totalMins = h * 60 + m;
-
-  const handleChange = (e) => {
-    const val = parseInt(e.target.value);
-    const hh = Math.floor(val / 60).toString().padStart(2, '0');
-    const mm = (val % 60).toString().padStart(2, '0');
-    onChange(`${hh}:${mm}`);
-  };
-
-  const adjustMins = (offset) => {
-    let newVal = totalMins + offset;
-    if (newVal < 0) newVal = 0;
-    if (newVal >= 1440) newVal = 1439;
-    const hh = Math.floor(newVal / 60).toString().padStart(2, '0');
-    const mm = (newVal % 60).toString().padStart(2, '0');
-    onChange(`${hh}:${mm}`);
-  };
-
-  if (compact) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#f9fafb', padding: '4px 8px', borderRadius: '10px' }}>
-        <Clock size={12} color="#9ca3af" />
-        <span style={{ fontSize: '12px', fontWeight: '800', color: '#111827', minWidth: '40px' }}>{value || '09:00'}</span>
-        <input 
-          type="range" 
-          min="0" 
-          max="1439" 
-          step="15" 
-          value={totalMins} 
-          onChange={handleChange}
-          style={{ width: '60px', height: '4px', accentColor: '#2563eb', cursor: 'pointer' }}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Clock size={14} color="#2563eb" />
-          <span style={{ fontSize: '16px', fontWeight: '900', color: '#111827' }}>{value || '09:00'}</span>
-        </div>
-        <div style={{ display: 'flex', gap: '4px' }}>
-          <button onClick={() => adjustMins(-30)} style={{ padding: '6px 10px', backgroundColor: '#f3f4f6', border: 'none', borderRadius: '8px', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}>-30m</button>
-          <button onClick={() => adjustMins(30)} style={{ padding: '6px 10px', backgroundColor: '#f3f4f6', border: 'none', borderRadius: '8px', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}>+30m</button>
-        </div>
-      </div>
-      <input 
-        type="range" 
-        min="0" 
-        max="1439" 
-        step="10" 
-        value={totalMins} 
-        onChange={handleChange}
-        style={{ 
-          width: '100%', 
-          height: '6px',
-          accentColor: '#2563eb', 
-          cursor: 'pointer',
-          appearance: 'none',
-          backgroundColor: '#e5e7eb',
-          borderRadius: '3px',
-          outline: 'none'
-        }}
-      />
-    </div>
-  );
-};
 
 function App() {
   const { isLoaded, loadError } = useJsApiLoader({
@@ -1520,11 +1449,15 @@ function App() {
                                       <h4 style={{ fontSize: '15px', fontWeight: '900', color: '#111827', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</h4>
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                      <TimeSlider 
-                                        value={item.time} 
-                                        onChange={(newTime) => updateItineraryItemTime(dayPlan.day, item.id, newTime)}
-                                        compact={true}
-                                      />
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#f9fafb', padding: '4px 8px', borderRadius: '10px' }}>
+                                        <Clock size={12} color="#9ca3af" />
+                                        <input 
+                                          type="time" 
+                                          value={item.time || '09:00'} 
+                                          onChange={(e) => updateItineraryItemTime(dayPlan.day, item.id, e.target.value)}
+                                          style={{ border: 'none', background: 'transparent', fontSize: '12px', fontWeight: '800', color: '#111827', outline: 'none', width: '70px' }}
+                                        />
+                                      </div>
                                     </div>
                                   </div>
                                   <div style={{ display: 'flex', gap: '4px' }}>
@@ -1949,13 +1882,45 @@ function App() {
                   </div>
                 </div>
 
-                {/* Option 3: Time Slider in InfoWindow */}
                 <div style={{ marginBottom: '20px', backgroundColor: '#f9fafb', padding: '16px', borderRadius: '16px' }}>
                   <div style={{ fontSize: '10px', fontWeight: '900', color: '#9ca3af', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.05em' }}>Arrival Time</div>
-                  <TimeSlider 
-                    value={itineraryTime || '09:00'} 
-                    onChange={(val) => setItineraryTime(val)} 
-                  />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center' }}>
+                      <Clock size={16} color="#2563eb" style={{ position: 'absolute', left: '12px' }} />
+                      <input 
+                        type="time" 
+                        value={itineraryTime || '09:00'} 
+                        onChange={(e) => setItineraryTime(e.target.value)}
+                        style={{ width: '100%', border: 'none', background: 'white', padding: '12px 12px 12px 38px', borderRadius: '12px', fontSize: '15px', fontWeight: '900', color: '#111827', outline: 'none' }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button 
+                        onClick={() => {
+                          const [h, m] = (itineraryTime || '09:00').split(':').map(Number);
+                          let total = Math.max(0, h * 60 + m - 30);
+                          const hh = Math.floor(total / 60).toString().padStart(2, '0');
+                          const mm = (total % 60).toString().padStart(2, '0');
+                          setItineraryTime(`${hh}:${mm}`);
+                        }}
+                        style={{ padding: '12px 10px', backgroundColor: '#f3f4f6', border: 'none', borderRadius: '12px', fontSize: '11px', fontWeight: '900', cursor: 'pointer', color: '#6b7280' }}
+                      >
+                        -30m
+                      </button>
+                      <button 
+                        onClick={() => {
+                          const [h, m] = (itineraryTime || '09:00').split(':').map(Number);
+                          let total = Math.min(1439, h * 60 + m + 30);
+                          const hh = Math.floor(total / 60).toString().padStart(2, '0');
+                          const mm = (total % 60).toString().padStart(2, '0');
+                          setItineraryTime(`${hh}:${mm}`);
+                        }}
+                        style={{ padding: '12px 10px', backgroundColor: '#f3f4f6', border: 'none', borderRadius: '12px', fontSize: '11px', fontWeight: '900', cursor: 'pointer', color: '#6b7280' }}
+                      >
+                        +30m
+                      </button>
+                    </div>
+                  </div>
                 </div>
                 
                 <div style={{ display: 'flex', gap: '10px' }}>
