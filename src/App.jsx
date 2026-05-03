@@ -48,7 +48,7 @@ const PremiumTimeInput = ({ value, onChange, label }) => {
   const [hh, mm] = timeValue.split(':');
   
   const adjustTime = (type, amount) => {
-    const [h, m] = timeValue.split(':').map(Number);
+    let [h, m] = timeValue.split(':').map(Number);
     if (type === 'h') h = (h + amount + 24) % 24;
     else m = (m + amount + 60) % 60;
     
