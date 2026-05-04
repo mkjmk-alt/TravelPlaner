@@ -925,7 +925,20 @@ function App() {
             if (index === -1) return day;
             const newIndex = direction === 'up' ? index - 1 : index + 1;
             if (newIndex >= 0 && newIndex < items.length) {
-              [items[index], items[newIndex]] = [items[newIndex], items[index]];
+              // Create shallow copies of items to avoid mutating state directly
+              const itemA = { ...items[index] };
+              const itemB = { ...items[newIndex] };
+              
+              // Swap the time values between the two items
+              const timeA = itemA.time;
+              const timeB = itemB.time;
+              
+              itemA.time = timeB;
+              itemB.time = timeA;
+              
+              // Now swap the entire items at their positions
+              items[index] = itemB;
+              items[newIndex] = itemA;
             }
             return { ...day, items };
           }
