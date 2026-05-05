@@ -739,8 +739,8 @@ function App() {
 
     try {
       console.log("Sending request to Gemini API...");
-      // v1beta 대신 v1을 사용하고, 모델명을 gemini-1.5-flash-latest로 변경하여 호환성을 높입니다.
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
+      // 가장 안정적이고 널리 지원되는 gemini-pro 모델로 변경합니다.
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
