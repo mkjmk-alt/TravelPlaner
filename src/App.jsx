@@ -8,6 +8,7 @@ import './index.css';
 const HK_CENTER = { lat: 22.2891, lng: 114.1924 };
 const MAP_LIBRARIES = ['places']; 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
 const countryToCurrency = {
   "대한민국": "KRW",
@@ -673,6 +674,11 @@ function App() {
   // --- AI ANALYSIS ---
   const generateAIAnalysis = async () => {
     if (!activeTrip) return;
+    if (!GEMINI_API_KEY) {
+      alert(".env 파일에 VITE_GEMINI_API_KEY를 설정해주세요.");
+      setShowAIModal(false);
+      return;
+    }
     
     setIsAnalyzing(true);
     setShowAIModal(true);
@@ -707,7 +713,7 @@ function App() {
 
       [Critical Request]
       Also provide an "optimizedItinerary" which is a restructured version of the input itinerary for better efficiency. 
-      Keep the same data structure for days and items.
+      Keep EXACTLY the same data structure for days and items (including all fields like id, name, time, loc, lat, lng, placeId).
 
       Respond strictly in JSON format as follows:
       {
@@ -722,40 +728,37 @@ function App() {
         ],
         "tips": ["Tip 1 in Korean", "Tip 2 in Korean", "Tip 3 in Korean"],
         "optimizedItinerary": [
-          { "day": 1, "items": [{ "id": "string", "name": "string", "time": "string", "loc": "string", "lat": number, "lng": number, "placeId": "string" }] }
+          { "day": 1, "items": [...] }
         ]
       }
     `;
 
     try {
-      // For now, we simulate the AI response. 
-      await new Promise(resolve => setTimeout(resolve, 2500));
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }]
+        })
+      });
+
+      if (!response.ok) throw new Error("API request failed");
+
+      const data = await response.json();
+      const text = data.candidates[0].content.parts[0].text;
       
-      const mockResult = {
-        score: 85,
-        summary: "전체적으로 동선이 깔끔하고 매력적인 장소들로 구성된 훌륭한 계획입니다. 다만 특정 요일의 이동량이 많아 체력 안배가 필요합니다.",
-        sections: [
-          { title: "동선 효율성", score: 92, content: "주요 거점을 중심으로 장소들이 잘 모여 있어 불필요한 이동시간을 최소화했습니다. 특히 숙소 위치와 방문지 간의 거리가 매우 이상적입니다." },
-          { title: "여행 강도", score: 75, content: "오전부터 밤늦게까지 빡빡한 일정이 이어집니다. 2일차 오후에는 카페 등에서 충분한 휴식 시간을 갖는 것을 추천합니다." },
-          { title: "테마 및 균형", score: 88, content: "문화 관광과 미식 탐방이 조화롭게 섞여 있습니다. 쇼핑 일정을 조금 더 구체화한다면 더욱 완벽한 테마 여행이 될 것입니다." },
-          { title: "예산 적절성", score: 80, content: "현지 물가 대비 예산 설정이 현실적입니다. 다만 인기 관광지의 입장료와 예약제 식당의 비용을 고려해 10% 정도 예비비를 확보하는 것이 좋습니다." },
-          { title: "AI 전문가 꿀팁", score: 100, content: "방문하시는 날짜가 현지 공휴일과 겹치는지 미리 확인하세요. 주요 명소는 최소 1주일 전 사전 예약을 권장하며, 대중교통 패스를 활용하면 비용을 절약할 수 있습니다." }
-        ],
-        tips: [
-          "구글 지도 오프라인 지도를 미리 다운로드하세요.",
-          "편한 운동화를 착용하는 것이 필수입니다.",
-          "현지 비상 연락망과 대사관 위치를 메모해두세요."
-        ],
-        optimizedItinerary: activeTrip.itinerary.map(day => ({
-          ...day,
-          items: [...day.items].reverse() // Example optimization: Reverse the order
-        }))
-      };
-      
-      setAiReport(mockResult);
+      // Extract JSON from the response text (it might be wrapped in ```json ... ```)
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const result = JSON.parse(jsonMatch[0]);
+        setAiReport(result);
+      } else {
+        throw new Error("Failed to parse AI response as JSON");
+      }
     } catch (error) {
       console.error("AI Analysis failed:", error);
-      alert("분석 중 오류가 발생했습니다.");
+      alert("AI 분석 도중 오류가 발생했습니다. API 키와 네트워크 상태를 확인해주세요.");
+      setShowAIModal(false);
     } finally {
       setIsAnalyzing(false);
     }
