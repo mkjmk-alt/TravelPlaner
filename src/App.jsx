@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete, Polyline } from '@react-google-maps/api';
-import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Camera, Play, Image, Clock } from 'lucide-react';
+import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Camera, Play, Image, Clock, Sparkles } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import './index.css';
 
@@ -211,6 +211,9 @@ function App() {
   const [slideshowIndex, setSlideshowIndex] = useState(0);
   const [itineraryTime, setItineraryTime] = useState('');
   const [editingTimeItem, setEditingTimeItem] = useState(null); // { day, id, time, name }
+  const [showAIModal, setShowAIModal] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [aiReport, setAiReport] = useState(null);
   const slideshowTimerRef = useRef(null);
 
   // --- DATA STATE ---
@@ -666,6 +669,87 @@ function App() {
       if (slideshowTimerRef.current) clearInterval(slideshowTimerRef.current);
     };
   }, [showSlideshow, allPhotos.length]);
+
+  // --- AI ANALYSIS ---
+  const generateAIAnalysis = async () => {
+    if (!activeTrip) return;
+    
+    setIsAnalyzing(true);
+    setShowAIModal(true);
+    setAiReport(null);
+
+    // 1. Prepare data for AI
+    const itineraryText = (activeTrip.itinerary || []).map(day => (
+      `Day ${day.day}:\n${(day.items || []).map(it => `- ${it.time || 'Time TBD'} - ${it.name}(${it.loc})`).join('\n')}`
+    )).join('\n\n');
+
+    const totalSpent = (expenses || []).reduce((acc, curr) => acc + (curr.amountKRW || 0), 0);
+    const budgetText = `Budget Limit: ₩${budgetSettings.limitKRW.toLocaleString()}, Total Spent: ₩${totalSpent.toLocaleString()}`;
+
+    // 2. Craft the prompt
+    const prompt = `
+      You are a professional travel consultant. Please analyze this travel itinerary and provide a detailed report.
+      Trip Name: ${activeTrip.name}
+      Destination: ${activeTrip.country || 'Not specified'}
+      
+      [Itinerary]
+      ${itineraryText}
+      
+      [Budget]
+      ${budgetText}
+
+      Please analyze the following 5 points in Korean:
+      1. Route Efficiency (Geographical optimization)
+      2. Tempo & Fatigue (Is it too tight or too loose?)
+      3. Variety & Theme (Balance of activities)
+      4. Budget Realism (Is the budget appropriate for the destination?)
+      5. Practical Pro-tips (Specific advice for this trip)
+
+      Respond strictly in JSON format as follows:
+      {
+        "score": number (overall score 0-100),
+        "summary": "Short overall summary in Korean",
+        "sections": [
+          { "title": "동선 효율성", "score": number, "content": "Detailed analysis in Korean" },
+          { "title": "여행 강도", "score": number, "content": "Detailed analysis in Korean" },
+          { "title": "테마 및 균형", "score": number, "content": "Detailed analysis in Korean" },
+          { "title": "예산 적절성", "score": number, "content": "Detailed analysis in Korean" },
+          { "title": "AI 전문가 꿀팁", "score": number, "content": "Detailed analysis in Korean" }
+        ],
+        "tips": ["Tip 1 in Korean", "Tip 2 in Korean", "Tip 3 in Korean"]
+      }
+    `;
+
+    try {
+      // For now, we simulate the AI response. 
+      // In a real scenario, you would fetch from an API endpoint.
+      await new Promise(resolve => setTimeout(resolve, 2500));
+      
+      const mockResult = {
+        score: 85,
+        summary: "전체적으로 동선이 깔끔하고 매력적인 장소들로 구성된 훌륭한 계획입니다. 다만 특정 요일의 이동량이 많아 체력 안배가 필요합니다.",
+        sections: [
+          { title: "동선 효율성", score: 92, content: "주요 거점을 중심으로 장소들이 잘 모여 있어 불필요한 이동시간을 최소화했습니다. 특히 숙소 위치와 방문지 간의 거리가 매우 이상적입니다." },
+          { title: "여행 강도", score: 75, content: "오전부터 밤늦게까지 빡빡한 일정이 이어집니다. 2일차 오후에는 카페 등에서 충분한 휴식 시간을 갖는 것을 추천합니다." },
+          { title: "테마 및 균형", score: 88, content: "문화 관광과 미식 탐방이 조화롭게 섞여 있습니다. 쇼핑 일정을 조금 더 구체화한다면 더욱 완벽한 테마 여행이 될 것입니다." },
+          { title: "예산 적절성", score: 80, content: "현지 물가 대비 예산 설정이 현실적입니다. 다만 인기 관광지의 입장료와 예약제 식당의 비용을 고려해 10% 정도 예비비를 확보하는 것이 좋습니다." },
+          { title: "AI 전문가 꿀팁", score: 100, content: "방문하시는 날짜가 현지 공휴일과 겹치는지 미리 확인하세요. 주요 명소는 최소 1주일 전 사전 예약을 권장하며, 대중교통 패스를 활용하면 비용을 절약할 수 있습니다." }
+        ],
+        tips: [
+          "구글 지도 오프라인 지도를 미리 다운로드하세요.",
+          "편한 운동화를 착용하는 것이 필수입니다.",
+          "현지 비상 연락망과 대사관 위치를 메모해두세요."
+        ]
+      };
+      
+      setAiReport(mockResult);
+    } catch (error) {
+      console.error("AI Analysis failed:", error);
+      alert("분석 중 오류가 발생했습니다.");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   const addDay = async () => {
     if (!activeTrip) return;
@@ -1457,6 +1541,12 @@ function App() {
                     <button onClick={addDay} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '800', color: '#2563eb', backgroundColor: '#eff6ff', padding: '8px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer' }}>
                       <PlusCircle size={14} /> ADD DAY
                     </button>
+                    <button 
+                      onClick={generateAIAnalysis} 
+                      style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '800', color: 'white', backgroundColor: '#8b5cf6', padding: '8px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)' }}
+                    >
+                      <Sparkles size={14} /> AI 분석
+                    </button>
                   </div>
                 </div>
 
@@ -2204,6 +2294,107 @@ function App() {
           from { transform: translateY(20px); opacity: 0; }
           to { transform: translateY(0); opacity: 1; }
         }
+      `}</style>
+      {/* === AI ANALYSIS MODAL === */}
+      {showAIModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10000,
+          backgroundColor: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(12px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
+          animation: 'fadeIn 0.3s ease-out'
+        }}>
+          <div style={{
+            backgroundColor: 'white', borderRadius: '32px', width: '100%', maxWidth: '500px',
+            maxHeight: '85vh', overflowY: 'auto', padding: '32px', position: 'relative',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            animation: 'slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
+          }}>
+            <button 
+              onClick={() => setShowAIModal(false)}
+              style={{ position: 'absolute', top: '24px', right: '24px', border: 'none', background: '#f1f5f9', width: '36px', height: '36px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}
+            >
+              <X size={20} color="#64748b" />
+            </button>
+
+            <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+              <div style={{ 
+                width: '64px', height: '64px', backgroundColor: '#f5f3ff', borderRadius: '22px', 
+                display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px',
+                boxShadow: '0 8px 16px rgba(139, 92, 246, 0.15)'
+              }}>
+                <Sparkles size={32} color="#8b5cf6" />
+              </div>
+              <h2 style={{ fontSize: '24px', fontWeight: '900', color: '#0f172a', margin: '0 0 8px 0', letterSpacing: '-0.02em' }}>AI 여행 전략 리포트</h2>
+              <p style={{ fontSize: '14px', color: '#64748b', fontWeight: '600' }}>{activeTrip?.name} 일정을 전문가가 분석했습니다.</p>
+            </div>
+
+            {isAnalyzing ? (
+              <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                <div style={{ width: '48px', height: '48px', border: '4px solid #8b5cf6', borderTopColor: 'transparent', borderRadius: '50%', margin: '0 auto 24px', animation: 'spin 1s linear infinite' }}></div>
+                <p style={{ fontWeight: '800', color: '#8b5cf6', letterSpacing: '0.05em', animation: 'pulse 1.5s infinite' }}>데이터 분석 및 전략 수립 중...</p>
+              </div>
+            ) : aiReport && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                {/* Overall Score */}
+                <div style={{ 
+                  background: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)', 
+                  padding: '28px', borderRadius: '28px', textAlign: 'center',
+                  border: '1px solid rgba(139, 92, 246, 0.1)'
+                }}>
+                  <div style={{ fontSize: '11px', fontWeight: '900', color: '#8b5cf6', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px' }}>종합 분석 스코어</div>
+                  <div style={{ fontSize: '56px', fontWeight: '900', color: '#7c3aed', lineHeight: 1, marginBottom: '16px' }}>
+                    {aiReport.score}<span style={{ fontSize: '20px', color: '#a78bfa' }}>/100</span>
+                  </div>
+                  <p style={{ fontSize: '14px', color: '#4c1d95', fontWeight: '800', margin: 0, lineHeight: 1.6, padding: '0 10px' }}>
+                    "{aiReport.summary}"
+                  </p>
+                </div>
+
+                {/* Analysis Sections */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {aiReport.sections.map((sec, idx) => (
+                    <div key={idx} style={{ padding: '20px', border: '1px solid #f1f5f9', borderRadius: '24px', backgroundColor: '#ffffff' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                        <h4 style={{ fontSize: '15px', fontWeight: '900', color: '#1e293b', margin: 0 }}>{sec.title}</h4>
+                        <div style={{ fontSize: '12px', fontWeight: '900', color: '#8b5cf6', backgroundColor: '#f5f3ff', padding: '4px 10px', borderRadius: '10px' }}>{sec.score}점</div>
+                      </div>
+                      <p style={{ fontSize: '13px', color: '#64748b', lineHeight: 1.6, margin: 0, fontWeight: '600' }}>{sec.content}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Pro Tips Section */}
+                <div style={{ backgroundColor: '#f0f9ff', padding: '24px', borderRadius: '28px', border: '1px solid #e0f2fe' }}>
+                  <h4 style={{ fontSize: '15px', fontWeight: '900', color: '#0369a1', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Brain size={18} /> 전문가 추천 Action Item
+                  </h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {aiReport.tips.map((tip, idx) => (
+                      <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                        <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#0ea5e9', marginTop: '6px', flexShrink: 0 }}></div>
+                        <p style={{ fontSize: '13px', color: '#0c4a6e', fontWeight: '700', margin: 0, lineHeight: 1.4 }}>{tip}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <button 
+                  onClick={() => setShowAIModal(false)}
+                  style={{ width: '100%', padding: '18px', borderRadius: '20px', border: 'none', backgroundColor: '#0f172a', color: 'white', fontSize: '15px', fontWeight: '900', cursor: 'pointer', marginTop: '8px', boxShadow: '0 10px 20px rgba(15, 23, 42, 0.2)' }}
+                >
+                  리포트 확인 완료
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
       `}</style>
     </div>
   );
