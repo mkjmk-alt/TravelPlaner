@@ -674,6 +674,10 @@ function App() {
   // --- AI ANALYSIS ---
   const generateAIAnalysis = async () => {
     if (!activeTrip) return;
+    
+    console.log("--- Starting AI Analysis ---");
+    console.log("Current API Key:", GEMINI_API_KEY ? "Loaded (starts with " + GEMINI_API_KEY.substring(0, 7) + ")" : "MISSING");
+
     if (!GEMINI_API_KEY) {
       alert(".env 파일에 VITE_GEMINI_API_KEY를 설정해주세요.");
       setShowAIModal(false);
@@ -734,6 +738,7 @@ function App() {
     `;
 
     try {
+      console.log("Sending request to Gemini API...");
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -742,22 +747,35 @@ function App() {
         })
       });
 
-      if (!response.ok) throw new Error("API request failed");
+      console.log("Response status:", response.status, response.statusText);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("API Error Response:", errorData);
+        throw new Error(`API error: ${response.status} - ${JSON.stringify(errorData)}`);
+      }
 
       const data = await response.json();
+      console.log("Raw AI Response Data:", data);
+
+      if (!data.candidates || !data.candidates[0]) {
+        throw new Error("No candidates found in AI response");
+      }
+
       const text = data.candidates[0].content.parts[0].text;
+      console.log("AI Text Output:", text);
       
-      // Extract JSON from the response text (it might be wrapped in ```json ... ```)
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const result = JSON.parse(jsonMatch[0]);
+        console.log("Parsed JSON Report:", result);
         setAiReport(result);
       } else {
-        throw new Error("Failed to parse AI response as JSON");
+        throw new Error("Failed to parse AI response as JSON. AI might not have returned JSON.");
       }
     } catch (error) {
-      console.error("AI Analysis failed:", error);
-      alert("AI 분석 도중 오류가 발생했습니다. API 키와 네트워크 상태를 확인해주세요.");
+      console.error("FULL ERROR LOG:", error);
+      alert(`AI 분석 도중 오류가 발생했습니다.\n원인: ${error.message.substring(0, 100)}...`);
       setShowAIModal(false);
     } finally {
       setIsAnalyzing(false);
