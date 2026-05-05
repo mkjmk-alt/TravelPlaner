@@ -1612,24 +1612,34 @@ function App() {
                                         const isKoreaAddress = ['대한민국', '강원', '경기', '서울', '인천', '부산', '대구', '광주', '대전', '울산', '세종', '충북', '충남', '전북', '전남', '경북', '경남', '제주'].some(k => item.loc?.includes(k));
                                         
                                         // 한국 여행이거나 주소에 한국 지명이 포함된 경우에만 네이버 지도 사용
-                                        if (isKoreaTrip || isKoreaAddress) {
-                                          const destName = encodeURIComponent(item.name);
-                                          const dlat = item.lat;
-                                          const dlng = item.lng;
-                                          
-                                          if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-                                            // iOS: nmap 앱 딥링크로 길찾기 실행
-                                            const nMapAppUrl = `nmap://route/public?dlat=${dlat}&dlng=${dlng}&dname=${destName}&appname=worldpro`;
-                                            const webFallback = `https://map.naver.com/v5/directions/-/${destName},${dlng},${dlat}/transit?c=${dlng},${dlat},15,0,0,0,dh`;
-                                            window.location.href = nMapAppUrl;
-                                            setTimeout(() => {
-                                              window.open(webFallback, '_blank');
-                                            }, 1500);
+                                          if (isKoreaTrip || isKoreaAddress) {
+                                            const destName = encodeURIComponent(item.name);
+                                            const dlat = item.lat;
+                                            const dlng = item.lng;
+                                            
+                                            // 네이버 지도 웹용 길찾기 URL (가장 확실한 Lat/Lng 지원 방식)
+                                            const webUrl = `https://map.naver.com/index.nhn?elng=${dlng}&elat=${dlat}&etext=${destName}&menu=route&pathType=1`;
+                                            
+                                            if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+                                              // iOS: nmap 앱 딥링크로 길찾기 실행 (pubtrans가 대중교통 모드)
+                                              const nMapAppUrl = `nmap://route/pubtrans?dlat=${dlat}&dlng=${dlng}&dname=${destName}&appname=worldpro`;
+                                              window.location.href = nMapAppUrl;
+                                              setTimeout(() => {
+                                                // 앱이 없을 경우 웹으로 폴백
+                                                window.open(webUrl, '_blank');
+                                              }, 1500);
+                                            } else if (/Android/i.test(navigator.userAgent)) {
+                                              // 안드로이드: Intent 스킴을 사용하여 앱 실행 시도, 미설치 시 웹/스토어 유도
+                                              const intentUrl = `intent://route/pubtrans?dlat=${dlat}&dlng=${dlng}&dname=${destName}&appname=worldpro#Intent;scheme=nmap;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.nhn.android.nmap;end`;
+                                              window.location.href = intentUrl;
+                                              setTimeout(() => {
+                                                window.open(webUrl, '_blank');
+                                              }, 1500);
+                                            } else {
+                                              // 데스크톱 및 기타 브라우저
+                                              window.open(webUrl, '_blank');
+                                            }
                                           } else {
-                                            // 안드로이드/데스크톱: 네이버 지도 웹 길찾기
-                                            window.open(`https://map.naver.com/v5/directions/-/${destName},${dlng},${dlat}/transit?c=${dlng},${dlat},15,0,0,0,dh`, '_blank');
-                                          }
-                                        } else {
                                           // 해외인 경우 구글 지도
                                           const googleUrl = `https://www.google.com/maps/dir/?api=1&destination=${item.lat},${item.lng}&destination_place_id=${item.placeId || ''}`;
                                           
