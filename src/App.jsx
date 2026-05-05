@@ -705,6 +705,10 @@ function App() {
       4. Budget Realism (Is the budget appropriate for the destination?)
       5. Practical Pro-tips (Specific advice for this trip)
 
+      [Critical Request]
+      Also provide an "optimizedItinerary" which is a restructured version of the input itinerary for better efficiency. 
+      Keep the same data structure for days and items.
+
       Respond strictly in JSON format as follows:
       {
         "score": number (overall score 0-100),
@@ -716,13 +720,15 @@ function App() {
           { "title": "예산 적절성", "score": number, "content": "Detailed analysis in Korean" },
           { "title": "AI 전문가 꿀팁", "score": number, "content": "Detailed analysis in Korean" }
         ],
-        "tips": ["Tip 1 in Korean", "Tip 2 in Korean", "Tip 3 in Korean"]
+        "tips": ["Tip 1 in Korean", "Tip 2 in Korean", "Tip 3 in Korean"],
+        "optimizedItinerary": [
+          { "day": 1, "items": [{ "id": "string", "name": "string", "time": "string", "loc": "string", "lat": number, "lng": number, "placeId": "string" }] }
+        ]
       }
     `;
 
     try {
       // For now, we simulate the AI response. 
-      // In a real scenario, you would fetch from an API endpoint.
       await new Promise(resolve => setTimeout(resolve, 2500));
       
       const mockResult = {
@@ -739,7 +745,11 @@ function App() {
           "구글 지도 오프라인 지도를 미리 다운로드하세요.",
           "편한 운동화를 착용하는 것이 필수입니다.",
           "현지 비상 연락망과 대사관 위치를 메모해두세요."
-        ]
+        ],
+        optimizedItinerary: activeTrip.itinerary.map(day => ({
+          ...day,
+          items: [...day.items].reverse() // Example optimization: Reverse the order
+        }))
       };
       
       setAiReport(mockResult);
@@ -748,6 +758,35 @@ function App() {
       alert("분석 중 오류가 발생했습니다.");
     } finally {
       setIsAnalyzing(false);
+    }
+  };
+
+  const applyAIProposedPlan = async () => {
+    if (!aiReport || !aiReport.optimizedItinerary || !activeTrip) return;
+
+    if (!confirm("AI가 제안한 최적화된 일정으로 현재 일정을 교체하시겠습니까?")) return;
+
+    try {
+      const updatedItinerary = aiReport.optimizedItinerary;
+      
+      // 1. Supabase 업데이트
+      const { error } = await supabase
+        .from('trips')
+        .update({ itinerary: updatedItinerary })
+        .eq('id', activeTrip.id);
+
+      if (error) throw error;
+
+      // 2. 로컬 상태 업데이트
+      const updatedTrip = { ...activeTrip, itinerary: updatedItinerary };
+      setActiveTrip(updatedTrip);
+      setTrips(trips.map(t => t.id === activeTrip.id ? updatedTrip : t));
+
+      setShowAIModal(false);
+      alert("✨ AI 최적화 일정이 성공적으로 적용되었습니다!");
+    } catch (error) {
+      console.error("Apply AI Plan failed:", error);
+      alert("일정 적용 중 오류가 발생했습니다.");
     }
   };
 
@@ -2378,12 +2417,20 @@ function App() {
                   </div>
                 </div>
 
-                <button 
-                  onClick={() => setShowAIModal(false)}
-                  style={{ width: '100%', padding: '18px', borderRadius: '20px', border: 'none', backgroundColor: '#0f172a', color: 'white', fontSize: '15px', fontWeight: '900', cursor: 'pointer', marginTop: '8px', boxShadow: '0 10px 20px rgba(15, 23, 42, 0.2)' }}
-                >
-                  리포트 확인 완료
-                </button>
+                <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                  <button 
+                    onClick={() => setShowAIModal(false)}
+                    style={{ flex: 1, padding: '18px', borderRadius: '20px', border: '1px solid #e2e8f0', backgroundColor: 'white', color: '#64748b', fontSize: '15px', fontWeight: '900', cursor: 'pointer' }}
+                  >
+                    닫기
+                  </button>
+                  <button 
+                    onClick={applyAIProposedPlan}
+                    style={{ flex: 2, padding: '18px', borderRadius: '20px', border: 'none', backgroundColor: '#8b5cf6', color: 'white', fontSize: '15px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 10px 20px rgba(139, 92, 246, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                  >
+                    <Check size={18} /> 수정안 적용하기
+                  </button>
+                </div>
               </div>
             )}
           </div>
