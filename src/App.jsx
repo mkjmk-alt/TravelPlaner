@@ -605,6 +605,33 @@ function App() {
     performCopy();
   };
 
+  // --- MAP VIEWPORT SYNC ---
+  useEffect(() => {
+    if (!map || !activeDay || (itinerary || []).length === 0) return;
+    
+    const dayPlan = (itinerary || []).find(d => d.day === activeDay);
+    if (!dayPlan || (dayPlan.items || []).length === 0) return;
+
+    const bounds = new window.google.maps.LatLngBounds();
+    let count = 0;
+    
+    dayPlan.items.forEach(item => {
+      if (item.lat && item.lng) {
+        bounds.extend({ lat: item.lat, lng: item.lng });
+        count++;
+      }
+    });
+
+    if (count > 0) {
+      map.fitBounds(bounds);
+      if (count === 1) {
+        setTimeout(() => {
+          map.setZoom(15);
+        }, 100);
+      }
+    }
+  }, [activeDay, itinerary, map]);
+
   // --- TRIP DATA MUTATORS ---
   const updateActiveTrip = async (updates) => {
     if (!activeTripId) return;
