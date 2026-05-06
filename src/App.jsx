@@ -739,9 +739,9 @@ function App() {
 
     try {
       console.log("Sending request to Gemini API...");
-      // 최신 고속 모델인 gemini-2.5-flash를 사용합니다. 
+      // 경제적인 gemini-2.0-flash-lite 모델을 사용합니다. 
       // (주의: Google Cloud Console에서 Generative Language API가 활성화되어 있어야 합니다.)
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-lite:generateContent?key=${GEMINI_API_KEY}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
