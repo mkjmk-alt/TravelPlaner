@@ -1712,7 +1712,18 @@ Travel Planner AI Analysis Report
               <>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
                   <h2 style={{ fontSize: '12px', fontWeight: '900', color: '#3b82f6', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>My Planner</h2>
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <div style={{ 
+                    display: 'flex', 
+                    gap: '10px', 
+                    alignItems: 'center', 
+                    overflowX: 'auto', 
+                    msOverflowStyle: 'none', 
+                    scrollbarWidth: 'none',
+                    paddingBottom: '4px' // 여백을 주어 그림자가 잘리지 않게 함
+                  }}>
+                    <style>{`
+                      div::-webkit-scrollbar { display: none; }
+                    `}</style>
                     {allPhotos.length > 0 && (
                       <button 
                         onClick={() => { setSlideshowIndex(0); setShowSlideshow(true); }} 
