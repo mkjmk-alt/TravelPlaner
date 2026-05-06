@@ -1737,41 +1737,41 @@ Travel Planner AI Analysis Report
                     <button 
                       onClick={addDay} 
                       style={{ 
-                        display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '800', 
-                        color: '#2563eb', backgroundColor: '#eff6ff', padding: '10px 16px', borderRadius: '16px', 
+                        display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: '800', 
+                        color: '#2563eb', backgroundColor: '#eff6ff', padding: '8px 12px', borderRadius: '14px', 
                         border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s'
                       }}
                       onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#dbeafe'}
                       onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#eff6ff'}
                     >
-                      <PlusCircle size={15} /> DAY 추가
+                      <PlusCircle size={14} /> Day+
                     </button>
                     {activeTrip?.aiAnalysis && (
                       <button 
                         onClick={() => { setAiReport(activeTrip.aiAnalysis); setShowAIModal(true); }} 
                         style={{ 
-                          display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '800', 
-                          color: '#64748b', backgroundColor: '#f1f5f9', padding: '10px 16px', borderRadius: '16px', 
+                          display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: '800', 
+                          color: '#64748b', backgroundColor: '#f1f5f9', padding: '8px 12px', borderRadius: '14px', 
                           border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s'
                         }}
                         onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#e2e8f0'}
                         onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
                       >
-                        <Brain size={15} /> 최근 결과
+                        <Brain size={14} /> 결과
                       </button>
                     )}
                     <button 
                       onClick={generateAIAnalysis} 
                       style={{ 
-                        display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '800', 
-                        color: 'white', backgroundColor: '#8b5cf6', padding: '10px 18px', borderRadius: '16px', 
+                        display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: '800', 
+                        color: 'white', backgroundColor: '#8b5cf6', padding: '8px 14px', borderRadius: '14px', 
                         border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)', 
                         whiteSpace: 'nowrap', transition: 'all 0.2s'
                       }}
                       onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(139, 92, 246, 0.4)'; }}
                       onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.3)'; }}
                     >
-                      <Sparkles size={15} /> AI 분석
+                      <Sparkles size={14} /> AI 추천
                     </button>
                   </div>
                 </div>
