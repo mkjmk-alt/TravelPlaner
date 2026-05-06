@@ -1895,24 +1895,49 @@ Travel Planner AI Analysis Report
                                       </div>
                                     </div>
                                   </div>
-                                  <div style={{ display: 'flex', gap: '4px' }}>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginRight: '4px' }}>
+                                  <div style={{ 
+                                    display: 'grid', 
+                                    gridTemplateColumns: 'repeat(2, 44px)', 
+                                    gridTemplateRows: 'repeat(2, 44px)',
+                                    gap: '6px',
+                                    alignItems: 'center'
+                                  }}>
+                                    {/* Order Group */}
+                                    <div style={{ 
+                                      display: 'flex', 
+                                      flexDirection: 'column', 
+                                      backgroundColor: '#f8fafc', 
+                                      borderRadius: '12px', 
+                                      overflow: 'hidden',
+                                      border: '1px solid #f1f5f9'
+                                    }}>
                                       <button 
                                         onClick={() => moveItineraryItem(dayPlan.day, item.id, 'up')}
-                                        style={{ background: 'none', border: 'none', color: iIdx === 0 ? '#e5e7eb' : '#9ca3af', cursor: iIdx === 0 ? 'default' : 'pointer', padding: '2px' }}
+                                        style={{ background: 'none', border: 'none', color: iIdx === 0 ? '#e5e7eb' : '#9ca3af', cursor: iIdx === 0 ? 'default' : 'pointer', padding: '4px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                         disabled={iIdx === 0}
                                       >
                                         <ChevronUp size={14} />
                                       </button>
                                       <button 
                                         onClick={() => moveItineraryItem(dayPlan.day, item.id, 'down')}
-                                        style={{ background: 'none', border: 'none', color: iIdx === dayPlan.items.length - 1 ? '#e5e7eb' : '#9ca3af', cursor: iIdx === dayPlan.items.length - 1 ? 'default' : 'pointer', padding: '2px' }}
+                                        style={{ background: 'none', border: 'none', color: iIdx === dayPlan.items.length - 1 ? '#e5e7eb' : '#9ca3af', cursor: iIdx === dayPlan.items.length - 1 ? 'default' : 'pointer', padding: '4px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderTop: '1px solid #f1f5f9' }}
                                         disabled={iIdx === dayPlan.items.length - 1}
                                       >
                                         <ChevronDown size={14} />
                                       </button>
                                     </div>
-                                    <label style={{ cursor: 'pointer', padding: '10px', color: item.image ? '#8b5cf6' : '#9ca3af', backgroundColor: item.image ? '#f5f3ff' : 'transparent', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="사진 추가">
+
+                                    {/* Camera Button */}
+                                    <label style={{ 
+                                      cursor: 'pointer', 
+                                      height: '44px', width: '44px',
+                                      color: item.image ? '#8b5cf6' : '#9ca3af', 
+                                      backgroundColor: item.image ? '#f5f3ff' : '#f8fafc', 
+                                      borderRadius: '12px', 
+                                      border: `1px solid ${item.image ? '#ddd6fe' : '#f1f5f9'}`,
+                                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                      transition: 'all 0.2s'
+                                    }} title="사진 추가">
                                       <Camera size={18} />
                                       <input 
                                         type="file" 
@@ -1921,67 +1946,62 @@ Travel Planner AI Analysis Report
                                         onChange={(e) => { handlePhotoUpload(e.target.files[0], dayPlan.day, item.id); e.target.value = ''; }}
                                       />
                                     </label>
+
+                                    {/* Navigation Button */}
                                     <button 
                                       onClick={(e) => { 
                                         e.stopPropagation(); 
                                         const isKoreaTrip = activeTrip?.country === '대한민국';
                                         const isKoreaAddress = ['대한민국', '강원', '경기', '서울', '인천', '부산', '대구', '광주', '대전', '울산', '세종', '충북', '충남', '전북', '전남', '경북', '경남', '제주'].some(k => item.loc?.includes(k));
                                         
-                                        // 한국 여행이거나 주소에 한국 지명이 포함된 경우에만 네이버 지도 사용
                                           if (isKoreaTrip || isKoreaAddress) {
                                             const destName = encodeURIComponent(item.name);
                                             const dlat = item.lat;
                                             const dlng = item.lng;
-                                            
-                                            // 네이버 지도 웹용 길찾기 URL (가장 확실한 Lat/Lng 지원 방식)
                                             const webUrl = `https://map.naver.com/index.nhn?elng=${dlng}&elat=${dlat}&etext=${destName}&menu=route&pathType=1`;
-                                            
                                             if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-                                              // iOS: nmap 앱 딥링크로 길찾기 실행 (pubtrans가 대중교통 모드)
-                                              const nMapAppUrl = `nmap://route/pubtrans?dlat=${dlat}&dlng=${dlng}&dname=${destName}&appname=worldpro`;
-                                              window.location.href = nMapAppUrl;
-                                              setTimeout(() => {
-                                                // 앱이 없을 경우 웹으로 폴백
-                                                window.open(webUrl, '_blank');
-                                              }, 1500);
+                                              window.location.href = `nmap://route/pubtrans?dlat=${dlat}&dlng=${dlng}&dname=${destName}&appname=worldpro`;
+                                              setTimeout(() => { window.open(webUrl, '_blank'); }, 1500);
                                             } else if (/Android/i.test(navigator.userAgent)) {
-                                              // 안드로이드: Intent 스킴을 사용하여 앱 실행 시도, 미설치 시 웹/스토어 유도
-                                              const intentUrl = `intent://route/pubtrans?dlat=${dlat}&dlng=${dlng}&dname=${destName}&appname=worldpro#Intent;scheme=nmap;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.nhn.android.nmap;end`;
-                                              window.location.href = intentUrl;
-                                              setTimeout(() => {
-                                                window.open(webUrl, '_blank');
-                                              }, 1500);
-                                            } else {
-                                              // 데스크톱 및 기타 브라우저
-                                              window.open(webUrl, '_blank');
-                                            }
+                                              window.location.href = `intent://route/pubtrans?dlat=${dlat}&dlng=${dlng}&dname=${destName}&appname=worldpro#Intent;scheme=nmap;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.nhn.android.nmap;end`;
+                                            } else { window.open(webUrl, '_blank'); }
                                           } else {
-                                          // 해외인 경우 구글 지도
                                           const googleUrl = `https://www.google.com/maps/dir/?api=1&destination=${item.lat},${item.lng}&destination_place_id=${item.placeId || ''}`;
-                                          
-                                          // 아이폰/iOS인 경우 구글 지도 앱 호출 시도
                                           if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-                                            const appUrl = `comgooglemaps://?daddr=${item.lat},${item.lng}&directionsmode=walking`;
-                                            window.location.href = appUrl;
-                                            // 앱이 없는 경우를 대비해 약간의 지연 후 웹으로 연결 (iOS 특성상 앱이 없으면 아무 일도 안 일어남)
-                                            setTimeout(() => {
-                                              window.open(googleUrl, '_blank');
-                                            }, 500);
-                                          } else {
-                                            window.open(googleUrl, '_blank');
-                                          }
+                                            window.location.href = `comgooglemaps://?daddr=${item.lat},${item.lng}&directionsmode=walking`;
+                                            setTimeout(() => { window.open(googleUrl, '_blank'); }, 500);
+                                          } else { window.open(googleUrl, '_blank'); }
                                         }
                                       }}
-                                      style={{ padding: '10px', color: '#3b82f6', backgroundColor: '#eff6ff', border: 'none', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                      style={{ 
+                                        height: '44px', width: '44px',
+                                        color: '#3b82f6', backgroundColor: '#eff6ff', 
+                                        border: '1px solid #dbeafe', borderRadius: '12px', 
+                                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        transition: 'all 0.2s'
+                                      }}
                                       title="길찾기"
                                     >
                                       <Navigation size={18} />
                                     </button>
+
+                                    {/* Delete Button */}
                                     <button 
                                       onClick={(e) => { e.stopPropagation(); handleInlineDelete(e, `itin-${item.id}`, () => removeFromItinerary(dIdx, item.id)); }}
-                                      style={{ padding: confirmDeleteId === `itin-${item.id}` ? '10px 14px' : '10px', color: confirmDeleteId === `itin-${item.id}` ? 'white' : '#f87171', backgroundColor: confirmDeleteId === `itin-${item.id}` ? '#ef4444' : 'transparent', border: 'none', borderRadius: '10px', cursor: 'pointer', flexShrink: 0 }}
+                                      style={{ 
+                                        height: '44px', width: confirmDeleteId === `itin-${item.id}` ? 'auto' : '44px',
+                                        minWidth: confirmDeleteId === `itin-${item.id}` ? '80px' : '44px',
+                                        position: confirmDeleteId === `itin-${item.id}` ? 'absolute' : 'relative',
+                                        right: confirmDeleteId === `itin-${item.id}` ? '16px' : 'auto',
+                                        zIndex: confirmDeleteId === `itin-${item.id}` ? 10 : 1,
+                                        color: confirmDeleteId === `itin-${item.id}` ? 'white' : '#f87171', 
+                                        backgroundColor: confirmDeleteId === `itin-${item.id}` ? '#ef4444' : '#fff5f5', 
+                                        border: `1px solid ${confirmDeleteId === `itin-${item.id}` ? '#dc2626' : '#fee2e2'}`,
+                                        borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s',
+                                        fontSize: '12px', fontWeight: '800'
+                                      }}
                                     >
-                                      {confirmDeleteId === `itin-${item.id}` ? '확인' : <Trash2 size={18} />}
+                                      {confirmDeleteId === `itin-${item.id}` ? '삭제확인' : <Trash2 size={18} />}
                                     </button>
                                   </div>
                                 </div>
