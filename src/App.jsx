@@ -732,9 +732,9 @@ function App() {
           { "title": "여행 강도", "score": number, "content": "Detailed analysis in Korean" },
           { "title": "테마 및 균형", "score": number, "content": "Detailed analysis in Korean" },
           { "title": "예산 적절성", "score": number, "content": "Detailed analysis in Korean" },
-          { "title": "AI 전문가 꿀팁", "score": number, "content": "Detailed analysis in Korean" }
+          { "title": "꿀팁", "score": number, "content": "Detailed analysis in Korean" }
         ],
-        "tips": ["Tip 1 in Korean", "Tip 2 in Korean", "Tip 3 in Korean"],
+        "tips": ["구체적인 추천 액션 1 (예: ~를 예약하세요)", "추천 액션 2", "추천 액션 3"],
         "optimizedItinerary": [
           { "day": 1, "items": [...] }
         ]
@@ -847,7 +847,7 @@ ${aiReport.sections.map(sec => `
 ■ ${sec.title} (${sec.score}점)
 ${sec.content}`).join('\n')}
 
-[AI 전문가 추천 팁]
+[추천 액션]
 ${aiReport.tips.map(tip => `- ${tip}`).join('\n')}
 
 ---
@@ -1714,22 +1714,22 @@ Travel Planner AI Analysis Report
                         <Play size={14} /> MOVIE ({allPhotos.length})
                       </button>
                     )}
-                    <button onClick={addDay} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '800', color: '#2563eb', backgroundColor: '#eff6ff', padding: '8px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer' }}>
-                      <PlusCircle size={14} /> ADD DAY
+                    <button onClick={addDay} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: '800', color: '#2563eb', backgroundColor: '#eff6ff', padding: '10px 16px', borderRadius: '14px', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                      <PlusCircle size={16} /> ADD DAY
                     </button>
                     {activeTrip?.aiAnalysis && (
                       <button 
                         onClick={() => { setAiReport(activeTrip.aiAnalysis); setShowAIModal(true); }} 
-                        style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '800', color: '#64748b', backgroundColor: '#f1f5f9', padding: '8px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer' }}
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: '800', color: '#64748b', backgroundColor: '#f1f5f9', padding: '10px 16px', borderRadius: '14px', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s' }}
                       >
-                        <Brain size={14} /> 최근 결과
+                        <Brain size={16} /> 최근 결과
                       </button>
                     )}
                     <button 
                       onClick={generateAIAnalysis} 
-                      style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '800', color: 'white', backgroundColor: '#8b5cf6', padding: '8px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)' }}
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: '800', color: 'white', backgroundColor: '#8b5cf6', padding: '10px 18px', borderRadius: '14px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)', whiteSpace: 'nowrap', transition: 'all 0.2s' }}
                     >
-                      <Sparkles size={14} /> AI 분석
+                      <Sparkles size={16} /> AI 분석
                     </button>
                   </div>
                 </div>
@@ -2554,7 +2554,7 @@ Travel Planner AI Analysis Report
                 {/* Pro Tips Section */}
                 <div style={{ backgroundColor: '#f0f9ff', padding: '24px', borderRadius: '28px', border: '1px solid #e0f2fe' }}>
                   <h4 style={{ fontSize: '15px', fontWeight: '900', color: '#0369a1', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Brain size={18} /> 전문가 추천 Action Item
+                    <Brain size={18} /> 추천 액션
                   </h4>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     {aiReport.tips.map((tip, idx) => (
@@ -2628,10 +2628,12 @@ Travel Planner AI Analysis Report
               일정을 변경하시겠습니까?
             </h3>
             <div style={{ backgroundColor: '#fff1f2', padding: '20px', borderRadius: '24px', marginBottom: '32px', border: '1px solid #ffe4e6' }}>
-              <p style={{ fontSize: '14px', color: '#991b1b', lineHeight: '1.6', margin: 0, fontWeight: '700' }}>
-                AI가 제안한 최적화된 일정으로 <span style={{ textDecoration: 'underline', fontWeight: '900' }}>현재 일정이 완전히 교체</span>됩니다.
+              <p style={{ fontSize: '14px', color: '#991b1b', lineHeight: '1.8', margin: 0, fontWeight: '700' }}>
+                AI가 제안한 최적화된 일정으로<br/>
+                <span style={{ textDecoration: 'underline', fontWeight: '900', fontSize: '15px' }}>현재 일정이 완전히 교체됩니다.</span>
                 <br/><br/>
-                <span style={{ fontSize: '12px', opacity: 0.8 }}>기존에 수동으로 설정하신 장소와 순서는 영구적으로 삭제되며, 이 작업은 되돌릴 수 없습니다.</span>
+                기존에 수동으로 설정하신 장소와 순서는<br/>
+                <span style={{ color: '#ef4444' }}>영구적으로 삭제되며</span>, 이 작업은 되돌릴 수 없습니다.
               </p>
             </div>
             <div style={{ display: 'flex', gap: '14px' }}>
