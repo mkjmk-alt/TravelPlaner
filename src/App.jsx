@@ -2,6 +2,7 @@ import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete, Polyline } from '@react-google-maps/api';
 import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Camera, Play, Image, Clock, Sparkles, Brain } from 'lucide-react';
 import { supabase } from './supabaseClient';
+import html2canvas from 'html2canvas';
 import './index.css';
 
 // --- CONFIGURATION ---
@@ -215,6 +216,7 @@ function App() {
   const [showAIModal, setShowAIModal] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiReport, setAiReport] = useState(null);
+  const reportRef = useRef(null);
   const slideshowTimerRef = useRef(null);
 
   // --- DATA STATE ---
@@ -792,6 +794,40 @@ function App() {
       setShowAIModal(false);
     } finally {
       setIsAnalyzing(false);
+    }
+  };
+
+  const handleDownloadImage = async () => {
+    if (!reportRef.current) return;
+    
+    const btn = document.getElementById('save-image-btn');
+    if (btn) btn.style.display = 'none'; // 버튼은 이미지에서 제외
+    
+    try {
+      const canvas = await html2canvas(reportRef.current, {
+        scale: 2, // 고화질
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        // 스크롤 영역 전체를 찍기 위한 설정
+        onclone: (clonedDoc) => {
+          const element = clonedDoc.getElementById('ai-report-content');
+          if (element) {
+            element.style.maxHeight = 'none';
+            element.style.overflow = 'visible';
+          }
+        }
+      });
+      
+      const image = canvas.toDataURL("image/png");
+      const link = document.createElement('a');
+      link.href = image;
+      link.download = `AI_Report_${activeTrip?.name || 'Travel'}.png`;
+      link.click();
+    } catch (err) {
+      console.error("Image capture failed:", err);
+      alert("이미지 저장 중 오류가 발생했습니다.");
+    } finally {
+      if (btn) btn.style.display = 'flex';
     }
   };
 
@@ -2400,12 +2436,16 @@ Travel Planner AI Analysis Report
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
           animation: 'fadeIn 0.3s ease-out'
         }}>
-          <div style={{
-            backgroundColor: 'white', borderRadius: '32px', width: '100%', maxWidth: '500px',
-            maxHeight: '85vh', overflowY: 'auto', padding: '32px', position: 'relative',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-            animation: 'slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
-          }}>
+          <div 
+            id="ai-report-content"
+            ref={reportRef}
+            style={{
+              backgroundColor: 'white', borderRadius: '32px', width: '100%', maxWidth: '500px',
+              maxHeight: '85vh', overflowY: 'auto', padding: '32px', position: 'relative',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              animation: 'slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+          >
             <button 
               onClick={() => setShowAIModal(false)}
               style={{ position: 'absolute', top: '24px', right: '24px', border: 'none', background: '#f1f5f9', width: '36px', height: '36px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}
@@ -2488,6 +2528,13 @@ Travel Planner AI Analysis Report
                       style={{ flex: 1, padding: '16px', borderRadius: '20px', border: '1px solid #8b5cf6', backgroundColor: '#f5f3ff', color: '#8b5cf6', fontSize: '14px', fontWeight: '900', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
                     >
                       <Share2 size={18} /> 이메일 공유
+                    </button>
+                    <button 
+                      id="save-image-btn"
+                      onClick={handleDownloadImage}
+                      style={{ flex: 1, padding: '16px', borderRadius: '20px', border: '1px solid #10b981', backgroundColor: '#ecfdf5', color: '#10b981', fontSize: '14px', fontWeight: '900', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                    >
+                      <Camera size={18} /> 이미지 저장
                     </button>
                   </div>
                   <button 
