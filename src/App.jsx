@@ -776,6 +776,9 @@ function App() {
           const result = JSON.parse(jsonMatch[0]);
           console.log("Parsed JSON Report:", result);
           setAiReport(result);
+          
+          // 추가: 분석 결과를 여행 데이터에 영구 저장
+          updateActiveTrip({ aiAnalysis: result });
         } catch (parseError) {
           console.error("JSON Parse Error:", parseError, "Text:", jsonMatch[0]);
           throw new Error("AI 응답을 해석하는 중 오류가 발생했습니다.");
@@ -790,6 +793,29 @@ function App() {
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  const handleEmailShare = () => {
+    if (!aiReport) return;
+    const subject = encodeURIComponent(`[AI 여행 리포트] ${activeTrip?.name || '나의 여행'}`);
+    const body = encodeURIComponent(`
+안녕하세요! '${activeTrip?.name || '나의 여행'}'에 대한 AI 분석 리포트입니다.
+
+[종합 분석 스코어: ${aiReport.score}점]
+"${aiReport.summary}"
+
+${aiReport.sections.map(sec => `
+■ ${sec.title} (${sec.score}점)
+${sec.content}`).join('\n')}
+
+[AI 전문가 추천 팁]
+${aiReport.tips.map(tip => `- ${tip}`).join('\n')}
+
+---
+Travel Planner AI Analysis Report
+`).replace(/%0A/g, '%0D%0A'); // Windows email clients often need CRLF
+    
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
   };
 
   const applyAIProposedPlan = async () => {
@@ -1604,6 +1630,14 @@ function App() {
                     <button onClick={addDay} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '800', color: '#2563eb', backgroundColor: '#eff6ff', padding: '8px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer' }}>
                       <PlusCircle size={14} /> ADD DAY
                     </button>
+                    {activeTrip?.aiAnalysis && (
+                      <button 
+                        onClick={() => { setAiReport(activeTrip.aiAnalysis); setShowAIModal(true); }} 
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '800', color: '#64748b', backgroundColor: '#f1f5f9', padding: '8px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer' }}
+                      >
+                        <Brain size={14} /> 최근 결과
+                      </button>
+                    )}
                     <button 
                       onClick={generateAIAnalysis} 
                       style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '800', color: 'white', backgroundColor: '#8b5cf6', padding: '8px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)' }}
@@ -2441,16 +2475,24 @@ function App() {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-                  <button 
-                    onClick={() => setShowAIModal(false)}
-                    style={{ flex: 1, padding: '18px', borderRadius: '20px', border: '1px solid #e2e8f0', backgroundColor: 'white', color: '#64748b', fontSize: '15px', fontWeight: '900', cursor: 'pointer' }}
-                  >
-                    닫기
-                  </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '8px' }}>
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <button 
+                      onClick={() => setShowAIModal(false)}
+                      style={{ flex: 1, padding: '16px', borderRadius: '20px', border: '1px solid #e2e8f0', backgroundColor: 'white', color: '#64748b', fontSize: '14px', fontWeight: '900', cursor: 'pointer' }}
+                    >
+                      닫기
+                    </button>
+                    <button 
+                      onClick={handleEmailShare}
+                      style={{ flex: 1, padding: '16px', borderRadius: '20px', border: '1px solid #8b5cf6', backgroundColor: '#f5f3ff', color: '#8b5cf6', fontSize: '14px', fontWeight: '900', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                    >
+                      <Share2 size={18} /> 이메일 공유
+                    </button>
+                  </div>
                   <button 
                     onClick={applyAIProposedPlan}
-                    style={{ flex: 2, padding: '18px', borderRadius: '20px', border: 'none', backgroundColor: '#8b5cf6', color: 'white', fontSize: '15px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 10px 20px rgba(139, 92, 246, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                    style={{ width: '100%', padding: '18px', borderRadius: '20px', border: 'none', backgroundColor: '#8b5cf6', color: 'white', fontSize: '15px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 10px 20px rgba(139, 92, 246, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
                   >
                     <Check size={18} /> 수정안 적용하기
                   </button>
