@@ -436,9 +436,15 @@ function App() {
   }, [favorites]);
 
   const polylinePath = useMemo(() => {
-    const dayPlan = itinerary.find(d => d.day === activeDay);
+    const dayPlan = itinerary.find(d => Number(d.day) === Number(activeDay));
     if (!dayPlan || (dayPlan.items || []).length < 2) return [];
-    return (dayPlan.items || []).map(item => ({ lat: item.lat, lng: item.lng }));
+    
+    return (dayPlan.items || [])
+      .filter(item => item.lat && item.lng)
+      .map(item => ({ 
+        lat: Number(item.lat), 
+        lng: Number(item.lng) 
+      }));
   }, [itinerary, activeDay]);
 
   const toggleCountry = (country) => {
@@ -609,15 +615,17 @@ function App() {
   useEffect(() => {
     if (!map || !activeDay || (itinerary || []).length === 0) return;
     
-    const dayPlan = (itinerary || []).find(d => d.day === activeDay);
+    const dayPlan = (itinerary || []).find(d => Number(d.day) === Number(activeDay));
     if (!dayPlan || (dayPlan.items || []).length === 0) return;
 
     const bounds = new window.google.maps.LatLngBounds();
     let count = 0;
     
     dayPlan.items.forEach(item => {
-      if (item.lat && item.lng) {
-        bounds.extend({ lat: item.lat, lng: item.lng });
+      const lat = Number(item.lat);
+      const lng = Number(item.lng);
+      if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+        bounds.extend({ lat, lng });
         count++;
       }
     });
@@ -2338,10 +2346,12 @@ Travel Planner AI Analysis Report
           )}
 
           {/* Itinerary Markers (for active day) */}
-          {itinerary.find(d => d.day === activeDay)?.items.map((item, idx) => (
+          {(itinerary.find(d => Number(d.day) === Number(activeDay))?.items || [])
+            .filter(item => item.lat && item.lng)
+            .map((item, idx) => (
             <Marker
               key={`itin-mark-${item.id}`}
-              position={{ lat: item.lat, lng: item.lng }}
+              position={{ lat: Number(item.lat), lng: Number(item.lng) }}
               label={{
                 text: `${idx + 1}`,
                 color: 'white',
