@@ -2597,7 +2597,7 @@ Travel Planner AI Analysis Report
                 <Sparkles size={32} color="#8b5cf6" />
               </div>
               <h2 style={{ fontSize: '24px', fontWeight: '900', color: '#0f172a', margin: '0 0 8px 0', letterSpacing: '-0.02em' }}>AI 여행 전략 리포트</h2>
-              <p style={{ fontSize: '14px', color: '#64748b', fontWeight: '600' }}>{activeTrip?.name} 일정을 전문가가 분석했습니다.</p>
+              <p style={{ fontSize: '14px', color: '#64748b', fontWeight: '600' }}>{activeTrip?.name} 일정을 분석했습니다.</p>
             </div>
 
             {isAnalyzing ? (
