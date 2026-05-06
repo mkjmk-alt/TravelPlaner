@@ -1464,7 +1464,16 @@ Travel Planner AI Analysis Report
             </div>
 
           {/* List Content */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px' }}>
+          <div style={{ 
+            flex: 1, 
+            overflowY: 'auto', 
+            padding: '24px 32px',
+            msOverflowStyle: 'none',
+            scrollbarWidth: 'none'
+          }}>
+            <style>{`
+              div::-webkit-scrollbar { display: none; }
+            `}</style>
             
             {/* --- TRIPS MODE --- */}
             {viewMode === 'trips' && (
@@ -1485,8 +1494,8 @@ Travel Planner AI Analysis Report
                 </div>
 
                 {(trips || []).length === 0 ? (
-                  <div style={{ padding: '40px 20px', border: '2px dashed #e5e7eb', borderRadius: '16px', textAlign: 'center' }}>
-                    <Plane size={36} color="#d1d5db" style={{ margin: '0 auto 12px auto' }} />
+                  <div style={{ padding: '60px 20px', border: '2px dashed #f3f4f6', borderRadius: '24px', textAlign: 'center' }}>
+                    <Plane size={48} color="#e5e7eb" style={{ margin: '0 auto 16px auto' }} />
                     <p style={{ fontSize: '12px', color: '#9ca3af', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>No trips planned yet</p>
                   </div>
                 ) : (
@@ -1495,9 +1504,9 @@ Travel Planner AI Analysis Report
                       <div 
                         key={trip.id} 
                         onClick={() => { setActiveTripId(trip.id); setViewMode('itinerary'); }}
-                        style={{ padding: '20px', backgroundColor: activeTripId === trip.id ? '#f5f3ff' : 'white', border: activeTripId === trip.id ? '2px solid #ddd6fe' : '1px solid #e5e7eb', borderRadius: '16px', cursor: 'pointer', transition: '0.2s' }}
+                        style={{ padding: '24px', backgroundColor: activeTripId === trip.id ? '#f5f3ff' : 'white', border: activeTripId === trip.id ? '2px solid #ddd6fe' : '1px solid #f3f4f6', borderRadius: '20px', cursor: 'pointer', transition: '0.2s', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}
                       >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
                           {editingTripId === trip.id ? (
                             <div 
                               onClick={(e) => e.stopPropagation()} 
@@ -1562,50 +1571,63 @@ Travel Planner AI Analysis Report
                               </button>
                             </div>
                           ) : (
-                            <>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', gap: '8px' }}>
-                          <h3 style={{ fontSize: '18px', fontWeight: '900', color: '#111827', margin: 0, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{trip.name}</h3>
-                          <div style={{ display: 'flex', gap: '4px', flexShrink: 0, alignItems: 'center' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                              <button 
-                                onClick={(e) => { e.stopPropagation(); moveTrip(trip.id, 'up'); }}
-                                style={{ background: 'none', border: 'none', color: (trips || []).indexOf(trip) === 0 ? '#e5e7eb' : '#9ca3af', cursor: (trips || []).indexOf(trip) === 0 ? 'default' : 'pointer', padding: '2px' }}
-                                disabled={(trips || []).indexOf(trip) === 0}
-                              >
-                                <ChevronUp size={14} />
-                              </button>
-                              <button 
-                                onClick={(e) => { e.stopPropagation(); moveTrip(trip.id, 'down'); }}
-                                style={{ background: 'none', border: 'none', color: (trips || []).indexOf(trip) === (trips || []).length - 1 ? '#e5e7eb' : '#9ca3af', cursor: (trips || []).indexOf(trip) === (trips || []).length - 1 ? 'default' : 'pointer', padding: '2px' }}
-                                disabled={(trips || []).indexOf(trip) === (trips || []).length - 1}
-                              >
-                                <ChevronDown size={14} />
-                              </button>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%', gap: '12px' }}>
+                              <h3 style={{ fontSize: '18px', fontWeight: '900', color: '#111827', margin: 0, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {trip.name}
+                              </h3>
+                              
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', borderRight: '1px solid #f3f4f6', paddingRight: '8px' }}>
+                                  <button 
+                                    onClick={(e) => { e.stopPropagation(); moveTrip(trip.id, 'up'); }}
+                                    style={{ background: 'none', border: 'none', color: (trips || []).indexOf(trip) === 0 ? '#f3f4f6' : '#cbd5e1', cursor: (trips || []).indexOf(trip) === 0 ? 'default' : 'pointer', padding: '1px', display: 'flex' }}
+                                    disabled={(trips || []).indexOf(trip) === 0}
+                                  >
+                                    <ChevronUp size={14} />
+                                  </button>
+                                  <button 
+                                    onClick={(e) => { e.stopPropagation(); moveTrip(trip.id, 'down'); }}
+                                    style={{ background: 'none', border: 'none', color: (trips || []).indexOf(trip) === (trips || []).length - 1 ? '#f3f4f6' : '#cbd5e1', cursor: (trips || []).indexOf(trip) === (trips || []).length - 1 ? 'default' : 'pointer', padding: '1px', display: 'flex' }}
+                                    disabled={(trips || []).indexOf(trip) === (trips || []).length - 1}
+                                  >
+                                    <ChevronDown size={14} />
+                                  </button>
+                                </div>
+
+                                <div style={{ display: 'flex', gap: '4px' }}>
+                                  <button 
+                                    onClick={(e) => { e.stopPropagation(); trip.sharedId ? copyToClipboard(trip.sharedId, trip.id) : shareTrip(trip.id); }}
+                                    style={{ width: '36px', height: '36px', borderRadius: '10px', border: 'none', backgroundColor: trip.sharedId ? '#f3f4f6' : '#f5f3ff', color: trip.sharedId ? '#6b7280' : '#8b5cf6', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s' }}
+                                    title={trip.sharedId ? "초대 코드 복사" : "친구 초대하기"}
+                                  >
+                                    {copiedId === trip.id ? <Check size={16} color="#10b981" /> : <Share2 size={16} />}
+                                  </button>
+                                  <button 
+                                    onClick={(e) => { e.stopPropagation(); startRenameTrip(trip); }}
+                                    style={{ width: '36px', height: '36px', borderRadius: '10px', border: 'none', backgroundColor: '#f8fafc', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s' }}
+                                    title="Edit Trip"
+                                  >
+                                    <Edit2 size={16} />
+                                  </button>
+                                  <button 
+                                    onClick={(e) => handleInlineDelete(e, `trip-${trip.id}`, () => deleteTrip(trip.id))}
+                                    style={{ 
+                                      minWidth: confirmDeleteId === `trip-${trip.id}` ? '60px' : '36px', 
+                                      height: '36px', 
+                                      borderRadius: '10px', 
+                                      border: 'none', 
+                                      backgroundColor: confirmDeleteId === `trip-${trip.id}` ? '#ef4444' : '#fff5f5', 
+                                      color: confirmDeleteId === `trip-${trip.id}` ? 'white' : '#f87171', 
+                                      display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s',
+                                      fontSize: '11px', fontWeight: '800'
+                                    }}
+                                    title="Delete Trip"
+                                  >
+                                    {confirmDeleteId === `trip-${trip.id}` ? '확인' : <Trash2 size={16} />}
+                                  </button>
+                                </div>
+                              </div>
                             </div>
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); trip.sharedId ? copyToClipboard(trip.sharedId, trip.id) : shareTrip(trip.id); }}
-                              style={{ width: '32px', height: '32px', borderRadius: '8px', border: 'none', backgroundColor: trip.sharedId ? '#f3f4f6' : '#f5f3ff', color: trip.sharedId ? '#6b7280' : '#8b5cf6', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                              title={trip.sharedId ? "초대 코드 복사" : "친구 초대하기"}
-                            >
-                              {copiedId === trip.id ? <Check size={14} color="#10b981" /> : (trip.sharedId ? <Users size={14} /> : <Share2 size={14} />)}
-                            </button>
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); startRenameTrip(trip); }}
-                              style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '4px', borderRadius: '8px' }}
-                              title="Edit Trip"
-                            >
-                              <Edit2 size={16} />
-                            </button>
-                            <button 
-                              onClick={(e) => handleInlineDelete(e, `trip-${trip.id}`, () => deleteTrip(trip.id))}
-                              style={{ background: confirmDeleteId === `trip-${trip.id}` ? '#ef4444' : 'none', border: 'none', color: confirmDeleteId === `trip-${trip.id}` ? 'white' : '#f87171', cursor: 'pointer', padding: confirmDeleteId === `trip-${trip.id}` ? '4px 8px' : '4px', borderRadius: '8px', fontSize: '11px', fontWeight: '800' }}
-                              title="Delete Trip"
-                            >
-                              {confirmDeleteId === `trip-${trip.id}` ? '확인' : <Trash2 size={16} />}
-                            </button>
-                          </div>
-                        </div>
-                            </>
                           )}
                         </div>
                         {editingTripId !== trip.id && (
