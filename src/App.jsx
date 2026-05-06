@@ -767,13 +767,21 @@ function App() {
       const text = data.candidates[0].content.parts[0].text;
       console.log("AI Text Output:", text);
       
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      // Remove potential markdown code blocks and extract JSON
+      const cleanJsonText = text.replace(/```json|```/g, "").trim();
+      const jsonMatch = cleanJsonText.match(/\{[\s\S]*\}/);
+      
       if (jsonMatch) {
-        const result = JSON.parse(jsonMatch[0]);
-        console.log("Parsed JSON Report:", result);
-        setAiReport(result);
+        try {
+          const result = JSON.parse(jsonMatch[0]);
+          console.log("Parsed JSON Report:", result);
+          setAiReport(result);
+        } catch (parseError) {
+          console.error("JSON Parse Error:", parseError, "Text:", jsonMatch[0]);
+          throw new Error("AI 응답을 해석하는 중 오류가 발생했습니다.");
+        }
       } else {
-        throw new Error("Failed to parse AI response as JSON. AI might not have returned JSON.");
+        throw new Error("AI가 유효한 JSON 형식을 반환하지 않았습니다.");
       }
     } catch (error) {
       console.error("FULL ERROR LOG:", error);
@@ -792,18 +800,11 @@ function App() {
     try {
       const updatedItinerary = aiReport.optimizedItinerary;
       
-      // 1. Supabase 업데이트
-      const { error } = await supabase
-        .from('trips')
-        .update({ itinerary: updatedItinerary })
-        .eq('id', activeTrip.id);
-
-      if (error) throw error;
-
-      // 2. 로컬 상태 업데이트
-      const updatedTrip = { ...activeTrip, itinerary: updatedItinerary };
-      setActiveTrip(updatedTrip);
-      setTrips(trips.map(t => t.id === activeTrip.id ? updatedTrip : t));
+      // 1. 전체 일정 배열에서 현재 여행의 itinerary만 교체
+      const nextTrips = trips.map(t => t.id === activeTrip.id ? { ...t, itinerary: updatedItinerary } : t);
+      
+      // 2. 통합 동기화 함수 호출 (로컬 저장 및 Cloud DB 업데이트 포함)
+      await syncTripsToCloud(nextTrips);
 
       setShowAIModal(false);
       alert("✨ AI 최적화 일정이 성공적으로 적용되었습니다!");
