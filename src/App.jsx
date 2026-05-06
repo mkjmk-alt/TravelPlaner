@@ -215,6 +215,8 @@ function App() {
   const [editingTimeItem, setEditingTimeItem] = useState(null); // { day, id, time, name }
   const [showAIModal, setShowAIModal] = useState(false);
   const [showConfirmApplyModal, setShowConfirmApplyModal] = useState(false);
+  const [showCustomModal, setShowCustomModal] = useState(false);
+  const [modalConfig, setModalConfig] = useState({ type: 'success', title: '', message: '' });
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
   const [aiReport, setAiReport] = useState(null);
@@ -356,7 +358,7 @@ function App() {
   }, []);
 
   // --- DERIVED STATE ---
-  const activeTrip = (trips || []).find(t => t.id === activeTripId);
+  const activeTrip = (trips || []).find(t => String(t.id) === String(activeTripId));
   const itinerary = activeTrip?.itinerary || [];
   const budgetSettings = activeTrip?.budgetSettings || { limitKRW: 1000000, travelCurrency: 'USD' };
   const expenses = activeTrip?.expenses || [];
@@ -534,7 +536,8 @@ function App() {
       setTimeout(() => setShowShareToast(false), 5000);
     } catch (err) {
       console.error("Sharing failed detail:", err);
-      alert(`공유에 실패했습니다: ${err.message || "네트워크나 데이터베이스 설정을 확인해주세요."}`);
+      setModalConfig({ type: 'error', title: '공유 실패', message: `공유에 실패했습니다: ${err.message || "네트워크나 데이터베이스 설정을 확인해주세요."}` });
+      setShowCustomModal(true);
     }
   };
 
@@ -552,7 +555,8 @@ function App() {
       if (error || !data) throw new Error("Invalid Code");
 
       if ((trips || []).some(t => t.sharedId === data.id)) {
-        alert("이미 목록에 있는 일정입니다.");
+        setModalConfig({ type: 'error', title: '참여 불가', message: "이미 참여 중인 여행입니다." });
+        setShowCustomModal(true);
         return;
       }
 
@@ -561,9 +565,11 @@ function App() {
       await syncTripsToCloud(newTrips);
       setActiveTripId(joinedTrip.id);
       setViewMode('itinerary');
-      alert(`'${joinedTrip.name}' 일정에 참여했습니다!`);
+      setModalConfig({ type: 'success', title: '참여 완료', message: `'${joinedTrip.name}' 일정에 참여했습니다!` });
+      setShowCustomModal(true);
     } catch (err) {
-      alert("올바른 공유 코드를 입력해 주세요.");
+      setModalConfig({ type: 'error', title: '참여 실패', message: "올바른 공유 코드를 입력해 주세요." });
+      setShowCustomModal(true);
     }
   };
 
@@ -574,6 +580,8 @@ function App() {
       try {
         if (navigator.clipboard && window.isSecureContext) {
           await navigator.clipboard.writeText(text);
+          setModalConfig({ type: 'success', title: '복사 완료', message: "초대 코드가 클립보드에 복사되었습니다." });
+          setShowCustomModal(true);
         } else {
           // Fallback for non-secure contexts
           const textArea = document.createElement("textarea");
@@ -582,18 +590,15 @@ function App() {
           textArea.select();
           document.execCommand("copy");
           document.body.removeChild(textArea);
+          setModalConfig({ type: 'success', title: '복사 완료', message: "초대 코드가 복사되었습니다." });
+          setShowCustomModal(true);
         }
         
         setCopiedId(id);
-        setHasTriggeredToast(true);
-        setShowShareToast(true);
-        setTimeout(() => {
-          setCopiedId(null);
-          setShowShareToast(false);
-        }, 5000);
       } catch (err) {
         console.error("Copy failed:", err);
-        alert("초대 코드 복사에 실패했습니다. 수동으로 복사해주세요: " + text);
+        setModalConfig({ type: 'error', title: '복사 실패', message: "초대 코드 복사에 실패했습니다. 수동으로 복사해주세요: " + text });
+        setShowCustomModal(true);
       }
     };
 
@@ -683,8 +688,8 @@ function App() {
     console.log("Current API Key:", GEMINI_API_KEY ? "Loaded (starts with " + GEMINI_API_KEY.substring(0, 7) + ")" : "MISSING");
 
     if (!GEMINI_API_KEY) {
-      alert(".env 파일에 VITE_GEMINI_API_KEY를 설정해주세요.");
-      setShowAIModal(false);
+      setModalConfig({ type: 'error', title: '설정 오류', message: ".env 파일에 VITE_GEMINI_API_KEY를 설정해 주세요." });
+      setShowCustomModal(true);
       return;
     }
     
@@ -743,8 +748,6 @@ function App() {
 
     try {
       console.log("Sending request to Gemini API...");
-      // 경제적인 gemini-2.0-flash-lite 모델을 사용합니다. 
-      // (주의: Google Cloud Console에서 Generative Language API가 활성화되어 있어야 합니다.)
       const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-lite:generateContent?key=${GEMINI_API_KEY}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -864,17 +867,20 @@ Travel Planner AI Analysis Report
       const updatedItinerary = aiReport.optimizedItinerary;
       
       // 1. 전체 일정 배열에서 현재 여행의 itinerary만 교체
-      const nextTrips = trips.map(t => t.id === activeTrip.id ? { ...t, itinerary: updatedItinerary } : t);
+      const nextTrips = trips.map(t => String(t.id) === String(activeTrip.id) ? { ...t, itinerary: [...updatedItinerary] } : t);
       
       // 2. 통합 동기화 함수 호출 (로컬 저장 및 Cloud DB 업데이트 포함)
-      await syncTripsToCloud(nextTrips);
+      // syncTripsToCloud 내부에서 setTrips(nextTrips)를 호출하므로 상태가 전파됩니다.
+      await syncTripsToCloud([...nextTrips]);
 
       setShowConfirmApplyModal(false);
       setShowAIModal(false);
-      alert("✨ AI 최적화 일정이 성공적으로 적용되었습니다!");
+      setModalConfig({ type: 'success', title: '적용 완료', message: "✨ AI 최적화 일정이 성공적으로 적용되었습니다!" });
+      setShowCustomModal(true);
     } catch (error) {
       console.error("Apply AI Plan failed:", error);
-      alert("일정 적용 중 오류가 발생했습니다.");
+      setModalConfig({ type: 'error', title: '적용 실패', message: "일정 적용 중 오류가 발생했습니다." });
+      setShowCustomModal(true);
     }
   };
 
@@ -1063,7 +1069,8 @@ Travel Planner AI Analysis Report
     await syncTripsToCloud(newTrips);
     setActiveTripId(testTrip.id);
     setViewMode('itinerary');
-    alert("🇮🇹 피렌체 3박 4일 테스트 일정이 로드되었습니다! 'AI 분석' 버튼을 눌러보세요.");
+    setModalConfig({ type: 'success', title: '테스트 로드 완료', message: "🇮🇹 피렌체 3박 4일 테스트 일정이 로드되었습니다! 'AI 분석' 버튼을 눌러보세요." });
+    setShowCustomModal(true);
   };
 
   const addExpense = () => {
@@ -2669,6 +2676,47 @@ Travel Planner AI Analysis Report
           animation: spin 0.8s linear infinite;
         }
       `}</style>
+      {/* Custom Modal (Success/Error) */}
+      {showCustomModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 3000, padding: '20px', animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div style={{
+            backgroundColor: 'white', borderRadius: '32px', width: '100%', maxWidth: '360px',
+            padding: '32px 24px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            textAlign: 'center', animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+          }}>
+            <div style={{
+              width: '64px', height: '64px', 
+              backgroundColor: modalConfig.type === 'success' ? '#f0fdf4' : '#fef2f2', 
+              borderRadius: '50%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: modalConfig.type === 'success' ? '#22c55e' : '#ef4444', 
+              margin: '0 auto 20px'
+            }}>
+              {modalConfig.type === 'success' ? <Check size={32} /> : <AlertCircle size={32} />}
+            </div>
+            <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#0f172a', margin: '0 0 12px 0' }}>{modalConfig.title}</h3>
+            <p style={{ fontSize: '15px', color: '#64748b', lineHeight: '1.6', margin: '0 0 32px 0', wordBreak: 'keep-all' }}>
+              {modalConfig.message}
+            </p>
+            <button 
+              onClick={() => setShowCustomModal(false)}
+              style={{
+                width: '100%', backgroundColor: modalConfig.type === 'success' ? '#0f172a' : '#ef4444', 
+                color: 'white', border: 'none',
+                padding: '16px', borderRadius: '16px', fontWeight: '800', fontSize: '15px',
+                cursor: 'pointer', transition: 'all 0.2s'
+              }}
+            >
+              확인
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
