@@ -215,7 +215,7 @@ function App() {
   const [editingTimeItem, setEditingTimeItem] = useState(null); // { day, id, time, name }
   const [showAIModal, setShowAIModal] = useState(false);
   const [showConfirmApplyModal, setShowConfirmApplyModal] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isCapturing, setIsCapturing] = useState(false);
   const [aiReport, setAiReport] = useState(null);
   const reportRef = useRef(null);
   const slideshowTimerRef = useRef(null);
@@ -779,7 +779,6 @@ function App() {
           const result = JSON.parse(jsonMatch[0]);
           console.log("Parsed JSON Report:", result);
           setAiReport(result);
-          
           // 추가: 분석 결과를 여행 데이터에 영구 저장
           updateActiveTrip({ aiAnalysis: result });
         } catch (parseError) {
@@ -800,6 +799,7 @@ function App() {
 
   const handleDownloadImage = async () => {
     if (!reportRef.current) return;
+    setIsCapturing(true);
     
     const btn = document.getElementById('save-image-btn');
     if (btn) btn.style.display = 'none'; // 버튼은 이미지에서 제외
@@ -829,6 +829,7 @@ function App() {
       alert("이미지 저장 중 오류가 발생했습니다.");
     } finally {
       if (btn) btn.style.display = 'flex';
+      setIsCapturing(false);
     }
   };
 
@@ -1016,6 +1017,52 @@ Travel Planner AI Analysis Report
     [newTrips[index], newTrips[targetIndex]] = [newTrips[targetIndex], newTrips[index]];
     
     await syncTripsToCloud(newTrips);
+  };
+
+  const loadFlorenceTest = async () => {
+    const testTrip = {
+      id: "test-firenze-" + Date.now(),
+      name: "피렌체 정복 3박 4일 (빡빡한 일정)",
+      country: "이탈리아",
+      startDate: "2026-06-01",
+      endDate: "2026-06-04",
+      itinerary: [
+        { day: 1, items: [
+          { id: 101, name: "피렌체 두오모 대성당", time: "10:00", loc: "Piazza del Duomo, Firenze", lat: 43.7731, lng: 11.2560, emoji: "⛪️" },
+          { id: 102, name: "산 조반니 세례당", time: "13:00", loc: "Piazza di San Giovanni, Firenze", lat: 43.7732, lng: 11.2550, emoji: "📍" },
+          { id: 103, name: "아카데미아 미술관", time: "15:30", loc: "Via Ricasoli, 58/60, Firenze", lat: 43.7769, lng: 11.2585, emoji: "🎨" },
+          { id: 104, name: "피렌체 중앙시장", time: "18:00", loc: "Piazza del Mercato Centrale, Firenze", lat: 43.7765, lng: 11.2533, emoji: "🍕" }
+        ]},
+        { day: 2, items: [
+          { id: 201, name: "우피치 미술관", time: "08:30", loc: "Piazzale degli Uffizi, 6, Firenze", lat: 43.7677, lng: 11.2553, emoji: "🖼️" },
+          { id: 202, name: "시뇨리아 광장 & 베키오 궁전", time: "13:00", loc: "Piazza della Signoria, Firenze", lat: 43.7693, lng: 11.2562, emoji: "🏰" },
+          { id: 203, name: "베키오 다리", time: "15:00", loc: "Ponte Vecchio, Firenze", lat: 43.7680, lng: 11.2532, emoji: "🌉" },
+          { id: 204, name: "피티 궁전 & 보볼리 정원", time: "16:30", loc: "Piazza de' Pitti, 1, Firenze", lat: 43.7651, lng: 11.2505, emoji: "🌳" }
+        ]},
+        { day: 3, items: [
+          { id: 301, name: "산 로렌초 성당", time: "09:00", loc: "Piazza di San Lorenzo, Firenze", lat: 43.7749, lng: 11.2538, emoji: "⛪️" },
+          { id: 302, name: "산타 마리아 노벨라 약국", time: "11:30", loc: "Via della Scala, 16, Firenze", lat: 43.7744, lng: 11.2464, emoji: "🧪" },
+          { id: 303, name: "산타 크로체 성당", time: "14:30", loc: "Piazza di Santa Croce, 16, Firenze", lat: 43.7685, lng: 11.2627, emoji: "⛪️" },
+          { id: 304, name: "미켈란젤로 광장", time: "17:30", loc: "Piazzale Michelangelo, Firenze", lat: 43.7629, lng: 11.2651, emoji: "🌅" }
+        ]},
+        { day: 4, items: [
+          { id: 401, name: "바르젤로 국립 미술관", time: "09:00", loc: "Via del Proconsolo, 4, Firenze", lat: 43.7704, lng: 11.2580, emoji: "🗿" },
+          { id: 402, name: "산 미니아토 알 몬테", time: "11:30", loc: "Via delle Porte Sante, 34, Firenze", lat: 43.7597, lng: 11.2647, emoji: "⛪️" },
+          { id: 403, name: "피렌체 산타 마리아 노벨라 역", time: "15:30", loc: "Piazza di Santa Maria Novella, Firenze", lat: 43.7766, lng: 11.2481, emoji: "🚂" }
+        ]}
+      ],
+      budgetSettings: { limitKRW: 2000000, travelCurrency: 'EUR' },
+      expenses: [
+        { id: 1, desc: "비행기표 (왕복)", amount: 1500000, currency: "KRW", amountKRW: 1500000, day: 0 }
+      ],
+      createdAt: Date.now()
+    };
+
+    const newTrips = [testTrip, ...(trips || [])];
+    await syncTripsToCloud(newTrips);
+    setActiveTripId(testTrip.id);
+    setViewMode('itinerary');
+    alert("🇮🇹 피렌체 3박 4일 테스트 일정이 로드되었습니다! 'AI 분석' 버튼을 눌러보세요.");
   };
 
   const addExpense = () => {
@@ -1417,6 +1464,9 @@ Travel Planner AI Analysis Report
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
                   <h2 style={{ fontSize: '12px', fontWeight: '900', color: '#8b5cf6', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>My Trips</h2>
                   <div style={{ display: 'flex', gap: '8px' }}>
+                    <button onClick={loadFlorenceTest} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '800', color: '#f97316', backgroundColor: '#fff7ed', padding: '8px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer' }}>
+                      <Sparkles size={14} /> TEST DATA
+                    </button>
                     <button onClick={joinSharedTrip} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '800', color: '#10b981', backgroundColor: '#ecfdf5', padding: '8px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer' }}>
                       <Users size={14} /> JOIN
                     </button>
@@ -2428,7 +2478,7 @@ Travel Planner AI Analysis Report
           to { transform: translateY(0); opacity: 1; }
         }
       `}</style>
-      {/* === AI ANALYSIS MODAL === */}
+       {/* === AI ANALYSIS MODAL === */}
       {showAIModal && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10000,
@@ -2448,7 +2498,7 @@ Travel Planner AI Analysis Report
           >
             <button 
               onClick={() => setShowAIModal(false)}
-              style={{ position: 'absolute', top: '24px', right: '24px', border: 'none', background: '#f1f5f9', width: '36px', height: '36px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}
+              style={{ position: 'absolute', top: '24px', right: '24px', border: 'none', background: '#f1f5f9', width: '36px', height: '36px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', zIndex: 10 }}
             >
               <X size={20} color="#64748b" />
             </button>
@@ -2532,9 +2582,11 @@ Travel Planner AI Analysis Report
                     <button 
                       id="save-image-btn"
                       onClick={handleDownloadImage}
-                      style={{ flex: 1, padding: '16px', borderRadius: '20px', border: '1px solid #10b981', backgroundColor: '#ecfdf5', color: '#10b981', fontSize: '14px', fontWeight: '900', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                      disabled={isCapturing}
+                      style={{ flex: 1, padding: '16px', borderRadius: '20px', border: '1px solid #10b981', backgroundColor: '#ecfdf5', color: '#10b981', fontSize: '14px', fontWeight: '900', cursor: isCapturing ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: isCapturing ? 0.6 : 1 }}
                     >
-                      <Camera size={18} /> 이미지 저장
+                      {isCapturing ? <div className="spinner-small" /> : <Camera size={18} />} 
+                      {isCapturing ? '저장 중...' : '이미지 저장'}
                     </button>
                   </div>
                   <button 
@@ -2550,37 +2602,47 @@ Travel Planner AI Analysis Report
         </div>
       )}
 
-      {/* AI 적용 확인 커스텀 모달 */}
+      {/* AI 적용 확인 커스텀 모달 (내부 창) */}
       {showConfirmApplyModal && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(8px)',
-          zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
+          backgroundColor: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(16px)',
+          zIndex: 11000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
+          animation: 'fadeIn 0.2s ease-out'
         }}>
           <div style={{
-            backgroundColor: 'white', borderRadius: '32px', width: '100%', maxWidth: '400px',
-            padding: '32px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-            textAlign: 'center', animation: 'scaleUp 0.3s ease-out'
+            backgroundColor: 'white', borderRadius: '40px', width: '100%', maxWidth: '420px',
+            padding: '40px', boxShadow: '0 30px 60px -12px rgba(0, 0, 0, 0.5)',
+            textAlign: 'center', animation: 'scaleUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+            border: '1px solid rgba(255,255,255,0.3)'
           }}>
-            <div style={{ width: '64px', height: '64px', backgroundColor: '#fef2f2', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
-              <AlertCircle size={32} color="#ef4444" />
+            <div style={{ 
+              width: '80px', height: '80px', backgroundColor: '#fef2f2', borderRadius: '30px', 
+              display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 28px',
+              boxShadow: '0 12px 24px rgba(239, 68, 68, 0.15)'
+            }}>
+              <AlertCircle size={40} color="#ef4444" />
             </div>
-            <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#1e293b', marginBottom: '12px' }}>
+            <h3 style={{ fontSize: '22px', fontWeight: '900', color: '#0f172a', marginBottom: '16px', letterSpacing: '-0.02em' }}>
               일정을 변경하시겠습니까?
             </h3>
-            <p style={{ fontSize: '14px', color: '#64748b', lineHeight: '1.6', marginBottom: '32px', fontWeight: '600' }}>
-              AI가 제안한 최적화된 일정으로 <span style={{ color: '#ef4444', fontWeight: '900' }}>현재 일정이 완전히 교체</span>됩니다.<br/>기존에 설정하신 장소와 순서는 사라지며, 이 작업은 되돌릴 수 없습니다.
-            </p>
-            <div style={{ display: 'flex', gap: '12px' }}>
+            <div style={{ backgroundColor: '#fff1f2', padding: '20px', borderRadius: '24px', marginBottom: '32px', border: '1px solid #ffe4e6' }}>
+              <p style={{ fontSize: '14px', color: '#991b1b', lineHeight: '1.6', margin: 0, fontWeight: '700' }}>
+                AI가 제안한 최적화된 일정으로 <span style={{ textDecoration: 'underline', fontWeight: '900' }}>현재 일정이 완전히 교체</span>됩니다.
+                <br/><br/>
+                <span style={{ fontSize: '12px', opacity: 0.8 }}>기존에 수동으로 설정하신 장소와 순서는 영구적으로 삭제되며, 이 작업은 되돌릴 수 없습니다.</span>
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: '14px' }}>
               <button 
                 onClick={() => setShowConfirmApplyModal(false)}
-                style={{ flex: 1, padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', backgroundColor: 'white', color: '#64748b', fontSize: '14px', fontWeight: '800', cursor: 'pointer' }}
+                style={{ flex: 1, padding: '18px', borderRadius: '20px', border: '1px solid #e2e8f0', backgroundColor: 'white', color: '#64748b', fontSize: '15px', fontWeight: '800', cursor: 'pointer', transition: 'all 0.2s' }}
               >
                 취소
               </button>
               <button 
                 onClick={applyAIProposedPlan}
-                style={{ flex: 1.5, padding: '16px', borderRadius: '16px', border: 'none', backgroundColor: '#ef4444', color: 'white', fontSize: '14px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 4px 12px rgba(239, 68, 68, 0.2)' }}
+                style={{ flex: 1.5, padding: '18px', borderRadius: '20px', border: 'none', backgroundColor: '#ef4444', color: 'white', fontSize: '15px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 8px 20px rgba(239, 68, 68, 0.3)', transition: 'all 0.2s' }}
               >
                 확인, 일정 변경
               </button>
@@ -2595,6 +2657,14 @@ Travel Planner AI Analysis Report
         @keyframes scaleUp { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
+        .spinner-small {
+          width: 18px;
+          height: 18px;
+          border: 2px solid rgba(16, 185, 129, 0.3);
+          border-top-color: #10b981;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+        }
       `}</style>
     </div>
   );
