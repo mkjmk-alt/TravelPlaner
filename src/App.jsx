@@ -441,7 +441,9 @@ function App() {
   }, [favorites]);
 
   const polylinePath = useMemo(() => {
-    const dayPlan = itinerary.find(d => Number(d.day) === Number(activeDay));
+    const parseDay = (d) => parseInt(String(d).replace(/[^0-9]/g, '')) || 0;
+    const targetDay = parseDay(activeDay);
+    const dayPlan = itinerary.find(d => parseDay(d.day) === targetDay);
     if (!dayPlan || (dayPlan.items || []).length < 2) return [];
     
     return (dayPlan.items || [])
@@ -620,7 +622,9 @@ function App() {
   useEffect(() => {
     if (!map || !activeDay || (itinerary || []).length === 0) return;
     
-    const dayPlan = (itinerary || []).find(d => Number(d.day) === Number(activeDay));
+    const parseDay = (d) => parseInt(String(d).replace(/[^0-9]/g, '')) || 0;
+    const targetDay = parseDay(activeDay);
+    const dayPlan = (itinerary || []).find(d => parseDay(d.day) === targetDay);
     if (!dayPlan || (dayPlan.items || []).length === 0) return;
 
     const bounds = new window.google.maps.LatLngBounds();
@@ -637,6 +641,13 @@ function App() {
 
     if (count > 0) {
       map.fitBounds(bounds);
+      
+      // Prevent over-zooming when points are very close or it's a single point
+      const listener = window.google.maps.event.addListener(map, 'idle', () => {
+        if (map.getZoom() > 16) map.setZoom(16);
+        window.google.maps.event.removeListener(listener);
+      });
+
       if (count === 1) {
         setTimeout(() => {
           map.setZoom(15);
@@ -2352,30 +2363,35 @@ Travel Planner AI Analysis Report
           )}
 
           {/* Itinerary Markers (for active day) */}
-          {(itinerary.find(d => Number(d.day) === Number(activeDay))?.items || [])
-            .filter(item => item.lat && item.lng)
-            .map((item, idx) => (
-            <Marker
-              key={`itin-mark-${item.id}`}
-              position={{ lat: Number(item.lat), lng: Number(item.lng) }}
-              label={{
-                text: `${idx + 1}`,
-                color: 'white',
-                fontSize: '14px',
-                fontWeight: '900'
-              }}
-              onClick={() => setSelectedPlace(item)}
-              icon={{
-                url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-                  <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="20" cy="20" r="16" fill="#3b82f6" stroke="white" stroke-width="3"/>
-                  </svg>
-                `)}`,
-                scaledSize: new window.google.maps.Size(40, 40),
-                anchor: new window.google.maps.Point(20, 20)
-              }}
-            />
-          ))}
+          {(() => {
+            const parseDay = (d) => parseInt(String(d).replace(/[^0-9]/g, '')) || 0;
+            const targetDay = parseDay(activeDay);
+            const dayPlan = (itinerary || []).find(d => parseDay(d.day) === targetDay);
+            return (dayPlan?.items || [])
+              .filter(item => item.lat && item.lng)
+              .map((item, idx) => (
+              <Marker
+                key={`itin-mark-${item.id}`}
+                position={{ lat: Number(item.lat), lng: Number(item.lng) }}
+                label={{
+                  text: `${idx + 1}`,
+                  color: 'white',
+                  fontSize: '14px',
+                  fontWeight: '900'
+                }}
+                onClick={() => setSelectedPlace(item)}
+                icon={{
+                  url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                    <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <circle cx="20" cy="20" r="16" fill="#3b82f6" stroke="white" stroke-width="3"/>
+                    </svg>
+                  `)}`,
+                  scaledSize: new window.google.maps.Size(40, 40),
+                  anchor: new window.google.maps.Point(20, 20)
+                }}
+              />
+            ));
+          })()}
 
           {/* Dynamic Search Result Marker */}
           {searchResult && searchResult.name !== selectedPlace?.name && (
