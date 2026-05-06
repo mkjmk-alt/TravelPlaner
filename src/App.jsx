@@ -214,6 +214,7 @@ function App() {
   const [itineraryTime, setItineraryTime] = useState('');
   const [editingTimeItem, setEditingTimeItem] = useState(null); // { day, id, time, name }
   const [showAIModal, setShowAIModal] = useState(false);
+  const [showConfirmApplyModal, setShowConfirmApplyModal] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiReport, setAiReport] = useState(null);
   const reportRef = useRef(null);
@@ -857,8 +858,6 @@ Travel Planner AI Analysis Report
   const applyAIProposedPlan = async () => {
     if (!aiReport || !aiReport.optimizedItinerary || !activeTrip) return;
 
-    if (!confirm("AI가 제안한 최적화된 일정으로 현재 일정을 교체하시겠습니까?")) return;
-
     try {
       const updatedItinerary = aiReport.optimizedItinerary;
       
@@ -868,6 +867,7 @@ Travel Planner AI Analysis Report
       // 2. 통합 동기화 함수 호출 (로컬 저장 및 Cloud DB 업데이트 포함)
       await syncTripsToCloud(nextTrips);
 
+      setShowConfirmApplyModal(false);
       setShowAIModal(false);
       alert("✨ AI 최적화 일정이 성공적으로 적용되었습니다!");
     } catch (error) {
@@ -2538,7 +2538,7 @@ Travel Planner AI Analysis Report
                     </button>
                   </div>
                   <button 
-                    onClick={applyAIProposedPlan}
+                    onClick={() => setShowConfirmApplyModal(true)}
                     style={{ width: '100%', padding: '18px', borderRadius: '20px', border: 'none', backgroundColor: '#8b5cf6', color: 'white', fontSize: '15px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 10px 20px rgba(139, 92, 246, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
                   >
                     <Check size={18} /> 수정안 적용하기
@@ -2550,9 +2550,49 @@ Travel Planner AI Analysis Report
         </div>
       )}
 
+      {/* AI 적용 확인 커스텀 모달 */}
+      {showConfirmApplyModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(8px)',
+          zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
+        }}>
+          <div style={{
+            backgroundColor: 'white', borderRadius: '32px', width: '100%', maxWidth: '400px',
+            padding: '32px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+            textAlign: 'center', animation: 'scaleUp 0.3s ease-out'
+          }}>
+            <div style={{ width: '64px', height: '64px', backgroundColor: '#fef2f2', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
+              <AlertCircle size={32} color="#ef4444" />
+            </div>
+            <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#1e293b', marginBottom: '12px' }}>
+              일정을 변경하시겠습니까?
+            </h3>
+            <p style={{ fontSize: '14px', color: '#64748b', lineHeight: '1.6', marginBottom: '32px', fontWeight: '600' }}>
+              AI가 제안한 최적화된 일정으로 <span style={{ color: '#ef4444', fontWeight: '900' }}>현재 일정이 완전히 교체</span>됩니다.<br/>기존에 설정하신 장소와 순서는 사라지며, 이 작업은 되돌릴 수 없습니다.
+            </p>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button 
+                onClick={() => setShowConfirmApplyModal(false)}
+                style={{ flex: 1, padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', backgroundColor: 'white', color: '#64748b', fontSize: '14px', fontWeight: '800', cursor: 'pointer' }}
+              >
+                취소
+              </button>
+              <button 
+                onClick={applyAIProposedPlan}
+                style={{ flex: 1.5, padding: '16px', borderRadius: '16px', border: 'none', backgroundColor: '#ef4444', color: 'white', fontSize: '14px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 4px 12px rgba(239, 68, 68, 0.2)' }}
+              >
+                확인, 일정 변경
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes scaleUp { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
       `}</style>
