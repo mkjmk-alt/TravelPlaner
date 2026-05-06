@@ -215,6 +215,7 @@ function App() {
   const [editingTimeItem, setEditingTimeItem] = useState(null); // { day, id, time, name }
   const [showAIModal, setShowAIModal] = useState(false);
   const [showConfirmApplyModal, setShowConfirmApplyModal] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
   const [aiReport, setAiReport] = useState(null);
   const reportRef = useRef(null);
