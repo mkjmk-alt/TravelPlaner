@@ -275,6 +275,11 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Reset activeDay when trip changes
+  useEffect(() => {
+    setActiveDay(1);
+  }, [activeTripId]);
+
   // Cloud Sync Initialization
   useEffect(() => {
     async function initCloudDB() {
@@ -2327,8 +2332,9 @@ Travel Planner AI Analysis Report
           ))}
 
           {/* Route Path (Polyline) */}
-          {polylinePath.length > 0 && (
+          {window.google && polylinePath.length > 0 && (
             <Polyline
+              key={`route-polyline-${activeDay}`}
               path={polylinePath}
               options={{
                 strokeColor: '#3b82f6',
