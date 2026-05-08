@@ -151,6 +151,7 @@ const mapOptions = {
 
 
 function App() {
+  const parseDay = (d) => parseInt(String(d).replace(/[^0-9]/g, '')) || 0;
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
@@ -441,7 +442,6 @@ function App() {
   }, [favorites]);
 
   const polylinePath = useMemo(() => {
-    const parseDay = (d) => parseInt(String(d).replace(/[^0-9]/g, '')) || 0;
     const targetDay = parseDay(activeDay);
     const dayPlan = itinerary.find(d => parseDay(d.day) === targetDay);
     if (!dayPlan || (dayPlan.items || []).length < 2) return [];
@@ -618,11 +618,9 @@ function App() {
     performCopy();
   };
 
-  // --- MAP VIEWPORT SYNC ---
   useEffect(() => {
     if (!map || !activeDay || (itinerary || []).length === 0) return;
     
-    const parseDay = (d) => parseInt(String(d).replace(/[^0-9]/g, '')) || 0;
     const targetDay = parseDay(activeDay);
     const dayPlan = (itinerary || []).find(d => parseDay(d.day) === targetDay);
     if (!dayPlan || (dayPlan.items || []).length === 0) return;
@@ -915,14 +913,25 @@ Travel Planner AI Analysis Report
     if (!aiReport || !aiReport.optimizedItinerary || !activeTrip) return;
 
     try {
-      const updatedItinerary = aiReport.optimizedItinerary;
+      const rawItinerary = aiReport.optimizedItinerary || [];
+      const updatedItinerary = rawItinerary.map(day => {
+        const sortedItems = [...(day.items || [])].sort((a, b) => 
+          (a.time || '00:00').localeCompare(b.time || '00:00')
+        );
+        return {
+          ...day,
+          day: parseInt(String(day.day).replace(/[^0-9]/g, '')) || 1,
+          items: sortedItems.map(item => ({
+            ...item,
+            lat: item.lat ? Number(item.lat) : null,
+            lng: item.lng ? Number(item.lng) : null
+          }))
+        };
+      });
       
-      // 1. 전체 일정 배열에서 현재 여행의 itinerary만 교체
       const nextTrips = trips.map(t => String(t.id) === String(activeTrip.id) ? { ...t, itinerary: [...updatedItinerary] } : t);
-      
-      // 2. 통합 동기화 함수 호출 (로컬 저장 및 Cloud DB 업데이트 포함)
-      // syncTripsToCloud 내부에서 setTrips(nextTrips)를 호출하므로 상태가 전파됩니다.
       await syncTripsToCloud([...nextTrips]);
+      setActiveDay(1);
 
       setShowConfirmApplyModal(false);
       setShowAIModal(false);
@@ -1124,6 +1133,46 @@ Travel Planner AI Analysis Report
     setShowCustomModal(true);
   };
 
+  const addToItinerary = (place) => {
+    const targetDay = parseDay(activeDay);
+    const newItinerary = (itinerary || []).map(d => ({ ...d, items: [...(d.items || [])] }));
+    const dayIndex = newItinerary.findIndex(d => parseDay(d.day) === targetDay);
+    
+    if (dayIndex !== -1) {
+      let finalTime = itineraryTime;
+      
+      if (!finalTime) {
+        const dayItems = newItinerary[dayIndex].items;
+        const itemsWithTime = dayItems.filter(it => it.time);
+        
+        if (itemsWithTime.length > 0) {
+          const lastItem = itemsWithTime[itemsWithTime.length - 1];
+          const [h, m] = lastItem.time.split(':').map(Number);
+          let totalMins = h * 60 + m + 90; 
+          if (totalMins >= 1440) totalMins = totalMins - 1440;
+          const hh = Math.floor(totalMins / 60).toString().padStart(2, '0');
+          const mm = (totalMins % 60).toString().padStart(2, '0');
+          finalTime = `${hh}:${mm}`;
+        } else {
+          finalTime = '09:00';
+        }
+      }
+
+      newItinerary[dayIndex].items = [
+        ...newItinerary[dayIndex].items,
+        { ...place, id: Date.now(), emoji: place.emoji || '📍', time: finalTime }
+      ].sort((a, b) => (a.time || '00:00').localeCompare(b.time || '00:00'));
+    } else {
+      newItinerary.push({ 
+        day: targetDay, 
+        items: [{ ...place, id: Date.now(), emoji: place.emoji || '📍', time: itineraryTime || '09:00' }] 
+      });
+    }
+    saveItinerary(newItinerary);
+    setItineraryTime(''); 
+    setViewMode('itinerary');
+  };
+
   const addExpense = () => {
     if (!activeTripId || !expenseInput.desc || !expenseInput.amount) return;
     
@@ -1169,51 +1218,15 @@ Travel Planner AI Analysis Report
     return (favorites || []).some(f => f.name === place.name);
   };
 
-  const addToItinerary = (place) => {
-    const newItinerary = [...itinerary];
-    const dayIndex = newItinerary.findIndex(d => d.day === activeDay);
-    
-    if (dayIndex !== -1) {
-      let finalTime = itineraryTime;
-      
-      // Option 2: Smart Default Logic
-      if (!finalTime) {
-        const dayItems = newItinerary[dayIndex].items;
-        const itemsWithTime = dayItems.filter(it => it.time);
-        
-        if (itemsWithTime.length > 0) {
-          const lastItem = itemsWithTime[itemsWithTime.length - 1];
-          const [h, m] = lastItem.time.split(':').map(Number);
-          let totalMins = h * 60 + m + 90; // Suggest 1.5 hours later
-          if (totalMins >= 1440) totalMins = totalMins - 1440;
-          
-          const hh = Math.floor(totalMins / 60).toString().padStart(2, '0');
-          const mm = (totalMins % 60).toString().padStart(2, '0');
-          finalTime = `${hh}:${mm}`;
-        } else {
-          finalTime = '09:00'; // Initial default
-        }
-      }
-
-      newItinerary[dayIndex].items.push({ 
-        ...place, 
-        id: Date.now(),
-        emoji: place.emoji || '📍',
-        time: finalTime
-      });
-      saveItinerary(newItinerary);
-      setItineraryTime(''); 
-      setViewMode('itinerary');
-    }
-  };
 
   const updateItineraryItemTime = (dayNumber, itemId, newTime) => {
+    const targetDayNum = parseDay(dayNumber);
+
     const nextTrips = (trips || []).map(t => {
       if (t.id === activeTripId) {
         const newItin = (t.itinerary || []).map(day => {
-          if (day.day === dayNumber) {
+          if (parseDay(day.day) === targetDayNum) {
             const updatedItems = day.items.map(it => it.id === itemId ? { ...it, time: newTime } : it);
-            // Option 1: Auto-sort by time chronologically
             updatedItems.sort((a, b) => {
               if (!a.time) return 1;
               if (!b.time) return -1;
@@ -1231,29 +1244,26 @@ Travel Planner AI Analysis Report
   };
 
   const moveItineraryItem = (dayNumber, itemId, direction) => {
+    const targetDayNum = parseDay(dayNumber);
+
     const nextTrips = (trips || []).map(t => {
       if (t.id === activeTripId) {
         const newItin = (t.itinerary || []).map(day => {
-          if (day.day === dayNumber) {
+          if (parseDay(day.day) === targetDayNum) {
             const items = [...day.items];
             const index = items.findIndex(it => it.id === itemId);
             if (index === -1) return day;
             const newIndex = direction === 'up' ? index - 1 : index + 1;
             if (newIndex >= 0 && newIndex < items.length) {
-              // Create shallow copies of items to avoid mutating state directly
               const itemA = { ...items[index] };
               const itemB = { ...items[newIndex] };
-              
-              // Swap the time values between the two items
               const timeA = itemA.time;
               const timeB = itemB.time;
-              
               itemA.time = timeB;
               itemB.time = timeA;
-              
-              // Now swap the entire items at their positions
               items[index] = itemB;
               items[newIndex] = itemA;
+              items.sort((a, b) => (a.time || '00:00').localeCompare(b.time || '00:00'));
             }
             return { ...day, items };
           }
@@ -1266,9 +1276,15 @@ Travel Planner AI Analysis Report
     syncTripsToCloud(nextTrips);
   };
 
-  const removeFromItinerary = (dayIndex, itemId) => {
-    const newItinerary = [...itinerary];
-    newItinerary[dayIndex].items = newItinerary[dayIndex].items.filter(i => i.id !== itemId);
+  const removeFromItinerary = (dayNumber, itemId) => {
+    const targetDayNum = parseDay(dayNumber);
+
+    const newItinerary = (itinerary || []).map(day => {
+      if (parseDay(day.day) === targetDayNum) {
+        return { ...day, items: day.items.filter(i => i.id !== itemId) };
+      }
+      return day;
+    });
     saveItinerary(newItinerary);
   };
 
@@ -1863,10 +1879,10 @@ Travel Planner AI Analysis Report
                   >
                     {/* Day Header */}
                     <div 
-                      onClick={() => dayPlan?.day && setActiveDay(dayPlan.day)}
+                      onClick={() => dayPlan?.day && setActiveDay(parseDay(dayPlan.day))}
                       style={{ 
                         padding: '20px 24px', 
-                        backgroundColor: activeDay === dayPlan?.day ? '#eff6ff' : '#f9fafb', 
+                        backgroundColor: parseDay(activeDay) === parseDay(dayPlan?.day) ? '#eff6ff' : '#f9fafb', 
                         borderBottom: '1px solid #f3f4f6', 
                         display: 'flex', 
                         justifyContent: 'space-between', 
@@ -1879,7 +1895,7 @@ Travel Planner AI Analysis Report
                         <div style={{ 
                           width: '40px', 
                           height: '40px', 
-                          backgroundColor: activeDay === dayPlan?.day ? '#2563eb' : '#9ca3af', 
+                          backgroundColor: parseDay(activeDay) === parseDay(dayPlan?.day) ? '#2563eb' : '#9ca3af', 
                           borderRadius: '12px', 
                           display: 'flex', 
                           alignItems: 'center', 
@@ -1893,12 +1909,12 @@ Travel Planner AI Analysis Report
                         </div>
                         <div>
                           <h3 style={{ fontSize: '16px', fontWeight: '900', color: '#111827', margin: 0 }}>Day {dayPlan?.day}</h3>
-                          <p style={{ fontSize: '12px', fontWeight: '700', color: activeDay === dayPlan?.day ? '#3b82f6' : '#9ca3af', margin: 0 }}>
+                          <p style={{ fontSize: '12px', fontWeight: '700', color: parseDay(activeDay) === parseDay(dayPlan?.day) ? '#3b82f6' : '#9ca3af', margin: 0 }}>
                             {getActualDateForDay(activeTrip?.startDate, dayPlan?.day)}
                           </p>
                         </div>
                       </div>
-                      <span style={{ fontSize: '11px', fontWeight: '900', color: activeDay === dayPlan?.day ? '#3b82f6' : '#9ca3af', backgroundColor: activeDay === dayPlan?.day ? '#dbeafe' : '#f3f4f6', padding: '4px 10px', borderRadius: '8px' }}>
+                      <span style={{ fontSize: '11px', fontWeight: '900', color: parseDay(activeDay) === parseDay(dayPlan?.day) ? '#3b82f6' : '#9ca3af', backgroundColor: parseDay(activeDay) === parseDay(dayPlan?.day) ? '#dbeafe' : '#f3f4f6', padding: '4px 10px', borderRadius: '8px' }}>
                         {(dayPlan?.items || []).length} SPOTS
                       </span>
                     </div>
@@ -2060,7 +2076,7 @@ Travel Planner AI Analysis Report
 
                                     {/* Delete Button */}
                                     <button 
-                                      onClick={(e) => { e.stopPropagation(); handleInlineDelete(e, `itin-${item.id}`, () => removeFromItinerary(dIdx, item.id)); }}
+                                      onClick={(e) => { e.stopPropagation(); handleInlineDelete(e, `itin-${item.id}`, () => removeFromItinerary(dayPlan.day, item.id)); }}
                                       style={{ 
                                         height: '44px', width: confirmDeleteId === `itin-${item.id}` ? 'auto' : '44px',
                                         minWidth: confirmDeleteId === `itin-${item.id}` ? '80px' : '44px',
@@ -2363,35 +2379,36 @@ Travel Planner AI Analysis Report
           )}
 
           {/* Itinerary Markers (for active day) */}
-          {(() => {
-            const parseDay = (d) => parseInt(String(d).replace(/[^0-9]/g, '')) || 0;
-            const targetDay = parseDay(activeDay);
-            const dayPlan = (itinerary || []).find(d => parseDay(d.day) === targetDay);
-            return (dayPlan?.items || [])
-              .filter(item => item.lat && item.lng)
-              .map((item, idx) => (
-              <Marker
-                key={`itin-mark-${item.id}`}
-                position={{ lat: Number(item.lat), lng: Number(item.lng) }}
-                label={{
-                  text: `${idx + 1}`,
-                  color: 'white',
-                  fontSize: '14px',
-                  fontWeight: '900'
-                }}
-                onClick={() => setSelectedPlace(item)}
-                icon={{
-                  url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-                    <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <circle cx="20" cy="20" r="16" fill="#3b82f6" stroke="white" stroke-width="3"/>
-                    </svg>
-                  `)}`,
-                  scaledSize: new window.google.maps.Size(40, 40),
-                  anchor: new window.google.maps.Point(20, 20)
-                }}
-              />
-            ));
-          })()}
+          <React.Fragment key={`markers-block-${activeDay}`}>
+            {(() => {
+              const targetDay = parseDay(activeDay);
+              const dayPlan = (itinerary || []).find(d => parseDay(d.day) === targetDay);
+              return (dayPlan?.items || [])
+                .filter(item => item.lat && item.lng)
+                .map((item, idx) => (
+                <Marker
+                  key={`itin-mark-${activeDay}-${item.id}`}
+                  position={{ lat: Number(item.lat), lng: Number(item.lng) }}
+                  label={{
+                    text: `${idx + 1}`,
+                    color: 'white',
+                    fontSize: '14px',
+                    fontWeight: '900'
+                  }}
+                  onClick={() => setSelectedPlace(item)}
+                  icon={{
+                    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                      <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="20" cy="20" r="16" fill="#3b82f6" stroke="white" stroke-width="3"/>
+                      </svg>
+                    `)}`,
+                    scaledSize: new window.google.maps.Size(40, 40),
+                    anchor: new window.google.maps.Point(20, 20)
+                  }}
+                />
+              ));
+            })()}
+          </React.Fragment>
 
           {/* Dynamic Search Result Marker */}
           {searchResult && searchResult.name !== selectedPlace?.name && (
