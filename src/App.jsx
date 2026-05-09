@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete, Polyline } from '@react-google-maps/api';
-import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Camera, Play, Image, Clock, Sparkles, Brain, Upload } from 'lucide-react';
+import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Camera, Play, Image, Clock, Sparkles, Brain, Upload, Clipboard } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import html2canvas from 'html2canvas';
 import './index.css';
@@ -223,6 +223,8 @@ function App() {
   const [aiReport, setAiReport] = useState(null);
   const reportRef = useRef(null);
   const slideshowTimerRef = useRef(null);
+  const [showPasteModal, setShowPasteModal] = useState(false);
+  const [pasteText, setPasteText] = useState('');
 
   // --- DATA STATE ---
   const [favorites, setFavorites] = useState(() => {
@@ -1071,6 +1073,66 @@ Travel Planner AI Analysis Report
     input.click();
   };
 
+  const handlePasteImport = () => {
+    if (!pasteText.trim()) return;
+    try {
+      const data = JSON.parse(pasteText);
+      if (!data.name || !data.itinerary) {
+        setModalConfig({ 
+          type: 'error', 
+          title: '가져오기 실패', 
+          message: '올바른 형식의 여행 일정 JSON이 아닙니다. name과 itinerary 필드가 필요합니다.' 
+        });
+        setShowCustomModal(true);
+        return;
+      }
+
+      const newId = Date.now().toString();
+      const newTrip = {
+        id: newId,
+        name: data.name || "Pasted Trip",
+        country: data.country || "",
+        startDate: data.startDate || new Date().toISOString().split('T')[0],
+        endDate: data.endDate || new Date().toISOString().split('T')[0],
+        itinerary: (data.itinerary || []).map((day, idx) => ({
+          ...day,
+          day: day.day || idx + 1,
+          items: (day.items || []).map(item => ({
+            ...item,
+            id: item.id || Math.random().toString(36).substr(2, 9)
+          }))
+        })),
+        budgetSettings: data.budgetSettings || { limitKRW: 1000000, travelCurrency: 'USD' },
+        expenses: (data.expenses || []).map(exp => ({
+          ...exp,
+          id: exp.id || Math.random().toString(36).substr(2, 9),
+          createdAt: exp.createdAt || Date.now()
+        })),
+        createdAt: Date.now()
+      };
+
+      const newTrips = [newTrip, ...trips];
+      syncTripsToCloud(newTrips);
+      setActiveTripId(newId);
+      
+      setShowPasteModal(false);
+      setPasteText('');
+      setModalConfig({ 
+        type: 'success', 
+        title: '가져오기 완료', 
+        message: `'${newTrip.name}' 일정을 성공적으로 불러왔습니다.` 
+      });
+      setShowCustomModal(true);
+    } catch (err) {
+      setModalConfig({ 
+        type: 'error', 
+        title: '형식 오류', 
+        message: 'JSON 형식이 올바르지 않습니다. 복사한 텍스트를 다시 확인해주세요.' 
+      });
+      setShowCustomModal(true);
+    }
+  };
+
   const startRenameTrip = (trip) => {
     setEditingTripId(trip.id);
     setEditTripData({ 
@@ -1626,6 +1688,9 @@ Travel Planner AI Analysis Report
                     </button>
                     <button onClick={handleUploadJson} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '800', color: '#6366f1', backgroundColor: '#eef2ff', padding: '8px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer' }}>
                       <Upload size={14} /> UPLOAD
+                    </button>
+                    <button onClick={() => setShowPasteModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '800', color: '#3b82f6', backgroundColor: '#eff6ff', padding: '8px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer' }}>
+                      <Clipboard size={14} /> PASTE
                     </button>
                     <button onClick={joinSharedTrip} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '800', color: '#10b981', backgroundColor: '#ecfdf5', padding: '8px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer' }}>
                       <Users size={14} /> JOIN
@@ -2943,6 +3008,60 @@ Travel Planner AI Analysis Report
             >
               확인
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* JSON Paste Modal */}
+      {showPasteModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 3000, padding: '20px', animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div style={{
+            backgroundColor: 'white', borderRadius: '32px', width: '100%', maxWidth: '480px',
+            padding: '32px 24px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+          }}>
+            <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#0f172a', margin: '0 0 8px 0' }}>JSON 붙여넣기</h3>
+            <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 20px 0' }}>AI나 다른 곳에서 복사한 일정 JSON 텍스트를 아래에 붙여넣어 주세요.</p>
+            
+            <textarea 
+              value={pasteText}
+              onChange={(e) => setPasteText(e.target.value)}
+              placeholder='{"name": "여행 제목", ...}'
+              style={{
+                width: '100%', height: '200px', padding: '16px', border: '1px solid #e2e8f0',
+                borderRadius: '16px', fontSize: '13px', fontFamily: 'monospace',
+                outline: 'none', resize: 'none', marginBottom: '24px', boxSizing: 'border-box',
+                backgroundColor: '#f8fafc'
+              }}
+            />
+
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button 
+                onClick={() => { setShowPasteModal(false); setPasteText(''); }}
+                style={{
+                  flex: 1, backgroundColor: '#f1f5f9', color: '#64748b', border: 'none',
+                  padding: '16px', borderRadius: '16px', fontWeight: '800', fontSize: '15px',
+                  cursor: 'pointer'
+                }}
+              >
+                취소
+              </button>
+              <button 
+                onClick={handlePasteImport}
+                style={{
+                  flex: 2, backgroundColor: '#2563eb', color: 'white', border: 'none',
+                  padding: '16px', borderRadius: '16px', fontWeight: '800', fontSize: '15px',
+                  cursor: 'pointer'
+                }}
+              >
+                일정 가져오기
+              </button>
+            </div>
           </div>
         </div>
       )}
