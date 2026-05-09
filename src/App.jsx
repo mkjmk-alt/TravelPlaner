@@ -1221,52 +1221,6 @@ Travel Planner AI Analysis Report
     await syncTripsToCloud(newTrips);
   };
 
-  const loadFlorenceTest = async () => {
-    const testTrip = {
-      id: "test-firenze-" + Date.now(),
-      name: "피렌체 정복 3박 4일 (빡빡한 일정)",
-      country: "이탈리아",
-      startDate: "2026-06-01",
-      endDate: "2026-06-04",
-      itinerary: [
-        { day: 1, items: [
-          { id: 101, name: "피렌체 두오모 대성당", time: "10:00", loc: "Piazza del Duomo, Firenze", lat: 43.7731, lng: 11.2560, emoji: "⛪️" },
-          { id: 102, name: "산 조반니 세례당", time: "13:00", loc: "Piazza di San Giovanni, Firenze", lat: 43.7732, lng: 11.2550, emoji: "📍" },
-          { id: 103, name: "아카데미아 미술관", time: "15:30", loc: "Via Ricasoli, 58/60, Firenze", lat: 43.7769, lng: 11.2585, emoji: "🎨" },
-          { id: 104, name: "피렌체 중앙시장", time: "18:00", loc: "Piazza del Mercato Centrale, Firenze", lat: 43.7765, lng: 11.2533, emoji: "🍕" }
-        ]},
-        { day: 2, items: [
-          { id: 201, name: "우피치 미술관", time: "08:30", loc: "Piazzale degli Uffizi, 6, Firenze", lat: 43.7677, lng: 11.2553, emoji: "🖼️" },
-          { id: 202, name: "시뇨리아 광장 & 베키오 궁전", time: "13:00", loc: "Piazza della Signoria, Firenze", lat: 43.7693, lng: 11.2562, emoji: "🏰" },
-          { id: 203, name: "베키오 다리", time: "15:00", loc: "Ponte Vecchio, Firenze", lat: 43.7680, lng: 11.2532, emoji: "🌉" },
-          { id: 204, name: "피티 궁전 & 보볼리 정원", time: "16:30", loc: "Piazza de' Pitti, 1, Firenze", lat: 43.7651, lng: 11.2505, emoji: "🌳" }
-        ]},
-        { day: 3, items: [
-          { id: 301, name: "산 로렌초 성당", time: "09:00", loc: "Piazza di San Lorenzo, Firenze", lat: 43.7749, lng: 11.2538, emoji: "⛪️" },
-          { id: 302, name: "산타 마리아 노벨라 약국", time: "11:30", loc: "Via della Scala, 16, Firenze", lat: 43.7744, lng: 11.2464, emoji: "🧪" },
-          { id: 303, name: "산타 크로체 성당", time: "14:30", loc: "Piazza di Santa Croce, 16, Firenze", lat: 43.7685, lng: 11.2627, emoji: "⛪️" },
-          { id: 304, name: "미켈란젤로 광장", time: "17:30", loc: "Piazzale Michelangelo, Firenze", lat: 43.7629, lng: 11.2651, emoji: "🌅" }
-        ]},
-        { day: 4, items: [
-          { id: 401, name: "바르젤로 국립 미술관", time: "09:00", loc: "Via del Proconsolo, 4, Firenze", lat: 43.7704, lng: 11.2580, emoji: "🗿" },
-          { id: 402, name: "산 미니아토 알 몬테", time: "11:30", loc: "Via delle Porte Sante, 34, Firenze", lat: 43.7597, lng: 11.2647, emoji: "⛪️" },
-          { id: 403, name: "피렌체 산타 마리아 노벨라 역", time: "15:30", loc: "Piazza di Santa Maria Novella, Firenze", lat: 43.7766, lng: 11.2481, emoji: "🚂" }
-        ]}
-      ],
-      budgetSettings: { limitKRW: 2000000, travelCurrency: 'EUR' },
-      expenses: [
-        { id: 1, desc: "비행기표 (왕복)", amount: 1500000, currency: "KRW", amountKRW: 1500000, day: 0 }
-      ],
-      createdAt: Date.now()
-    };
-
-    const newTrips = [testTrip, ...(trips || [])];
-    await syncTripsToCloud(newTrips);
-    setActiveTripId(testTrip.id);
-    setViewMode('itinerary');
-    setModalConfig({ type: 'success', title: '테스트 로드 완료', message: "🇮🇹 피렌체 3박 4일 테스트 일정이 로드되었습니다! 'AI 분석' 버튼을 눌러보세요." });
-    setShowCustomModal(true);
-  };
 
   const addToItinerary = (place) => {
     const targetDay = parseDay(activeDay);
@@ -1683,9 +1637,6 @@ Travel Planner AI Analysis Report
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
                   <h2 style={{ fontSize: '12px', fontWeight: '900', color: '#8b5cf6', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>My Trips</h2>
                   <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={loadFlorenceTest} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '800', color: '#f97316', backgroundColor: '#fff7ed', padding: '8px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer' }}>
-                      <Sparkles size={14} /> TEST DATA
-                    </button>
                     <button onClick={handleUploadJson} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '800', color: '#6366f1', backgroundColor: '#eef2ff', padding: '8px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer' }}>
                       <Upload size={14} /> UPLOAD
                     </button>
