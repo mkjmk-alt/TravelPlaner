@@ -1,7 +1,7 @@
 // Build Version: v1.2.2-build-trigger-fix
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete, Polyline } from '@react-google-maps/api';
-import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Camera, Play, Image, Clock, Sparkles, Brain, Upload, Clipboard } from 'lucide-react';
+import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Camera, Play, Image, Clock, Sparkles, Brain, Upload, Clipboard, LocateFixed } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import html2canvas from 'html2canvas';
 import './index.css';
@@ -227,6 +227,31 @@ function App() {
   const [showPasteModal, setShowPasteModal] = useState(false);
   const [pasteText, setPasteText] = useState('');
   const [showFullRoute, setShowFullRoute] = useState(false);
+  const [userLocation, setUserLocation] = useState(null);
+
+  const handleMyLocation = () => {
+    if (!navigator.geolocation) {
+      alert("이 브라우저에서는 위치 정보를 사용할 수 없습니다.");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        const newPos = { lat: latitude, lng: longitude };
+        setUserLocation(newPos);
+        if (map) {
+          map.panTo(newPos);
+          map.setZoom(15);
+        }
+      },
+      (error) => {
+        console.error("Geolocation error:", error);
+        alert("위치 정보를 가져올 수 없습니다. GPS 권한을 허용했는지 확인해주세요.");
+      },
+      { enableHighAccuracy: true }
+    );
+  };
 
   const dayColors = [
     '#4f46e5', // Indigo
@@ -2469,8 +2494,9 @@ Travel Planner AI Analysis Report
 
       {/* MAP VIEWPORT */}
       <div className="map-wrapper">
-        {/* MAP CONTROLS (ALWAYS VISIBLE) */}
+        {/* MAP CONTROLS (TOP-RIGHT) */}
         <div style={{ position: 'absolute', top: '24px', right: '24px', zIndex: 2000, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {/* Full Route Toggle */}
           <button 
             onClick={() => setShowFullRoute(!showFullRoute)} 
             style={{ 
@@ -2484,6 +2510,22 @@ Travel Planner AI Analysis Report
             title={showFullRoute ? "일차별 경로 보기" : "전체 경로 보기"}
           >
             <Navigation size={24} style={{ transform: showFullRoute ? 'rotate(45deg)' : 'none', transition: 'transform 0.3s' }} />
+          </button>
+
+          {/* My Location Button */}
+          <button 
+            onClick={handleMyLocation} 
+            style={{ 
+              width: '56px', height: '56px', 
+              backgroundColor: 'white', 
+              borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', 
+              cursor: 'pointer', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', 
+              color: '#10b981',
+              transition: 'all 0.2s'
+            }}
+            title="내 현재 위치 찾기"
+          >
+            <LocateFixed size={24} />
           </button>
         </div>
 
@@ -2522,6 +2564,26 @@ Travel Planner AI Analysis Report
               }}
             />
           ))}
+
+          {/* User Current Location Marker */}
+          {userLocation && (
+            <Marker
+              position={userLocation}
+              icon={{
+                url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="12" r="8" fill="#3b82f6" stroke="white" stroke-width="2"/>
+                    <circle cx="12" cy="12" r="11" stroke="#3b82f6" stroke-opacity="0.3" stroke-width="2">
+                      <animate attributeName="r" from="8" to="11" dur="1.5s" repeatCount="indefinite" />
+                      <animate attributeName="stroke-opacity" from="0.5" to="0" dur="1.5s" repeatCount="indefinite" />
+                    </circle>
+                  </svg>
+                `)}`,
+                scaledSize: new window.google.maps.Size(24, 24),
+                anchor: new window.google.maps.Point(12, 12)
+              }}
+            />
+          )}
 
           {/* Route Path (Polyline) */}
           {window.google && !showFullRoute && polylinePath.length > 0 && (
