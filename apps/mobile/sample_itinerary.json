@@ -1,0 +1,31 @@
+{
+  "name": "도쿄 3박 4일 여행",
+  "startDate": "2026-06-01",
+  "endDate": "2026-06-04",
+  "budget": 500000,
+  "currency": "KRW",
+  "color": "#FF6B6B",
+  "itinerary": [
+    {
+      "id": "item-1",
+      "name": "나리타 공항 도착",
+      "lat": 35.772,
+      "lng": 140.392,
+      "loc": "도쿄, 일본",
+      "time": "11:00",
+      "day": 1,
+      "emoji": "✈️"
+    },
+    {
+      "id": "item-2",
+      "name": "시부야 스카이",
+      "lat": 35.658,
+      "lng": 139.701,
+      "loc": "도쿄, 일본",
+      "time": "18:00",
+      "day": 1,
+      "emoji": "🏙️"
+    }
+  ],
+  "expenses": []
+}
