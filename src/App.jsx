@@ -470,6 +470,20 @@ function App() {
       }));
   }, [itinerary, activeDay]);
 
+  const dayColors = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'];
+
+  const fullTripPaths = useMemo(() => {
+    if (!itinerary || itinerary.length === 0) return [];
+    return itinerary.map(day => {
+      return (day.items || [])
+        .filter(item => item.lat && item.lng)
+        .map(item => ({ 
+          lat: Number(item.lat), 
+          lng: Number(item.lng) 
+        }));
+    }).filter(path => path.length > 0);
+  }, [itinerary]);
+
   const toggleCountry = (country) => {
     setExpandedCountries(prev => ({
       ...prev,
