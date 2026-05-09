@@ -225,6 +225,21 @@ function App() {
   const slideshowTimerRef = useRef(null);
   const [showPasteModal, setShowPasteModal] = useState(false);
   const [pasteText, setPasteText] = useState('');
+  const [showFullRoute, setShowFullRoute] = useState(false);
+
+  const dayColors = [
+    '#4f46e5', // Indigo
+    '#10b981', // Emerald
+    '#f59e0b', // Amber
+    '#ef4444', // Red
+    '#8b5cf6', // Violet
+    '#ec4899', // Pink
+    '#06b6d4', // Cyan
+    '#f97316'  // Orange
+  ];
+  const getDayColor = (idx) => dayColors[idx % dayColors.length];
+  const [showPasteModal, setShowPasteModal] = useState(false);
+  const [pasteText, setPasteText] = useState('');
 
   // --- DATA STATE ---
   const [favorites, setFavorites] = useState(() => {
@@ -2421,9 +2436,25 @@ Travel Planner AI Analysis Report
       {/* MAP VIEWPORT */}
       <div className="map-wrapper">
         {!sidebarOpen && (
-          <button onClick={() => setSidebarOpen(true)} className="absolute top-6 left-6 z-[2000] w-14 h-14 bg-white rounded-2xl shadow-2xl flex items-center justify-center text-blue-600 hover:scale-110 transition-all border border-white" style={{ position: 'absolute', top: '24px', left: '24px', zIndex: 2000, width: '56px', height: '56px', backgroundColor: 'white', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', cursor: 'pointer', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb' }}>
-            <Menu size={24} />
-          </button>
+          <div style={{ position: 'absolute', top: '24px', left: '24px', zIndex: 2000, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <button onClick={() => setSidebarOpen(true)} style={{ width: '56px', height: '56px', backgroundColor: 'white', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', cursor: 'pointer', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb' }}>
+              <Menu size={24} />
+            </button>
+            <button 
+              onClick={() => setShowFullRoute(!showFullRoute)} 
+              style={{ 
+                width: '56px', height: '56px', 
+                backgroundColor: showFullRoute ? '#4f46e5' : 'white', 
+                borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', 
+                cursor: 'pointer', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                color: showFullRoute ? 'white' : '#4f46e5',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+              }}
+              title={showFullRoute ? "일차별 경로 보기" : "전체 경로 보기"}
+            >
+              <Navigation size={24} style={{ transform: showFullRoute ? 'rotate(45deg)' : 'none', transition: 'transform 0.3s' }} />
+            </button>
+          </div>
         )}
 
         <GoogleMap
@@ -2454,7 +2485,7 @@ Travel Planner AI Analysis Report
           ))}
 
           {/* Route Path (Polyline) */}
-          {window.google && polylinePath.length > 0 && (
+          {window.google && !showFullRoute && polylinePath.length > 0 && (
             <Polyline
               key={`route-polyline-${activeDay}`}
               path={polylinePath}
@@ -2462,48 +2493,74 @@ Travel Planner AI Analysis Report
                 strokeColor: '#3b82f6',
                 strokeOpacity: 0.8,
                 strokeWeight: 4,
-                icons: [
-                  {
-                    icon: { path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW, scale: 3, fillOpacity: 1, strokeColor: '#3b82f6' },
-                    offset: '50%',
-                    repeat: '100px'
-                  }
-                ],
+                icons: [{ icon: { path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW, scale: 3, fillOpacity: 1, strokeColor: '#3b82f6' }, offset: '50%', repeat: '100px' }],
               }}
             />
           )}
 
-          {/* Itinerary Markers (for active day) */}
-          <React.Fragment key={`markers-block-${activeDay}`}>
-            {(() => {
-              const targetDay = parseDay(activeDay);
-              const dayPlan = (itinerary || []).find(d => parseDay(d.day) === targetDay);
-              return (dayPlan?.items || [])
+          {window.google && showFullRoute && fullTripPaths.map((p, idx) => (
+            <Polyline
+              key={`full-route-p-${idx}`}
+              path={p.path}
+              options={{
+                strokeColor: p.color,
+                strokeOpacity: 0.6,
+                strokeWeight: 5,
+                icons: [{ icon: { path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW, scale: 2, fillOpacity: 1, strokeColor: p.color }, offset: '50%', repeat: '120px' }],
+              }}
+            />
+          ))}
+
+          {/* Itinerary Markers */}
+          {!showFullRoute && (
+            <React.Fragment key={`markers-daily-${activeDay}`}>
+              {(() => {
+                const targetDay = parseDay(activeDay);
+                const dayPlan = (itinerary || []).find(d => parseDay(d.day) === targetDay);
+                return (dayPlan?.items || [])
+                  .filter(item => item.lat && item.lng)
+                  .map((item, idx) => (
+                  <Marker
+                    key={`itin-mark-${activeDay}-${item.id}`}
+                    position={{ lat: Number(item.lat), lng: Number(item.lng) }}
+                    label={{ text: `${idx + 1}`, color: 'white', fontSize: '14px', fontWeight: '900' }}
+                    onClick={() => setSelectedPlace(item)}
+                    icon={{
+                      url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                        <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <circle cx="20" cy="20" r="16" fill="#3b82f6" stroke="white" stroke-width="3"/>
+                        </svg>
+                      `)}`,
+                      scaledSize: new window.google.maps.Size(40, 40), anchor: new window.google.maps.Point(20, 20)
+                    }}
+                  />
+                ));
+              })()}
+            </React.Fragment>
+          )}
+
+          {showFullRoute && itinerary.map((day, dIdx) => (
+            <React.Fragment key={`markers-full-${dIdx}`}>
+              {(day.items || [])
                 .filter(item => item.lat && item.lng)
                 .map((item, idx) => (
-                <Marker
-                  key={`itin-mark-${activeDay}-${item.id}`}
-                  position={{ lat: Number(item.lat), lng: Number(item.lng) }}
-                  label={{
-                    text: `${idx + 1}`,
-                    color: 'white',
-                    fontSize: '14px',
-                    fontWeight: '900'
-                  }}
-                  onClick={() => setSelectedPlace(item)}
-                  icon={{
-                    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-                      <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <circle cx="20" cy="20" r="16" fill="#3b82f6" stroke="white" stroke-width="3"/>
-                      </svg>
-                    `)}`,
-                    scaledSize: new window.google.maps.Size(40, 40),
-                    anchor: new window.google.maps.Point(20, 20)
-                  }}
-                />
-              ));
-            })()}
-          </React.Fragment>
+                  <Marker
+                    key={`full-itin-mark-${dIdx}-${item.id}`}
+                    position={{ lat: Number(item.lat), lng: Number(item.lng) }}
+                    label={{ text: `${day.day}-${idx + 1}`, color: 'white', fontSize: '11px', fontWeight: '800' }}
+                    onClick={() => setSelectedPlace(item)}
+                    icon={{
+                      url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                        <svg width="34" height="34" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <circle cx="17" cy="17" r="14" fill="${getDayColor(dIdx)}" stroke="white" stroke-width="2"/>
+                        </svg>
+                      `)}`,
+                      scaledSize: new window.google.maps.Size(34, 34), anchor: new window.google.maps.Point(17, 17)
+                    }}
+                  />
+              ))}
+            </React.Fragment>
+          ))}
 
           {/* Dynamic Search Result Marker */}
           {searchResult && searchResult.name !== selectedPlace?.name && (
