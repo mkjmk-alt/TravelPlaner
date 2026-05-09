@@ -1,0 +1,85 @@
+{
+  "name": "홍콩 3박 4일 미식 여행",
+  "country": "홍콩",
+  "startDate": "2026-06-01",
+  "endDate": "2026-06-04",
+  "itinerary": [
+    {
+      "day": 1,
+      "items": [
+        {
+          "name": "홍콩 국제공항",
+          "time": "14:00",
+          "loc": "Chek Lap Kok, Hong Kong",
+          "lat": 22.308,
+          "lng": 113.9185,
+          "emoji": "✈️",
+          "cat": "교통"
+        },
+        {
+          "name": "침사추이 산책로",
+          "time": "16:30",
+          "loc": "Tsim Sha Tsui, Hong Kong",
+          "lat": 22.2938,
+          "lng": 114.174,
+          "emoji": "🚶",
+          "cat": "관광"
+        },
+        {
+          "name": "템플 스트리트 야시장",
+          "time": "19:00",
+          "loc": "Temple St, Jordan, Hong Kong",
+          "lat": 22.3069,
+          "lng": 114.1702,
+          "emoji": "🌃",
+          "cat": "음식"
+        }
+      ]
+    },
+    {
+      "day": 2,
+      "items": [
+        {
+          "name": "빅토리아 피크",
+          "time": "10:00",
+          "loc": "The Peak, Hong Kong",
+          "lat": 22.2759,
+          "lng": 114.1455,
+          "emoji": "⛰️",
+          "cat": "관광"
+        },
+        {
+          "name": "란콰이퐁",
+          "time": "20:00",
+          "loc": "Lan Kwai Fong, Central, Hong Kong",
+          "lat": 22.2811,
+          "lng": 114.1557,
+          "emoji": "🍹",
+          "cat": "엔터테인먼트"
+        }
+      ]
+    }
+  ],
+  "budgetSettings": {
+    "limitKRW": 2000000,
+    "travelCurrency": "HKD"
+  },
+  "expenses": [
+    {
+      "desc": "항공권 예약",
+      "amount": 450000,
+      "currency": "KRW",
+      "amountKRW": 450000,
+      "day": 1,
+      "category": "교통"
+    },
+    {
+      "desc": "딤섬 점심",
+      "amount": 350,
+      "currency": "HKD",
+      "amountKRW": 61250,
+      "day": 1,
+      "category": "식비"
+    }
+  ]
+}

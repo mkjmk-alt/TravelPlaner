@@ -998,74 +998,140 @@ Travel Planner AI Analysis Report
     setEditTripData({ name: "New Trip", startDate: today, endDate: today, country: "" });
   };
 
-  const handleUploadJson = () => {
+  const handleFileImport = () => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.json';
+    input.accept = '.json,application/json,.md,text/markdown,.txt,text/plain';
     input.onchange = async (e) => {
       const file = e.target.files[0];
       if (!file) return;
 
+      const isJson = file.name.endsWith('.json');
       const reader = new FileReader();
+      
       reader.onload = async (event) => {
-        try {
-          const content = event.target.result;
-          const data = JSON.parse(content);
-
-          if (!data.name || !data.itinerary) {
-            setModalConfig({ 
-              type: 'error', 
-              title: '업로드 실패', 
-              message: '올바른 형식의 여행 일정 JSON 파일이 아닙니다. name과 itinerary 필드가 필요합니다.' 
-            });
+        const content = event.target.result;
+        
+        if (isJson) {
+          try {
+            const data = JSON.parse(content);
+            processImportedTrip(data);
+          } catch (err) {
+            setModalConfig({ type: 'error', title: '파일 오류', message: 'JSON 파싱 중 오류가 발생했습니다.' });
             setShowCustomModal(true);
-            return;
           }
+        } else {
+          // AI Parsing for Markdown/Text
+          setIsAnalyzing(true);
+          setShowAIModal(true);
+          setAiReport({ summary: "AI가 일정을 분석하고 있습니다...", score: 0, sections: [], tips: [] });
 
-          const newId = Date.now().toString();
-          const newTrip = {
-            id: newId,
-            name: data.name || "Uploaded Trip",
-            country: data.country || "",
-            startDate: data.startDate || new Date().toISOString().split('T')[0],
-            endDate: data.endDate || new Date().toISOString().split('T')[0],
-            itinerary: (data.itinerary || []).map((day, idx) => ({
-              ...day,
-              day: day.day || idx + 1,
-              items: (day.items || []).map(item => ({
-                ...item,
-                id: item.id || Math.random().toString(36).substr(2, 9)
-              }))
-            })),
-            budgetSettings: data.budgetSettings || { limitKRW: 1000000, travelCurrency: 'USD' },
-            expenses: (data.expenses || []).map(exp => ({
-              ...exp,
-              id: exp.id || Math.random().toString(36).substr(2, 9),
-              createdAt: exp.createdAt || Date.now()
-            })),
-            createdAt: Date.now()
-          };
+          try {
+            const prompt = `
+              사용자가 제공한 여행 계획 텍스트(Markdown 또는 자유 형식)를 분석하여 여행 일정 JSON 데이터로 변환해줘.
+              
+              [텍스트 내용]
+              ${content}
+              
+              [출력 형식 가이드]
+              반드시 아래 JSON 구조를 엄격히 지켜서 응답해줘. 
+              - startDate와 endDate는 텍스트에 언급이 없으면 "2026-06-01"과 같은 임의의 가까운 미래 날짜로 설정해줘.
+              - lat, lng 좌표는 장소 이름을 바탕으로 해당 지역(예: 홍콩) 내 예상 좌표를 소수점 4자리까지 포함해줘.
+              - cat(카테고리)는 '관광', '음식', '교통', '쇼핑', '호텔' 중 하나로 설정해줘.
+              - 각 항목마다 적절한 emoji를 하나씩 넣어줘.
+              
+              JSON 구조:
+              {
+                "name": "여행 제목",
+                "country": "국가명",
+                "startDate": "YYYY-MM-DD",
+                "endDate": "YYYY-MM-DD",
+                "itinerary": [
+                  {
+                    "day": 1,
+                    "items": [
+                      {
+                        "name": "장소 이름",
+                        "time": "HH:MM",
+                        "loc": "장소 주소 또는 위치 설명",
+                        "lat": 위도숫자,
+                        "lng": 경도숫자,
+                        "emoji": "이모지",
+                        "cat": "카테고리"
+                      }
+                    ]
+                  }
+                ]
+              }
+              
+              응답은 다른 설명 없이 오직 JSON 데이터만 반환해줘.
+            `;
 
-          const newTrips = [newTrip, ...trips];
-          await syncTripsToCloud(newTrips);
-          setActiveTripId(newId);
-          
-          setModalConfig({ 
-            type: 'success', 
-            title: '업로드 완료', 
-            message: `'${newTrip.name}' 일정을 성공적으로 불러왔습니다.` 
-          });
-          setShowCustomModal(true);
-        } catch (err) {
-          console.error("JSON parsing error:", err);
-          setModalConfig({ 
-            type: 'error', 
-            title: '파일 오류', 
-            message: 'JSON 파일을 파싱하는 중 오류가 발생했습니다.' 
-          });
-          setShowCustomModal(true);
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-lite:generateContent?key=${GEMINI_API_KEY}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+            });
+
+            const resData = await response.json();
+            let jsonStr = resData.candidates[0].content.parts[0].text;
+            jsonStr = jsonStr.replace(/```json/g, '').replace(/```/g, '').trim();
+            const data = JSON.parse(jsonStr);
+            processImportedTrip(data);
+          } catch (err) {
+            console.error("AI Import Error:", err);
+            setModalConfig({ type: 'error', title: 'AI 분석 실패', message: '일정 분석 중 오류가 발생했습니다. 파일 형식을 확인해주세요.' });
+            setShowCustomModal(true);
+          } finally {
+            setIsAnalyzing(false);
+            setShowAIModal(false);
+          }
         }
       };
+
+      const processImportedTrip = async (data) => {
+        if (!data.name || !data.itinerary) {
+          setModalConfig({ type: 'error', title: '데이터 오류', message: '필수 데이터(name, itinerary)가 누락되었습니다.' });
+          setShowCustomModal(true);
+          return;
+        }
+
+        const newId = Date.now().toString();
+        const newTrip = {
+          id: newId,
+          name: data.name || "Imported Trip",
+          country: data.country || "",
+          startDate: data.startDate || new Date().toISOString().split('T')[0],
+          endDate: data.endDate || new Date().toISOString().split('T')[0],
+          itinerary: (data.itinerary || []).map((day, idx) => ({
+            ...day,
+            day: day.day || idx + 1,
+            items: (day.items || []).map(item => ({
+              ...item,
+              id: item.id || Math.random().toString(36).substr(2, 9)
+            }))
+          })),
+          budgetSettings: data.budgetSettings || { limitKRW: 1000000, travelCurrency: 'USD' },
+          expenses: (data.expenses || []).map(exp => ({
+            ...exp,
+            id: exp.id || Math.random().toString(36).substr(2, 9),
+            createdAt: exp.createdAt || Date.now()
+          })),
+          createdAt: Date.now()
+        };
+
+        const newTrips = [newTrip, ...trips];
+        await syncTripsToCloud(newTrips);
+        setActiveTripId(newId);
+        
+        setModalConfig({ 
+          type: 'success', 
+          title: '가져오기 완료', 
+          message: `'${newTrip.name}' 일정을 성공적으로 불러왔습니다.` 
+        });
+        setShowCustomModal(true);
+      };
+
       reader.readAsText(file);
     };
     input.click();
@@ -1624,7 +1690,7 @@ Travel Planner AI Analysis Report
                     <button onClick={loadFlorenceTest} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '800', color: '#f97316', backgroundColor: '#fff7ed', padding: '8px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer' }}>
                       <Sparkles size={14} /> TEST DATA
                     </button>
-                    <button onClick={handleUploadJson} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '800', color: '#6366f1', backgroundColor: '#eef2ff', padding: '8px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer' }}>
+                    <button onClick={handleFileImport} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '800', color: '#6366f1', backgroundColor: '#eef2ff', padding: '8px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer' }}>
                       <Upload size={14} /> UPLOAD
                     </button>
                     <button onClick={joinSharedTrip} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '800', color: '#10b981', backgroundColor: '#ecfdf5', padding: '8px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer' }}>
