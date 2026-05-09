@@ -1634,20 +1634,23 @@ Travel Planner AI Analysis Report
             {/* --- TRIPS MODE --- */}
             {viewMode === 'trips' && (
               <>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-                  <h2 style={{ fontSize: '12px', fontWeight: '900', color: '#8b5cf6', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>My Trips</h2>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={handleUploadJson} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '800', color: '#6366f1', backgroundColor: '#eef2ff', padding: '8px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer' }}>
-                      <Upload size={14} /> UPLOAD
+                <div style={{ marginBottom: '32px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
+                    <h2 style={{ fontSize: '26px', fontWeight: '900', color: '#0f172a', margin: 0 }}>My Trips</h2>
+                    <button onClick={createNewTrip} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: '800', color: 'white', backgroundColor: '#8b5cf6', padding: '14px 24px', borderRadius: '18px', border: 'none', cursor: 'pointer', boxShadow: '0 10px 15px -3px rgba(139, 92, 246, 0.3)', transition: 'all 0.2s' }}>
+                      <PlusCircle size={18} /> 새 여행 계획하기
                     </button>
-                    <button onClick={() => setShowPasteModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '800', color: '#3b82f6', backgroundColor: '#eff6ff', padding: '8px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer' }}>
-                      <Clipboard size={14} /> PASTE
+                  </div>
+                  
+                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                    <button onClick={handleUploadJson} style={{ flex: '1 1 160px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', fontSize: '13px', fontWeight: '800', color: '#4f46e5', backgroundColor: '#f5f7ff', padding: '16px', borderRadius: '20px', border: '1px solid #e0e7ff', cursor: 'pointer', transition: 'all 0.2s' }}>
+                      <Upload size={18} /> 일정 파일 가져오기
                     </button>
-                    <button onClick={joinSharedTrip} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '800', color: '#10b981', backgroundColor: '#ecfdf5', padding: '8px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer' }}>
-                      <Users size={14} /> JOIN
+                    <button onClick={() => setShowPasteModal(true)} style={{ flex: '1 1 160px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', fontSize: '13px', fontWeight: '800', color: '#2563eb', backgroundColor: '#f0f7ff', padding: '16px', borderRadius: '20px', border: '1px solid #dbeafe', cursor: 'pointer', transition: 'all 0.2s' }}>
+                      <Clipboard size={18} /> 일정 텍스트 붙여넣기
                     </button>
-                    <button onClick={createNewTrip} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '800', color: '#8b5cf6', backgroundColor: '#f5f3ff', padding: '8px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer' }}>
-                      <PlusCircle size={14} /> NEW TRIP
+                    <button onClick={joinSharedTrip} style={{ flex: '0.5 1 120px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', fontSize: '13px', fontWeight: '800', color: '#059669', backgroundColor: '#f0fdf4', padding: '16px', borderRadius: '20px', border: '1px solid #dcfce7', cursor: 'pointer', transition: 'all 0.2s' }}>
+                      <Users size={18} /> 참여하기
                     </button>
                   </div>
                 </div>
