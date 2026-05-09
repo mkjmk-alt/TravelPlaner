@@ -2439,24 +2439,29 @@ Travel Planner AI Analysis Report
 
       {/* MAP VIEWPORT */}
       <div className="map-wrapper">
+        {/* MAP CONTROLS (ALWAYS VISIBLE) */}
+        <div style={{ position: 'absolute', top: '24px', right: '24px', zIndex: 2000, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <button 
+            onClick={() => setShowFullRoute(!showFullRoute)} 
+            style={{ 
+              width: '56px', height: '56px', 
+              backgroundColor: showFullRoute ? '#4f46e5' : 'white', 
+              borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', 
+              cursor: 'pointer', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', 
+              color: showFullRoute ? 'white' : '#4f46e5',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+            }}
+            title={showFullRoute ? "일차별 경로 보기" : "전체 경로 보기"}
+          >
+            <Navigation size={24} style={{ transform: showFullRoute ? 'rotate(45deg)' : 'none', transition: 'transform 0.3s' }} />
+          </button>
+        </div>
+
+        {/* SIDEBAR TOGGLE (ONLY WHEN CLOSED) */}
         {!sidebarOpen && (
-          <div style={{ position: 'absolute', top: '24px', left: '24px', zIndex: 2000, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ position: 'absolute', top: '24px', left: '24px', zIndex: 2000 }}>
             <button onClick={() => setSidebarOpen(true)} style={{ width: '56px', height: '56px', backgroundColor: 'white', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', cursor: 'pointer', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb' }}>
               <Menu size={24} />
-            </button>
-            <button 
-              onClick={() => setShowFullRoute(!showFullRoute)} 
-              style={{ 
-                width: '56px', height: '56px', 
-                backgroundColor: showFullRoute ? '#4f46e5' : 'white', 
-                borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', 
-                cursor: 'pointer', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                color: showFullRoute ? 'white' : '#4f46e5',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-              }}
-              title={showFullRoute ? "일차별 경로 보기" : "전체 경로 보기"}
-            >
-              <Navigation size={24} style={{ transform: showFullRoute ? 'rotate(45deg)' : 'none', transition: 'transform 0.3s' }} />
             </button>
           </div>
         )}
