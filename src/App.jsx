@@ -1649,23 +1649,28 @@ Travel Planner AI Analysis Report
             {viewMode === 'trips' && (
               <>
                 <div style={{ marginBottom: '32px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
-                    <h2 style={{ fontSize: '26px', fontWeight: '900', color: '#0f172a', margin: 0 }}>My Trips</h2>
-                    <button onClick={createNewTrip} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: '800', color: 'white', backgroundColor: '#8b5cf6', padding: '14px 24px', borderRadius: '18px', border: 'none', cursor: 'pointer', boxShadow: '0 10px 15px -3px rgba(139, 92, 246, 0.3)', transition: 'all 0.2s' }}>
-                      <PlusCircle size={18} /> 새 여행 계획하기
-                    </button>
-                  </div>
+                  <h2 style={{ fontSize: '28px', fontWeight: '900', color: '#0f172a', marginBottom: '24px' }}>My Trips</h2>
                   
-                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                    <button onClick={handleUploadJson} style={{ flex: '1 1 160px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', fontSize: '13px', fontWeight: '800', color: '#4f46e5', backgroundColor: '#f5f7ff', padding: '16px', borderRadius: '20px', border: '1px solid #e0e7ff', cursor: 'pointer', transition: 'all 0.2s' }}>
-                      <Upload size={18} /> 일정 파일 가져오기
-                    </button>
-                    <button onClick={() => setShowPasteModal(true)} style={{ flex: '1 1 160px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', fontSize: '13px', fontWeight: '800', color: '#2563eb', backgroundColor: '#f0f7ff', padding: '16px', borderRadius: '20px', border: '1px solid #dbeafe', cursor: 'pointer', transition: 'all 0.2s' }}>
-                      <Clipboard size={18} /> 일정 텍스트 붙여넣기
-                    </button>
-                    <button onClick={joinSharedTrip} style={{ flex: '0.5 1 120px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', fontSize: '13px', fontWeight: '800', color: '#059669', backgroundColor: '#f0fdf4', padding: '16px', borderRadius: '20px', border: '1px solid #dcfce7', cursor: 'pointer', transition: 'all 0.2s' }}>
-                      <Users size={18} /> 참여하기
-                    </button>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {/* Row 1: Import Options */}
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                      <button onClick={handleUploadJson} style={{ flex: '1 1 160px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', fontSize: '13px', fontWeight: '800', color: '#4f46e5', backgroundColor: '#f5f7ff', padding: '16px', borderRadius: '20px', border: '1px solid #e0e7ff', cursor: 'pointer', transition: 'all 0.2s' }}>
+                        <Upload size={18} /> 일정 파일 가져오기
+                      </button>
+                      <button onClick={() => setShowPasteModal(true)} style={{ flex: '1 1 160px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', fontSize: '13px', fontWeight: '800', color: '#2563eb', backgroundColor: '#f0f7ff', padding: '16px', borderRadius: '20px', border: '1px solid #dbeafe', cursor: 'pointer', transition: 'all 0.2s' }}>
+                        <Clipboard size={18} /> 일정 텍스트 붙여넣기
+                      </button>
+                    </div>
+
+                    {/* Row 2: Create & Join Options */}
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                      <button onClick={createNewTrip} style={{ flex: '1.5 1 180px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', fontSize: '14px', fontWeight: '800', color: 'white', backgroundColor: '#8b5cf6', padding: '16px', borderRadius: '20px', border: 'none', cursor: 'pointer', boxShadow: '0 10px 15px -3px rgba(139, 92, 246, 0.3)', transition: 'all 0.2s' }}>
+                        <PlusCircle size={18} /> 새 여행 계획하기
+                      </button>
+                      <button onClick={joinSharedTrip} style={{ flex: '1 1 120px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', fontSize: '13px', fontWeight: '800', color: '#059669', backgroundColor: '#f0fdf4', padding: '16px', borderRadius: '20px', border: '1px solid #dcfce7', cursor: 'pointer', transition: 'all 0.2s' }}>
+                        <Users size={18} /> 참여하기
+                      </button>
+                    </div>
                   </div>
                 </div>
 
