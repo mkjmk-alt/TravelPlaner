@@ -484,6 +484,22 @@ function App() {
     }).filter(path => path.length > 0);
   }, [itinerary]);
 
+  const interDayPaths = useMemo(() => {
+    if (fullTripPaths.length < 2) return [];
+    const bridges = [];
+    for (let i = 0; i < fullTripPaths.length - 1; i++) {
+      const currentDay = fullTripPaths[i];
+      const nextDay = fullTripPaths[i + 1];
+      if (currentDay.length > 0 && nextDay.length > 0) {
+        bridges.push([
+          currentDay[currentDay.length - 1],
+          nextDay[0]
+        ]);
+      }
+    }
+    return bridges;
+  }, [fullTripPaths]);
+
   const toggleCountry = (country) => {
     setExpandedCountries(prev => ({
       ...prev,
@@ -2521,18 +2537,75 @@ Travel Planner AI Analysis Report
             />
           )}
 
-          {window.google && showFullRoute && fullTripPaths.map((p, idx) => (
-            <Polyline
-              key={`full-route-p-${idx}`}
-              path={p.path}
-              options={{
-                strokeColor: p.color,
-                strokeOpacity: 0.6,
-                strokeWeight: 5,
-                icons: [{ icon: { path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW, scale: 2, fillOpacity: 1, strokeColor: p.color }, offset: '50%', repeat: '120px' }],
-              }}
-            />
-          ))}
+          {/* --- FULL TRIP ROUTE RENDERING --- */}
+          {window.google && showFullRoute && (
+            <>
+              {/* 1. Inter-day Connections (Dashed) */}
+              {interDayPaths.map((path, idx) => (
+                <Polyline
+                  key={`inter-day-${idx}`}
+                  path={path}
+                  options={{
+                    strokeColor: '#94a3b8',
+                    strokeOpacity: 0.4,
+                    strokeWeight: 2,
+                    icons: [{
+                      icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.6, scale: 3 },
+                      offset: '0',
+                      repeat: '15px'
+                    }],
+                  }}
+                />
+              ))}
+
+              {/* 2. Daily Routes (Solid with Arrows) */}
+              {fullTripPaths.map((path, idx) => (
+                <Polyline
+                  key={`full-route-day-${idx}`}
+                  path={path}
+                  options={{
+                    strokeColor: dayColors[idx % dayColors.length],
+                    strokeOpacity: 0.8,
+                    strokeWeight: 5,
+                    icons: [{ 
+                      icon: { 
+                        path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW, 
+                        scale: 3, 
+                        fillOpacity: 1, 
+                        strokeColor: dayColors[idx % dayColors.length] 
+                      }, 
+                      offset: '50%', 
+                      repeat: '100px' 
+                    }],
+                  }}
+                />
+              ))}
+
+              {/* 3. Day Markers (Labels for the start of each day) */}
+              {fullTripPaths.map((path, idx) => (
+                <Marker
+                  key={`day-label-${idx}`}
+                  position={path[0]}
+                  label={{
+                    text: `Day ${idx + 1}`,
+                    color: 'white',
+                    fontSize: '12px',
+                    fontWeight: '900'
+                  }}
+                  icon={{
+                    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                      <svg width="60" height="30" viewBox="0 0 60 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect width="60" height="24" rx="12" fill="${dayColors[idx % dayColors.length]}" />
+                        <path d="M30 30L26 24H34L30 30Z" fill="${dayColors[idx % dayColors.length]}" />
+                      </svg>
+                    `)}`,
+                    scaledSize: new window.google.maps.Size(60, 30),
+                    anchor: new window.google.maps.Point(30, 30)
+                  }}
+                />
+              ))}
+            </>
+          )}
 
           {/* Itinerary Markers */}
           {!showFullRoute && (
