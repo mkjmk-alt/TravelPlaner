@@ -2244,23 +2244,34 @@ Travel Planner AI Analysis Report
                                     </button>
 
                                     {/* Delete Button */}
-                                    <button 
-                                      onClick={(e) => { e.stopPropagation(); handleInlineDelete(e, `itin-${item.id}`, () => removeFromItinerary(dayPlan.day, item.id)); }}
-                                      style={{ 
-                                        height: '44px', width: confirmDeleteId === `itin-${item.id}` ? 'auto' : '44px',
-                                        minWidth: confirmDeleteId === `itin-${item.id}` ? '80px' : '44px',
-                                        position: confirmDeleteId === `itin-${item.id}` ? 'absolute' : 'relative',
-                                        right: confirmDeleteId === `itin-${item.id}` ? '16px' : 'auto',
-                                        zIndex: confirmDeleteId === `itin-${item.id}` ? 10 : 1,
-                                        color: confirmDeleteId === `itin-${item.id}` ? 'white' : '#f87171', 
-                                        backgroundColor: confirmDeleteId === `itin-${item.id}` ? '#ef4444' : '#fff5f5', 
-                                        border: `1px solid ${confirmDeleteId === `itin-${item.id}` ? '#dc2626' : '#fee2e2'}`,
-                                        borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s',
-                                        fontSize: '12px', fontWeight: '800'
-                                      }}
-                                    >
-                                      {confirmDeleteId === `itin-${item.id}` ? '삭제확인' : <Trash2 size={18} />}
-                                    </button>
+                                    <div style={{ position: 'relative', width: '44px', height: '44px' }}>
+                                      <button 
+                                        onClick={(e) => { e.stopPropagation(); handleInlineDelete(e, `itin-${item.id}`, () => removeFromItinerary(dayPlan.day, item.id)); }}
+                                        style={{ 
+                                          position: confirmDeleteId === `itin-${item.id}` ? 'absolute' : 'relative',
+                                          right: 0,
+                                          top: 0,
+                                          height: '44px', 
+                                          width: confirmDeleteId === `itin-${item.id}` ? '94px' : '44px',
+                                          zIndex: confirmDeleteId === `itin-${item.id}` ? 50 : 1,
+                                          color: confirmDeleteId === `itin-${item.id}` ? 'white' : '#f87171', 
+                                          backgroundColor: confirmDeleteId === `itin-${item.id}` ? '#ef4444' : '#fff5f5', 
+                                          border: `1px solid ${confirmDeleteId === `itin-${item.id}` ? '#dc2626' : '#fee2e2'}`,
+                                          borderRadius: '12px', 
+                                          cursor: 'pointer', 
+                                          display: 'flex', 
+                                          alignItems: 'center', 
+                                          justifyContent: 'center',
+                                          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                                          fontSize: '11px', 
+                                          fontWeight: '900',
+                                          boxShadow: confirmDeleteId === `itin-${item.id}` ? '0 4px 12px rgba(239, 68, 68, 0.3)' : 'none',
+                                          whiteSpace: 'nowrap'
+                                        }}
+                                      >
+                                        {confirmDeleteId === `itin-${item.id}` ? '삭제 확인' : <Trash2 size={18} />}
+                                      </button>
+                                    </div>
                                   </div>
                                 </div>
 
