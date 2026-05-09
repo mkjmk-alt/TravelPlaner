@@ -238,8 +238,6 @@ function App() {
     '#f97316'  // Orange
   ];
   const getDayColor = (idx) => dayColors[idx % dayColors.length];
-  const [showPasteModal, setShowPasteModal] = useState(false);
-  const [pasteText, setPasteText] = useState('');
 
   // --- DATA STATE ---
   const [favorites, setFavorites] = useState(() => {
