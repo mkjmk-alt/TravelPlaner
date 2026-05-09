@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete, Polyline } from '@react-google-maps/api';
-import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Camera, Play, Image, Clock, Sparkles, Brain } from 'lucide-react';
+import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Camera, Play, Image, Clock, Sparkles, Brain, Upload } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import html2canvas from 'html2canvas';
 import './index.css';
@@ -998,6 +998,79 @@ Travel Planner AI Analysis Report
     setEditTripData({ name: "New Trip", startDate: today, endDate: today, country: "" });
   };
 
+  const handleUploadJson = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        try {
+          const content = event.target.result;
+          const data = JSON.parse(content);
+
+          if (!data.name || !data.itinerary) {
+            setModalConfig({ 
+              type: 'error', 
+              title: '업로드 실패', 
+              message: '올바른 형식의 여행 일정 JSON 파일이 아닙니다. name과 itinerary 필드가 필요합니다.' 
+            });
+            setShowCustomModal(true);
+            return;
+          }
+
+          const newId = Date.now().toString();
+          const newTrip = {
+            id: newId,
+            name: data.name || "Uploaded Trip",
+            country: data.country || "",
+            startDate: data.startDate || new Date().toISOString().split('T')[0],
+            endDate: data.endDate || new Date().toISOString().split('T')[0],
+            itinerary: (data.itinerary || []).map((day, idx) => ({
+              ...day,
+              day: day.day || idx + 1,
+              items: (day.items || []).map(item => ({
+                ...item,
+                id: item.id || Math.random().toString(36).substr(2, 9)
+              }))
+            })),
+            budgetSettings: data.budgetSettings || { limitKRW: 1000000, travelCurrency: 'USD' },
+            expenses: (data.expenses || []).map(exp => ({
+              ...exp,
+              id: exp.id || Math.random().toString(36).substr(2, 9),
+              createdAt: exp.createdAt || Date.now()
+            })),
+            createdAt: Date.now()
+          };
+
+          const newTrips = [newTrip, ...trips];
+          await syncTripsToCloud(newTrips);
+          setActiveTripId(newId);
+          
+          setModalConfig({ 
+            type: 'success', 
+            title: '업로드 완료', 
+            message: `'${newTrip.name}' 일정을 성공적으로 불러왔습니다.` 
+          });
+          setShowCustomModal(true);
+        } catch (err) {
+          console.error("JSON parsing error:", err);
+          setModalConfig({ 
+            type: 'error', 
+            title: '파일 오류', 
+            message: 'JSON 파일을 파싱하는 중 오류가 발생했습니다.' 
+          });
+          setShowCustomModal(true);
+        }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  };
+
   const startRenameTrip = (trip) => {
     setEditingTripId(trip.id);
     setEditTripData({ 
@@ -1550,6 +1623,9 @@ Travel Planner AI Analysis Report
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button onClick={loadFlorenceTest} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '800', color: '#f97316', backgroundColor: '#fff7ed', padding: '8px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer' }}>
                       <Sparkles size={14} /> TEST DATA
+                    </button>
+                    <button onClick={handleUploadJson} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '800', color: '#6366f1', backgroundColor: '#eef2ff', padding: '8px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer' }}>
+                      <Upload size={14} /> UPLOAD
                     </button>
                     <button onClick={joinSharedTrip} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '800', color: '#10b981', backgroundColor: '#ecfdf5', padding: '8px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer' }}>
                       <Users size={14} /> JOIN
