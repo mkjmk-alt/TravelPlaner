@@ -9,7 +9,7 @@ import * as FileSystem from 'expo-file-system';
 import { Alert } from 'react-native';
 
 export default function TripsScreen() {
-  const { trips, loading, fetchTrips, setActiveTrip } = useTripStore();
+  const { trips, loading, fetchTrips, setActiveTrip, addTrip } = useTripStore();
   const router = useRouter();
 
   useEffect(() => {
@@ -177,14 +177,14 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   uploadButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: Colors.background.main,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: Colors.background.sub,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: Colors.border.light,
+    borderColor: Colors.border.medium,
   },
   listContent: {
     padding: 24,
