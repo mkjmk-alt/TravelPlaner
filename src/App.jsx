@@ -307,10 +307,7 @@ function App() {
     return [];
   });
 
-  const [activeTripId, setActiveTripId] = useState(() => {
-    const savedTrips = JSON.parse(localStorage.getItem('world_pro_trips_v1') || '[]');
-    return savedTrips.length > 0 ? savedTrips[0].id : null;
-  });
+  const [activeTripId, setActiveTripId] = useState(null);
 
   const [exchangeRates, setExchangeRates] = useState({});
   const [expenseInput, setExpenseInput] = useState({ desc: '', amount: '', currency: '', day: 1 });
