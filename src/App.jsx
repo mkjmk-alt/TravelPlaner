@@ -75,53 +75,53 @@ const PremiumTimeInput = ({ value, onChange, label }) => {
   };
 
   return (
-    <div style={{ width: '100%', marginBottom: window.innerWidth < 768 ? '12px' : '20px' }}>
-      {label && <div style={{ fontSize: '10px', fontWeight: '900', color: '#9ca3af', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.05em' }}>{label}</div>}
+    <div style={{ width: '100%', marginBottom: window.innerWidth < 768 ? '8px' : '20px' }}>
+      {label && <div style={{ fontSize: '9px', fontWeight: '900', color: '#9ca3af', textTransform: 'uppercase', marginBottom: window.innerWidth < 768 ? '4px' : '8px', letterSpacing: '0.05em' }}>{label}</div>}
       <div style={{ 
         display: 'flex', 
         alignItems: 'center', 
         justifyContent: 'space-between',
         backgroundColor: 'white',
-        padding: window.innerWidth < 768 ? '10px 14px' : '14px',
-        borderRadius: '20px',
+        padding: window.innerWidth < 768 ? '8px 12px' : '14px',
+        borderRadius: '16px',
         boxShadow: '0 4px 20px rgba(0,0,0,0.04)',
         border: '1px solid #f1f5f9'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-            <button onClick={() => adjustTime('h', 1)} style={{ border: 'none', background: 'none', color: '#cbd5e1', cursor: 'pointer', padding: '2px' }}><ChevronUp size={14} /></button>
-            <div style={{ fontSize: window.innerWidth < 768 ? '22px' : '26px', fontWeight: '900', color: '#0f172a', width: '32px', textAlign: 'center', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>{hh}</div>
-            <button onClick={() => adjustTime('h', -1)} style={{ border: 'none', background: 'none', color: '#cbd5e1', cursor: 'pointer', padding: '2px' }}><ChevronDown size={14} /></button>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px' }}>
+            <button onClick={() => adjustTime('h', 1)} style={{ border: 'none', background: 'none', color: '#cbd5e1', cursor: 'pointer', padding: '1px' }}><ChevronUp size={12} /></button>
+            <div style={{ fontSize: window.innerWidth < 768 ? '20px' : '26px', fontWeight: '900', color: '#0f172a', width: '30px', textAlign: 'center', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>{hh}</div>
+            <button onClick={() => adjustTime('h', -1)} style={{ border: 'none', background: 'none', color: '#cbd5e1', cursor: 'pointer', padding: '1px' }}><ChevronDown size={12} /></button>
           </div>
           
-          <div style={{ fontSize: '18px', fontWeight: '900', color: '#e2e8f0' }}>:</div>
+          <div style={{ fontSize: '16px', fontWeight: '900', color: '#e2e8f0' }}>:</div>
           
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-            <button onClick={() => adjustTime('m', 5)} style={{ border: 'none', background: 'none', color: '#cbd5e1', cursor: 'pointer', padding: '2px' }}><ChevronUp size={14} /></button>
-            <div style={{ fontSize: window.innerWidth < 768 ? '22px' : '26px', fontWeight: '900', color: '#0f172a', width: '32px', textAlign: 'center', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>{mm}</div>
-            <button onClick={() => adjustTime('m', -5)} style={{ border: 'none', background: 'none', color: '#cbd5e1', cursor: 'pointer', padding: '2px' }}><ChevronDown size={14} /></button>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px' }}>
+            <button onClick={() => adjustTime('m', 5)} style={{ border: 'none', background: 'none', color: '#cbd5e1', cursor: 'pointer', padding: '1px' }}><ChevronUp size={12} /></button>
+            <div style={{ fontSize: window.innerWidth < 768 ? '20px' : '26px', fontWeight: '900', color: '#0f172a', width: '30px', textAlign: 'center', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>{mm}</div>
+            <button onClick={() => adjustTime('m', -5)} style={{ border: 'none', background: 'none', color: '#cbd5e1', cursor: 'pointer', padding: '1px' }}><ChevronDown size={12} /></button>
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
           <button 
             onClick={setNow}
             style={{ 
-              padding: '4px 10px', 
+              padding: '2px 8px', 
               backgroundColor: '#f8fafc', 
               color: '#64748b', 
               border: '1px solid #e2e8f0', 
-              borderRadius: '8px', 
-              fontSize: '9px', 
+              borderRadius: '6px', 
+              fontSize: '8px', 
               fontWeight: '900', 
               cursor: 'pointer'
             }}
           >
             NOW
           </button>
-          <div style={{ display: 'flex', gap: '4px' }}>
-            <button onClick={() => adjustTime('m', -30)} style={{ width: '32px', height: '28px', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '6px', fontSize: '9px', fontWeight: '900', color: '#94a3b8', cursor: 'pointer' }}>-30</button>
-            <button onClick={() => adjustTime('m', 30)} style={{ width: '32px', height: '28px', backgroundColor: '#eff6ff', border: 'none', borderRadius: '6px', fontSize: '9px', fontWeight: '900', color: '#3b82f6', cursor: 'pointer' }}>+30</button>
+          <div style={{ display: 'flex', gap: '2px' }}>
+            <button onClick={() => adjustTime('m', -30)} style={{ width: '28px', height: '24px', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '4px', fontSize: '8px', fontWeight: '900', color: '#94a3b8', cursor: 'pointer' }}>-30</button>
+            <button onClick={() => adjustTime('m', 30)} style={{ width: '28px', height: '24px', backgroundColor: '#eff6ff', border: 'none', borderRadius: '4px', fontSize: '8px', fontWeight: '900', color: '#3b82f6', cursor: 'pointer' }}>+30</button>
           </div>
         </div>
       </div>
@@ -2751,20 +2751,20 @@ Travel Planner AI Analysis Report
           {/* Selected Place InfoWindow */}
           {selectedPlace && (
             <InfoWindow position={{ lat: selectedPlace.lat, lng: selectedPlace.lng }} onCloseClick={() => setSelectedPlace(null)}>
-              <div style={{ padding: window.innerWidth < 768 ? '12px 16px' : '20px', minWidth: window.innerWidth < 768 ? '260px' : '300px', maxWidth: '340px', fontFamily: '"Inter", "Roboto", sans-serif' }}>
+              <div style={{ padding: window.innerWidth < 768 ? '8px 12px' : '20px', minWidth: window.innerWidth < 768 ? '250px' : '300px', maxWidth: '340px', fontFamily: '"Inter", "Roboto", sans-serif' }}>
                 {/* TOP SECTION: Place Info & Favorite */}
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: window.innerWidth < 768 ? '12px' : '16px', marginBottom: window.innerWidth < 768 ? '12px' : '16px' }}>
-                  <div style={{ width: window.innerWidth < 768 ? '44px' : '56px', height: window.innerWidth < 768 ? '44px' : '56px', backgroundColor: '#f9fafb', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: window.innerWidth < 768 ? '24px' : '32px', border: '1px solid #f3f4f6', flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: window.innerWidth < 768 ? '10px' : '16px', marginBottom: window.innerWidth < 768 ? '8px' : '16px' }}>
+                  <div style={{ width: window.innerWidth < 768 ? '40px' : '56px', height: window.innerWidth < 768 ? '40px' : '56px', backgroundColor: '#f9fafb', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: window.innerWidth < 768 ? '20px' : '32px', border: '1px solid #f3f4f6', flexShrink: 0 }}>
                     {selectedPlace.emoji}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                      <h3 style={{ fontSize: window.innerWidth < 768 ? '16px' : '18px', fontWeight: '900', margin: '0 0 2px 0', color: '#111827', lineHeight: 1.2, flex: 1 }}>{selectedPlace.name}</h3>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '6px' }}>
+                      <h3 style={{ fontSize: window.innerWidth < 768 ? '15px' : '18px', fontWeight: '900', margin: '0 0 1px 0', color: '#111827', lineHeight: 1.2, flex: 1 }}>{selectedPlace.name}</h3>
                       <button 
                         onClick={() => toggleFavorite(selectedPlace)} 
                         style={{ 
-                          padding: '6px', 
-                          borderRadius: '10px', 
+                          padding: '5px', 
+                          borderRadius: '8px', 
                           border: 'none',
                           backgroundColor: isFavorite(selectedPlace) ? '#fee2e2' : '#f1f5f9', 
                           color: isFavorite(selectedPlace) ? '#ef4444' : '#9ca3af', 
@@ -2775,20 +2775,20 @@ Travel Planner AI Analysis Report
                           transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
                         }}
                       >
-                        <Heart size={window.innerWidth < 768 ? 18 : 22} fill={isFavorite(selectedPlace) ? "currentColor" : "none"} />
+                        <Heart size={window.innerWidth < 768 ? 16 : 22} fill={isFavorite(selectedPlace) ? "currentColor" : "none"} />
                       </button>
                     </div>
-                    <p style={{ fontSize: '10px', fontWeight: '800', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0, display: 'flex', alignItems: 'flex-start', gap: '4px', lineHeight: 1.3 }}>
-                      <MapPin size={10} color="#3b82f6" style={{ marginTop: '2px', flexShrink: 0 }} /> 
+                    <p style={{ fontSize: '9px', fontWeight: '800', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0, display: 'flex', alignItems: 'flex-start', gap: '4px', lineHeight: 1.2 }}>
+                      <MapPin size={9} color="#3b82f6" style={{ marginTop: '1px', flexShrink: 0 }} /> 
                       <span style={{ overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}>{selectedPlace.loc}</span>
                     </p>
                   </div>
                 </div>
 
-                <div style={{ height: '1px', backgroundColor: '#f1f5f9', margin: window.innerWidth < 768 ? '10px 0' : '16px 0' }} />
+                <div style={{ height: '1px', backgroundColor: '#f1f5f9', margin: window.innerWidth < 768 ? '8px 0' : '16px 0' }} />
 
                 {/* BOTTOM SECTION: Add to Itinerary */}
-                <div style={{ backgroundColor: '#f8fafc', padding: window.innerWidth < 768 ? '12px' : '16px', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
+                <div style={{ backgroundColor: '#f8fafc', padding: window.innerWidth < 768 ? '10px' : '16px', borderRadius: '14px', border: '1px solid #f1f5f9' }}>
                   <PremiumTimeInput 
                     label="Add to Itinerary"
                     value={itineraryTime || '09:00'} 
@@ -2799,23 +2799,23 @@ Travel Planner AI Analysis Report
                     onClick={() => addToItinerary(selectedPlace)} 
                     style={{ 
                       width: '100%', 
-                      padding: window.innerWidth < 768 ? '10px' : '14px', 
+                      padding: window.innerWidth < 768 ? '8px' : '14px', 
                       backgroundColor: '#2563eb', 
                       color: 'white', 
-                      borderRadius: '12px', 
-                      fontSize: '12px', 
+                      borderRadius: '10px', 
+                      fontSize: '11px', 
                       fontWeight: '900', 
                       border: 'none', 
                       cursor: 'pointer', 
-                      boxShadow: '0 6px 15px rgba(37, 99, 235, 0.2)', 
+                      boxShadow: '0 4px 12px rgba(37, 99, 235, 0.2)', 
                       display: 'flex', 
                       alignItems: 'center', 
                       justifyContent: 'center', 
-                      gap: '6px',
+                      gap: '4px',
                       transition: 'all 0.2s'
                     }}
                   >
-                    <PlusCircle size={16} /> 일정 추가
+                    <PlusCircle size={14} /> 일정 추가
                   </button>
                 </div>
               </div>
