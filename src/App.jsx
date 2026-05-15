@@ -2804,74 +2804,76 @@ Travel Planner AI Analysis Report
                 <div style={{ height: '1px', backgroundColor: '#f1f5f9', margin: window.innerWidth < 768 ? '8px 0' : '16px 0' }} />
 
                 {/* BOTTOM SECTION: Add to Itinerary */}
-                <div style={{ backgroundColor: '#f8fafc', padding: window.innerWidth < 768 ? '10px' : '16px', borderRadius: '14px', border: '1px solid #f1f5f9' }}>
-                  <div style={{ fontSize: '9px', fontWeight: '900', color: '#9ca3af', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.05em' }}>Select Day</div>
-                  <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
-                    {[1, 2, 3].map(day => (
-                      <button
-                        key={day}
-                        onClick={() => setActiveDay(day)}
-                        style={{
-                          flex: 1,
-                          padding: '8px 0',
-                          borderRadius: '10px',
-                          border: '1px solid',
-                          borderColor: activeDay === day ? '#2563eb' : '#e2e8f0',
-                          backgroundColor: activeDay === day ? '#eff6ff' : 'white',
-                          color: activeDay === day ? '#2563eb' : '#64748b',
-                          fontSize: '11px',
-                          fontWeight: '900',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        {day}일차
-                      </button>
-                    ))}
-                  </div>
+                {activeTripId && (
+                  <div style={{ backgroundColor: '#f8fafc', padding: window.innerWidth < 768 ? '10px' : '16px', borderRadius: '14px', border: '1px solid #f1f5f9' }}>
+                    <div style={{ fontSize: '9px', fontWeight: '900', color: '#9ca3af', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.05em' }}>Select Day</div>
+                    <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
+                      {[1, 2, 3].map(day => (
+                        <button
+                          key={day}
+                          onClick={() => setActiveDay(day)}
+                          style={{
+                            flex: 1,
+                            padding: '8px 0',
+                            borderRadius: '10px',
+                            border: '1px solid',
+                            borderColor: activeDay === day ? '#2563eb' : '#e2e8f0',
+                            backgroundColor: activeDay === day ? '#eff6ff' : 'white',
+                            color: activeDay === day ? '#2563eb' : '#64748b',
+                            fontSize: '11px',
+                            fontWeight: '900',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          {day}일차
+                        </button>
+                      ))}
+                    </div>
 
-                  <PremiumTimeInput 
-                    label="Arrival Time"
-                    value={itineraryTime || '09:00'} 
-                    onChange={(val) => setItineraryTime(val)} 
-                  />
-                  
-                  <button 
-                    onClick={() => {
-                      if (!activeDay) {
-                        setModalConfig({ 
-                          type: 'error', 
-                          title: '일차 미선택', 
-                          message: '추가할 일차를 먼저 선택해주세요! 상단의 1, 2, 3일차 버튼 중 하나를 클릭하면 됩니다.' 
-                        });
-                        setShowCustomModal(true);
-                        return;
-                      }
-                      addToItinerary(selectedPlace);
-                    }} 
-                    style={{ 
-                      width: '100%', 
-                      padding: window.innerWidth < 768 ? '8px' : '14px', 
-                      backgroundColor: activeDay ? '#2563eb' : '#94a3b8', 
-                      color: 'white', 
-                      borderRadius: '10px', 
-                      fontSize: '11px', 
-                      fontWeight: '900', 
-                      border: 'none', 
-                      cursor: activeDay ? 'pointer' : 'not-allowed', 
-                      boxShadow: activeDay ? '0 4px 12px rgba(37, 99, 235, 0.2)' : 'none', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center', 
-                      gap: '4px',
-                      transition: 'all 0.2s',
-                      opacity: activeDay ? 1 : 0.7
-                    }}
-                  >
-                    <PlusCircle size={14} /> 
-                    {activeDay ? `${activeDay}일차 일정에 추가` : '일차를 선택해주세요'}
-                  </button>
-                </div>
+                    <PremiumTimeInput 
+                      label="Arrival Time"
+                      value={itineraryTime || '09:00'} 
+                      onChange={(val) => setItineraryTime(val)} 
+                    />
+                    
+                    <button 
+                      onClick={() => {
+                        if (!activeDay) {
+                          setModalConfig({ 
+                            type: 'error', 
+                            title: '일차 미선택', 
+                            message: '추가할 일차를 먼저 선택해주세요! 상단의 1, 2, 3일차 버튼 중 하나를 클릭하면 됩니다.' 
+                          });
+                          setShowCustomModal(true);
+                          return;
+                        }
+                        addToItinerary(selectedPlace);
+                      }} 
+                      style={{ 
+                        width: '100%', 
+                        padding: window.innerWidth < 768 ? '8px' : '14px', 
+                        backgroundColor: activeDay ? '#2563eb' : '#94a3b8', 
+                        color: 'white', 
+                        borderRadius: '10px', 
+                        fontSize: '11px', 
+                        fontWeight: '900', 
+                        border: 'none', 
+                        cursor: activeDay ? 'pointer' : 'not-allowed', 
+                        boxShadow: activeDay ? '0 4px 12px rgba(37, 99, 235, 0.2)' : 'none', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        gap: '4px',
+                        transition: 'all 0.2s',
+                        opacity: activeDay ? 1 : 0.7
+                      }}
+                    >
+                      <PlusCircle size={14} /> 
+                      {activeDay ? `${activeDay}일차 일정에 추가` : '일차를 선택해주세요'}
+                    </button>
+                  </div>
+                )}
               </div>
             </InfoWindow>
           )}
