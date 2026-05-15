@@ -230,7 +230,12 @@ function App() {
 
   const handleMyLocation = () => {
     if (!navigator.geolocation) {
-      alert("이 브라우저에서는 위치 정보를 사용할 수 없습니다.");
+      setModalConfig({ 
+        type: 'error', 
+        title: '위치 정보 지원 불가', 
+        message: '이 브라우저에서는 위치 정보를 사용할 수 없습니다.' 
+      });
+      setShowCustomModal(true);
       return;
     }
 
@@ -246,7 +251,12 @@ function App() {
       },
       (error) => {
         console.error("Geolocation error:", error);
-        alert("위치 정보를 가져올 수 없습니다. GPS 권한을 허용했는지 확인해주세요.");
+        setModalConfig({ 
+          type: 'error', 
+          title: '위치 정보 오류', 
+          message: '위치 정보를 가져올 수 없습니다. GPS 권한을 허용했는지 확인해주세요.' 
+        });
+        setShowCustomModal(true);
       },
       { enableHighAccuracy: true }
     );
@@ -913,7 +923,12 @@ function App() {
       }
     } catch (error) {
       console.error("FULL ERROR LOG:", error);
-      alert(`AI 분석 도중 오류가 발생했습니다.\n원인: ${error.message.substring(0, 100)}...`);
+      setModalConfig({ 
+        type: 'error', 
+        title: 'AI 분석 오류', 
+        message: `AI 분석 도중 오류가 발생했습니다. 원인: ${error.message.substring(0, 100)}...` 
+      });
+      setShowCustomModal(true);
       setShowAIModal(false);
     } finally {
       setIsAnalyzing(false);
@@ -949,7 +964,12 @@ function App() {
       link.click();
     } catch (err) {
       console.error("Image capture failed:", err);
-      alert("이미지 저장 중 오류가 발생했습니다.");
+      setModalConfig({ 
+        type: 'error', 
+        title: '이미지 저장 실패', 
+        message: '이미지 저장 중 오류가 발생했습니다.' 
+      });
+      setShowCustomModal(true);
     } finally {
       if (btn) btn.style.display = 'flex';
       setIsCapturing(false);
@@ -2823,7 +2843,12 @@ Travel Planner AI Analysis Report
                   <button 
                     onClick={() => {
                       if (!activeDay) {
-                        alert('추가할 일차를 먼저 선택해주세요!');
+                        setModalConfig({ 
+                          type: 'error', 
+                          title: '일차 미선택', 
+                          message: '추가할 일차를 먼저 선택해주세요! 상단의 1, 2, 3일차 버튼 중 하나를 클릭하면 됩니다.' 
+                        });
+                        setShowCustomModal(true);
                         return;
                       }
                       addToItinerary(selectedPlace);
