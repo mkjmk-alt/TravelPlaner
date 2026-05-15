@@ -199,7 +199,7 @@ function App() {
   const [viewMode, setViewMode] = useState('trips');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResult, setSearchResult] = useState(null);
-  const [activeDay, setActiveDay] = useState(1);
+  const [activeDay, setActiveDay] = useState(null);
   const [expandedCountries, setExpandedCountries] = useState({});
   const [editingTripId, setEditingTripId] = useState(null);
   const [editTripData, setEditTripData] = useState({ name: "", startDate: "", endDate: "", country: "" });
@@ -318,7 +318,7 @@ function App() {
 
   // Reset activeDay when trip changes
   useEffect(() => {
-    setActiveDay(1);
+    setActiveDay(null);
   }, [activeTripId]);
 
   // Cloud Sync Initialization
@@ -2789,33 +2789,66 @@ Travel Planner AI Analysis Report
 
                 {/* BOTTOM SECTION: Add to Itinerary */}
                 <div style={{ backgroundColor: '#f8fafc', padding: window.innerWidth < 768 ? '10px' : '16px', borderRadius: '14px', border: '1px solid #f1f5f9' }}>
+                  <div style={{ fontSize: '9px', fontWeight: '900', color: '#9ca3af', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.05em' }}>Select Day</div>
+                  <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
+                    {[1, 2, 3].map(day => (
+                      <button
+                        key={day}
+                        onClick={() => setActiveDay(day)}
+                        style={{
+                          flex: 1,
+                          padding: '8px 0',
+                          borderRadius: '10px',
+                          border: '1px solid',
+                          borderColor: activeDay === day ? '#2563eb' : '#e2e8f0',
+                          backgroundColor: activeDay === day ? '#eff6ff' : 'white',
+                          color: activeDay === day ? '#2563eb' : '#64748b',
+                          fontSize: '11px',
+                          fontWeight: '900',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        {day}일차
+                      </button>
+                    ))}
+                  </div>
+
                   <PremiumTimeInput 
-                    label="Add to Itinerary"
+                    label="Arrival Time"
                     value={itineraryTime || '09:00'} 
                     onChange={(val) => setItineraryTime(val)} 
                   />
                   
                   <button 
-                    onClick={() => addToItinerary(selectedPlace)} 
+                    onClick={() => {
+                      if (!activeDay) {
+                        alert('추가할 일차를 먼저 선택해주세요!');
+                        return;
+                      }
+                      addToItinerary(selectedPlace);
+                    }} 
                     style={{ 
                       width: '100%', 
                       padding: window.innerWidth < 768 ? '8px' : '14px', 
-                      backgroundColor: '#2563eb', 
+                      backgroundColor: activeDay ? '#2563eb' : '#94a3b8', 
                       color: 'white', 
                       borderRadius: '10px', 
                       fontSize: '11px', 
                       fontWeight: '900', 
                       border: 'none', 
-                      cursor: 'pointer', 
-                      boxShadow: '0 4px 12px rgba(37, 99, 235, 0.2)', 
+                      cursor: activeDay ? 'pointer' : 'not-allowed', 
+                      boxShadow: activeDay ? '0 4px 12px rgba(37, 99, 235, 0.2)' : 'none', 
                       display: 'flex', 
                       alignItems: 'center', 
                       justifyContent: 'center', 
                       gap: '4px',
-                      transition: 'all 0.2s'
+                      transition: 'all 0.2s',
+                      opacity: activeDay ? 1 : 0.7
                     }}
                   >
-                    <PlusCircle size={14} /> 일정 추가
+                    <PlusCircle size={14} /> 
+                    {activeDay ? `${activeDay}일차 일정에 추가` : '일차를 선택해주세요'}
                   </button>
                 </div>
               </div>
