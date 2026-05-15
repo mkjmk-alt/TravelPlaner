@@ -2506,7 +2506,7 @@ Travel Planner AI Analysis Report
       {/* MAP VIEWPORT */}
       <div className="map-wrapper">
         {/* MAP CONTROLS (TOP-RIGHT) */}
-        <div style={{ position: 'absolute', top: '24px', right: '24px', zIndex: 2000, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div className="map-controls-group">
           {/* Full Route Toggle */}
           <button 
             onClick={() => setShowFullRoute(!showFullRoute)} 
@@ -2542,7 +2542,7 @@ Travel Planner AI Analysis Report
 
         {/* SIDEBAR TOGGLE (ONLY WHEN CLOSED) */}
         {!sidebarOpen && (
-          <div style={{ position: 'absolute', top: '24px', left: '24px', zIndex: 2000 }}>
+          <div className="sidebar-toggle-btn">
             <button onClick={() => setSidebarOpen(true)} style={{ width: '56px', height: '56px', backgroundColor: 'white', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', cursor: 'pointer', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb' }}>
               <Menu size={24} />
             </button>
@@ -2753,12 +2753,33 @@ Travel Planner AI Analysis Report
           {selectedPlace && (
             <InfoWindow position={{ lat: selectedPlace.lat, lng: selectedPlace.lng }} onCloseClick={() => setSelectedPlace(null)}>
               <div style={{ padding: '20px', minWidth: '300px', maxWidth: '340px', fontFamily: '"Inter", "Roboto", sans-serif' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', marginBottom: '20px' }}>
+                {/* TOP SECTION: Place Info & Favorite */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', marginBottom: '16px' }}>
                   <div style={{ width: '56px', height: '56px', backgroundColor: '#f9fafb', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', border: '1px solid #f3f4f6', flexShrink: 0 }}>
                     {selectedPlace.emoji}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <h3 style={{ fontSize: '18px', fontWeight: '900', margin: '0 0 6px 0', color: '#111827', lineHeight: 1.2 }}>{selectedPlace.name}</h3>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                      <h3 style={{ fontSize: '18px', fontWeight: '900', margin: '0 0 4px 0', color: '#111827', lineHeight: 1.2, flex: 1 }}>{selectedPlace.name}</h3>
+                      <button 
+                        onClick={() => toggleFavorite(selectedPlace)} 
+                        style={{ 
+                          padding: '8px', 
+                          borderRadius: '12px', 
+                          border: 'none',
+                          backgroundColor: isFavorite(selectedPlace) ? '#fee2e2' : '#f1f5f9', 
+                          color: isFavorite(selectedPlace) ? '#ef4444' : '#9ca3af', 
+                          cursor: 'pointer', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center',
+                          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                          boxShadow: isFavorite(selectedPlace) ? '0 4px 12px rgba(239, 68, 68, 0.2)' : 'none'
+                        }}
+                      >
+                        <Heart size={22} fill={isFavorite(selectedPlace) ? "currentColor" : "none"} />
+                      </button>
+                    </div>
                     <p style={{ fontSize: '11px', fontWeight: '800', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0, display: 'flex', alignItems: 'flex-start', gap: '4px', lineHeight: 1.4 }}>
                       <MapPin size={12} color="#3b82f6" style={{ marginTop: '2px', flexShrink: 0 }} /> 
                       <span style={{ overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{selectedPlace.loc}</span>
@@ -2766,24 +2787,37 @@ Travel Planner AI Analysis Report
                   </div>
                 </div>
 
-                <PremiumTimeInput 
-                  label="Arrival Time"
-                  value={itineraryTime || '09:00'} 
-                  onChange={(val) => setItineraryTime(val)} 
-                />
-                
-                <div style={{ display: 'flex', gap: '10px' }}>
+                <div style={{ height: '1px', backgroundColor: '#f1f5f9', margin: '16px 0' }} />
+
+                {/* BOTTOM SECTION: Add to Itinerary */}
+                <div style={{ backgroundColor: '#f8fafc', padding: '16px', borderRadius: '20px', border: '1px solid #f1f5f9' }}>
+                  <PremiumTimeInput 
+                    label="Add to Itinerary"
+                    value={itineraryTime || '09:00'} 
+                    onChange={(val) => setItineraryTime(val)} 
+                  />
+                  
                   <button 
                     onClick={() => addToItinerary(selectedPlace)} 
-                    style={{ flex: 1, padding: '12px', backgroundColor: '#2563eb', color: 'white', borderRadius: '12px', fontSize: '13px', fontWeight: '900', border: 'none', cursor: 'pointer', boxShadow: '0 4px 14px rgba(37, 99, 235, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                    style={{ 
+                      width: '100%', 
+                      padding: '14px', 
+                      backgroundColor: '#2563eb', 
+                      color: 'white', 
+                      borderRadius: '14px', 
+                      fontSize: '13px', 
+                      fontWeight: '900', 
+                      border: 'none', 
+                      cursor: 'pointer', 
+                      boxShadow: '0 8px 20px rgba(37, 99, 235, 0.25)', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      gap: '8px',
+                      transition: 'all 0.2s'
+                    }}
                   >
-                    <PlusCircle size={16} /> ADD TO DAY {activeDay}
-                  </button>
-                  <button 
-                    onClick={() => toggleFavorite(selectedPlace)} 
-                    style={{ padding: '12px', borderRadius: '12px', border: `2px solid ${isFavorite(selectedPlace) ? '#fee2e2' : '#f3f4f6'}`, backgroundColor: isFavorite(selectedPlace) ? '#fef2f2' : 'white', color: isFavorite(selectedPlace) ? '#ef4444' : '#9ca3af', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                  >
-                    <Heart size={20} fill={isFavorite(selectedPlace) ? "currentColor" : "none"} />
+                    <PlusCircle size={18} /> DAY {activeDay} 일정에 추가
                   </button>
                 </div>
               </div>

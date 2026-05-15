@@ -190,3 +190,40 @@ body {
     display: none !important;
   }
 }
+.map-controls-group {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: top 0.3s ease-in-out;
+}
+
+.sidebar-toggle-btn {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  z-index: 2000;
+  transition: top 0.3s ease-in-out;
+}
+
+@media (max-width: 768px) {
+  .map-controls-group {
+    top: 100px; /* Offset to clear the search bar on mobile */
+    right: 16px;
+    gap: 8px;
+  }
+
+  .sidebar-toggle-btn {
+    top: 100px; /* Offset to clear the search bar on mobile */
+    left: 16px;
+  }
+
+  .map-controls-group button, .sidebar-toggle-btn button {
+    width: 48px !important;
+    height: 48px !important;
+    border-radius: 12px !important;
+  }
+}
