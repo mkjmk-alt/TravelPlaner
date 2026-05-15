@@ -355,7 +355,6 @@ function App() {
         } else if (cloudTrips) {
           setTrips(cloudTrips || []);
           localStorage.setItem('world_pro_trips_v1', JSON.stringify(cloudTrips || []));
-          if (!activeTripId && (cloudTrips || []).length > 0) setActiveTripId(cloudTrips[0].id);
         }
 
         if (!cloudFavs && (favorites || []).length > 0) {
