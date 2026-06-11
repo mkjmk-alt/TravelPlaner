@@ -162,14 +162,39 @@ function App() {
 
   // --- GLOBAL UI & AUTH STATE ---
   const [session, setSession] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  
+  const [windowSize, setWindowSize] = useState({
+    width: window.innerWidth,
+    height: window.innerHeight
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowSize({
+        width: window.innerWidth,
+        height: window.innerHeight
+      });
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const [sheetMode, setSheetMode] = useState('half'); // 'collapsed' | 'half' | 'full'
+  const sidebarOpen = sheetMode !== 'collapsed';
+  const setSidebarOpen = (open) => {
+    setSheetMode(open ? 'half' : 'collapsed');
+  };
+
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
   const [touchStartY, setTouchStartY] = useState(0);
 
   const onTouchStart = (e) => {
     const target = e.target;
-    if (target.closest('.drag-handle') || target.closest('.sidebar-header')) {
+    if (
+      target.closest('.drag-handle') || 
+      (target.closest('.sidebar-header') && !target.closest('button') && !target.closest('a') && !target.closest('input'))
+    ) {
       setIsDragging(true);
       setTouchStartY(e.touches[0].clientY);
     }
@@ -179,20 +204,43 @@ function App() {
     if (!isDragging) return;
     const currentY = e.touches[0].clientY;
     const diff = currentY - touchStartY;
-    if (sidebarOpen) {
-      if (diff > 0) setDragOffset(diff);
-    } else {
-      if (diff < 0) setDragOffset(diff);
-    }
+    setDragOffset(diff);
   };
 
   const onTouchEnd = () => {
     if (!isDragging) return;
     setIsDragging(false);
-    if (sidebarOpen) {
-      if (dragOffset > 100) setSidebarOpen(false);
+    
+    if (windowSize.width < 768) {
+      const H = windowSize.height;
+      const snapPoints = {
+        full: 0,
+        half: H * 0.45,
+        collapsed: H - 60
+      };
+      
+      let baseTranslatePx = snapPoints[sheetMode];
+      let finalTranslatePx = baseTranslatePx + dragOffset;
+      finalTranslatePx = Math.max(0, Math.min(H - 60, finalTranslatePx));
+      
+      let closestMode = sheetMode;
+      let minDiff = Infinity;
+      
+      Object.entries(snapPoints).forEach(([mode, value]) => {
+        const diff = Math.abs(finalTranslatePx - value);
+        if (diff < minDiff) {
+          minDiff = diff;
+          closestMode = mode;
+        }
+      });
+      
+      setSheetMode(closestMode);
     } else {
-      if (dragOffset < -100) setSidebarOpen(true);
+      if (sidebarOpen) {
+        if (dragOffset > 100) setSidebarOpen(false);
+      } else {
+        if (dragOffset < -100) setSidebarOpen(true);
+      }
     }
     setDragOffset(0);
   };
@@ -1622,17 +1670,32 @@ Travel Planner AI Analysis Report
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
         style={{
-          transform: sidebarOpen ? `translateY(${dragOffset}px)` : `translateY(calc(100% - 60px + ${dragOffset}px))`
+          height: windowSize.width < 768 ? `${windowSize.height}px` : undefined,
+          transform: windowSize.width < 768
+            ? `translateY(${Math.max(0, Math.min(windowSize.height - 60, (sheetMode === 'full' ? 0 : sheetMode === 'half' ? windowSize.height * 0.45 : windowSize.height - 60) + dragOffset))}px)`
+            : (sidebarOpen ? `translateY(${dragOffset}px)` : `translateY(calc(100% - 60px + ${dragOffset}px))`)
         }}
       >
         <div 
           className="drag-handle" 
-          onClick={() => setSidebarOpen(!sidebarOpen)}
+          onClick={() => {
+            if (windowSize.width < 768) {
+              if (sheetMode === 'collapsed') {
+                setSheetMode('half');
+              } else if (sheetMode === 'half') {
+                setSheetMode('full');
+              } else {
+                setSheetMode('half');
+              }
+            } else {
+              setSidebarOpen(!sidebarOpen);
+            }
+          }}
           style={{ cursor: 'pointer' }}
         ></div>
 
           {/* Header */}
-          <div style={{ padding: '24px 32px', borderBottom: '1px solid #f3f4f6', backgroundColor: 'white' }}>
+          <div className="sidebar-header" style={{ padding: '24px 32px', borderBottom: '1px solid #f3f4f6', backgroundColor: 'white', userSelect: 'none' }}>
             {/* Row 1: Logo & Auth */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <div>
