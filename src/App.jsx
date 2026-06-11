@@ -2192,15 +2192,34 @@ Travel Planner AI Analysis Report
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                   <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                                      <h4 style={{ 
-                                        fontSize: (item.name?.length > 15 ? '12px' : item.name?.length > 10 ? '14px' : '17px'), 
-                                        fontWeight: '900', 
-                                        color: '#000000', 
-                                        margin: 0, 
-                                        whiteSpace: 'nowrap',
-                                        flexShrink: 1,
-                                        transition: 'font-size 0.2s ease'
-                                      }}>
+                                      <h4 
+                                        onClick={() => {
+                                          if (item.lat && item.lng) {
+                                            const newPos = { lat: Number(item.lat), lng: Number(item.lng) };
+                                            setSelectedPlace(item);
+                                            if (map) {
+                                              map.panTo(newPos);
+                                              map.setZoom(16);
+                                            }
+                                            if (windowSize.width < 768 && sheetMode === 'full') {
+                                              setSheetMode('half');
+                                            }
+                                          }
+                                        }}
+                                        style={{ 
+                                          fontSize: (item.name?.length > 15 ? '12px' : item.name?.length > 10 ? '14px' : '17px'), 
+                                          fontWeight: '900', 
+                                          color: (item.lat && item.lng) ? '#2563eb' : '#000000',
+                                          textDecoration: (item.lat && item.lng) ? 'underline' : 'none',
+                                          textDecorationColor: (item.lat && item.lng) ? '#93c5fd' : 'transparent',
+                                          margin: 0, 
+                                          whiteSpace: 'nowrap',
+                                          flexShrink: 1,
+                                          cursor: (item.lat && item.lng) ? 'pointer' : 'default',
+                                          transition: 'all 0.2s ease'
+                                        }}
+                                        title={(item.lat && item.lng) ? "지도에서 위치 보기" : undefined}
+                                      >
                                         {item.name || '장소 이름 정보 없음'}
                                       </h4>
                                       <div 
