@@ -1265,62 +1265,6 @@ Travel Planner AI Analysis Report
     }
   };
 
-  // ponytail: simplified static JSON example clipboard copying
-  const handleCopyExampleJson = () => {
-    const exampleJson = {
-      name: "홍콩 3박 4일 여행",
-      country: "홍콩",
-      startDate: new Date().toISOString().split('T')[0],
-      endDate: new Date(Date.now() + 3*24*60*60*1000).toISOString().split('T')[0],
-      budgetSettings: {
-        limitKRW: 1500000,
-        travelCurrency: "HKD"
-      },
-      itinerary: [
-        {
-          day: 1,
-          items: [
-            {
-              name: "홍콩 디즈니랜드",
-              time: "10:00",
-              loc: "란타우 섬",
-              lat: 22.3130,
-              lng: 114.0413,
-              emoji: "🎡",
-              note: "야간 성 쇼(모먼터스) 꼭 보기"
-            }
-          ]
-        }
-      ]
-    };
-
-    const text = JSON.stringify(exampleJson, null, 2);
-    
-    const performCopy = async () => {
-      try {
-        if (navigator.clipboard && window.isSecureContext) {
-          await navigator.clipboard.writeText(text);
-          setModalConfig({ type: 'success', title: '복사 완료', message: "예시 JSON 서식이 클립보드에 복사되었습니다. 파일로 저장하거나 붙여넣어 사용하세요." });
-          setShowCustomModal(true);
-        } else {
-          const textArea = document.createElement("textarea");
-          textArea.value = text;
-          document.body.appendChild(textArea);
-          textArea.select();
-          document.execCommand("copy");
-          document.body.removeChild(textArea);
-          setModalConfig({ type: 'success', title: '복사 완료', message: "예시 JSON 서식이 복사되었습니다." });
-          setShowCustomModal(true);
-        }
-      } catch (err) {
-        console.error("Copy failed:", err);
-        setModalConfig({ type: 'error', title: '복사 실패', message: "복사에 실패했습니다." });
-        setShowCustomModal(true);
-      }
-    };
-    performCopy();
-  };
-
   const startRenameTrip = (trip) => {
     setEditingTripId(trip.id);
     setEditTripData({ 
@@ -1848,9 +1792,6 @@ Travel Planner AI Analysis Report
                         </button>
                         <button onClick={() => setShowPasteModal(true)} style={{ flex: '1 1 140px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '13px', fontWeight: '800', color: '#2563eb', backgroundColor: '#f0f7ff', padding: '14px 10px', borderRadius: '20px', border: '1px solid #dbeafe', cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap' }}>
                           <Clipboard size={18} /> 일정 텍스트 붙여넣기
-                        </button>
-                        <button onClick={handleCopyExampleJson} style={{ flex: '1 1 140px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '13px', fontWeight: '800', color: '#16a34a', backgroundColor: '#f0fdf4', padding: '14px 10px', borderRadius: '20px', border: '1px solid #bbf7d0', cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap' }}>
-                          <Copy size={18} /> 예시 JSON 복사
                         </button>
                       </div>
 
@@ -3434,46 +3375,7 @@ Travel Planner AI Analysis Report
             padding: '32px 24px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
             animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#0f172a', margin: 0 }}>JSON 붙여넣기</h3>
-              <button 
-                onClick={() => {
-                  const exampleJson = {
-                    name: "홍콩 3박 4일 여행",
-                    country: "홍콩",
-                    startDate: new Date().toISOString().split('T')[0],
-                    endDate: new Date(Date.now() + 3*24*60*60*1000).toISOString().split('T')[0],
-                    budgetSettings: {
-                      limitKRW: 1500000,
-                      travelCurrency: "HKD"
-                    },
-                    itinerary: [
-                      {
-                        day: 1,
-                        items: [
-                          {
-                            name: "홍콩 디즈니랜드",
-                            time: "10:00",
-                            loc: "란타우 섬",
-                            lat: 22.3130,
-                            lng: 114.0413,
-                            emoji: "🎡",
-                            note: "야간 성 쇼(모먼터스) 꼭 보기"
-                          }
-                        ]
-                      }
-                    ]
-                  };
-                  setPasteText(JSON.stringify(exampleJson, null, 2));
-                }}
-                style={{
-                  border: 'none', background: 'none', color: '#4f46e5', fontSize: '12px', fontWeight: '800', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', gap: '4px'
-                }}
-              >
-                <Clipboard size={14} /> 예시 채워넣기
-              </button>
-            </div>
+            <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#0f172a', margin: '0 0 8px 0' }}>JSON 붙여넣기</h3>
             <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 20px 0' }}>AI나 다른 곳에서 복사한 일정 JSON 텍스트를 아래에 붙여넣어 주세요.</p>
             
             <textarea 
