@@ -253,3 +253,20 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     top: calc(100px + env(safe-area-inset-top));
   }
 }
+
+@media (max-width: 768px) {
+  .sidebar-header {
+    max-height: 300px;
+    overflow: hidden;
+    transition: max-height 0.25s ease, padding 0.25s ease, opacity 0.2s ease, border-color 0.2s ease;
+  }
+
+  .sidebar-header.mobile-header-hidden {
+    max-height: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    opacity: 0;
+    border-bottom-color: transparent !important;
+    pointer-events: none;
+  }
+}

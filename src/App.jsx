@@ -264,10 +264,19 @@ function App() {
     setDragOffset(0);
   };
   const [viewMode, setViewMode] = useState('trips');
+  const [isMobileHeaderHidden, setIsMobileHeaderHidden] = useState(false);
   const openItinerary = () => {
+    setIsMobileHeaderHidden(false);
     setViewMode('itinerary');
     if (windowSize.width < 768) setSheetMode('full');
   };
+
+  const handleSidebarScroll = (e) => {
+    if (windowSize.width >= 768 || viewMode !== 'itinerary') return;
+    const shouldHideHeader = e.currentTarget.scrollTop > 8;
+    setIsMobileHeaderHidden((hidden) => hidden === shouldHideHeader ? hidden : shouldHideHeader);
+  };
+
   const [searchQuery, setSearchQuery] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [searchResult, setSearchResult] = useState(null);
@@ -1224,6 +1233,7 @@ function App() {
     
     if (activeTripId === id) {
       setActiveTripId(newTrips.length > 0 ? newTrips[0].id : null);
+      setIsMobileHeaderHidden(false);
       setViewMode('trips');
     }
   };
@@ -1645,7 +1655,7 @@ function App() {
         ></div>
 
           {/* Header */}
-          <div className="sidebar-header" style={{ padding: '24px 32px', borderBottom: '1px solid #f3f4f6', backgroundColor: 'white', userSelect: 'none' }}>
+          <div className={"sidebar-header " + (isMobileHeaderHidden ? "mobile-header-hidden" : "")} style={{ padding: '24px 32px', borderBottom: '1px solid #f3f4f6', backgroundColor: 'white', userSelect: 'none' }}>
             {/* Row 1: Logo & Auth */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <div>
@@ -1668,14 +1678,14 @@ function App() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', gap: '6px', paddingRight: '12px', borderRight: '1px solid #f3f4f6' }}>
                 <button 
-                  onClick={() => setViewMode('trips')}
+                  onClick={() => { setIsMobileHeaderHidden(false); setViewMode('trips'); }}
                   style={{ width: '40px', height: '40px', borderRadius: '12px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.2s', backgroundColor: viewMode === 'trips' ? '#8b5cf6' : '#f3f4f6', color: viewMode === 'trips' ? 'white' : '#9ca3af' }}
                   aria-label="내 여행" title="내 여행"
                 >
                   <Plane size={18} />
                 </button>
                 <button 
-                  onClick={() => setViewMode('favorites')}
+                  onClick={() => { setIsMobileHeaderHidden(false); setViewMode('favorites'); }}
                   style={{ width: '40px', height: '40px', borderRadius: '12px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.2s', backgroundColor: viewMode === 'favorites' ? '#ef4444' : '#f3f4f6', color: viewMode === 'favorites' ? 'white' : '#9ca3af' }}
                   aria-label="저장한 장소" title="저장한 장소"
                 >
@@ -1693,7 +1703,7 @@ function App() {
                     <Calendar size={18} />
                   </button>
                   <button 
-                    onClick={() => setViewMode('budget')}
+                    onClick={() => { setIsMobileHeaderHidden(false); setViewMode('budget'); }}
                     style={{ width: '40px', height: '40px', borderRadius: '12px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.2s', backgroundColor: viewMode === 'budget' ? '#10b981' : '#f3f4f6', color: viewMode === 'budget' ? 'white' : '#9ca3af' }}
                     aria-label="예산" title="예산"
                   >
@@ -1717,8 +1727,10 @@ function App() {
             </div>
 
           {/* List Content */}
-          <div style={{ 
-            flex: 1, 
+          <div
+            onScroll={handleSidebarScroll}
+            style={{
+            flex: 1,
             overflowY: 'auto', 
             padding: '24px 32px',
             msOverflowStyle: 'none',
@@ -2131,6 +2143,24 @@ function App() {
                                 }}
                               >
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                  <div
+                                    aria-label={`${iIdx + 1}번째 일정`}
+                                    style={{
+                                      width: '34px',
+                                      height: '34px',
+                                      borderRadius: '50%',
+                                      backgroundColor: '#3b82f6',
+                                      color: 'white',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: '15px',
+                                      fontWeight: '900',
+                                      flexShrink: 0,
+                                    }}
+                                  >
+                                    {iIdx + 1}
+                                  </div>
                                   <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                                       <h4 
