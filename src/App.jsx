@@ -10,7 +10,6 @@ import './index.css';
 const HK_CENTER = { lat: 22.2891, lng: 114.1924 };
 const MAP_LIBRARIES = ['places']; 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
 const readStoredJson = (key, fallback) => {
   try {
@@ -917,13 +916,6 @@ function App() {
     if (!activeTrip) return;
     
     console.log("--- Starting AI Analysis ---");
-    console.log("Current API Key:", GEMINI_API_KEY ? "Loaded (starts with " + GEMINI_API_KEY.substring(0, 7) + ")" : "MISSING");
-
-    if (!GEMINI_API_KEY) {
-      setModalConfig({ type: 'error', title: '설정 오류', message: ".env 파일에 VITE_GEMINI_API_KEY를 설정해 주세요." });
-      setShowCustomModal(true);
-      return;
-    }
     
     setIsAnalyzing(true);
     setShowAIModal(true);
@@ -980,7 +972,7 @@ function App() {
 
     try {
       console.log("Sending request to Gemini API...");
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-lite:generateContent?key=${GEMINI_API_KEY}`, {
+      const response = await fetch("/api/ai-analysis", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -991,9 +983,10 @@ function App() {
       console.log("Response status:", response.status, response.statusText);
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({}));
         console.error("API Error Response:", errorData);
-        throw new Error(`API error: ${response.status} - ${JSON.stringify(errorData)}`);
+        const apiMessage = errorData?.error?.message || "AI 서버 요청에 실패했습니다.";
+        throw new Error("API error: " + response.status + " - " + apiMessage);
       }
 
       const data = await response.json();
