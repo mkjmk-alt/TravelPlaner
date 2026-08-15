@@ -262,7 +262,7 @@ function App() {
   const [slideshowIndex, setSlideshowIndex] = useState(0);
   const [itineraryTime, setItineraryTime] = useState('');
   const [itineraryDisplayName, setItineraryDisplayName] = useState('');
-  const [editingTimeItem, setEditingTimeItem] = useState(null); // { day, id, time, name }
+  const [editingTimeItem, setEditingTimeItem] = useState(null); // { day, id, time, displayName, originalName }
   const [showAIModal, setShowAIModal] = useState(false);
   const [showConfirmApplyModal, setShowConfirmApplyModal] = useState(false);
   const [showCustomModal, setShowCustomModal] = useState(false);
@@ -1448,14 +1448,14 @@ Travel Planner AI Analysis Report
   };
 
 
-  const updateItineraryItemTime = (dayNumber, itemId, newTime) => {
+  const updateItineraryItem = (dayNumber, itemId, updates) => {
     const targetDayNum = parseDay(dayNumber);
 
     const nextTrips = (trips || []).map(t => {
       if (t.id === activeTripId) {
         const newItin = (t.itinerary || []).map(day => {
           if (parseDay(day.day) === targetDayNum) {
-            const updatedItems = day.items.map(it => it.id === itemId ? { ...it, time: newTime } : it);
+            const updatedItems = day.items.map(it => it.id === itemId ? { ...it, ...updates } : it);
             updatedItems.sort((a, b) => {
               if (!a.time) return 1;
               if (!b.time) return -1;
@@ -2231,7 +2231,7 @@ Travel Planner AI Analysis Report
                                         {item.displayName || item.name || '장소 이름 정보 없음'}
                                       </h4>
                                       <div 
-                                        onClick={() => setEditingTimeItem({ day: dayPlan.day, id: item.id, time: item.time || '09:00', name: item.displayName || item.name })}
+                                        onClick={() => setEditingTimeItem({ day: dayPlan.day, id: item.id, time: item.time || '09:00', displayName: item.displayName || item.name || '', originalName: item.name || '' })}
                                         style={{ 
                                           display: 'flex', 
                                           alignItems: 'center', 
@@ -2247,6 +2247,7 @@ Travel Planner AI Analysis Report
                                         }}
                                       >
                                         <Clock size={11} color="#64748b" />
+                                        <Edit2 size={10} color="#3b82f6" />
                                         <span style={{ 
                                           fontSize: '12px', 
                                           fontWeight: '800', 
@@ -3118,8 +3119,20 @@ Travel Planner AI Analysis Report
             </button>
 
             <div style={{ marginBottom: '24px' }}>
-              <div style={{ fontSize: '12px', fontWeight: '900', color: '#3b82f6', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>Edit Time</div>
-              <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#0f172a', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{editingTimeItem.name}</h3>
+              <div style={{ fontSize: '12px', fontWeight: '900', color: '#3b82f6', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>Edit Schedule</div>
+              <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#0f172a', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{editingTimeItem.originalName || '일정 수정'}</h3>
+            </div>
+
+            <div style={{ marginBottom: "18px" }}>
+              <label style={{ display: "block", fontSize: "10px", fontWeight: "900", color: "#64748b", marginBottom: "8px" }}>일정 표시 이름</label>
+              <input
+                type="text"
+                value={editingTimeItem.displayName}
+                onChange={(e) => setEditingTimeItem({ ...editingTimeItem, displayName: e.target.value })}
+                placeholder={editingTimeItem.originalName || "장소 이름"}
+                maxLength={80}
+                style={{ width: "100%", boxSizing: "border-box", padding: "12px", borderRadius: "12px", border: "1px solid #e2e8f0", fontSize: "14px", fontWeight: "700", outline: "none" }}
+              />
             </div>
 
             <PremiumTimeInput 
@@ -3137,7 +3150,10 @@ Travel Planner AI Analysis Report
               </button>
               <button 
                 onClick={() => {
-                  updateItineraryItemTime(editingTimeItem.day, editingTimeItem.id, editingTimeItem.time);
+                  updateItineraryItem(editingTimeItem.day, editingTimeItem.id, {
+                    time: editingTimeItem.time,
+                    displayName: editingTimeItem.displayName.trim() || editingTimeItem.originalName
+                  });
                   setEditingTimeItem(null);
                 }}
                 style={{ flex: 2, padding: '16px', borderRadius: '16px', border: 'none', backgroundColor: '#3b82f6', color: 'white', fontSize: '15px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 10px 15px -3px rgba(59, 130, 246, 0.3)' }}
