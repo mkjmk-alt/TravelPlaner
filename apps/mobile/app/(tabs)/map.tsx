@@ -1,27 +1,25 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Dimensions, TextInput, TouchableOpacity,
-  Animated, PanResponder, ScrollView, Platform, Modal, ActivityIndicator,
+  Animated, PanResponder, ScrollView, Platform,
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE, Polyline } from 'react-native-maps';
 import { BlurView } from 'expo-blur';
 import { Colors } from '../../src/theme/colors';
 import { useTripStore } from '../../src/stores/tripStore';
-import { 
-  Search, MapPin, Calendar, Clock, Plus, ChevronUp, ChevronDown, 
-  Trash2, Navigation, Sparkles, Brain, Wallet, AlertCircle, 
-  CheckCircle2, Plane, Heart, Share2, Users, Check, Edit2, 
-  PlusCircle, ChevronRight, X
+import {
+  Search, MapPin, Calendar, Clock, Plus, ChevronUp, ChevronDown,
+  Trash2, Navigation, Wallet, AlertCircle,
+  Plane, Heart, Share2, Users, Check, Edit2,
+  PlusCircle, ChevronRight
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { analyzeTripWithAI, AIAnalysisResult } from '../../src/lib/gemini';
-
 const { width, height } = Dimensions.get('window');
 
 // Bottom sheet snap positions
-const SNAP_BOTTOM = height * 0.12;   
-const SNAP_MIDDLE = height * 0.50;   
-const SNAP_TOP    = height * 0.92;   
+const SNAP_BOTTOM = height * 0.12;
+const SNAP_MIDDLE = height * 0.50;
+const SNAP_TOP    = height * 0.92;
 
 const MAP_STYLE = [
   { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#eff6ff' }] },
@@ -54,11 +52,6 @@ export default function MapScreen() {
     latitudeDelta: 0.05,
     longitudeDelta: 0.05,
   });
-
-  // AI Analysis State
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [aiReport, setAiReport] = useState<AIAnalysisResult | null>(null);
-  const [showAIModal, setShowAIModal] = useState(false);
 
   // ---- Custom Bottom Sheet (Animated API) ----
   const sheetHeight = useRef(new Animated.Value(SNAP_MIDDLE)).current;
@@ -137,22 +130,6 @@ export default function MapScreen() {
     }
   }, [activeTrip?.id]);
 
-  const handleAIAnalysis = async () => {
-    if (!displayTrip) return;
-    setIsAnalyzing(true);
-    setShowAIModal(true);
-    try {
-      const totalSpent = (displayTrip.expenses || []).reduce((acc: number, curr: any) => acc + (curr.amount || 0), 0);
-      const budgetLimit = displayTrip.budget || 1000000;
-      const report = await analyzeTripWithAI(displayTrip, totalSpent, budgetLimit);
-      setAiReport(report);
-    } catch (error) {
-      console.error(error);
-      alert('AI 분석에 실패했습니다.');
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
 
   // Markers & Polyline
   const allMarkers = displayTrip?.itinerary?.flatMap((day: any) =>
@@ -206,8 +183,8 @@ export default function MapScreen() {
         </View>
       ) : (
         trips.map(trip => (
-          <TouchableOpacity 
-            key={trip.id} 
+          <TouchableOpacity
+            key={trip.id}
             style={[styles.tripCard, activeTrip?.id === trip.id && styles.tripCardActive]}
             onPress={() => setActiveTrip(trip)}
           >
@@ -222,7 +199,7 @@ export default function MapScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-            
+
             <View style={styles.tripCardInfoRow}>
               <View style={styles.infoItem}>
                 <Calendar size={12} color={Colors.text.muted} />
@@ -376,21 +353,18 @@ export default function MapScreen() {
         <TouchableOpacity style={styles.fab} onPress={() => mapRef.current?.animateToRegion(region)}>
           <Navigation color={Colors.primary} size={20} />
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.fab, { marginTop: 12, backgroundColor: Colors.primary }]} onPress={handleAIAnalysis}>
-          <Sparkles color="white" size={20} />
-        </TouchableOpacity>
       </View>
 
       {/* Sidebar/Bottom Sheet Overlay */}
       <Animated.View style={[styles.sidebarSheet, { height: sheetHeight }]}>
         <BlurView intensity={100} tint="light" style={StyleSheet.absoluteFill} />
-        
+
         {/* Navigation Tabs Header */}
         <View style={styles.sheetHeader}>
           <View {...panResponder.panHandlers} style={styles.dragHandleContainer}>
             <View style={styles.dragHandle} />
           </View>
-          
+
           <View style={styles.brandRow}>
             <View>
               <Text style={styles.brandName}>WorldPro</Text>
@@ -403,29 +377,29 @@ export default function MapScreen() {
 
           <View style={styles.navRow}>
             <View style={styles.navGroup}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.navTab, viewMode === 'trips' && { backgroundColor: Colors.secondary }]}
                 onPress={() => setViewMode('trips')}
               >
                 <Plane size={18} color={viewMode === 'trips' ? 'white' : Colors.text.muted} />
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.navTab, viewMode === 'favorites' && { backgroundColor: Colors.danger }]}
                 onPress={() => setViewMode('favorites')}
               >
                 <Heart size={18} color={viewMode === 'favorites' ? 'white' : Colors.text.muted} />
               </TouchableOpacity>
             </View>
-            
+
             {displayTrip && (
               <View style={[styles.navGroup, { marginLeft: 12, paddingLeft: 12, borderLeftWidth: 1, borderLeftColor: Colors.border.light }]}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[styles.navTab, viewMode === 'itinerary' && { backgroundColor: Colors.primary }]}
                   onPress={() => setViewMode('itinerary')}
                 >
                   <Calendar size={18} color={viewMode === 'itinerary' ? 'white' : Colors.text.muted} />
                 </TouchableOpacity>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[styles.navTab, viewMode === 'budget' && { backgroundColor: Colors.success }]}
                   onPress={() => setViewMode('budget')}
                 >
@@ -433,7 +407,7 @@ export default function MapScreen() {
                 </TouchableOpacity>
               </View>
             )}
-            
+
             <TouchableOpacity style={styles.shareBadge}>
               <Share2 size={14} color={Colors.secondary} />
               <Text style={styles.shareText}>INVITE</Text>
@@ -449,45 +423,6 @@ export default function MapScreen() {
         </ScrollView>
       </Animated.View>
 
-      {/* AI Analysis Modal */}
-      <Modal visible={showAIModal} animationType="slide" transparent={true}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.aiModalContent}>
-            <View style={styles.modalHeader}>
-              <View style={styles.aiHeaderIcon}><Brain color="white" size={24} /></View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.modalTitle}>AI 여행 분석 리포트</Text>
-                <Text style={styles.modalSubtitle}>Gemini 2.0 Flash 분석</Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowAIModal(false)}><X size={24} color={Colors.text.primary} /></TouchableOpacity>
-            </View>
-            <ScrollView style={styles.aiScroll}>
-              {isAnalyzing ? (
-                <View style={styles.loadingBox}>
-                  <ActivityIndicator size="large" color={Colors.primary} />
-                  <Text style={styles.loadingText}>일정을 분석하고 있습니다...</Text>
-                </View>
-              ) : aiReport ? (
-                <View>
-                  <View style={styles.scoreBox}>
-                    <Text style={styles.scoreNum}>{aiReport.score}</Text>
-                    <Text style={styles.scoreSum}>{aiReport.summary}</Text>
-                  </View>
-                  {aiReport.sections.map((s, i) => (
-                    <View key={i} style={styles.aiSection}>
-                      <View style={styles.aiSectionHead}>
-                        <CheckCircle2 size={16} color={Colors.primary} />
-                        <Text style={styles.aiSectionTitle}>{s.title}</Text>
-                      </View>
-                      <Text style={styles.aiSectionContent}>{s.content}</Text>
-                    </View>
-                  ))}
-                </View>
-              ) : null}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -498,8 +433,8 @@ const styles = StyleSheet.create({
 
   // Header Search
   headerSearchWrapper: { position: 'absolute', left: 16, right: 16, zIndex: 3000 },
-  glassSearch: { 
-    flexDirection: 'row', alignItems: 'center', padding: 6, borderRadius: 24, 
+  glassSearch: {
+    flexDirection: 'row', alignItems: 'center', padding: 6, borderRadius: 24,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)', overflow: 'hidden',
     shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20,
   },
@@ -508,21 +443,21 @@ const styles = StyleSheet.create({
 
   // FABs
   floatingBtns: { position: 'absolute', right: 16, zIndex: 10 },
-  fab: { 
-    width: 48, height: 48, borderRadius: 24, backgroundColor: 'white', 
-    justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 
+  fab: {
+    width: 48, height: 48, borderRadius: 24, backgroundColor: 'white',
+    justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10, elevation: 5
   },
 
   // Sidebar Sheet
-  sidebarSheet: { 
-    position: 'absolute', left: 0, right: 0, bottom: 0, 
+  sidebarSheet: {
+    position: 'absolute', left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(255,255,255,0.9)', borderTopLeftRadius: 32, borderTopRightRadius: 32,
     shadowColor: '#000', shadowOffset: { width: 0, height: -10 }, shadowOpacity: 0.1, shadowRadius: 30, elevation: 20,
     overflow: 'hidden'
   },
   dragHandleContainer: { width: '100%', alignItems: 'center', paddingTop: 12, paddingBottom: 8 },
   dragHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border.medium },
-  
+
   sheetHeader: { paddingHorizontal: 24, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: Colors.border.light },
   brandRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   brandName: { fontSize: 24, fontFamily: 'Inter_900Black', color: Colors.text.primary, letterSpacing: -1 },
@@ -544,7 +479,7 @@ const styles = StyleSheet.create({
   inlineActionText: { fontSize: 11, fontFamily: 'Inter_900Black', color: Colors.secondary },
 
   // Trip Cards
-  tripCard: { 
+  tripCard: {
     padding: 20, backgroundColor: 'white', borderRadius: 20, marginBottom: 12,
     borderWidth: 1, borderColor: Colors.border.light, shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 10
   },
@@ -574,8 +509,8 @@ const styles = StyleSheet.create({
   timelineContainer: { width: 20, alignItems: 'center', paddingTop: 18 },
   timelineDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.primary },
   timelineLine: { width: 2, flex: 1, backgroundColor: Colors.border.light, marginVertical: 4 },
-  placeCard: { 
-    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, 
+  placeCard: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14,
     backgroundColor: 'white', borderRadius: 16, marginLeft: 8, marginBottom: 12,
     borderWidth: 1, borderColor: Colors.border.light
   },
@@ -599,21 +534,4 @@ const styles = StyleSheet.create({
   progressBarFill: { height: '100%' },
   budgetLimitText: { fontSize: 12, fontFamily: 'Inter_700Bold', color: Colors.text.muted },
 
-  // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  aiModalContent: { backgroundColor: 'white', borderTopLeftRadius: 32, borderTopRightRadius: 32, height: height * 0.8, padding: 24 },
-  modalHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 24 },
-  aiHeaderIcon: { width: 48, height: 48, borderRadius: 16, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' },
-  modalTitle: { fontSize: 20, fontFamily: 'Inter_900Black', color: Colors.text.primary },
-  modalSubtitle: { fontSize: 12, fontFamily: 'Inter_700Bold', color: Colors.primary },
-  aiScroll: { flex: 1 },
-  loadingBox: { padding: 40, alignItems: 'center' },
-  loadingText: { marginTop: 16, fontSize: 15, fontFamily: 'Inter_700Bold', color: Colors.text.secondary },
-  scoreBox: { padding: 24, backgroundColor: '#f5f3ff', borderRadius: 24, alignItems: 'center', marginBottom: 20 },
-  scoreNum: { fontSize: 48, fontFamily: 'Inter_900Black', color: Colors.secondary },
-  scoreSum: { fontSize: 14, fontFamily: 'Inter_700Bold', color: Colors.text.secondary, textAlign: 'center', marginTop: 8 },
-  aiSection: { marginBottom: 20 },
-  aiSectionHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
-  aiSectionTitle: { fontSize: 16, fontFamily: 'Inter_900Black', color: Colors.text.primary },
-  aiSectionContent: { fontSize: 14, lineHeight: 20, color: Colors.text.secondary, fontFamily: 'Inter_400Regular' },
 });

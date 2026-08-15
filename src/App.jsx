@@ -1,9 +1,8 @@
 // Build Version: v1.2.2-build-trigger-fix
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete, Polyline } from '@react-google-maps/api';
-import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Camera, Play, Image, Clock, Sparkles, Brain, Upload, Clipboard, LocateFixed, Download } from 'lucide-react';
+import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Camera, Play, Image, Clock, Upload, Clipboard, LocateFixed, Download } from 'lucide-react';
 import { supabase } from './supabaseClient';
-import html2canvas from 'html2canvas';
 import './index.css';
 
 // --- CONFIGURATION ---
@@ -284,14 +283,8 @@ function App() {
   const [itineraryTime, setItineraryTime] = useState('');
   const [itineraryDisplayName, setItineraryDisplayName] = useState('');
   const [editingTimeItem, setEditingTimeItem] = useState(null); // { day, id, time, displayName, originalName }
-  const [showAIModal, setShowAIModal] = useState(false);
-  const [showConfirmApplyModal, setShowConfirmApplyModal] = useState(false);
   const [showCustomModal, setShowCustomModal] = useState(false);
   const [modalConfig, setModalConfig] = useState({ type: 'success', title: '', message: '' });
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isCapturing, setIsCapturing] = useState(false);
-  const [aiReport, setAiReport] = useState(null);
-  const reportRef = useRef(null);
   const slideshowTimerRef = useRef(null);
   const [showPasteModal, setShowPasteModal] = useState(false);
   const [pasteText, setPasteText] = useState('');
@@ -910,225 +903,6 @@ function App() {
       if (slideshowTimerRef.current) clearInterval(slideshowTimerRef.current);
     };
   }, [showSlideshow, allPhotos.length]);
-
-  // --- AI ANALYSIS ---
-  const generateAIAnalysis = async () => {
-    if (!activeTrip) return;
-    
-    console.log("--- Starting AI Analysis ---");
-    
-    setIsAnalyzing(true);
-    setShowAIModal(true);
-    setAiReport(null);
-
-    // 1. Prepare data for AI
-    const itineraryText = (activeTrip.itinerary || []).map(day => (
-      `Day ${day.day}:\n${(day.items || []).map(it => `- ${it.time || 'Time TBD'} - ${it.name}(${it.loc})`).join('\n')}`
-    )).join('\n\n');
-
-    const totalSpent = (expenses || []).reduce((acc, curr) => acc + (curr.amountKRW || 0), 0);
-    const budgetText = `예산 한도: ₩${budgetSettings.limitKRW.toLocaleString()}, Total Spent: ₩${totalSpent.toLocaleString()}`;
-
-    // 2. Craft the prompt
-    const prompt = `
-      You are a professional travel consultant. Please analyze this travel itinerary and provide a detailed report.
-      Trip Name: ${activeTrip.name}
-      Destination: ${activeTrip.country || 'Not specified'}
-      
-      [Itinerary]
-      ${itineraryText}
-      
-      [Budget]
-      ${budgetText}
-
-      Please analyze the following 5 points in Korean:
-      1. Route Efficiency (Geographical optimization)
-      2. Tempo & Fatigue (Is it too tight or too loose?)
-      3. Variety & Theme (Balance of activities)
-      4. Budget Realism (Is the budget appropriate for the destination?)
-      5. Practical Pro-tips (Specific advice for this trip)
-
-      [Critical Request]
-      Also provide an "optimizedItinerary" which is a restructured version of the input itinerary for better efficiency. 
-      Keep EXACTLY the same data structure for days and items (including all fields like id, name, time, loc, lat, lng, placeId).
-
-      Respond strictly in JSON format as follows:
-      {
-        "score": number (overall score 0-100),
-        "summary": "Short overall summary in Korean",
-        "sections": [
-          { "title": "동선 효율성", "score": number, "content": "Detailed analysis in Korean" },
-          { "title": "여행 강도", "score": number, "content": "Detailed analysis in Korean" },
-          { "title": "테마 및 균형", "score": number, "content": "Detailed analysis in Korean" },
-          { "title": "예산 적절성", "score": number, "content": "Detailed analysis in Korean" },
-          { "title": "꿀팁", "score": number, "content": "Detailed analysis in Korean" }
-        ],
-        "tips": ["구체적인 추천 액션 1 (예: ~를 예약하세요)", "추천 액션 2", "추천 액션 3"],
-        "optimizedItinerary": [
-          { "day": 1, "items": [...] }
-        ]
-      }
-    `;
-
-    try {
-      console.log("Sending request to Gemini API...");
-      const response = await fetch("/api/ai-analysis", {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }]
-        })
-      });
-
-      console.log("Response status:", response.status, response.statusText);
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error("API Error Response:", errorData);
-        const apiMessage = errorData?.error?.message || "AI 서버 요청에 실패했습니다.";
-        throw new Error("API error: " + response.status + " - " + apiMessage);
-      }
-
-      const data = await response.json();
-      console.log("Raw AI Response Data:", data);
-
-      if (!data.candidates || !data.candidates[0]) {
-        throw new Error("No candidates found in AI response");
-      }
-
-      const text = data.candidates[0].content.parts[0].text;
-      console.log("AI Text Output:", text);
-      
-      // Remove potential markdown code blocks and extract JSON
-      const cleanJsonText = text.replace(/```json|```/g, "").trim();
-      const jsonMatch = cleanJsonText.match(/\{[\s\S]*\}/);
-      
-      if (jsonMatch) {
-        try {
-          const result = JSON.parse(jsonMatch[0]);
-          console.log("Parsed JSON Report:", result);
-          setAiReport(result);
-          // 추가: 분석 결과를 여행 데이터에 영구 저장
-          updateActiveTrip({ aiAnalysis: result });
-        } catch (parseError) {
-          console.error("JSON Parse Error:", parseError, "Text:", jsonMatch[0]);
-          throw new Error("AI 응답을 해석하는 중 오류가 발생했습니다.");
-        }
-      } else {
-        throw new Error("AI가 유효한 JSON 형식을 반환하지 않았습니다.");
-      }
-    } catch (error) {
-      console.error("FULL ERROR LOG:", error);
-      setModalConfig({ 
-        type: 'error', 
-        title: 'AI 분석 오류', 
-        message: `AI 분석 도중 오류가 발생했습니다. 원인: ${error.message.substring(0, 100)}...` 
-      });
-      setShowCustomModal(true);
-      setShowAIModal(false);
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-
-  const handleDownloadImage = async () => {
-    if (!reportRef.current) return;
-    setIsCapturing(true);
-    
-    const btn = document.getElementById('save-image-btn');
-    if (btn) btn.style.display = 'none'; // 버튼은 이미지에서 제외
-    
-    try {
-      const canvas = await html2canvas(reportRef.current, {
-        scale: 2, // 고화질
-        useCORS: true,
-        backgroundColor: '#ffffff',
-        // 스크롤 영역 전체를 찍기 위한 설정
-        onclone: (clonedDoc) => {
-          const element = clonedDoc.getElementById('ai-report-content');
-          if (element) {
-            element.style.maxHeight = 'none';
-            element.style.overflow = 'visible';
-          }
-        }
-      });
-      
-      const image = canvas.toDataURL("image/png");
-      const link = document.createElement('a');
-      link.href = image;
-      link.download = `AI_Report_${activeTrip?.name || 'Travel'}.png`;
-      link.click();
-    } catch (err) {
-      console.error("Image capture failed:", err);
-      setModalConfig({ 
-        type: 'error', 
-        title: '이미지 저장 실패', 
-        message: '이미지 저장 중 오류가 발생했습니다.' 
-      });
-      setShowCustomModal(true);
-    } finally {
-      if (btn) btn.style.display = 'flex';
-      setIsCapturing(false);
-    }
-  };
-
-  const handleEmailShare = () => {
-    if (!aiReport) return;
-    const subject = encodeURIComponent(`[AI 여행 리포트] ${activeTrip?.name || '나의 여행'}`);
-    const body = encodeURIComponent(`
-안녕하세요! '${activeTrip?.name || '나의 여행'}'에 대한 AI 분석 리포트입니다.
-
-[종합 분석 스코어: ${aiReport.score}점]
-"${aiReport.summary}"
-
-${aiReport.sections.map(sec => `
-■ ${sec.title} (${sec.score}점)
-${sec.content}`).join('\n')}
-
-[추천 액션]
-${aiReport.tips.map(tip => `- ${tip}`).join('\n')}
-
----
-Travel Planner AI Analysis Report
-`).replace(/%0A/g, '%0D%0A'); // Windows email clients often need CRLF
-    
-    window.location.href = `mailto:?subject=${subject}&body=${body}`;
-  };
-
-  const applyAIProposedPlan = async () => {
-    if (!aiReport || !aiReport.optimizedItinerary || !activeTrip) return;
-
-    try {
-      const rawItinerary = aiReport.optimizedItinerary || [];
-      const updatedItinerary = rawItinerary.map(day => {
-        const sortedItems = [...(day.items || [])].sort((a, b) => 
-          (a.time || '00:00').localeCompare(b.time || '00:00')
-        );
-        return {
-          ...day,
-          day: parseInt(String(day.day).replace(/[^0-9]/g, '')) || 1,
-          items: sortedItems.map(item => ({
-            ...item,
-            lat: item.lat ? Number(item.lat) : null,
-            lng: item.lng ? Number(item.lng) : null
-          }))
-        };
-      });
-      
-      const nextTrips = trips.map(t => String(t.id) === String(activeTrip.id) ? { ...t, itinerary: [...updatedItinerary] } : t);
-      await syncTripsToCloud([...nextTrips]);
-      setActiveDay(1);
-
-      setShowConfirmApplyModal(false);
-      setShowAIModal(false);
-      setModalConfig({ type: 'success', title: '적용 완료', message: "✨ AI 최적화 일정이 성공적으로 적용되었습니다!" });
-      setShowCustomModal(true);
-    } catch (error) {
-      console.error("Apply AI Plan failed:", error);
-      setModalConfig({ type: 'error', title: '적용 실패', message: "일정 적용 중 오류가 발생했습니다." });
-      setShowCustomModal(true);
-    }
-  };
 
   const addDay = async () => {
     if (!activeTrip) return;
@@ -2267,34 +2041,7 @@ Travel Planner AI Analysis Report
                     >
                       <PlusCircle size={14} /> 일차 추가
                     </button>
-                    {activeTrip?.aiAnalysis && (
-                      <button 
-                        onClick={() => { setAiReport(activeTrip.aiAnalysis); setShowAIModal(true); }} 
-                        style={{ 
-                          display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: '800', 
-                          color: '#64748b', backgroundColor: '#f1f5f9', padding: '8px 12px', borderRadius: '14px', 
-                          border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s'
-                        }}
-                        onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#e2e8f0'}
-                        onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
-                      >
-                        <Brain size={14} /> 결과
-                      </button>
-                    )}
-                    <button 
-                      onClick={generateAIAnalysis} 
-                      style={{ 
-                        display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: '800', 
-                        color: 'white', backgroundColor: '#8b5cf6', padding: '8px 14px', borderRadius: '14px', 
-                        border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)', 
-                        whiteSpace: 'nowrap', transition: 'all 0.2s'
-                      }}
-                      onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(139, 92, 246, 0.4)'; }}
-                      onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.3)'; }}
-                    >
-                      <Sparkles size={14} /> AI 추천
-                    </button>
-                  </div>
+                </div>
                 </div>
 
                 {(itinerary || []).map((dayPlan, dIdx) => (
@@ -3369,195 +3116,10 @@ Travel Planner AI Analysis Report
           to { transform: translateY(0); opacity: 1; }
         }
       `}</style>
-       {/* === AI ANALYSIS MODAL === */}
-      {showAIModal && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10000,
-          backgroundColor: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(12px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
-          animation: 'fadeIn 0.3s ease-out'
-        }}>
-          <div 
-            id="ai-report-content"
-            ref={reportRef}
-            style={{
-              backgroundColor: 'white', borderRadius: '32px', width: '100%', maxWidth: '500px',
-              maxHeight: '85vh', overflowY: 'auto', padding: '32px', position: 'relative',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-              animation: 'slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
-            }}
-          >
-            <button 
-              onClick={() => setShowAIModal(false)}
-              style={{ position: 'absolute', top: '24px', right: '24px', border: 'none', background: '#f1f5f9', width: '36px', height: '36px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', zIndex: 10 }}
-            >
-              <X size={20} color="#64748b" />
-            </button>
-
-            <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-              <div style={{ 
-                width: '64px', height: '64px', backgroundColor: '#f5f3ff', borderRadius: '22px', 
-                display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px',
-                boxShadow: '0 8px 16px rgba(139, 92, 246, 0.15)'
-              }}>
-                <Sparkles size={32} color="#8b5cf6" />
-              </div>
-              <h2 style={{ fontSize: '24px', fontWeight: '900', color: '#0f172a', margin: '0 0 8px 0', letterSpacing: '-0.02em' }}>AI 여행 전략 리포트</h2>
-              <p style={{ fontSize: '14px', color: '#64748b', fontWeight: '600' }}>{activeTrip?.name} 일정을 분석했습니다.</p>
-            </div>
-
-            {isAnalyzing ? (
-              <div style={{ textAlign: 'center', padding: '40px 0' }}>
-                <div style={{ width: '48px', height: '48px', border: '4px solid #8b5cf6', borderTopColor: 'transparent', borderRadius: '50%', margin: '0 auto 24px', animation: 'spin 1s linear infinite' }}></div>
-                <p style={{ fontWeight: '800', color: '#8b5cf6', letterSpacing: '0.05em', animation: 'pulse 1.5s infinite' }}>데이터 분석 및 전략 수립 중...</p>
-              </div>
-            ) : aiReport && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                {/* Overall Score */}
-                <div style={{ 
-                  background: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)', 
-                  padding: '28px', borderRadius: '28px', textAlign: 'center',
-                  border: '1px solid rgba(139, 92, 246, 0.1)'
-                }}>
-                  <div style={{ fontSize: '11px', fontWeight: '900', color: '#8b5cf6', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px' }}>종합 분석 스코어</div>
-                  <div style={{ fontSize: '56px', fontWeight: '900', color: '#7c3aed', lineHeight: 1, marginBottom: '16px' }}>
-                    {aiReport.score}<span style={{ fontSize: '20px', color: '#a78bfa' }}>/100</span>
-                  </div>
-                  <p style={{ fontSize: '14px', color: '#4c1d95', fontWeight: '800', margin: 0, lineHeight: 1.6, padding: '0 10px' }}>
-                    "{aiReport.summary}"
-                  </p>
-                </div>
-
-                {/* Analysis Sections */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {aiReport.sections.map((sec, idx) => (
-                    <div key={idx} style={{ padding: '20px', border: '1px solid #f1f5f9', borderRadius: '24px', backgroundColor: '#ffffff' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                        <h4 style={{ fontSize: '15px', fontWeight: '900', color: '#1e293b', margin: 0 }}>{sec.title}</h4>
-                        <div style={{ fontSize: '12px', fontWeight: '900', color: '#8b5cf6', backgroundColor: '#f5f3ff', padding: '4px 10px', borderRadius: '10px' }}>{sec.score}점</div>
-                      </div>
-                      <p style={{ fontSize: '13px', color: '#64748b', lineHeight: 1.6, margin: 0, fontWeight: '600' }}>{sec.content}</p>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Pro Tips Section */}
-                <div style={{ backgroundColor: '#f0f9ff', padding: '24px', borderRadius: '28px', border: '1px solid #e0f2fe' }}>
-                  <h4 style={{ fontSize: '15px', fontWeight: '900', color: '#0369a1', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Brain size={18} /> 추천 액션
-                  </h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {aiReport.tips.map((tip, idx) => (
-                      <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                        <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#0ea5e9', marginTop: '6px', flexShrink: 0 }}></div>
-                        <p style={{ fontSize: '13px', color: '#0c4a6e', fontWeight: '700', margin: 0, lineHeight: 1.4 }}>{tip}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '8px' }}>
-                  <div style={{ display: 'flex', gap: '12px' }}>
-                    <button 
-                      onClick={() => setShowAIModal(false)}
-                      style={{ flex: 1, padding: '16px', borderRadius: '20px', border: '1px solid #e2e8f0', backgroundColor: 'white', color: '#64748b', fontSize: '14px', fontWeight: '900', cursor: 'pointer' }}
-                    >
-                      닫기
-                    </button>
-                    <button 
-                      onClick={handleEmailShare}
-                      style={{ flex: 1, padding: '16px', borderRadius: '20px', border: '1px solid #8b5cf6', backgroundColor: '#f5f3ff', color: '#8b5cf6', fontSize: '14px', fontWeight: '900', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-                    >
-                      <Share2 size={18} /> 이메일 공유
-                    </button>
-                    <button 
-                      id="save-image-btn"
-                      onClick={handleDownloadImage}
-                      disabled={isCapturing}
-                      style={{ flex: 1, padding: '16px', borderRadius: '20px', border: '1px solid #10b981', backgroundColor: '#ecfdf5', color: '#10b981', fontSize: '14px', fontWeight: '900', cursor: isCapturing ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: isCapturing ? 0.6 : 1 }}
-                    >
-                      {isCapturing ? <div className="spinner-small" /> : <Camera size={18} />} 
-                      {isCapturing ? '저장 중...' : '이미지 저장'}
-                    </button>
-                  </div>
-                  <button 
-                    onClick={() => setShowConfirmApplyModal(true)}
-                    style={{ width: '100%', padding: '18px', borderRadius: '20px', border: 'none', backgroundColor: '#8b5cf6', color: 'white', fontSize: '15px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 10px 20px rgba(139, 92, 246, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-                  >
-                    <Check size={18} /> 수정안 적용하기
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* AI 적용 확인 커스텀 모달 (내부 창) */}
-      {showConfirmApplyModal && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(16px)',
-          zIndex: 11000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
-          animation: 'fadeIn 0.2s ease-out'
-        }}>
-          <div style={{
-            backgroundColor: 'white', borderRadius: '40px', width: '100%', maxWidth: '420px',
-            padding: '40px', boxShadow: '0 30px 60px -12px rgba(0, 0, 0, 0.5)',
-            textAlign: 'center', animation: 'scaleUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
-            border: '1px solid rgba(255,255,255,0.3)'
-          }}>
-            <div style={{ 
-              width: '80px', height: '80px', backgroundColor: '#fef2f2', borderRadius: '30px', 
-              display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 28px',
-              boxShadow: '0 12px 24px rgba(239, 68, 68, 0.15)'
-            }}>
-              <AlertCircle size={40} color="#ef4444" />
-            </div>
-            <h3 style={{ fontSize: '22px', fontWeight: '900', color: '#0f172a', marginBottom: '16px', letterSpacing: '-0.02em' }}>
-              일정을 변경하시겠습니까?
-            </h3>
-            <div style={{ backgroundColor: '#fff1f2', padding: '20px', borderRadius: '24px', marginBottom: '32px', border: '1px solid #ffe4e6' }}>
-              <p style={{ fontSize: '14px', color: '#991b1b', lineHeight: '1.8', margin: 0, fontWeight: '700' }}>
-                AI가 제안한 최적화된 일정으로<br/>
-                <span style={{ textDecoration: 'underline', fontWeight: '900', fontSize: '15px' }}>현재 일정이 완전히 교체됩니다.</span>
-                <br/><br/>
-                기존에 수동으로 설정하신 장소와 순서는<br/>
-                <span style={{ color: '#ef4444' }}>영구적으로 삭제되며</span>, 이 작업은 되돌릴 수 없습니다.
-              </p>
-            </div>
-            <div style={{ display: 'flex', gap: '14px' }}>
-              <button 
-                onClick={() => setShowConfirmApplyModal(false)}
-                style={{ flex: 1, padding: '18px', borderRadius: '20px', border: '1px solid #e2e8f0', backgroundColor: 'white', color: '#64748b', fontSize: '15px', fontWeight: '800', cursor: 'pointer', transition: 'all 0.2s' }}
-              >
-                취소
-              </button>
-              <button 
-                onClick={applyAIProposedPlan}
-                style={{ flex: 1.5, padding: '18px', borderRadius: '20px', border: 'none', backgroundColor: '#ef4444', color: 'white', fontSize: '15px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 8px 20px rgba(239, 68, 68, 0.3)', transition: 'all 0.2s' }}
-              >
-                확인, 일정 변경
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <style>{`
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        @keyframes scaleUp { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
-        .spinner-small {
-          width: 18px;
-          height: 18px;
-          border: 2px solid rgba(16, 185, 129, 0.3);
-          border-top-color: #10b981;
-          border-radius: 50%;
-          animation: spin 0.8s linear infinite;
-        }
       `}</style>
       {/* Custom Modal (Success/Error) */}
       {showCustomModal && (
@@ -3615,7 +3177,7 @@ Travel Planner AI Analysis Report
             animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
           }}>
             <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#0f172a', margin: '0 0 8px 0' }}>JSON 붙여넣기</h3>
-            <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 20px 0' }}>AI나 다른 곳에서 복사한 일정 JSON 텍스트를 아래에 붙여넣어 주세요.</p>
+            <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 20px 0' }}>다른 곳에서 복사한 일정 JSON 텍스트를 아래에 붙여넣어 주세요.</p>
             
             <textarea 
               value={pasteText}
