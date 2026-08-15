@@ -2889,13 +2889,16 @@ Travel Planner AI Analysis Report
                 {activeTripId && (
                   <div style={{ backgroundColor: '#f8fafc', padding: window.innerWidth < 768 ? '10px' : '16px', borderRadius: '14px', border: '1px solid #f1f5f9' }}>
                     <div style={{ fontSize: '9px', fontWeight: '900', color: '#9ca3af', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.05em' }}>Select Day</div>
-                    <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
-                      {[1, 2, 3].map(day => (
+                    <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', overflowX: 'auto', paddingBottom: '2px' }}>
+                      {(itinerary || []).map((dayPlan, dayIndex) => {
+                        const day = parseDay(dayPlan?.day) || dayIndex + 1;
+                        return (
                         <button
                           key={day}
                           onClick={() => setActiveDay(day)}
                           style={{
-                            flex: 1,
+                            flex: '0 0 auto',
+                            minWidth: '58px',
                             padding: '8px 0',
                             borderRadius: '10px',
                             border: '1px solid',
@@ -2910,7 +2913,8 @@ Travel Planner AI Analysis Report
                         >
                           {day}일차
                         </button>
-                      ))}
+                        );
+                      })}
                     </div>
 
                     <PremiumTimeInput 
@@ -2925,7 +2929,7 @@ Travel Planner AI Analysis Report
                           setModalConfig({ 
                             type: 'error', 
                             title: '일차 미선택', 
-                            message: '추가할 일차를 먼저 선택해주세요! 상단의 1, 2, 3일차 버튼 중 하나를 클릭하면 됩니다.' 
+                            message: '추가할 일차를 먼저 선택해주세요! 상단의 일차 버튼 중 하나를 클릭하면 됩니다.'
                           });
                           setShowCustomModal(true);
                           return;
