@@ -1,7 +1,7 @@
 // Build Version: v1.2.2-build-trigger-fix
-import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete, Polyline } from '@react-google-maps/api';
-import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Camera, Play, Image, Clock, Sparkles, Brain, Upload, Clipboard, LocateFixed } from 'lucide-react';
+import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Camera, Play, Image, Clock, Sparkles, Brain, Upload, Clipboard, LocateFixed, Download } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import html2canvas from 'html2canvas';
 import './index.css';
@@ -11,6 +11,26 @@ const HK_CENTER = { lat: 22.2891, lng: 114.1924 };
 const MAP_LIBRARIES = ['places']; 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+
+const readStoredJson = (key, fallback) => {
+  try {
+    const saved = localStorage.getItem(key);
+    return saved ? JSON.parse(saved) : fallback;
+  } catch (error) {
+    console.warn("저장된 데이터를 읽지 못했습니다.", error);
+    return fallback;
+  }
+};
+
+const writeStoredJson = (key, value) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  } catch (error) {
+    console.warn("저장 공간에 데이터를 기록하지 못했습니다.", error);
+    return false;
+  }
+};
 
 const countryToCurrency = {
   "대한민국": "KRW",
@@ -246,6 +266,7 @@ function App() {
   };
   const [viewMode, setViewMode] = useState('trips');
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [searchResult, setSearchResult] = useState(null);
   const [activeDay, setActiveDay] = useState(null);
   const [expandedCountries, setExpandedCountries] = useState({});
@@ -256,6 +277,7 @@ function App() {
   const [map, setMap] = useState(null);
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [isLoadingDB, setIsLoadingDB] = useState(true);
+  const [syncStatus, setSyncStatus] = useState('saved');
   const [showShareToast, setShowShareToast] = useState(false);
   const [hasTriggeredToast, setHasTriggeredToast] = useState(false);
   const [showSlideshow, setShowSlideshow] = useState(false);
@@ -325,32 +347,28 @@ function App() {
 
   // --- DATA STATE ---
   const [favorites, setFavorites] = useState(() => {
-    const saved = localStorage.getItem('world_pro_fav_v1');
-    return saved ? JSON.parse(saved) : [];
+    const savedFavorites = readStoredJson("world_pro_fav_v1", []);
+    return Array.isArray(savedFavorites) ? savedFavorites : [];
   });
 
   const [trips, setTrips] = useState(() => {
-    const savedTrips = localStorage.getItem('world_pro_trips_v1');
-    if (savedTrips) return JSON.parse(savedTrips);
+    const savedTrips = readStoredJson("world_pro_trips_v1", null);
+    if (Array.isArray(savedTrips)) return savedTrips;
     
-    const oldItinerary = JSON.parse(localStorage.getItem('world_pro_v16') || '[]');
-    let oldBudget = { limitKRW: 1000000, travelCurrency: 'USD' };
-    try {
-      const budgetRaw = localStorage.getItem('world_pro_budget_v1');
-      if (budgetRaw && budgetRaw.startsWith('{')) oldBudget = JSON.parse(budgetRaw);
-    } catch {}
-    const oldExpenses = JSON.parse(localStorage.getItem('world_pro_expenses_v1') || '[]');
+    const oldItinerary = readStoredJson("world_pro_v16", []);
+    const oldBudget = readStoredJson("world_pro_budget_v1", { limitKRW: 1000000, travelCurrency: "USD" });
+    const oldExpenses = readStoredJson("world_pro_expenses_v1", []);
     
     if (oldItinerary.length > 0 || oldExpenses.length > 0) {
       const migratedTrip = {
         id: Date.now().toString(),
-        name: "My First Trip",
+        name: "첫 여행",
         itinerary: oldItinerary.length > 0 ? oldItinerary : [{ day: 1, items: [] }],
         budgetSettings: oldBudget,
         expenses: oldExpenses,
         createdAt: Date.now()
       };
-      localStorage.setItem('world_pro_trips_v1', JSON.stringify([migratedTrip]));
+      writeStoredJson("world_pro_trips_v1", [migratedTrip]);
       return [migratedTrip];
     }
     return [];
@@ -361,7 +379,9 @@ function App() {
   const [exchangeRates, setExchangeRates] = useState({});
   const [expenseInput, setExpenseInput] = useState({ desc: '', amount: '', currency: '', day: 1 });
 
+  const sharedTripCount = (trips || []).filter(t => t.sharedId).length;
   const autocompleteRef = useRef(null);
+  const makeEntityId = () => crypto.randomUUID();
 
   // --- EFFECTS ---
   
@@ -374,11 +394,15 @@ function App() {
 
   // Reset activeDay when trip changes
   useEffect(() => {
+    // Intentionally reset the selected day when switching trips.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setActiveDay(null);
   }, [activeTripId]);
 
   // Reset the custom itinerary name when the selected place changes
   useEffect(() => {
+    // Keep the custom label in sync with the selected place.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setItineraryDisplayName(selectedPlace?.displayName || '');
   }, [selectedPlace]);
 
@@ -387,8 +411,10 @@ function App() {
     async function initCloudDB() {
       if (!session) {
         setIsLoadingDB(false);
+        setSyncStatus("saved");
         return;
       }
+      setSyncStatus("saving");
       try {
         const { data, error } = await supabase.from('user_state').select('*').eq('user_id', session.user.id);
         if (error) throw error;
@@ -405,26 +431,49 @@ function App() {
         }
 
         if (!cloudTrips && (trips || []).length > 0) {
-          await supabase.from('user_state').upsert({ user_id: session.user.id, key: 'world_pro_trips_v1', value: trips || [] }, { onConflict: 'user_id,key' });
+          const { error: localTripSyncError } = await supabase.from("user_state").upsert({ user_id: session.user.id, key: "world_pro_trips_v1", value: trips || [] }, { onConflict: "user_id,key" });
+          if (localTripSyncError) throw localTripSyncError;
         } else if (cloudTrips) {
-          setTrips(cloudTrips || []);
-          localStorage.setItem('world_pro_trips_v1', JSON.stringify(cloudTrips || []));
+          const cloudTripList = Array.isArray(cloudTrips) ? cloudTrips : [];
+          const localOnlyTrips = (trips || []).filter(localTrip =>
+            !cloudTripList.some(cloudTrip => String(cloudTrip.id) === String(localTrip.id))
+          );
+          const mergedTrips = [...cloudTripList, ...localOnlyTrips];
+          setTrips(mergedTrips);
+          writeStoredJson("world_pro_trips_v1", mergedTrips);
+          if (localOnlyTrips.length > 0) {
+            const { error: mergeTripError } = await supabase.from("user_state").upsert({ user_id: session.user.id, key: "world_pro_trips_v1", value: mergedTrips }, { onConflict: "user_id,key" });
+            if (mergeTripError) throw mergeTripError;
+          }
         }
 
         if (!cloudFavs && (favorites || []).length > 0) {
-          // Initial sync from local to cloud
-          await supabase.from('user_state').upsert({ user_id: session.user.id, key: 'world_pro_fav_v1', value: favorites || [] }, { onConflict: 'user_id,key' });
+          const { error: localFavSyncError } = await supabase.from("user_state").upsert({ user_id: session.user.id, key: "world_pro_fav_v1", value: favorites || [] }, { onConflict: "user_id,key" });
+          if (localFavSyncError) throw localFavSyncError;
         } else if (cloudFavs) {
-          setFavorites(cloudFavs || []);
-          localStorage.setItem('world_pro_fav_v1', JSON.stringify(cloudFavs || []));
+          const cloudFavList = Array.isArray(cloudFavs) ? cloudFavs : [];
+          const localOnlyFavs = (favorites || []).filter(localFav =>
+            !cloudFavList.some(cloudFav => (cloudFav.name || cloudFav.loc) === (localFav.name || localFav.loc))
+          );
+          const mergedFavs = [...cloudFavList, ...localOnlyFavs];
+          setFavorites(mergedFavs);
+          writeStoredJson("world_pro_fav_v1", mergedFavs);
+          if (localOnlyFavs.length > 0) {
+            const { error: mergeFavError } = await supabase.from("user_state").upsert({ user_id: session.user.id, key: "world_pro_fav_v1", value: mergedFavs }, { onConflict: "user_id,key" });
+            if (mergeFavError) throw mergeFavError;
+          }
         }
+        setSyncStatus("saved");
       } catch (err) {
         console.error("Supabase sync failed:", err);
+        setSyncStatus("error");
       } finally {
         setIsLoadingDB(false);
       }
     }
     initCloudDB();
+  // Cloud initialization intentionally runs only when authentication changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
   // --- REALTIME SYNC FOR SHARED TRIPS ---
@@ -449,7 +498,9 @@ function App() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [(trips || []).filter(t => t.sharedId).length]);
+  // Realtime subscription only needs to change when the number of shared trips changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sharedTripCount]);
 
   // Exchange Rates
   useEffect(() => {
@@ -465,7 +516,7 @@ function App() {
 
   // --- DERIVED STATE ---
   const activeTrip = (trips || []).find(t => String(t.id) === String(activeTripId));
-  const itinerary = activeTrip?.itinerary || [];
+  const itinerary = useMemo(() => activeTrip?.itinerary || [], [activeTrip]);
   const budgetSettings = activeTrip?.budgetSettings || { limitKRW: 1000000, travelCurrency: 'USD' };
   const expenses = activeTrip?.expenses || [];
 
@@ -556,17 +607,10 @@ function App() {
 
 
 
-  const fullTripPaths = useMemo(() => {
-    if (!itinerary || itinerary.length === 0) return [];
-    return itinerary.map(day => {
-      return (day.items || [])
-        .filter(item => item.lat && item.lng)
-        .map(item => ({ 
-          lat: Number(item.lat), 
-          lng: Number(item.lng) 
-        }));
-    }).filter(path => path.length > 0);
-  }, [itinerary]);
+  const fullTripPaths = (itinerary || []).map(day => (day.items || [])
+    .filter(item => item.lat && item.lng)
+    .map(item => ({ lat: Number(item.lat), lng: Number(item.lng) }))
+  ).filter(path => path.length > 0);
 
   const interDayPaths = useMemo(() => {
     if (fullTripPaths.length < 2) return [];
@@ -592,9 +636,13 @@ function App() {
   };
 
   const syncFavoritesToCloud = async (newFavs) => {
+    setSyncStatus('saving');
     const safeFavs = newFavs || [];
     setFavorites(safeFavs);
-    localStorage.setItem('world_pro_fav_v1', JSON.stringify(safeFavs));
+    if (!writeStoredJson("world_pro_fav_v1", safeFavs)) {
+      setSyncStatus("error");
+      return;
+    }
     
     if (session?.user?.id) {
       try {
@@ -607,8 +655,11 @@ function App() {
         if (error) throw error;
       } catch (err) {
         console.error("Favorites cloud sync failed:", err);
+        setSyncStatus('error');
+        return;
       }
     }
+    setSyncStatus('saved');
   };
 
   const saveFavorites = (newFavs) => {
@@ -616,8 +667,12 @@ function App() {
   };
 
   const syncTripsToCloud = async (newTrips) => {
+    setSyncStatus('saving');
     setTrips(newTrips);
-    localStorage.setItem('world_pro_trips_v1', JSON.stringify(newTrips));
+    if (!writeStoredJson("world_pro_trips_v1", newTrips)) {
+      setSyncStatus("error");
+      return;
+    }
     
     // 1. Sync to private user_state
     if (session?.user?.id) {
@@ -631,6 +686,8 @@ function App() {
         if (error) throw error;
       } catch (err) {
         console.error("Cloud sync failed:", err);
+        setSyncStatus('error');
+        return;
       }
     }
 
@@ -645,9 +702,12 @@ function App() {
           if (error) throw error;
         } catch (err) {
           console.error("Shared trip update failed:", err);
+          setSyncStatus('error');
+          return;
         }
       }
     }
+    setSyncStatus('saved');
   };
 
   const shareTrip = async (tripId) => {
@@ -710,7 +770,7 @@ function App() {
       setViewMode('itinerary');
       setModalConfig({ type: 'success', title: '참여 완료', message: `'${joinedTrip.name}' 일정에 참여했습니다!` });
       setShowCustomModal(true);
-    } catch (err) {
+    } catch {
       setModalConfig({ type: 'error', title: '참여 실패', message: "올바른 공유 코드를 입력해 주세요." });
       setShowCustomModal(true);
     }
@@ -834,18 +894,11 @@ function App() {
   };
 
   // Collect all photos for slideshow
-  const allPhotos = useMemo(() => {
-    if (!activeTrip?.itinerary) return [];
-    const photos = [];
-    (activeTrip.itinerary || []).forEach(day => {
-      (day.items || []).forEach(item => {
-        if (item.image) {
-          photos.push({ image: item.image, name: item.name, emoji: item.emoji, day: day.day, cat: item.cat });
-        }
-      });
-    });
-    return photos;
-  }, [activeTrip]);
+  const allPhotos = (activeTrip?.itinerary || []).flatMap(day =>
+    (day.items || []).filter(item => item.image).map(item => ({
+      image: item.image, name: item.name, emoji: item.emoji, day: day.day, cat: item.cat
+    }))
+  );
 
   // Slideshow auto-play
   useEffect(() => {
@@ -882,7 +935,7 @@ function App() {
     )).join('\n\n');
 
     const totalSpent = (expenses || []).reduce((acc, curr) => acc + (curr.amountKRW || 0), 0);
-    const budgetText = `Budget Limit: ₩${budgetSettings.limitKRW.toLocaleString()}, Total Spent: ₩${totalSpent.toLocaleString()}`;
+    const budgetText = `예산 한도: ₩${budgetSettings.limitKRW.toLocaleString()}, Total Spent: ₩${totalSpent.toLocaleString()}`;
 
     // 2. Craft the prompt
     const prompt = `
@@ -1086,6 +1139,11 @@ Travel Planner AI Analysis Report
 
   const addDay = async () => {
     if (!activeTrip) return;
+    if (itinerary.length >= 100) {
+      setModalConfig({ type: "error", title: "일차를 더 추가할 수 없습니다", message: "여행 기간은 최대 100일까지 설정할 수 있습니다." });
+      setShowCustomModal(true);
+      return;
+    }
     
     const newItinerary = [...itinerary, { day: itinerary.length + 1, items: [] }];
     const totalDays = newItinerary.length;
@@ -1120,7 +1178,7 @@ Travel Planner AI Analysis Report
     const today = new Date().toISOString().split('T')[0];
     const newTrip = {
       id: newId,
-      name: "New Trip",
+      name: "새 여행",
       country: "",
       startDate: today,
       endDate: today,
@@ -1135,7 +1193,49 @@ Travel Planner AI Analysis Report
     
     // Auto-enter inline edit mode
     setEditingTripId(newId);
-    setEditTripData({ name: "New Trip", startDate: today, endDate: today, country: "" });
+    setEditTripData({ name: "새 여행", startDate: today, endDate: today, country: "" });
+  };
+
+  const exportTripAsJson = (trip = activeTrip) => {
+    if (!trip) return;
+
+    const exportData = { ...trip };
+    delete exportData.sharedId;
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const safeName = (trip.name || "travel-plan").replace(/[^\w가-힣-]+/g, "_");
+    link.href = url;
+    link.download = safeName + ".json";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setModalConfig({ type: "success", title: "내보내기 완료", message: "일정 JSON 파일을 저장했습니다." });
+    setShowCustomModal(true);
+  };
+
+  const duplicateTrip = (trip) => {
+    if (!trip) return;
+    const duplicateId = Date.now().toString();
+    const tripWithoutShare = { ...trip };
+    delete tripWithoutShare.sharedId;
+    const duplicate = {
+      ...tripWithoutShare,
+      id: duplicateId,
+      name: (trip.name || "여행") + " 복사본",
+      createdAt: Date.now(),
+      itinerary: (trip.itinerary || []).map((day, dayIndex) => ({
+        ...day,
+        items: (day.items || []).map((item, itemIndex) => ({
+          ...item,
+          id: duplicateId + "-" + dayIndex + "-" + itemIndex
+        }))
+      }))
+    };
+    syncTripsToCloud([duplicate, ...(trips || [])]);
+    setActiveTripId(duplicateId);
+    setViewMode("itinerary");
   };
 
   const handleUploadJson = () => {
@@ -1165,7 +1265,7 @@ Travel Planner AI Analysis Report
           const newId = Date.now().toString();
           const newTrip = {
             id: newId,
-            name: data.name || "Uploaded Trip",
+            name: data.name || "업로드한 여행",
             country: data.country || "",
             startDate: data.startDate || new Date().toISOString().split('T')[0],
             endDate: data.endDate || new Date().toISOString().split('T')[0],
@@ -1228,7 +1328,7 @@ Travel Planner AI Analysis Report
       const newId = Date.now().toString();
       const newTrip = {
         id: newId,
-        name: data.name || "Pasted Trip",
+        name: data.name || "붙여넣은 여행",
         country: data.country || "",
         startDate: data.startDate || new Date().toISOString().split('T')[0],
         endDate: data.endDate || new Date().toISOString().split('T')[0],
@@ -1261,7 +1361,7 @@ Travel Planner AI Analysis Report
         message: `'${newTrip.name}' 일정을 성공적으로 불러왔습니다.` 
       });
       setShowCustomModal(true);
-    } catch (err) {
+    } catch {
       setModalConfig({ 
         type: 'error', 
         title: '형식 오류', 
@@ -1292,11 +1392,21 @@ Travel Planner AI Analysis Report
       }
       
       if (startDate && endDate) {
-        const start = new Date(startDate);
-        const end = new Date(endDate);
+        const start = new Date(startDate + "T00:00:00");
+        const end = new Date(endDate + "T00:00:00");
+        if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
+          setModalConfig({ type: "error", title: "날짜를 확인해 주세요", message: "시작일은 종료일보다 늦을 수 없습니다." });
+          setShowCustomModal(true);
+          return;
+        }
         if (start <= end) {
           const diffTime = Math.abs(end - start);
           const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+          if (diffDays > 100) {
+            setModalConfig({ type: "error", title: "여행 기간이 너무 깁니다", message: "여행 기간은 최대 100일까지 설정할 수 있습니다." });
+            setShowCustomModal(true);
+            return;
+          }
           if (diffDays > 0 && diffDays <= 100) {
              newItinerary = Array.from({length: diffDays}, (_, i) => ({ day: i + 1, items: [] }));
           }
@@ -1388,12 +1498,12 @@ Travel Planner AI Analysis Report
 
       newItinerary[dayIndex].items = [
         ...newItinerary[dayIndex].items,
-        { ...place, id: Date.now(), emoji: place.emoji || '📍', displayName, time: finalTime }
+        { ...place, id: makeEntityId(), emoji: place.emoji || '📍', displayName, time: finalTime }
       ].sort((a, b) => (a.time || '00:00').localeCompare(b.time || '00:00'));
     } else {
       newItinerary.push({ 
         day: targetDay, 
-        items: [{ ...place, id: Date.now(), emoji: place.emoji || '📍', displayName, time: itineraryTime || '09:00' }]
+        items: [{ ...place, id: makeEntityId(), emoji: place.emoji || '📍', displayName, time: itineraryTime || '09:00' }]
       });
     }
     saveItinerary(newItinerary);
@@ -1415,7 +1525,7 @@ Travel Planner AI Analysis Report
     }
 
     const newExpense = {
-      id: Date.now(),
+      id: makeEntityId(),
       desc: expenseInput.desc,
       amount: parseFloat(expenseInput.amount),
       currency: currentCurrency,
@@ -1437,9 +1547,9 @@ Travel Planner AI Analysis Report
     const isFav = safeFavs.some(f => f.name === place.name);
     const nextFavs = isFav 
       ? safeFavs.filter(f => f.name !== place.name)
-      : [...safeFavs, { ...place, id: Date.now() }];
+      : [...safeFavs, { ...place, id: makeEntityId() }];
     
-    syncFavoritesToCloud(nextFavs);
+    saveFavorites(nextFavs);
   };
 
   const isFavorite = (place) => {
@@ -1449,25 +1559,37 @@ Travel Planner AI Analysis Report
 
 
   const updateItineraryItem = (dayNumber, itemId, updates) => {
-    const targetDayNum = parseDay(dayNumber);
+    const sourceDayNum = parseDay(dayNumber);
+    const destinationDayNum = parseDay(updates.day ?? dayNumber);
+    const itemUpdates = { ...updates };
+    delete itemUpdates.day;
+
+    const sortItems = (items) => [...items].sort((a, b) => {
+      if (!a.time) return 1;
+      if (!b.time) return -1;
+      return a.time.localeCompare(b.time);
+    });
 
     const nextTrips = (trips || []).map(t => {
-      if (t.id === activeTripId) {
-        const newItin = (t.itinerary || []).map(day => {
-          if (parseDay(day.day) === targetDayNum) {
-            const updatedItems = day.items.map(it => it.id === itemId ? { ...it, ...updates } : it);
-            updatedItems.sort((a, b) => {
-              if (!a.time) return 1;
-              if (!b.time) return -1;
-              return a.time.localeCompare(b.time);
-            });
-            return { ...day, items: updatedItems };
-          }
-          return day;
-        });
-        return { ...t, itinerary: newItin };
-      }
-      return t;
+      if (t.id !== activeTripId) return t;
+      const sourceDay = (t.itinerary || []).find(day => parseDay(day.day) === sourceDayNum);
+      const sourceItem = sourceDay?.items?.find(item => item.id === itemId);
+      if (!sourceItem) return t;
+      const updatedItem = { ...sourceItem, ...itemUpdates };
+      const newItin = (t.itinerary || []).map(day => {
+        const dayNum = parseDay(day.day);
+        if (dayNum === sourceDayNum && dayNum === destinationDayNum) {
+          return { ...day, items: sortItems(day.items.map(item => item.id === itemId ? updatedItem : item)) };
+        }
+        if (dayNum === sourceDayNum) {
+          return { ...day, items: day.items.filter(item => item.id !== itemId) };
+        }
+        if (dayNum === destinationDayNum) {
+          return { ...day, items: sortItems([...day.items, updatedItem]) };
+        }
+        return day;
+      });
+      return { ...t, itinerary: newItin };
     });
     syncTripsToCloud(nextTrips);
   };
@@ -1535,6 +1657,8 @@ Travel Planner AI Analysis Report
 
     setSearchResult(newPlace);
     setSelectedPlace(newPlace);
+    setSearchInput(place.name || '');
+    setSearchQuery(place.formatted_address || place.name || '');
     
     if (map) {
       if (place.geometry.viewport) {
@@ -1544,6 +1668,43 @@ Travel Planner AI Analysis Report
         map.setZoom(18);
       }
     }
+  };
+
+  const handleSearchSubmit = () => {
+    const query = searchQuery.trim();
+    const autocompletePlace = autocompleteRef.current?.getPlace?.();
+    if (autocompletePlace?.geometry?.location) {
+      onPlaceSelected();
+      return;
+    }
+    if (!query || !window.google?.maps) return;
+
+    const geocoder = new window.google.maps.Geocoder();
+    geocoder.geocode({ address: query }, (results, status) => {
+      const result = results?.[0];
+      if (status !== 'OK' || !result?.geometry?.location) {
+        setModalConfig({ type: 'error', title: '검색 결과 없음', message: '주소나 장소명을 다시 확인해 주세요.' });
+        setShowCustomModal(true);
+        return;
+      }
+      const location = result.geometry.location;
+      const newPlace = {
+        name: result.formatted_address || query,
+        lat: location.lat(),
+        lng: location.lng(),
+        loc: result.formatted_address || query,
+        desc: result.formatted_address || query,
+        emoji: '📍',
+        type: 'geocoded-search'
+      };
+      setSearchResult(newPlace);
+      setSelectedPlace(newPlace);
+      setSearchInput(newPlace.name);
+      if (map) {
+        map.panTo({ lat: newPlace.lat, lng: newPlace.lng });
+        map.setZoom(16);
+      }
+    });
   };
 
   const fetchPlaceDetails = (placeId) => {
@@ -1564,6 +1725,7 @@ Travel Planner AI Analysis Report
           };
           setSearchResult(newPlace);
           setSelectedPlace(newPlace);
+          setSearchInput(newPlace.name || '');
         }
       }
     );
@@ -1645,7 +1807,11 @@ Travel Planner AI Analysis Report
                   onPlaceChanged={onPlaceSelected}
                >
                  <input 
-                    type="text" 
+                    type="text"
+                    value={searchInput}
+                    onChange={(e) => { setSearchInput(e.target.value); setSearchQuery(e.target.value); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleSearchSubmit(); } }}
+                    aria-label="장소 또는 주소 검색"
                     placeholder="어디로 떠나시나요?" 
                     style={{ 
                       width: '100%', 
@@ -1665,7 +1831,7 @@ Travel Planner AI Analysis Report
                </Autocomplete>
              </div>
            </div>
-           <button style={{ width: '48px', height: '48px', backgroundColor: '#2563eb', color: 'white', borderRadius: '16px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)' }}>
+           <button type="button" onClick={handleSearchSubmit} aria-label="장소 검색" style={{ width: '48px', height: '48px', backgroundColor: '#2563eb', color: 'white', borderRadius: '16px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)' }}>
              <Search size={20} />
            </button>
         </div>
@@ -1707,16 +1873,16 @@ Travel Planner AI Analysis Report
             {/* Row 1: Logo & Auth */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <div>
-                <h1 style={{ fontSize: '24px', fontWeight: '900', color: '#111827', margin: 0, letterSpacing: '-0.05em' }}>WorldPro</h1>
-                <p style={{ fontSize: '9px', fontWeight: '800', color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.15em', margin: '2px 0 0 0' }}>Global Travel Planner</p>
+                <h1 style={{ fontSize: '24px', fontWeight: '900', color: '#111827', margin: 0, letterSpacing: '-0.05em' }}>TravelPlaner</h1>
+                <p style={{ fontSize: '9px', fontWeight: '800', color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.15em', margin: '2px 0 0 0' }}>여행 일정 플래너</p>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 {session ? (
-                  <button onClick={() => supabase.auth.signOut()} style={{ background: '#f3f4f6', border: 'none', color: '#6b7280', fontWeight: '800', fontSize: '10px', cursor: 'pointer', padding: '8px 12px', borderRadius: '10px' }}>LOGOUT</button>
+                  <button onClick={() => supabase.auth.signOut()} style={{ background: '#f3f4f6', border: 'none', color: '#6b7280', fontWeight: '800', fontSize: '10px', cursor: 'pointer', padding: '8px 12px', borderRadius: '10px' }}>로그아웃</button>
                 ) : (
                   <button onClick={() => supabase.auth.signInWithOAuth({ provider: 'google' })} style={{ background: 'white', border: '1px solid #e5e7eb', color: '#4b5563', padding: '8px 12px', borderRadius: '10px', fontWeight: '800', fontSize: '10px', cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <img src="https://www.google.com/favicon.ico" width="12" height="12" alt="Google" />
-                    LOGIN
+                    로그인
                   </button>
                 )}
               </div>
@@ -1728,14 +1894,14 @@ Travel Planner AI Analysis Report
                 <button 
                   onClick={() => setViewMode('trips')}
                   style={{ width: '40px', height: '40px', borderRadius: '12px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.2s', backgroundColor: viewMode === 'trips' ? '#8b5cf6' : '#f3f4f6', color: viewMode === 'trips' ? 'white' : '#9ca3af' }}
-                  title="My Trips"
+                  aria-label="내 여행" title="내 여행"
                 >
                   <Plane size={18} />
                 </button>
                 <button 
                   onClick={() => setViewMode('favorites')}
                   style={{ width: '40px', height: '40px', borderRadius: '12px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.2s', backgroundColor: viewMode === 'favorites' ? '#ef4444' : '#f3f4f6', color: viewMode === 'favorites' ? 'white' : '#9ca3af' }}
-                  title="Favorites"
+                  aria-label="저장한 장소" title="저장한 장소"
                 >
                   <Heart size={18} fill={viewMode === 'favorites' ? "currentColor" : "none"} />
                 </button>
@@ -1746,14 +1912,14 @@ Travel Planner AI Analysis Report
                   <button 
                     onClick={() => setViewMode('itinerary')}
                     style={{ width: '40px', height: '40px', borderRadius: '12px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.2s', backgroundColor: viewMode === 'itinerary' ? '#2563eb' : '#f3f4f6', color: viewMode === 'itinerary' ? 'white' : '#9ca3af' }}
-                    title="Planner"
+                    aria-label="내 일정" title="내 일정"
                   >
                     <Calendar size={18} />
                   </button>
                   <button 
                     onClick={() => setViewMode('budget')}
                     style={{ width: '40px', height: '40px', borderRadius: '12px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.2s', backgroundColor: viewMode === 'budget' ? '#10b981' : '#f3f4f6', color: viewMode === 'budget' ? 'white' : '#9ca3af' }}
-                    title="Budget"
+                    aria-label="예산" title="예산"
                   >
                     <Wallet size={18} />
                   </button>
@@ -1766,7 +1932,7 @@ Travel Planner AI Analysis Report
                       title={activeTrip?.sharedId ? "초대 코드 복사" : "친구 초대하기"}
                     >
                       {copiedId === activeTrip?.id ? <Check size={14} color="#10b981" /> : (activeTrip?.sharedId ? <Users size={14} /> : <Share2 size={14} />)}
-                      {copiedId === activeTrip?.id ? "COPIED" : (activeTrip?.sharedId ? "INVITED" : "INVITE")}
+                      {copiedId === activeTrip?.id ? "복사됨" : (activeTrip?.sharedId ? "공유 중" : "초대")}
                     </button>
                   </div>
                 </div>
@@ -1790,7 +1956,7 @@ Travel Planner AI Analysis Report
             {viewMode === 'trips' && (
               <>
                 <div style={{ marginBottom: '32px' }}>
-                  <h2 style={{ fontSize: '28px', fontWeight: '900', color: '#0f172a', marginBottom: '24px' }}>My Trips</h2>
+                  <h2 style={{ fontSize: '28px', fontWeight: '900', color: '#0f172a', marginBottom: '24px' }}>내 여행</h2>
                   
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {/* Row 1: Import Options */}
@@ -1818,7 +1984,8 @@ Travel Planner AI Analysis Report
                 {(trips || []).length === 0 ? (
                   <div style={{ padding: '60px 20px', border: '2px dashed #f3f4f6', borderRadius: '24px', textAlign: 'center' }}>
                     <Plane size={48} color="#e5e7eb" style={{ margin: '0 auto 16px auto' }} />
-                    <p style={{ fontSize: '12px', color: '#9ca3af', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>No trips planned yet</p>
+                    <p style={{ fontSize: '12px', color: '#9ca3af', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>아직 계획된 여행이 없습니다</p>
+                    <p style={{ fontSize: "12px", color: "#94a3b8", fontWeight: "600", margin: "8px 0 0" }}>새 여행을 만들고 장소를 검색해 일정에 추가해 보세요.</p>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -1854,19 +2021,19 @@ Travel Planner AI Analysis Report
                                     </select>
                                   </div>
                                   <div style={{ flex: '1 1 140px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                    <label style={{ fontSize: '10px', fontWeight: '900', color: '#9ca3af' }}>NAME</label>
+                                    <label style={{ fontSize: '10px', fontWeight: '900', color: '#9ca3af' }}>여행 이름</label>
                                     <input 
                                       type="text" 
                                       value={editTripData.name} 
                                       onChange={(e) => setEditTripData({ ...editTripData, name: e.target.value })}
-                                      placeholder="Trip Name"
+                                      placeholder="여행 이름"
                                       style={{ width: '100%', padding: '10px', border: '1px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', fontWeight: '700', outline: 'none', boxSizing: 'border-box' }}
                                     />
                                   </div>
                                 </div>
                                 <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                                   <div style={{ flex: '1 1 140px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                    <label style={{ fontSize: '10px', fontWeight: '900', color: '#9ca3af' }}>START DATE</label>
+                                    <label style={{ fontSize: '10px', fontWeight: '900', color: '#9ca3af' }}>시작일</label>
                                     <input 
                                       type="date" 
                                       value={editTripData.startDate} 
@@ -1875,7 +2042,7 @@ Travel Planner AI Analysis Report
                                     />
                                   </div>
                                   <div style={{ flex: '1 1 140px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                    <label style={{ fontSize: '10px', fontWeight: '900', color: '#9ca3af' }}>END DATE</label>
+                                    <label style={{ fontSize: '10px', fontWeight: '900', color: '#9ca3af' }}>종료일</label>
                                     <input 
                                       type="date" 
                                       value={editTripData.endDate} 
@@ -1889,7 +2056,7 @@ Travel Planner AI Analysis Report
                                 onClick={(e) => { e.stopPropagation(); saveRenameTrip(trip.id); }}
                                 style={{ padding: '12px', backgroundColor: '#8b5cf6', color: 'white', border: 'none', borderRadius: '12px', fontWeight: '900', cursor: 'pointer', marginTop: '8px', boxShadow: '0 4px 12px rgba(139, 92, 246, 0.2)' }}
                               >
-                                SAVE TRIP DETAILS
+                                여행 정보 저장
                               </button>
                             </div>
                           ) : (
@@ -1924,10 +2091,18 @@ Travel Planner AI Analysis Report
                                   >
                                     {copiedId === trip.id ? <Check size={16} color="#10b981" /> : <Share2 size={16} />}
                                   </button>
-                                  <button 
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); duplicateTrip(trip); }}
+                                    style={{ width: "36px", height: "36px", borderRadius: "10px", border: "none", backgroundColor: "#f8fafc", color: "#64748b", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.2s" }}
+                                    title="여행 복제"
+                                    aria-label="여행 복제"
+                                  >
+                                    <Copy size={16} />
+                                  </button>
+                                  <button
                                     onClick={(e) => { e.stopPropagation(); startRenameTrip(trip); }}
                                     style={{ width: '36px', height: '36px', borderRadius: '10px', border: 'none', backgroundColor: '#f8fafc', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s' }}
-                                    title="Edit Trip"
+                                    title="여행 정보 수정"
                                   >
                                     <Edit2 size={16} />
                                   </button>
@@ -1943,7 +2118,7 @@ Travel Planner AI Analysis Report
                                       display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s',
                                       fontSize: '11px', fontWeight: '800'
                                     }}
-                                    title="Delete Trip"
+                                    title="여행 삭제"
                                   >
                                     {confirmDeleteId === `trip-${trip.id}` ? '확인' : <Trash2 size={16} />}
                                   </button>
@@ -1959,10 +2134,10 @@ Travel Planner AI Analysis Report
                               {trip.startDate ? (
                                 <>
                                   <span style={{ color: '#111827' }}>{trip.startDate} ~ {trip.endDate}</span>
-                                  <span style={{ color: '#9ca3af', marginLeft: '4px' }}>({(trip.itinerary || []).length} {(trip.itinerary || []).length === 1 ? 'Day' : 'Days'})</span>
+                                  <span style={{ color: '#9ca3af', marginLeft: '4px' }}>({(trip.itinerary || []).length}일차)</span>
                                 </>
                               ) : (
-                                <span style={{ color: '#111827' }}>{(trip.itinerary || []).length} {(trip.itinerary || []).length === 1 ? 'Day' : 'Days'}</span>
+                                <span style={{ color: '#111827' }}>{(trip.itinerary || []).length}일차</span>
                               )}
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
@@ -1982,12 +2157,12 @@ Travel Planner AI Analysis Report
             {viewMode === 'favorites' && (
               <>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-                  <h2 style={{ fontSize: '12px', fontWeight: '900', color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>Saved Places</h2>
+                  <h2 style={{ fontSize: '12px', fontWeight: '900', color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>저장한 장소</h2>
                 </div>
                 {Object.keys(groupedFavorites).length === 0 ? (
                   <div style={{ padding: '40px 20px', border: '2px dashed #fecaca', borderRadius: '16px', textAlign: 'center' }}>
                     <Heart size={36} color="#fca5a5" style={{ margin: '0 auto 12px auto' }} />
-                    <p style={{ fontSize: '12px', color: '#9ca3af', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>No places saved yet</p>
+                    <p style={{ fontSize: '12px', color: '#9ca3af', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>저장한 장소가 없습니다</p>
                   </div>
                 ) : (
                   Object.entries(groupedFavorites).map(([country, places]) => (
@@ -2028,7 +2203,7 @@ Travel Planner AI Analysis Report
                                       addToItinerary(loc);
                                     }} 
                                     style={{ padding: '10px', backgroundColor: '#eff6ff', border: 'none', color: '#3b82f6', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                    title={`Day ${activeDay} 일정에 추가`}
+                                    title={`${activeDay}일차 일정에 추가`}
                                   >
                                     <Plus size={18} />
                                   </button>
@@ -2055,7 +2230,7 @@ Travel Planner AI Analysis Report
             {viewMode === 'itinerary' && (
               <>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-                  <h2 style={{ fontSize: '12px', fontWeight: '900', color: '#3b82f6', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>My Planner</h2>
+                  <h2 style={{ fontSize: '12px', fontWeight: '900', color: '#3b82f6', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>내 일정</h2>
                   <div style={{ 
                     display: 'flex', 
                     gap: '10px', 
@@ -2075,10 +2250,19 @@ Travel Planner AI Analysis Report
                         onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#ede9fe'}
                         onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#f5f3ff'}
                       >
-                        <Play size={15} /> MOVIE
+                        <Play size={15} /> 사진 보기
                       </button>
                     )}
-                    <button 
+                    <button
+                      onClick={() => exportTripAsJson(activeTrip)}
+                      type="button"
+                      aria-label="일정 JSON 내보내기"
+                      title="일정 JSON 내보내기"
+                      style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", fontWeight: "800", color: "#475569", backgroundColor: "#f8fafc", padding: "8px 12px", borderRadius: "14px", border: "none", cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.2s" }}
+                    >
+                      <Download size={14} /> 내보내기
+                    </button>
+                    <button
                       onClick={addDay} 
                       style={{ 
                         display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: '800', 
@@ -2088,7 +2272,7 @@ Travel Planner AI Analysis Report
                       onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#dbeafe'}
                       onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#eff6ff'}
                     >
-                      <PlusCircle size={14} /> Day+
+                      <PlusCircle size={14} /> 일차 추가
                     </button>
                     {activeTrip?.aiAnalysis && (
                       <button 
@@ -2163,14 +2347,14 @@ Travel Planner AI Analysis Report
                           {dayPlan?.day}
                         </div>
                         <div>
-                          <h3 style={{ fontSize: '16px', fontWeight: '900', color: '#111827', margin: 0 }}>Day {dayPlan?.day}</h3>
+                          <h3 style={{ fontSize: '16px', fontWeight: '900', color: '#111827', margin: 0 }}>{dayPlan?.day}일차</h3>
                           <p style={{ fontSize: '12px', fontWeight: '700', color: parseDay(activeDay) === parseDay(dayPlan?.day) ? '#3b82f6' : '#9ca3af', margin: 0 }}>
                             {getActualDateForDay(activeTrip?.startDate, dayPlan?.day)}
                           </p>
                         </div>
                       </div>
                       <span style={{ fontSize: '11px', fontWeight: '900', color: parseDay(activeDay) === parseDay(dayPlan?.day) ? '#3b82f6' : '#9ca3af', backgroundColor: parseDay(activeDay) === parseDay(dayPlan?.day) ? '#dbeafe' : '#f3f4f6', padding: '4px 10px', borderRadius: '8px' }}>
-                        {(dayPlan?.items || []).length} SPOTS
+                        {(dayPlan?.items || []).length} 장소
                       </span>
                     </div>
 
@@ -2416,19 +2600,19 @@ Travel Planner AI Analysis Report
             {viewMode === 'budget' && (
               <>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-                  <h2 style={{ fontSize: '12px', fontWeight: '900', color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>Budget & Expenses</h2>
+                  <h2 style={{ fontSize: '12px', fontWeight: '900', color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>예산 및 지출</h2>
                 </div>
 
                 {/* Progress Card */}
                 <div style={{ backgroundColor: '#ecfdf5', padding: '20px', borderRadius: '16px', marginBottom: '24px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '12px' }}>
                     <div>
-                      <p style={{ fontSize: '10px', fontWeight: '800', color: '#059669', textTransform: 'uppercase', margin: '0 0 4px 0' }}>Total Spent (KRW)</p>
+                      <p style={{ fontSize: '10px', fontWeight: '800', color: '#059669', textTransform: 'uppercase', margin: '0 0 4px 0' }}>총 지출 (KRW)</p>
                       <h3 style={{ fontSize: '24px', fontWeight: '900', color: '#064e3b', margin: 0 }}>₩ {totalSpentKRW.toLocaleString()}</h3>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
                       <div style={{ textAlign: 'right' }}>
-                        <p style={{ fontSize: '10px', fontWeight: '800', color: '#34d399', textTransform: 'uppercase', margin: '0 0 4px 0' }}>Budget Limit</p>
+                        <p style={{ fontSize: '10px', fontWeight: '800', color: '#34d399', textTransform: 'uppercase', margin: '0 0 4px 0' }}>예산 한도</p>
                         <input 
                           type="number"
                           value={budgetSettings.limitKRW}
@@ -2437,7 +2621,7 @@ Travel Planner AI Analysis Report
                         />
                       </div>
                       <div style={{ textAlign: 'right' }}>
-                        <p style={{ fontSize: '10px', fontWeight: '800', color: '#34d399', textTransform: 'uppercase', margin: '0 0 4px 0' }}>Local Currency</p>
+                        <p style={{ fontSize: '10px', fontWeight: '800', color: '#34d399', textTransform: 'uppercase', margin: '0 0 4px 0' }}>현지 통화</p>
                         <select 
                           value={budgetSettings.travelCurrency}
                           onChange={(e) => saveBudgetSettings({ ...budgetSettings, travelCurrency: e.target.value })}
@@ -2473,8 +2657,8 @@ Travel Planner AI Analysis Report
                       onChange={e => setExpenseInput({...expenseInput, day: e.target.value})}
                       style={{ flex: 1, minWidth: 0, boxSizing: 'border-box', padding: '10px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '12px', fontWeight: '700', outline: 'none' }}
                     >
-                      <option value={0}>Pre-trip (Flight)</option>
-                      {itinerary.map(d => <option key={`opt-day-${d.day}`} value={d.day}>Day {d.day}</option>)}
+                      <option value={0}>여행 전 (항공권)</option>
+                      {itinerary.map(d => <option key={`opt-day-${d.day}`} value={d.day}>{d.day}일차</option>)}
                     </select>
                     <select 
                       value={expenseInput.currency || budgetSettings.travelCurrency} 
@@ -2490,14 +2674,14 @@ Travel Planner AI Analysis Report
                   <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
                     <input 
                       type="text" 
-                      placeholder="What did you buy?" 
+                      placeholder="지출 내용"
                       value={expenseInput.desc}
                       onChange={e => setExpenseInput({...expenseInput, desc: e.target.value})}
                       style={{ flex: 2, minWidth: 0, boxSizing: 'border-box', padding: '10px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '12px', fontWeight: '700', outline: 'none' }}
                     />
                     <input 
                       type="number" 
-                      placeholder="Amount" 
+                      placeholder="금액"
                       value={expenseInput.amount}
                       onChange={e => setExpenseInput({...expenseInput, amount: e.target.value})}
                       style={{ flex: 1, minWidth: 0, boxSizing: 'border-box', padding: '10px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '12px', fontWeight: '700', outline: 'none' }}
@@ -2507,7 +2691,7 @@ Travel Planner AI Analysis Report
                     onClick={addExpense}
                     style={{ width: '100%', padding: '12px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 4px 10px rgba(16, 185, 129, 0.2)' }}
                   >
-                    + ADD EXPENSE
+                    + 지출 추가
                   </button>
                 </div>
 
@@ -2515,7 +2699,7 @@ Travel Planner AI Analysis Report
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {expenses.length === 0 ? (
                     <div style={{ padding: '32px 20px', border: '2px dashed #e5e7eb', borderRadius: '16px', textAlign: 'center' }}>
-                      <p style={{ fontSize: '11px', color: '#d1d5db', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>No expenses recorded</p>
+                      <p style={{ fontSize: '11px', color: '#d1d5db', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>기록된 지출이 없습니다</p>
                     </div>
                   ) : (
                     [0, ...itinerary.map(d=>d.day)].map(dayNum => {
@@ -2525,7 +2709,7 @@ Travel Planner AI Analysis Report
                       return (
                         <div key={`exp-day-${dayNum}`} style={{ marginBottom: '16px' }}>
                           <h4 style={{ fontSize: '10px', fontWeight: '900', color: '#9ca3af', textTransform: 'uppercase', marginBottom: '8px' }}>
-                            {dayNum === 0 ? 'Pre-trip (Booking, etc)' : `Day ${dayNum} ${activeTrip?.startDate ? `(${getActualDateForDay(activeTrip.startDate, dayNum)})` : ''}`}
+                            {dayNum === 0 ? '여행 전 (예약 등)' : `${dayNum}일차 ${activeTrip?.startDate ? `(${getActualDateForDay(activeTrip.startDate, dayNum)})` : ''}`}
                           </h4>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             {dayExpenses.map(exp => (
@@ -2562,8 +2746,9 @@ Travel Planner AI Analysis Report
 
           {/* Footer */}
         <div style={{ padding: '24px 32px', borderTop: '1px solid #f3f4f6', backgroundColor: '#f9fafb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '11px', fontWeight: '900', color: '#111827', letterSpacing: '0.05em' }}>{(favorites || []).length} SAVED • {totalSpots} PLANNED</span>
-            <button onClick={() => setSidebarOpen(false)} style={{ fontSize: '11px', fontWeight: '900', color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer', letterSpacing: '0.05em' }}>CLOSE</button>
+            <span style={{ fontSize: "11px", fontWeight: "900", color: "#111827", letterSpacing: "0.05em" }}>{(favorites || []).length} 저장 • {totalSpots} 일정</span>
+            <span style={{ fontSize: "10px", fontWeight: "800", color: syncStatus === "error" ? "#ef4444" : syncStatus === "saving" ? "#f59e0b" : "#10b981" }}>{isLoadingDB ? "동기화 중…" : syncStatus === "saving" ? "저장 중…" : syncStatus === "error" ? "로컬 저장됨" : "저장됨"}</span>
+            <button onClick={() => setSidebarOpen(false)} style={{ fontSize: '11px', fontWeight: '900', color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer', letterSpacing: '0.05em' }}>닫기</button>
           </div>
         </aside>
 
@@ -2596,10 +2781,12 @@ Travel Planner AI Analysis Report
               <Users size={20} color="white" />
             </div>
             <div>
-              <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: '900', color: '#a78bfa' }}>Code Copied!</h4>
+              <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: '900', color: '#a78bfa' }}>초대 코드 복사됨</h4>
               <p style={{ margin: 0, fontSize: '12px', fontWeight: '700', color: '#d1d5db', lineHeight: 1.4 }}>이 코드를 친구에게 전달하면<br/>실시간으로 함께 일정을 짤 수 있습니다! 🤝</p>
             </div>
             <button 
+              aria-label="알림 닫기"
+              title="알림 닫기"
               onClick={() => setShowShareToast(false)}
               style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#4b5563', cursor: 'pointer', padding: '4px' }}
             >
@@ -2624,7 +2811,7 @@ Travel Planner AI Analysis Report
               color: showFullRoute ? 'white' : '#4f46e5',
               transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
             }}
-            title={showFullRoute ? "일차별 경로 보기" : "전체 경로 보기"}
+            aria-label={showFullRoute ? "일차별 경로 보기" : "전체 경로 보기"} title={showFullRoute ? "일차별 경로 보기" : "전체 경로 보기"}
           >
             <Navigation size={24} style={{ transform: showFullRoute ? 'rotate(45deg)' : 'none', transition: 'transform 0.3s' }} />
           </button>
@@ -2640,7 +2827,7 @@ Travel Planner AI Analysis Report
               color: '#10b981',
               transition: 'all 0.2s'
             }}
-            title="내 현재 위치 찾기"
+            aria-label="내 현재 위치 찾기" title="내 현재 위치 찾기"
           >
             <LocateFixed size={24} />
           </button>
@@ -2649,7 +2836,7 @@ Travel Planner AI Analysis Report
         {/* SIDEBAR TOGGLE (ONLY WHEN CLOSED) */}
         {!sidebarOpen && (
           <div className="sidebar-toggle-btn">
-            <button onClick={() => setSidebarOpen(true)} style={{ width: '56px', height: '56px', backgroundColor: 'white', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', cursor: 'pointer', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb' }}>
+            <button aria-label="메뉴 열기" title="메뉴 열기" onClick={() => setSidebarOpen(true)} style={{ width: '56px', height: '56px', backgroundColor: 'white', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', cursor: 'pointer', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb' }}>
               <Menu size={24} />
             </button>
           </div>
@@ -2766,7 +2953,7 @@ Travel Planner AI Analysis Report
                   key={`day-label-${idx}`}
                   position={path[0]}
                   label={{
-                    text: `Day ${idx + 1}`,
+                    text: `${idx + 1}일차`,
                     color: 'white',
                     fontSize: '12px',
                     fontWeight: '900'
@@ -2897,7 +3084,7 @@ Travel Planner AI Analysis Report
                 {/* BOTTOM SECTION: Add to Itinerary */}
                 {activeTripId && (
                   <div style={{ backgroundColor: '#f8fafc', padding: window.innerWidth < 768 ? '10px' : '16px', borderRadius: '14px', border: '1px solid #f1f5f9' }}>
-                    <div style={{ fontSize: '9px', fontWeight: '900', color: '#9ca3af', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.05em' }}>Select Day</div>
+                    <div style={{ fontSize: '9px', fontWeight: '900', color: '#9ca3af', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.05em' }}>일차 선택</div>
                     <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', overflowX: 'auto', paddingBottom: '2px' }}>
                       {(itinerary || []).map((dayPlan, dayIndex) => {
                         const day = parseDay(dayPlan?.day) || dayIndex + 1;
@@ -2944,7 +3131,7 @@ Travel Planner AI Analysis Report
                     </div>
 
                     <PremiumTimeInput 
-                      label="Arrival Time"
+                      label="도착 시간"
                       value={itineraryTime || '09:00'} 
                       onChange={(val) => setItineraryTime(val)} 
                     />
@@ -3119,8 +3306,21 @@ Travel Planner AI Analysis Report
             </button>
 
             <div style={{ marginBottom: '24px' }}>
-              <div style={{ fontSize: '12px', fontWeight: '900', color: '#3b82f6', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>Edit Schedule</div>
+              <div style={{ fontSize: '12px', fontWeight: '900', color: '#3b82f6', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>일정 수정</div>
               <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#0f172a', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{editingTimeItem.originalName || '일정 수정'}</h3>
+            </div>
+
+            <div style={{ marginBottom: "14px" }}>
+              <label style={{ display: "block", fontSize: "10px", fontWeight: "900", color: "#64748b", marginBottom: "8px" }}>일정 일차</label>
+              <select
+                value={editingTimeItem.day}
+                onChange={(e) => setEditingTimeItem({ ...editingTimeItem, day: Number(e.target.value) })}
+                style={{ width: "100%", boxSizing: "border-box", padding: "12px", borderRadius: "12px", border: "1px solid #e2e8f0", backgroundColor: "white", fontSize: "14px", fontWeight: "700", outline: "none" }}
+              >
+                {itinerary.map(dayPlan => (
+                  <option key={dayPlan.day} value={parseDay(dayPlan.day)}>{parseDay(dayPlan.day)}일차</option>
+                ))}
+              </select>
             </div>
 
             <div style={{ marginBottom: "18px" }}>
@@ -3138,7 +3338,7 @@ Travel Planner AI Analysis Report
             <PremiumTimeInput 
               value={editingTimeItem.time}
               onChange={(newTime) => setEditingTimeItem({ ...editingTimeItem, time: newTime })}
-              label="Select Schedule"
+              label="일정 시간 선택"
             />
 
             <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
@@ -3146,11 +3346,12 @@ Travel Planner AI Analysis Report
                 onClick={() => setEditingTimeItem(null)}
                 style={{ flex: 1, padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', backgroundColor: 'white', color: '#64748b', fontSize: '15px', fontWeight: '900', cursor: 'pointer' }}
               >
-                Cancel
+                취소
               </button>
               <button 
                 onClick={() => {
                   updateItineraryItem(editingTimeItem.day, editingTimeItem.id, {
+                    day: editingTimeItem.day,
                     time: editingTimeItem.time,
                     displayName: editingTimeItem.displayName.trim() || editingTimeItem.originalName
                   });
@@ -3158,7 +3359,7 @@ Travel Planner AI Analysis Report
                 }}
                 style={{ flex: 2, padding: '16px', borderRadius: '16px', border: 'none', backgroundColor: '#3b82f6', color: 'white', fontSize: '15px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 10px 15px -3px rgba(59, 130, 246, 0.3)' }}
               >
-                Save Changes
+                저장
               </button>
             </div>
           </div>

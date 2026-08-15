@@ -236,3 +236,20 @@ body {
     border-radius: 12px !important;
   }
 }
+
+
+/* Keyboard and mobile usability */
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 3px solid #2563eb !important;
+  outline-offset: 2px;
+}
+
+@media (max-width: 768px) {
+  .search-bar-container {
+    top: calc(20px + env(safe-area-inset-top)) !important;
+  }
+
+  .map-controls-group {
+    top: calc(100px + env(safe-area-inset-top));
+  }
+}
