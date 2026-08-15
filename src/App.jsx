@@ -261,6 +261,7 @@ function App() {
   const [showSlideshow, setShowSlideshow] = useState(false);
   const [slideshowIndex, setSlideshowIndex] = useState(0);
   const [itineraryTime, setItineraryTime] = useState('');
+  const [itineraryDisplayName, setItineraryDisplayName] = useState('');
   const [editingTimeItem, setEditingTimeItem] = useState(null); // { day, id, time, name }
   const [showAIModal, setShowAIModal] = useState(false);
   const [showConfirmApplyModal, setShowConfirmApplyModal] = useState(false);
@@ -375,6 +376,11 @@ function App() {
   useEffect(() => {
     setActiveDay(null);
   }, [activeTripId]);
+
+  // Reset the custom itinerary name when the selected place changes
+  useEffect(() => {
+    setItineraryDisplayName(selectedPlace?.displayName || '');
+  }, [selectedPlace]);
 
   // Cloud Sync Initialization
   useEffect(() => {
@@ -1356,6 +1362,7 @@ Travel Planner AI Analysis Report
 
   const addToItinerary = (place) => {
     const targetDay = parseDay(activeDay);
+    const displayName = itineraryDisplayName.trim() || place.displayName || place.name || '장소 이름 정보 없음';
     const newItinerary = (itinerary || []).map(d => ({ ...d, items: [...(d.items || [])] }));
     const dayIndex = newItinerary.findIndex(d => parseDay(d.day) === targetDay);
     
@@ -1381,16 +1388,17 @@ Travel Planner AI Analysis Report
 
       newItinerary[dayIndex].items = [
         ...newItinerary[dayIndex].items,
-        { ...place, id: Date.now(), emoji: place.emoji || '📍', time: finalTime }
+        { ...place, id: Date.now(), emoji: place.emoji || '📍', displayName, time: finalTime }
       ].sort((a, b) => (a.time || '00:00').localeCompare(b.time || '00:00'));
     } else {
       newItinerary.push({ 
         day: targetDay, 
-        items: [{ ...place, id: Date.now(), emoji: place.emoji || '📍', time: itineraryTime || '09:00' }] 
+        items: [{ ...place, id: Date.now(), emoji: place.emoji || '📍', displayName, time: itineraryTime || '09:00' }]
       });
     }
     saveItinerary(newItinerary);
-    setItineraryTime(''); 
+    setItineraryTime('');
+    setItineraryDisplayName('');
     setViewMode('itinerary');
   };
 
@@ -2207,7 +2215,7 @@ Travel Planner AI Analysis Report
                                           }
                                         }}
                                         style={{ 
-                                          fontSize: (item.name?.length > 15 ? '12px' : item.name?.length > 10 ? '14px' : '17px'), 
+                                          fontSize: ((item.displayName || item.name)?.length > 15 ? '12px' : (item.displayName || item.name)?.length > 10 ? '14px' : '17px'),
                                           fontWeight: '900', 
                                           color: (item.lat && item.lng) ? '#2563eb' : '#000000',
                                           textDecoration: (item.lat && item.lng) ? 'underline' : 'none',
@@ -2220,10 +2228,10 @@ Travel Planner AI Analysis Report
                                         }}
                                         title={(item.lat && item.lng) ? "지도에서 위치 보기" : undefined}
                                       >
-                                        {item.name || '장소 이름 정보 없음'}
+                                        {item.displayName || item.name || '장소 이름 정보 없음'}
                                       </h4>
                                       <div 
-                                        onClick={() => setEditingTimeItem({ day: dayPlan.day, id: item.id, time: item.time || '09:00', name: item.name })}
+                                        onClick={() => setEditingTimeItem({ day: dayPlan.day, id: item.id, time: item.time || '09:00', name: item.displayName || item.name })}
                                         style={{ 
                                           display: 'flex', 
                                           alignItems: 'center', 
@@ -2915,6 +2923,23 @@ Travel Planner AI Analysis Report
                         </button>
                         );
                       })}
+                    </div>
+
+                    <div style={{ marginBottom: "12px" }}>
+                      <label style={{ display: "block", fontSize: "9px", fontWeight: "900", color: "#9ca3af", textTransform: "uppercase", marginBottom: "6px", letterSpacing: "0.05em" }}>
+                        일정 표시 이름 (선택)
+                      </label>
+                      <input
+                        type="text"
+                        value={itineraryDisplayName}
+                        onChange={(e) => setItineraryDisplayName(e.target.value)}
+                        placeholder={selectedPlace.name || "예: 호텔 체크인"}
+                        maxLength={80}
+                        style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: "10px", border: "1px solid #e2e8f0", fontSize: "12px", fontWeight: "700", outline: "none" }}
+                      />
+                      <p style={{ margin: "5px 0 0", fontSize: "10px", color: "#94a3b8" }}>
+                        입력하지 않으면 검색된 장소명이 일정에 표시됩니다.
+                      </p>
                     </div>
 
                     <PremiumTimeInput 
