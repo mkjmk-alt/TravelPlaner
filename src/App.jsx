@@ -264,6 +264,10 @@ function App() {
     setDragOffset(0);
   };
   const [viewMode, setViewMode] = useState('trips');
+  const openItinerary = () => {
+    setViewMode('itinerary');
+    if (windowSize.width < 768) setSheetMode('full');
+  };
   const [searchQuery, setSearchQuery] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [searchResult, setSearchResult] = useState(null);
@@ -760,7 +764,7 @@ function App() {
       const newTrips = [joinedTrip, ...(trips || [])];
       await syncTripsToCloud(newTrips);
       setActiveTripId(joinedTrip.id);
-      setViewMode('itinerary');
+      openItinerary();
       setModalConfig({ type: 'success', title: '참여 완료', message: `'${joinedTrip.name}' 일정에 참여했습니다!` });
       setShowCustomModal(true);
     } catch {
@@ -1003,7 +1007,7 @@ function App() {
     };
     syncTripsToCloud([duplicate, ...(trips || [])]);
     setActiveTripId(duplicateId);
-    setViewMode("itinerary");
+    openItinerary();
   };
 
   const handleUploadJson = () => {
@@ -1277,7 +1281,7 @@ function App() {
     saveItinerary(newItinerary);
     setItineraryTime('');
     setItineraryDisplayName('');
-    setViewMode('itinerary');
+    openItinerary();
   };
 
   const addExpense = () => {
@@ -1619,6 +1623,10 @@ function App() {
         }}
       >
         <div 
+        role="button"
+        tabIndex={0}
+        aria-label={sheetMode === 'full' ? '일정 패널 줄이기' : '일정 패널 크게 보기'}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } }}
           className="drag-handle" 
           onClick={() => {
             if (windowSize.width < 768) {
@@ -1678,7 +1686,7 @@ function App() {
               {activeTripId && (
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flex: 1 }}>
                   <button 
-                    onClick={() => setViewMode('itinerary')}
+                    onClick={() => openItinerary()}
                     style={{ width: '40px', height: '40px', borderRadius: '12px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.2s', backgroundColor: viewMode === 'itinerary' ? '#2563eb' : '#f3f4f6', color: viewMode === 'itinerary' ? 'white' : '#9ca3af' }}
                     aria-label="내 일정" title="내 일정"
                   >
@@ -1760,7 +1768,7 @@ function App() {
                     {(trips || []).map(trip => (
                       <div 
                         key={trip.id} 
-                        onClick={() => { setActiveTripId(trip.id); setViewMode('itinerary'); }}
+                        onClick={() => { setActiveTripId(trip.id); openItinerary(); }}
                         style={{ padding: '24px', backgroundColor: activeTripId === trip.id ? '#f5f3ff' : 'white', border: activeTripId === trip.id ? '2px solid #ddd6fe' : '1px solid #f3f4f6', borderRadius: '20px', cursor: 'pointer', transition: '0.2s', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
