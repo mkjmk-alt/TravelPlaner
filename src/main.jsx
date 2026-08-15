@@ -1,7 +1,7 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
-import App from './App.jsx'
+
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -56,8 +56,16 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-createRoot(document.getElementById('root')).render(
-  <ErrorBoundary>
-    <App />
-  </ErrorBoundary>,
-)
+fetch('/api/config')
+  .then((response) => response.ok ? response.json() : {})
+  .catch(() => ({}))
+  .then(async (runtimeConfig) => {
+    window.__TRAVELPLANER_CONFIG__ = runtimeConfig;
+    const { default: App } = await import('./App.jsx');
+
+    createRoot(document.getElementById('root')).render(
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>,
+    )
+  })

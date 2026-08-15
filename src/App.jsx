@@ -8,7 +8,8 @@ import './index.css';
 // --- CONFIGURATION ---
 const HK_CENTER = { lat: 22.2891, lng: 114.1924 };
 const MAP_LIBRARIES = ['places']; 
-const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+const runtimeConfig = typeof window !== "undefined" ? window.__TRAVELPLANER_CONFIG__ || {} : {};
+const GOOGLE_MAPS_API_KEY = runtimeConfig.googleMapsApiKey || import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
 const readStoredJson = (key, fallback) => {
   try {
