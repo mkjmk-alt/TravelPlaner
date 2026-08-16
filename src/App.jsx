@@ -1970,7 +1970,7 @@ function App() {
             {viewMode === 'trips' && (
               <>
                 <div style={{ marginBottom: '32px' }}>
-                  <h2 style={{ fontSize: '28px', fontWeight: '900', color: '#0f172a', marginBottom: '24px' }}>내 여행</h2>
+                  <h2 className="menu-section-title" style={{ marginBottom: '24px' }}>내 여행</h2>
                   
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {/* Row 1: Import Options */}
@@ -2171,7 +2171,7 @@ function App() {
             {viewMode === 'favorites' && (
               <>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-                  <h2 style={{ fontSize: '12px', fontWeight: '900', color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>저장한 장소</h2>
+                  <h2 className="menu-section-title">저장한 장소</h2>
                 </div>
                 {Object.keys(groupedFavorites).length === 0 ? (
                   <div style={{ padding: '40px 20px', border: '2px dashed #fecaca', borderRadius: '16px', textAlign: 'center' }}>
@@ -2244,7 +2244,7 @@ function App() {
             {viewMode === 'itinerary' && (
               <>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, marginBottom: '24px' }}>
-                  <h2 style={{ flex: '0 0 auto', whiteSpace: 'nowrap', fontSize: '12px', fontWeight: '900', color: '#3b82f6', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>내 일정</h2>
+                  <h2 className="menu-section-title" style={{ flex: '0 0 auto', whiteSpace: 'nowrap' }}>내 일정</h2>
                   <div style={{ 
                     flex: '1 1 auto',
                     minWidth: 0,
@@ -2660,7 +2660,7 @@ function App() {
             {viewMode === 'budget' && (
               <>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '24px' }}>
-                  <h2 style={{ fontSize: '12px', fontWeight: '900', color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>예산 및 지출</h2>
+                  <h2 className="menu-section-title">예산 및 지출</h2>
                   <button type="button" onClick={() => exportBudgetAsCsv(activeTrip)} aria-label="예산 CSV 내보내기" title="예산 CSV 내보내기" style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '8px 11px', border: 'none', borderRadius: '12px', backgroundColor: '#ecfdf5', color: '#059669', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}><FileText size={14} /> CSV</button>
                 </div>
 

@@ -186,6 +186,17 @@ body {
   display: flex !important;
 }
 
+.menu-section-title {
+  margin: 0;
+  color: #0f172a;
+  font-family: 'Inter', sans-serif;
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1.25;
+  letter-spacing: -0.03em;
+  white-space: nowrap;
+}
+
 @media (max-width: 768px) {
   .mobile-only-flex {
     display: flex !important;
