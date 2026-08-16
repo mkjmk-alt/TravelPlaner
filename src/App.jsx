@@ -288,7 +288,7 @@ function App() {
   };
 
   const handleSidebarScroll = (e) => {
-    if (windowSize.width >= 768 || viewMode !== 'itinerary') return;
+    if (windowSize.width >= 768) return;
     const shouldHideHeader = e.currentTarget.scrollTop > 8;
     setIsMobileHeaderHidden((hidden) => hidden === shouldHideHeader ? hidden : shouldHideHeader);
   };
@@ -1749,6 +1749,7 @@ function App() {
   const totalSpots = (itinerary || []).reduce((acc, day) => acc + (day.items || []).length, 0);
   const totalSpentKRW = (expenses || []).reduce((acc, curr) => acc + (curr.amountKRW || 0), 0);
   const budgetProgress = budgetSettings.limitKRW > 0 ? Math.min((totalSpentKRW / budgetSettings.limitKRW) * 100, 100) : 0;
+  const useFloatingPlacePanel = true;
 
   // Robust Error Boundaries
   if (loadError) {
@@ -3140,7 +3141,7 @@ function App() {
           )}
 
           {/* Selected Place InfoWindow */}
-          {selectedPlace && windowSize.width >= 768 && (
+          {!useFloatingPlacePanel && selectedPlace && windowSize.width >= 768 && (
             <InfoWindow position={{ lat: selectedPlace.lat, lng: selectedPlace.lng }} options={{ disableAutoPan: true }} onCloseClick={() => setSelectedPlace(null)}>
               <div className="place-info-window-content" style={{ padding: window.innerWidth < 768 ? '8px 12px' : '20px', minWidth: window.innerWidth < 768 ? '250px' : '300px', maxWidth: '340px', fontFamily: '"Inter", "Roboto", sans-serif' }}>
                 {/* TOP SECTION: Place Info & Favorite */}
@@ -3277,7 +3278,7 @@ function App() {
         </GoogleMap>
       </div>
 
-      {selectedPlace && windowSize.width < 768 && (
+      {selectedPlace && (
         <div className="mobile-place-add-overlay" role="dialog" aria-modal="true" aria-label="장소를 일정에 추가">
           <div
             className="mobile-place-add-panel"
