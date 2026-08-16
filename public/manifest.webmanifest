@@ -1,0 +1,17 @@
+{
+  "name": "TravelPlaner 여행 일정 플래너",
+  "short_name": "TravelPlaner",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

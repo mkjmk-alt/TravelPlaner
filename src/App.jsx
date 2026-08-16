@@ -1,7 +1,7 @@
 // Build Version: v1.2.2-build-trigger-fix
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete, Polyline } from '@react-google-maps/api';
-import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Camera, Play, Image, Clock, Upload, Clipboard, LocateFixed, Download } from 'lucide-react';
+import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Camera, Play, Image, Clock, Upload, Clipboard, LocateFixed, Download, Bell, FileText } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import './index.css';
 
@@ -29,6 +29,22 @@ const writeStoredJson = (key, value) => {
     console.warn("저장 공간에 데이터를 기록하지 못했습니다.", error);
     return false;
   }
+};
+
+const ONBOARDING_STORAGE_KEY = 'travelplaner_onboarding_seen_v1';
+
+const escapeIcsText = (value) => String(value || '')
+  .replace(/\\/g, '\\\\')
+  .replace(/;/g, '\\;')
+  .replace(/,/g, '\\,')
+  .replace(/\r?\n/g, '\\n');
+
+const getIcsDateTime = (startDate, dayNumber, time, offsetMinutes = 0) => {
+  const date = new Date(`${startDate}T${time || '09:00'}:00`);
+  date.setDate(date.getDate() + (Number(dayNumber) - 1));
+  date.setMinutes(date.getMinutes() + offsetMinutes);
+  const pad = (number) => String(number).padStart(2, '0');
+  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}T${pad(date.getHours())}${pad(date.getMinutes())}00`;
 };
 
 const countryToCurrency = {
@@ -136,7 +152,7 @@ const PremiumTimeInput = ({ value, onChange, label }) => {
               cursor: 'pointer'
             }}
           >
-            NOW
+            현재 시간
           </button>
           <div style={{ display: 'flex', gap: '2px' }}>
             <button onClick={() => adjustTime('m', -30)} style={{ width: '28px', height: '24px', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '4px', fontSize: '8px', fontWeight: '900', color: '#94a3b8', cursor: 'pointer' }}>-30</button>
@@ -304,6 +320,14 @@ function App() {
   const [pasteText, setPasteText] = useState('');
   const [showFullRoute, setShowFullRoute] = useState(false);
   const [userLocation, setUserLocation] = useState(null);
+  const [showOnboarding, setShowOnboarding] = useState(() => !readStoredJson(ONBOARDING_STORAGE_KEY, false));
+  const [onboardingStep, setOnboardingStep] = useState(0);
+  const [mergeNotice, setMergeNotice] = useState(null);
+  const [selectedItineraryItems, setSelectedItineraryItems] = useState([]);
+  const [bulkMoveTarget, setBulkMoveTarget] = useState('');
+  const [notificationPermission, setNotificationPermission] = useState(() => (
+    typeof Notification === 'undefined' ? 'unsupported' : Notification.permission
+  ));
 
   const handleMyLocation = () => {
     if (!navigator.geolocation) {
@@ -403,6 +427,8 @@ function App() {
     // Intentionally reset the selected day when switching trips.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setActiveDay(null);
+    setSelectedItineraryItems([]);
+    setBulkMoveTarget('');
   }, [activeTripId]);
 
   // Reset the custom itinerary name when the selected place changes
@@ -427,6 +453,8 @@ function App() {
         
         let cloudTrips = null;
         let cloudFavs = null;
+        let mergedTripCount = 0;
+        let mergedFavoriteCount = 0;
         
         if (data && data.length > 0) {
           const tripsRow = data.find(r => r.key === 'world_pro_trips_v1');
@@ -447,6 +475,7 @@ function App() {
           const mergedTrips = [...cloudTripList, ...localOnlyTrips];
           setTrips(mergedTrips);
           writeStoredJson("world_pro_trips_v1", mergedTrips);
+          mergedTripCount = localOnlyTrips.length;
           if (localOnlyTrips.length > 0) {
             const { error: mergeTripError } = await supabase.from("user_state").upsert({ user_id: session.user.id, key: "world_pro_trips_v1", value: mergedTrips }, { onConflict: "user_id,key" });
             if (mergeTripError) throw mergeTripError;
@@ -464,10 +493,14 @@ function App() {
           const mergedFavs = [...cloudFavList, ...localOnlyFavs];
           setFavorites(mergedFavs);
           writeStoredJson("world_pro_fav_v1", mergedFavs);
+          mergedFavoriteCount = localOnlyFavs.length;
           if (localOnlyFavs.length > 0) {
             const { error: mergeFavError } = await supabase.from("user_state").upsert({ user_id: session.user.id, key: "world_pro_fav_v1", value: mergedFavs }, { onConflict: "user_id,key" });
             if (mergeFavError) throw mergeFavError;
           }
+        }
+        if (mergedTripCount > 0 || mergedFavoriteCount > 0) {
+          setMergeNotice({ trips: mergedTripCount, favorites: mergedFavoriteCount });
         }
         setSyncStatus("saved");
       } catch (err) {
@@ -525,6 +558,61 @@ function App() {
   const itinerary = useMemo(() => activeTrip?.itinerary || [], [activeTrip]);
   const budgetSettings = activeTrip?.budgetSettings || { limitKRW: 1000000, travelCurrency: 'USD' };
   const expenses = activeTrip?.expenses || [];
+
+  const requestNotificationPermission = async () => {
+    if (typeof Notification === 'undefined') return 'unsupported';
+    const permission = Notification.permission === 'default'
+      ? await Notification.requestPermission()
+      : Notification.permission;
+    setNotificationPermission(permission);
+    return permission;
+  };
+
+  const toggleTripReminders = async () => {
+    if (!activeTrip) return;
+    if (activeTrip.reminders?.enabled) {
+      await updateActiveTrip({ reminders: { ...activeTrip.reminders, enabled: false } });
+      return;
+    }
+    const permission = await requestNotificationPermission();
+    if (permission !== 'granted') {
+      setModalConfig({ type: 'error', title: '알림 권한이 필요합니다', message: '브라우저 설정에서 알림 권한을 허용한 뒤 다시 시도해주세요.' });
+      setShowCustomModal(true);
+      return;
+    }
+    await updateActiveTrip({ reminders: { enabled: true, minutesBefore: activeTrip.reminders?.minutesBefore || 30 } });
+  };
+
+  useEffect(() => {
+    if (!activeTrip?.reminders?.enabled || notificationPermission !== 'granted') return undefined;
+
+    const checkReminders = () => {
+      if (!activeTrip.startDate) return;
+      const now = new Date();
+      const minutesBefore = Number(activeTrip.reminders.minutesBefore) || 30;
+      for (const day of activeTrip.itinerary || []) {
+        for (const item of day.items || []) {
+          if (!item.time) continue;
+          const target = new Date(`${activeTrip.startDate}T${item.time}:00`);
+          target.setDate(target.getDate() + (parseDay(day.day) - 1));
+          const difference = (target.getTime() - now.getTime()) / 60000;
+          if (difference >= 0 && difference <= minutesBefore) {
+            const reminderKey = `travelplaner-reminder-${activeTrip.id}-${day.day}-${item.id}-${target.toISOString().slice(0, 10)}`;
+            if (readStoredJson(reminderKey, false)) continue;
+            new Notification(`${item.displayName || item.name || '일정'} 출발 알림`, {
+              body: `${day.day}일차 ${item.time} 일정이 ${Math.ceil(difference)}분 후 시작됩니다.`,
+              icon: '/favicon.svg'
+            });
+            writeStoredJson(reminderKey, true);
+          }
+        }
+      }
+    };
+
+    checkReminders();
+    const timer = window.setInterval(checkReminders, 60000);
+    return () => window.clearInterval(timer);
+  }, [activeTrip, notificationPermission]);
 
   // Natively translate and sort currencies
   const getCurrencyNameKO = (code) => {
@@ -949,12 +1037,37 @@ function App() {
     setActiveDay(totalDays);
   };
 
+  const deleteDay = async (dayNumber) => {
+    if (!activeTrip) return;
+    if (itinerary.length <= 1) {
+      setModalConfig({ type: 'error', title: '일차를 삭제할 수 없습니다', message: '여행에는 최소 한 개의 일차가 필요합니다.' });
+      setShowCustomModal(true);
+      return;
+    }
+
+    const targetDay = parseDay(dayNumber);
+    const newItinerary = itinerary
+      .filter(day => parseDay(day.day) !== targetDay)
+      .map((day, index) => ({ ...day, day: index + 1 }));
+    let newEndDate = activeTrip.endDate;
+    if (activeTrip.endDate) {
+      const endDate = new Date(`${activeTrip.endDate}T00:00:00`);
+      endDate.setDate(endDate.getDate() - 1);
+      newEndDate = endDate.toISOString().slice(0, 10);
+    }
+
+    await updateActiveTrip({ itinerary: newItinerary, endDate: newEndDate });
+    setSelectedItineraryItems([]);
+    setBulkMoveTarget('');
+    setActiveDay(Math.min(targetDay, newItinerary.length));
+  };
+
   const saveItinerary = (newItinerary) => updateActiveTrip({ itinerary: newItinerary });
   const saveBudgetSettings = (newSettings) => updateActiveTrip({ budgetSettings: newSettings });
   const saveExpenses = (newExpenses) => updateActiveTrip({ expenses: newExpenses });
 
   // --- TRIP CRUD ---
-  const createNewTrip = () => {
+  const createNewTrip = (openAfterCreate = false) => {
     const newId = Date.now().toString();
     const today = new Date().toISOString().split('T')[0];
     const newTrip = {
@@ -966,6 +1079,7 @@ function App() {
       itinerary: [{ day: 1, items: [] }],
       budgetSettings: { limitKRW: 1000000, travelCurrency: 'USD' },
       expenses: [],
+      reminders: { enabled: false, minutesBefore: 30 },
       createdAt: Date.now()
     };
     
@@ -975,6 +1089,31 @@ function App() {
     // Auto-enter inline edit mode
     setEditingTripId(newId);
     setEditTripData({ name: "새 여행", startDate: today, endDate: today, country: "" });
+    if (openAfterCreate) {
+      setEditingTripId(null);
+      setActiveTripId(newId);
+      openItinerary();
+      setOnboardingStep(1);
+    }
+  };
+
+  const dismissOnboarding = () => {
+    writeStoredJson(ONBOARDING_STORAGE_KEY, true);
+    setShowOnboarding(false);
+  };
+
+  const handleOnboardingAction = () => {
+    if (onboardingStep === 0) {
+      createNewTrip(true);
+      return;
+    }
+    if (onboardingStep === 1) {
+      openItinerary();
+      setShowOnboarding(false);
+      setOnboardingStep(2);
+      return;
+    }
+    dismissOnboarding();
   };
 
   const exportTripAsJson = (trip = activeTrip) => {
@@ -993,6 +1132,57 @@ function App() {
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     setModalConfig({ type: "success", title: "내보내기 완료", message: "일정 JSON 파일을 저장했습니다." });
+    setShowCustomModal(true);
+  };
+
+  const downloadTextFile = (fileName, content, type) => {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const exportTripAsIcal = (trip = activeTrip) => {
+    if (!trip) return;
+    const events = (trip.itinerary || []).flatMap(day => (day.items || []).map(item => {
+      const start = getIcsDateTime(trip.startDate || new Date().toISOString().slice(0, 10), day.day, item.time);
+      const end = getIcsDateTime(trip.startDate || new Date().toISOString().slice(0, 10), day.day, item.time, 60);
+      return [
+        'BEGIN:VEVENT',
+        `UID:${escapeIcsText(item.id || crypto.randomUUID())}@travelplaner`,
+        `DTSTAMP:${getIcsDateTime(new Date().toISOString().slice(0, 10), 1, new Date().toTimeString().slice(0, 5))}Z`,
+        `DTSTART:${start}`,
+        `DTEND:${end}`,
+        `SUMMARY:${escapeIcsText(item.displayName || item.name || '여행 일정')}`,
+        `LOCATION:${escapeIcsText(item.loc || '')}`,
+        `DESCRIPTION:${escapeIcsText(item.desc || '')}`,
+        'END:VEVENT'
+      ].join('\r\n');
+    }));
+    const ical = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//TravelPlaner//Itinerary//KO', 'CALSCALE:GREGORIAN', ...events, 'END:VCALENDAR'].join('\r\n');
+    downloadTextFile(`${(trip.name || 'travel-plan').replace(/[^\w가-힣-]+/g, '_')}.ics`, ical, 'text/calendar;charset=utf-8');
+    setModalConfig({ type: 'success', title: '캘린더 내보내기 완료', message: 'Google Calendar, Apple 캘린더 등에서 열 수 있는 iCal 파일을 저장했습니다.' });
+    setShowCustomModal(true);
+  };
+
+  const exportBudgetAsCsv = (trip = activeTrip) => {
+    if (!trip) return;
+    const header = ['일차', '날짜', '지출 내용', '금액', '통화', '원화 환산'].join(',');
+    const rows = (trip.expenses || []).map(expense => [
+      expense.day === 0 ? '여행 전' : `${expense.day}일차`,
+      expense.day === 0 ? '' : getActualDateForDay(trip.startDate, expense.day),
+      expense.desc,
+      expense.amount,
+      expense.currency,
+      expense.amountKRW
+    ].map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(','));
+    downloadTextFile(`${(trip.name || 'travel-plan').replace(/[^\w가-힣-]+/g, '_')}-budget.csv`, `\uFEFF${[header, ...rows].join('\r\n')}`, 'text/csv;charset=utf-8');
+    setModalConfig({ type: 'success', title: 'CSV 내보내기 완료', message: '예산 및 지출 내역을 CSV 파일로 저장했습니다.' });
     setShowCustomModal(true);
   };
 
@@ -1064,6 +1254,7 @@ function App() {
               id: exp.id || Math.random().toString(36).substr(2, 9),
               createdAt: exp.createdAt || Date.now()
             })),
+            reminders: data.reminders || { enabled: false, minutesBefore: 30 },
             createdAt: Date.now()
           };
 
@@ -1409,6 +1600,39 @@ function App() {
     syncTripsToCloud(nextTrips);
   };
 
+  const toggleItineraryItemSelection = (dayNumber, itemId) => {
+    const key = `${parseDay(dayNumber)}::${itemId}`;
+    setSelectedItineraryItems((current) => current.includes(key)
+      ? current.filter(itemKey => itemKey !== key)
+      : [...current, key]);
+  };
+
+  const moveSelectedItineraryItems = () => {
+    if (!activeTrip || selectedItineraryItems.length === 0) return;
+    const targetDay = parseDay(bulkMoveTarget);
+    if (!targetDay) return;
+    const selected = new Set(selectedItineraryItems);
+    const movingItems = [];
+    const newItinerary = itinerary.map(day => {
+      const remainingItems = [];
+      (day.items || []).forEach(item => {
+        if (selected.has(`${parseDay(day.day)}::${item.id}`)) movingItems.push(item);
+        else remainingItems.push(item);
+      });
+      return { ...day, items: remainingItems };
+    }).map(day => {
+      if (parseDay(day.day) !== targetDay) return day;
+      const items = [...day.items, ...movingItems].sort((a, b) => (a.time || '00:00').localeCompare(b.time || '00:00'));
+      return { ...day, items };
+    });
+
+    if (movingItems.length === 0) return;
+    saveItinerary(newItinerary);
+    setSelectedItineraryItems([]);
+    setBulkMoveTarget('');
+    setActiveDay(targetDay);
+  };
+
   const removeFromItinerary = (dayNumber, itemId) => {
     const targetDayNum = parseDay(dayNumber);
 
@@ -1531,7 +1755,7 @@ function App() {
     return (
       <div className="h-screen flex flex-col items-center justify-center bg-red-50 text-red-500 font-sans p-10 text-center" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: '#fef2f2', color: '#ef4444' }}>
         <AlertCircle size={48} className="mb-4" />
-        <h1 style={{ fontSize: '24px', fontWeight: '900', margin: '16px 0 8px 0' }}>Map Load Error</h1>
+        <h1 style={{ fontSize: '24px', fontWeight: '900', margin: '16px 0 8px 0' }}>지도를 불러오지 못했습니다</h1>
         <p style={{ fontWeight: 'bold' }}>{loadError.message}</p>
       </div>
     );
@@ -1541,8 +1765,8 @@ function App() {
     return (
       <div className="h-screen flex flex-col items-center justify-center bg-orange-50 text-orange-500 font-sans p-10 text-center" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: '#fff7ed', color: '#f97316' }}>
         <AlertCircle size={48} className="mb-4" />
-        <h1 style={{ fontSize: '24px', fontWeight: '900', margin: '16px 0 8px 0' }}>API Key Missing</h1>
-        <p style={{ fontWeight: 'bold' }}>Please check your .env file.</p>
+        <h1 style={{ fontSize: '24px', fontWeight: '900', margin: '16px 0 8px 0' }}>지도 API 키가 없습니다</h1>
+        <p style={{ fontWeight: 'bold' }}>환경 설정을 확인해주세요.</p>
       </div>
     );
   }
@@ -1551,7 +1775,7 @@ function App() {
     return (
       <div className="h-screen flex flex-col items-center justify-center font-sans bg-white text-gray-400" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: 'white', color: '#9ca3af' }}>
         <div style={{ width: '48px', height: '48px', border: '4px solid #3b82f6', borderTopColor: 'transparent', borderRadius: '50%', marginBottom: '16px', animation: 'spin 1s linear infinite' }}></div>
-        <div style={{ fontWeight: '900', letterSpacing: '0.1em' }}>LOADING WORLD...</div>
+        <div style={{ fontWeight: '900', letterSpacing: '0.1em' }}>여행 지도를 불러오는 중…</div>
       </div>
     );
   }
@@ -1792,7 +2016,7 @@ function App() {
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                 <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                                   <div style={{ flex: '1 1 140px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                    <label style={{ fontSize: '10px', fontWeight: '900', color: '#9ca3af' }}>COUNTRY</label>
+                                    <label style={{ fontSize: '10px', fontWeight: '900', color: '#9ca3af' }}>국가</label>
                                     <select 
                                       value={editTripData.country}
                                       onChange={(e) => setEditTripData({ ...editTripData, country: e.target.value, currency: countryToCurrency[e.target.value] || 'KRW' })}
@@ -1961,7 +2185,7 @@ function App() {
                       >
                         <h3 style={{ fontSize: '16px', fontWeight: '900', color: '#ef4444', margin: 0 }}>{country}</h3>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontSize: '12px', fontWeight: '800', color: '#f87171' }}>{places.length} spots</span>
+                          <span style={{ fontSize: '12px', fontWeight: '800', color: '#f87171' }}>{places.length} 장소</span>
                           <ChevronRight size={18} color="#f87171" style={{ transform: expandedCountries[country] ? 'rotate(90deg)' : 'rotate(0deg)', transition: '0.2s' }} />
                         </div>
                       </div>
@@ -2031,6 +2255,15 @@ function App() {
                     <style>{`
                       div::-webkit-scrollbar { display: none; }
                     `}</style>
+                    <button
+                        onClick={toggleTripReminders}
+                        type="button"
+                        aria-label="일정 알림 설정"
+                        title="출발 전 알림 설정"
+                        style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: '800', color: activeTrip?.reminders?.enabled ? '#b45309' : '#64748b', backgroundColor: activeTrip?.reminders?.enabled ? '#fef3c7' : '#f8fafc', padding: '8px 12px', borderRadius: '14px', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                      >
+                        <Bell size={14} /> {activeTrip?.reminders?.enabled ? '알림 켜짐' : '알림 설정'}
+                    </button>
                     {allPhotos.length > 0 && (
                       <button 
                         onClick={() => { setSlideshowIndex(0); setShowSlideshow(true); }} 
@@ -2051,6 +2284,15 @@ function App() {
                       <Download size={14} /> 내보내기
                     </button>
                     <button
+                      onClick={() => exportTripAsIcal(activeTrip)}
+                      type="button"
+                      aria-label="캘린더 파일 내보내기"
+                      title="Google Calendar/iCal 내보내기"
+                      style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: '800', color: '#2563eb', backgroundColor: '#eff6ff', padding: '8px 12px', borderRadius: '14px', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                    >
+                      <Calendar size={14} /> 캘린더
+                    </button>
+                    <button
                       onClick={addDay} 
                       style={{ 
                         display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: '800', 
@@ -2064,6 +2306,18 @@ function App() {
                     </button>
                 </div>
                 </div>
+
+                {selectedItineraryItems.length > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', padding: '12px 14px', marginBottom: '16px', backgroundColor: '#eff6ff', border: '1px solid #dbeafe', borderRadius: '14px' }}>
+                    <span style={{ fontSize: '12px', fontWeight: '900', color: '#2563eb' }}>{selectedItineraryItems.length}개 선택</span>
+                    <select value={bulkMoveTarget} onChange={(e) => setBulkMoveTarget(e.target.value)} style={{ flex: 1, minWidth: '110px', padding: '8px 10px', border: '1px solid #bfdbfe', borderRadius: '10px', backgroundColor: 'white', color: '#1d4ed8', fontSize: '12px', fontWeight: '800' }}>
+                      <option value="">이동할 일차 선택</option>
+                      {itinerary.map(day => <option key={`bulk-day-${day.day}`} value={parseDay(day.day)}>{parseDay(day.day)}일차</option>)}
+                    </select>
+                    <button type="button" onClick={moveSelectedItineraryItems} disabled={!bulkMoveTarget} style={{ padding: '8px 12px', border: 'none', borderRadius: '10px', backgroundColor: bulkMoveTarget ? '#2563eb' : '#93c5fd', color: 'white', fontSize: '12px', fontWeight: '900', cursor: bulkMoveTarget ? 'pointer' : 'not-allowed' }}>선택 이동</button>
+                    <button type="button" onClick={() => setSelectedItineraryItems([])} style={{ padding: '8px 10px', border: 'none', borderRadius: '10px', backgroundColor: 'white', color: '#64748b', fontSize: '12px', fontWeight: '800', cursor: 'pointer' }}>취소</button>
+                  </div>
+                )}
 
                 {(itinerary || []).map((dayPlan, dIdx) => (
                   <div 
@@ -2114,9 +2368,20 @@ function App() {
                           </p>
                         </div>
                       </div>
-                      <span style={{ fontSize: '11px', fontWeight: '900', color: parseDay(activeDay) === parseDay(dayPlan?.day) ? '#3b82f6' : '#9ca3af', backgroundColor: parseDay(activeDay) === parseDay(dayPlan?.day) ? '#dbeafe' : '#f3f4f6', padding: '4px 10px', borderRadius: '8px' }}>
-                        {(dayPlan?.items || []).length} 장소
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: '900', color: parseDay(activeDay) === parseDay(dayPlan?.day) ? '#3b82f6' : '#9ca3af', backgroundColor: parseDay(activeDay) === parseDay(dayPlan?.day) ? '#dbeafe' : '#f3f4f6', padding: '4px 10px', borderRadius: '8px' }}>
+                          {(dayPlan?.items || []).length} 장소
+                        </span>
+                        <button
+                            type="button"
+                            aria-label={`${dayPlan?.day}일차 삭제`}
+                            title="이 일차 삭제"
+                            onClick={(event) => { event.stopPropagation(); handleInlineDelete(event, `day-${dayPlan?.day}`, () => deleteDay(dayPlan?.day)); }}
+                            style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', borderRadius: '10px', backgroundColor: confirmDeleteId === `day-${dayPlan?.day}` ? '#ef4444' : '#fff5f5', color: confirmDeleteId === `day-${dayPlan?.day}` ? 'white' : '#f87171', cursor: 'pointer' }}
+                          >
+                            {confirmDeleteId === `day-${dayPlan?.day}` ? '확인' : <Trash2 size={14} />}
+                        </button>
+                      </div>
                     </div>
 
                     {/* Day Items List */}
@@ -2143,6 +2408,13 @@ function App() {
                                 }}
                               >
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                  <input
+                                      type="checkbox"
+                                      aria-label={`${item.displayName || item.name || '일정'} 선택`}
+                                      checked={selectedItineraryItems.includes(`${parseDay(dayPlan.day)}::${item.id}`)}
+                                      onChange={() => toggleItineraryItemSelection(dayPlan.day, item.id)}
+                                      style={{ width: '18px', height: '18px', accentColor: '#2563eb', flexShrink: 0, cursor: 'pointer' }}
+                                  />
                                   <div
                                     aria-label={`${iIdx + 1}번째 일정`}
                                     style={{
@@ -2194,7 +2466,7 @@ function App() {
                                         {item.displayName || item.name || '장소 이름 정보 없음'}
                                       </h4>
                                       <div 
-                                        onClick={() => setEditingTimeItem({ day: dayPlan.day, id: item.id, time: item.time || '09:00', displayName: item.displayName || item.name || '', originalName: item.name || '' })}
+                                        onClick={() => setEditingTimeItem({ sourceDay: dayPlan.day, day: dayPlan.day, id: item.id, time: item.time || '09:00', displayName: item.displayName || item.name || '', originalName: item.name || '' })}
                                         style={{ 
                                           display: 'flex', 
                                           alignItems: 'center', 
@@ -2378,8 +2650,9 @@ function App() {
             {/* --- BUDGET MODE --- */}
             {viewMode === 'budget' && (
               <>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '24px' }}>
                   <h2 style={{ fontSize: '12px', fontWeight: '900', color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>예산 및 지출</h2>
+                  <button type="button" onClick={() => exportBudgetAsCsv(activeTrip)} aria-label="예산 CSV 내보내기" title="예산 CSV 내보내기" style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '8px 11px', border: 'none', borderRadius: '12px', backgroundColor: '#ecfdf5', color: '#059669', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}><FileText size={14} /> CSV</button>
                 </div>
 
                 {/* Progress Card */}
@@ -2571,6 +2844,43 @@ function App() {
             >
               <X size={18} />
             </button>
+          </div>
+        </div>
+      )}
+
+      {mergeNotice && (
+        <div role="status" style={{ position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)', zIndex: 11000, width: 'min(92vw, 480px)', padding: '16px 18px', borderRadius: '18px', backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', boxShadow: '0 12px 30px rgba(15,23,42,0.12)', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+          <Check size={18} color="#059669" style={{ flexShrink: 0, marginTop: '1px' }} />
+          <div style={{ flex: 1 }}>
+            <strong style={{ display: 'block', color: '#065f46', fontSize: '13px', marginBottom: '4px' }}>기존 일정과 동기화했습니다</strong>
+            <span style={{ color: '#047857', fontSize: '12px', lineHeight: 1.5 }}>로그인 전 저장된 여행 {mergeNotice.trips}개{mergeNotice.favorites > 0 ? `와 장소 ${mergeNotice.favorites}개` : ''}를 계정에 병합했습니다.</span>
+          </div>
+          <button type="button" aria-label="동기화 안내 닫기" onClick={() => setMergeNotice(null)} style={{ border: 'none', background: 'none', color: '#059669', cursor: 'pointer', padding: '2px' }}><X size={16} /></button>
+        </div>
+      )}
+
+      {showOnboarding && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 12000, backgroundColor: 'rgba(15, 23, 42, 0.45)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ width: '100%', maxWidth: '420px', backgroundColor: 'white', borderRadius: '28px', padding: '28px', boxShadow: '0 24px 80px rgba(15,23,42,0.25)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+              <div style={{ width: '42px', height: '42px', borderRadius: '14px', backgroundColor: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Plane size={22} /></div>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '900', color: '#0f172a' }}>여행을 시작해볼까요?</h2>
+                <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#64748b', fontWeight: '700' }}>3단계로 간단하게 일정을 만들 수 있어요.</p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', margin: '24px 0' }}>
+              {[['여행 만들기', '여행 이름과 날짜를 정해요.'], ['장소 검색', '지도에서 장소나 주소를 검색해요.'], ['일정 추가', '시간과 표시 이름을 정해 일정에 넣어요.']].map(([title, description], index) => (
+                <div key={title} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', borderRadius: '14px', backgroundColor: onboardingStep === index ? '#eff6ff' : '#f8fafc', border: onboardingStep === index ? '1px solid #bfdbfe' : '1px solid transparent' }}>
+                  <div style={{ width: '30px', height: '30px', flexShrink: 0, borderRadius: '50%', backgroundColor: onboardingStep >= index ? '#2563eb' : '#e2e8f0', color: onboardingStep >= index ? 'white' : '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '900' }}>{index + 1}</div>
+                  <div><strong style={{ display: 'block', fontSize: '13px', color: '#1e293b' }}>{title}</strong><span style={{ fontSize: '11px', color: '#64748b' }}>{description}</span></div>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button type="button" onClick={dismissOnboarding} style={{ flex: 1, padding: '13px', border: 'none', borderRadius: '14px', backgroundColor: '#f1f5f9', color: '#64748b', fontSize: '13px', fontWeight: '800', cursor: 'pointer' }}>나중에</button>
+              <button type="button" onClick={handleOnboardingAction} style={{ flex: 1.5, padding: '13px', border: 'none', borderRadius: '14px', backgroundColor: '#2563eb', color: 'white', fontSize: '13px', fontWeight: '900', cursor: 'pointer' }}>{onboardingStep === 0 ? '여행 만들기' : onboardingStep === 1 ? '장소 검색하기' : '시작하기'}</button>
+            </div>
           </div>
         </div>
       )}
@@ -2824,7 +3134,7 @@ function App() {
           {/* Selected Place InfoWindow */}
           {selectedPlace && (
             <InfoWindow position={{ lat: selectedPlace.lat, lng: selectedPlace.lng }} onCloseClick={() => setSelectedPlace(null)}>
-              <div style={{ padding: window.innerWidth < 768 ? '8px 12px' : '20px', minWidth: window.innerWidth < 768 ? '250px' : '300px', maxWidth: '340px', fontFamily: '"Inter", "Roboto", sans-serif' }}>
+              <div className="place-info-window-content" style={{ padding: window.innerWidth < 768 ? '8px 12px' : '20px', minWidth: window.innerWidth < 768 ? '250px' : '300px', maxWidth: '340px', fontFamily: '"Inter", "Roboto", sans-serif' }}>
                 {/* TOP SECTION: Place Info & Favorite */}
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: window.innerWidth < 768 ? '10px' : '16px', marginBottom: window.innerWidth < 768 ? '8px' : '16px' }}>
                   <div style={{ width: window.innerWidth < 768 ? '40px' : '56px', height: window.innerWidth < 768 ? '40px' : '56px', backgroundColor: '#f9fafb', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: window.innerWidth < 768 ? '20px' : '32px', border: '1px solid #f3f4f6', flexShrink: 0 }}>
@@ -2916,6 +3226,7 @@ function App() {
                     />
                     
                     <button 
+                      className="place-info-window-add-button"
                       onClick={() => {
                         if (!activeDay) {
                           setModalConfig({ 
@@ -2970,7 +3281,7 @@ function App() {
             cursor: 'pointer', animation: 'fadeIn 0.3s ease'
           }}
         >
-          <Menu size={16} /> SHOW MENU
+          <Menu size={16} /> 메뉴 열기
         </button>
       )}
     {/* === SLIDESHOW MODAL === */}
@@ -3129,7 +3440,7 @@ function App() {
               </button>
               <button 
                 onClick={() => {
-                  updateItineraryItem(editingTimeItem.day, editingTimeItem.id, {
+                  updateItineraryItem(editingTimeItem.sourceDay ?? editingTimeItem.day, editingTimeItem.id, {
                     day: editingTimeItem.day,
                     time: editingTimeItem.time,
                     displayName: editingTimeItem.displayName.trim() || editingTimeItem.originalName
