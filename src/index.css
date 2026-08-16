@@ -302,4 +302,75 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     margin-top: 10px;
     box-shadow: 0 -8px 16px rgba(248, 250, 252, 0.95) !important;
   }
+
+  /* Give the itinerary cards more room on narrow screens. */
+  .sidebar-list-content {
+    padding: 14px 16px 24px !important;
+  }
+
+  .itinerary-day-card {
+    border-radius: 18px !important;
+    margin-bottom: 20px !important;
+  }
+
+  .itinerary-day-header {
+    padding: 14px 16px !important;
+  }
+
+  .itinerary-day-items {
+    padding: 12px !important;
+  }
+
+  .itinerary-item-card {
+    gap: 8px !important;
+    padding: 12px !important;
+    border-radius: 16px !important;
+  }
+
+  .itinerary-item-main {
+    gap: 8px !important;
+  }
+
+  .itinerary-item-checkbox {
+    width: 16px !important;
+    height: 16px !important;
+  }
+
+  .itinerary-item-number {
+    width: 30px !important;
+    height: 30px !important;
+    border-radius: 10px !important;
+    font-size: 13px !important;
+  }
+
+  .itinerary-item-actions {
+    grid-template-columns: repeat(2, 36px) !important;
+    grid-template-rows: repeat(2, 36px) !important;
+    gap: 4px !important;
+  }
+
+  .itinerary-item-actions > div:first-child,
+  .itinerary-item-actions > div:last-child {
+    width: 36px !important;
+    height: 36px !important;
+  }
+
+  .itinerary-item-actions > div:first-child button {
+    width: 36px !important;
+    height: 18px !important;
+    padding: 2px !important;
+  }
+
+  .itinerary-item-actions > label,
+  .itinerary-item-actions > button,
+  .itinerary-item-actions > div:last-child button {
+    width: 36px !important;
+    height: 36px !important;
+    border-radius: 10px !important;
+  }
+
+  .itinerary-item-actions svg {
+    width: 15px !important;
+    height: 15px !important;
+  }
 }

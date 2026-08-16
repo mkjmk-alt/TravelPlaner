@@ -1952,6 +1952,7 @@ function App() {
 
           {/* List Content */}
           <div
+            className="sidebar-list-content"
             onScroll={handleSidebarScroll}
             style={{
             flex: 1,
@@ -2241,9 +2242,11 @@ function App() {
             {/* --- ITINERARY MODE --- */}
             {viewMode === 'itinerary' && (
               <>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-                  <h2 style={{ fontSize: '12px', fontWeight: '900', color: '#3b82f6', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>내 일정</h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, marginBottom: '24px' }}>
+                  <h2 style={{ flex: '0 0 auto', whiteSpace: 'nowrap', fontSize: '12px', fontWeight: '900', color: '#3b82f6', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>내 일정</h2>
                   <div style={{ 
+                    flex: '1 1 auto',
+                    minWidth: 0,
                     display: 'flex', 
                     gap: '10px', 
                     alignItems: 'center', 
@@ -2321,6 +2324,7 @@ function App() {
 
                 {(itinerary || []).map((dayPlan, dIdx) => (
                   <div 
+                    className="itinerary-day-card"
                     key={dayPlan?.day || dIdx} 
                     style={{ 
                       backgroundColor: 'white', 
@@ -2333,6 +2337,7 @@ function App() {
                   >
                     {/* Day Header */}
                     <div 
+                      className="itinerary-day-header"
                       onClick={() => dayPlan?.day && setActiveDay(parseDay(dayPlan.day))}
                       style={{ 
                         padding: '20px 24px', 
@@ -2385,7 +2390,7 @@ function App() {
                     </div>
 
                     {/* Day Items List */}
-                    <div style={{ padding: '24px' }}>
+                    <div className="itinerary-day-items" style={{ padding: '24px' }}>
                       {(!dayPlan?.items || dayPlan.items.length === 0) ? (
                         <div style={{ padding: '32px', textAlign: 'center', border: '2px dashed #f3f4f6', borderRadius: '16px' }}>
                           <p style={{ fontSize: '13px', color: '#d1d5db', fontWeight: '700', margin: 0 }}>이 날의 일정을 추가해 보세요!</p>
@@ -2394,6 +2399,7 @@ function App() {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                           {dayPlan.items.map((item, iIdx) => (
                               <div 
+                                className="itinerary-item-card"
                                 key={item.id} 
                                 style={{ 
                                   display: 'flex', 
@@ -2407,8 +2413,9 @@ function App() {
                                   boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
                                 }}
                               >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <div className="itinerary-item-main" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                   <input
+                                      className="itinerary-item-checkbox"
                                       type="checkbox"
                                       aria-label={`${item.displayName || item.name || '일정'} 선택`}
                                       checked={selectedItineraryItems.includes(`${parseDay(dayPlan.day)}::${item.id}`)}
@@ -2416,6 +2423,7 @@ function App() {
                                       style={{ width: '18px', height: '18px', accentColor: '#2563eb', flexShrink: 0, cursor: 'pointer' }}
                                   />
                                   <div
+                                    className="itinerary-item-number"
                                     aria-label={`${iIdx + 1}번째 일정`}
                                     style={{
                                       width: '34px',
@@ -2494,7 +2502,7 @@ function App() {
                                       </div>
                                     </div>
                                   </div>
-                                  <div style={{ 
+                                  <div className="itinerary-item-actions" style={{
                                     display: 'grid', 
                                     gridTemplateColumns: 'repeat(2, 44px)', 
                                     gridTemplateRows: 'repeat(2, 44px)',
