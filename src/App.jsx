@@ -3140,8 +3140,8 @@ function App() {
           )}
 
           {/* Selected Place InfoWindow */}
-          {selectedPlace && (
-            <InfoWindow position={{ lat: selectedPlace.lat, lng: selectedPlace.lng }} onCloseClick={() => setSelectedPlace(null)}>
+          {selectedPlace && windowSize.width >= 768 && (
+            <InfoWindow position={{ lat: selectedPlace.lat, lng: selectedPlace.lng }} options={{ disableAutoPan: true }} onCloseClick={() => setSelectedPlace(null)}>
               <div className="place-info-window-content" style={{ padding: window.innerWidth < 768 ? '8px 12px' : '20px', minWidth: window.innerWidth < 768 ? '250px' : '300px', maxWidth: '340px', fontFamily: '"Inter", "Roboto", sans-serif' }}>
                 {/* TOP SECTION: Place Info & Favorite */}
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: window.innerWidth < 768 ? '10px' : '16px', marginBottom: window.innerWidth < 768 ? '8px' : '16px' }}>
@@ -3276,6 +3276,123 @@ function App() {
           )}
         </GoogleMap>
       </div>
+
+      {selectedPlace && windowSize.width < 768 && (
+        <div className="mobile-place-add-overlay" role="dialog" aria-modal="true" aria-label="장소를 일정에 추가">
+          <div
+            className="mobile-place-add-panel"
+            onPointerDown={(event) => event.stopPropagation()}
+            onTouchMove={(event) => event.stopPropagation()}
+          >
+            <div className="mobile-place-add-handle" aria-hidden="true" />
+            <button
+              type="button"
+              className="mobile-place-add-close"
+              onClick={() => setSelectedPlace(null)}
+              aria-label="장소 추가 창 닫기"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="mobile-place-add-content">
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '10px', paddingRight: '28px' }}>
+                <div style={{ width: '42px', height: '42px', backgroundColor: '#f9fafb', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '21px', border: '1px solid #f3f4f6', flexShrink: 0 }}>
+                  {selectedPlace.emoji}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                    <h3 style={{ fontSize: '16px', fontWeight: '900', margin: '0 0 2px', color: '#111827', lineHeight: 1.25, flex: 1 }}>
+                      {selectedPlace.name}
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => toggleFavorite(selectedPlace)}
+                      aria-label="즐겨찾기"
+                      style={{ padding: '5px', borderRadius: '8px', border: 'none', backgroundColor: isFavorite(selectedPlace) ? '#fee2e2' : '#f1f5f9', color: isFavorite(selectedPlace) ? '#ef4444' : '#9ca3af', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                    >
+                      <Heart size={16} fill={isFavorite(selectedPlace) ? 'currentColor' : 'none'} />
+                    </button>
+                  </div>
+                  <p style={{ fontSize: '10px', fontWeight: '800', color: '#9ca3af', margin: 0, display: 'flex', alignItems: 'flex-start', gap: '4px', lineHeight: 1.25 }}>
+                    <MapPin size={10} color="#3b82f6" style={{ marginTop: '1px', flexShrink: 0 }} />
+                    <span style={{ overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{selectedPlace.loc}</span>
+                  </p>
+                </div>
+              </div>
+
+              {activeTripId && (
+                <div style={{ backgroundColor: '#f8fafc', padding: '12px', borderRadius: '14px', border: '1px solid #f1f5f9' }}>
+                  <div style={{ fontSize: '10px', fontWeight: '900', color: '#64748b', marginBottom: '8px' }}>일차 선택</div>
+                  <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', overflowX: 'auto', paddingBottom: '2px' }}>
+                    {(itinerary || []).map((dayPlan, dayIndex) => {
+                      const day = parseDay(dayPlan?.day) || dayIndex + 1;
+                      return (
+                        <button
+                          type="button"
+                          key={day}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            setActiveDay(day);
+                          }}
+                          style={{ flex: '0 0 auto', minWidth: '58px', padding: '8px 0', borderRadius: '10px', border: '1px solid', borderColor: activeDay === day ? '#2563eb' : '#e2e8f0', backgroundColor: activeDay === day ? '#eff6ff' : 'white', color: activeDay === day ? '#2563eb' : '#64748b', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}
+                        >
+                          {day}일차
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', fontSize: '9px', fontWeight: '900', color: '#64748b', marginBottom: '6px' }}>
+                      일정 표시 이름 (선택)
+                    </label>
+                    <input
+                      type="text"
+                      value={itineraryDisplayName}
+                      onChange={(e) => setItineraryDisplayName(e.target.value)}
+                      placeholder={selectedPlace.name || '예: 호텔 체크인'}
+                      maxLength={80}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '12px', fontWeight: '700', outline: 'none' }}
+                    />
+                    <p style={{ margin: '5px 0 0', fontSize: '10px', color: '#94a3b8', lineHeight: 1.35 }}>
+                      입력하지 않으면 검색된 장소명이 일정에 표시됩니다.
+                    </p>
+                  </div>
+
+                  <PremiumTimeInput
+                    label="도착 시간"
+                    value={itineraryTime || '09:00'}
+                    onChange={(val) => setItineraryTime(val)}
+                  />
+
+                  <button
+                    type="button"
+                    className="mobile-place-add-button"
+                    onClick={() => {
+                      if (!activeDay) {
+                        setModalConfig({
+                          type: 'error',
+                          title: '일차 미선택',
+                          message: '추가할 일차를 먼저 선택해주세요! 상단의 일차 버튼 중 하나를 클릭하면 됩니다.'
+                        });
+                        setShowCustomModal(true);
+                        return;
+                      }
+                      addToItinerary(selectedPlace);
+                      setSelectedPlace(null);
+                    }}
+                    style={{ width: '100%', minHeight: '44px', marginTop: '10px', padding: '10px', backgroundColor: activeDay ? '#2563eb' : '#94a3b8', color: 'white', borderRadius: '10px', fontSize: '12px', fontWeight: '900', border: 'none', cursor: activeDay ? 'pointer' : 'not-allowed', boxShadow: activeDay ? '0 4px 12px rgba(37, 99, 235, 0.2)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', opacity: activeDay ? 1 : 0.7 }}
+                  >
+                    <PlusCircle size={16} />
+                    {activeDay ? activeDay + '일차 일정에 추가' : '일차를 선택해주세요'}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {!sidebarOpen && (
         <button 
