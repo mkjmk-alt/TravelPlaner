@@ -396,6 +396,66 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   /* Google Maps limits InfoWindow content to the map viewport on mobile.
      Render the add form above that viewport so the time controls and action
      button are never hidden behind the itinerary sheet. */
+  .mobile-place-add-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .mobile-place-add-header-main {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .mobile-place-add-place-icon {
+    width: 42px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 42px;
+    background: #f9fafb;
+    border: 1px solid #f3f4f6;
+    border-radius: 12px;
+    font-size: 21px;
+  }
+
+  .mobile-place-add-place-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .mobile-place-add-place-info h3 {
+    margin: 0 0 2px;
+    color: #111827;
+    font-size: 16px;
+    font-weight: 900;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+  }
+
+  .mobile-place-add-place-info p {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+    margin: 0;
+    color: #9ca3af;
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1.25;
+  }
+
+  .mobile-place-add-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+  }
+
   .mobile-place-add-overlay {
     position: fixed;
     inset: 0;
@@ -427,10 +487,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     background: #dbe2ea;
   }
 
+  .mobile-place-add-favorite,
   .mobile-place-add-close {
-    position: absolute;
-    top: 28px;
-    right: 12px;
+    position: static;
     width: 32px;
     height: 32px;
     display: flex;
@@ -438,9 +497,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     justify-content: center;
     border: none;
     border-radius: 10px;
+    border: none;
+    cursor: pointer;
+  }
+
+  .mobile-place-add-close {
     background: #f1f5f9;
     color: #64748b;
-    cursor: pointer;
   }
 
   .mobile-place-add-content {
@@ -530,6 +593,66 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 @media (min-width: 769px) {
   /* Keep the place form anchored to the viewport instead of a map coordinate.
      Changing the selected day can now never make Google Maps re-center it. */
+  .mobile-place-add-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .mobile-place-add-header-main {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .mobile-place-add-place-icon {
+    width: 42px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 42px;
+    background: #f9fafb;
+    border: 1px solid #f3f4f6;
+    border-radius: 12px;
+    font-size: 21px;
+  }
+
+  .mobile-place-add-place-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .mobile-place-add-place-info h3 {
+    margin: 0 0 2px;
+    color: #111827;
+    font-size: 16px;
+    font-weight: 900;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+  }
+
+  .mobile-place-add-place-info p {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+    margin: 0;
+    color: #9ca3af;
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1.25;
+  }
+
+  .mobile-place-add-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+  }
+
   .mobile-place-add-overlay {
     position: fixed;
     inset: 0;
@@ -558,10 +681,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     display: none;
   }
 
+  .mobile-place-add-favorite,
   .mobile-place-add-close {
-    position: absolute;
-    top: 20px;
-    right: 12px;
+    position: static;
     width: 32px;
     height: 32px;
     display: flex;
@@ -569,9 +691,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     justify-content: center;
     border: none;
     border-radius: 10px;
+    border: none;
+    cursor: pointer;
+  }
+
+  .mobile-place-add-close {
     background: #f1f5f9;
     color: #64748b;
-    cursor: pointer;
   }
 
   .mobile-place-add-content {

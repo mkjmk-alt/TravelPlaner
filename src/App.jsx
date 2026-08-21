@@ -85,6 +85,25 @@ const countryToCurrency = {
   "터키": "TRY"
 };
 
+const CURRENCY_FAVORITES_STORAGE_KEY = 'world_pro_currency_favorites_v1';
+const SUPPORTED_CURRENCY_CODES = [
+  'USD', 'KRW', 'VND', 'EUR', 'JPY', 'CNY', 'TWD', 'HKD', 'MOP', 'THB',
+  'SGD', 'PHP', 'MYR', 'IDR', 'MNT', 'CAD', 'AUD', 'NZD', 'GBP', 'CHF',
+  'CZK', 'HUF', 'TRY'
+];
+
+const getCurrencySymbol = (code = 'KRW') => {
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: code,
+      currencyDisplay: 'narrowSymbol'
+    }).formatToParts(0).find(part => part.type === 'currency')?.value || code;
+  } catch {
+    return code;
+  }
+};
+
 const PremiumTimeInput = ({ value, onChange, label }) => {
   // Ensure we always have a valid time format even if value is empty
   const timeValue = value && value.includes(':') ? value : '09:00';
@@ -162,6 +181,97 @@ const PremiumTimeInput = ({ value, onChange, label }) => {
           <div style={{ display: 'flex', gap: '2px' }}>
             <button onClick={() => adjustTime('m', -30)} style={{ width: '28px', height: '24px', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '4px', fontSize: '8px', fontWeight: '900', color: '#94a3b8', cursor: 'pointer' }}>-30</button>
             <button onClick={() => adjustTime('m', 30)} style={{ width: '28px', height: '24px', backgroundColor: '#eff6ff', border: 'none', borderRadius: '4px', fontSize: '8px', fontWeight: '900', color: '#3b82f6', cursor: 'pointer' }}>+30</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ScrollTimeInput = ({ value, onChange, label }) => {
+  const timeValue = value && value.includes(':') ? value : '09:00';
+  const [rawHour, rawMinute] = timeValue.split(':').map(Number);
+  const hour = Number.isFinite(rawHour) ? Math.min(Math.max(rawHour, 0), 23) : 9;
+  const minute = Number.isFinite(rawMinute) ? Math.min(Math.max(rawMinute, 0), 59) : 0;
+  const hourRef = useRef(null);
+  const minuteRef = useRef(null);
+  const ITEM_HEIGHT = 36;
+  const hours = Array.from({ length: 24 }, (_, index) => index);
+  const minutes = Array.from({ length: 60 }, (_, index) => index);
+
+  const emitTime = (nextHour, nextMinute) => {
+    const nextValue = `${String(nextHour).padStart(2, '0')}:${String(nextMinute).padStart(2, '0')}`;
+    if (nextValue !== timeValue) onChange(nextValue);
+  };
+
+  const scrollToValue = (ref, index, behavior = 'auto') => {
+    if (!ref.current) return;
+    ref.current.scrollTo({ top: index * ITEM_HEIGHT, behavior });
+  };
+
+  useEffect(() => {
+    scrollToValue(hourRef, hour);
+    scrollToValue(minuteRef, minute);
+  }, [hour, minute]);
+
+  const handleScroll = (type, event) => {
+    const index = Math.round(event.currentTarget.scrollTop / ITEM_HEIGHT);
+    if (type === 'hour') {
+      emitTime(Math.min(Math.max(index, 0), 23), minute);
+    } else {
+      emitTime(hour, Math.min(Math.max(index, 0), 59));
+    }
+  };
+
+  const setNow = () => {
+    const now = new Date();
+    emitTime(now.getHours(), now.getMinutes());
+  };
+
+  const adjustMinutes = (amount) => {
+    const totalMinutes = (hour * 60 + minute + amount + 1440) % 1440;
+    emitTime(Math.floor(totalMinutes / 60), totalMinutes % 60);
+  };
+
+  const renderScrollColumn = (items, selectedValue, ref, type) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+      <div
+        ref={ref}
+        onScroll={(event) => handleScroll(type, event)}
+        aria-label={type === 'hour' ? '시간 선택' : '분 선택'}
+        style={{ width: '58px', height: '108px', overflowY: 'auto', overscrollBehavior: 'contain', scrollSnapType: 'y mandatory', scrollbarWidth: 'thin', border: '1px solid #e2e8f0', borderRadius: '12px', backgroundColor: '#f8fafc', WebkitOverflowScrolling: 'touch' }}
+      >
+        <div style={{ padding: `${ITEM_HEIGHT}px 0` }}>
+          {items.map(item => (
+            <button
+              key={`${type}-${item}`}
+              type="button"
+              onClick={() => emitTime(type === 'hour' ? item : hour, type === 'minute' ? item : minute)}
+              style={{ display: 'block', width: '100%', height: `${ITEM_HEIGHT}px`, padding: 0, border: 'none', backgroundColor: item === selectedValue ? '#dbeafe' : 'transparent', color: item === selectedValue ? '#1d4ed8' : '#94a3b8', fontSize: item === selectedValue ? '20px' : '14px', fontWeight: item === selectedValue ? '900' : '700', fontVariantNumeric: 'tabular-nums', scrollSnapAlign: 'center', cursor: 'pointer' }}
+            >
+              {String(item).padStart(2, '0')}
+            </button>
+          ))}
+        </div>
+      </div>
+      <span style={{ fontSize: '16px', fontWeight: '900', color: '#cbd5e1' }}>{type === 'hour' ? '시' : '분'}</span>
+    </div>
+  );
+
+  return (
+    <div style={{ width: '100%', marginBottom: window.innerWidth < 768 ? '8px' : '20px' }}>
+      {label && <div style={{ fontSize: '9px', fontWeight: '900', color: '#9ca3af', textTransform: 'uppercase', marginBottom: window.innerWidth < 768 ? '4px' : '8px', letterSpacing: '0.05em' }}>{label}</div>}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', backgroundColor: 'white', padding: window.innerWidth < 768 ? '10px' : '14px', borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.04)', border: '1px solid #f1f5f9' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          {renderScrollColumn(hours, hour, hourRef, 'hour')}
+          <span style={{ fontSize: '20px', fontWeight: '900', color: '#cbd5e1' }}>:</span>
+          {renderScrollColumn(minutes, minute, minuteRef, 'minute')}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flexShrink: 0 }}>
+          <button type="button" onClick={setNow} style={{ padding: '5px 7px', backgroundColor: '#f8fafc', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: '7px', fontSize: '8px', fontWeight: '900', cursor: 'pointer', whiteSpace: 'nowrap' }}>현재 시간</button>
+          <div style={{ display: 'flex', gap: '3px' }}>
+            <button type="button" onClick={() => adjustMinutes(-30)} style={{ width: '30px', height: '25px', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '5px', fontSize: '8px', fontWeight: '900', color: '#94a3b8', cursor: 'pointer' }}>-30</button>
+            <button type="button" onClick={() => adjustMinutes(30)} style={{ width: '30px', height: '25px', backgroundColor: '#eff6ff', border: 'none', borderRadius: '5px', fontSize: '8px', fontWeight: '900', color: '#3b82f6', cursor: 'pointer' }}>+30</button>
           </div>
         </div>
       </div>
@@ -386,10 +496,21 @@ function App() {
     return Array.isArray(savedFavorites) ? savedFavorites : [];
   });
 
+  const [favoriteCurrencies, setFavoriteCurrencies] = useState(() => {
+    const savedCurrencies = readStoredJson(CURRENCY_FAVORITES_STORAGE_KEY, null);
+    if (!Array.isArray(savedCurrencies)) return ['USD'];
+    return Array.from(new Set(savedCurrencies.filter(code => SUPPORTED_CURRENCY_CODES.includes(code))));
+  });
+
   const [trips, setTrips] = useState(() => {
     const savedTrips = readStoredJson("world_pro_trips_v1", null);
     if (Array.isArray(savedTrips)) {
-      return savedTrips.map(trip => ({
+      // Remove local-only test trips when the app starts. Real trips are kept intact.
+      const cleanedTrips = savedTrips.filter(trip => !trip.localOnly);
+      if (cleanedTrips.length !== savedTrips.length) {
+        writeStoredJson("world_pro_trips_v1", cleanedTrips);
+      }
+      return cleanedTrips.map(trip => ({
         ...trip,
         reserveItems: Array.isArray(trip.reserveItems) ? trip.reserveItems : []
       }));
@@ -426,6 +547,15 @@ function App() {
   const makeEntityId = () => crypto.randomUUID();
 
   // --- EFFECTS ---
+
+  // Also clear a test trip that may still be held by an already-open local page.
+  useEffect(() => {
+    const cleanedTrips = (trips || []).filter(trip => !trip.localOnly);
+    if (cleanedTrips.length === (trips || []).length) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setTrips(cleanedTrips);
+    writeStoredJson("world_pro_trips_v1", cleanedTrips);
+  }, [trips]);
   
   // Auth listener
   useEffect(() => {
@@ -476,20 +606,23 @@ function App() {
           if (favsRow) cloudFavs = favsRow.value;
         }
 
-        if (!cloudTrips && (trips || []).length > 0) {
-          const { error: localTripSyncError } = await supabase.from("user_state").upsert({ user_id: session.user.id, key: "world_pro_trips_v1", value: trips || [] }, { onConflict: "user_id,key" });
+        const localTestTrips = (trips || []).filter(trip => trip.localOnly);
+        const localRegularTrips = (trips || []).filter(trip => !trip.localOnly);
+
+        if (!cloudTrips && localRegularTrips.length > 0) {
+          const { error: localTripSyncError } = await supabase.from("user_state").upsert({ user_id: session.user.id, key: "world_pro_trips_v1", value: localRegularTrips }, { onConflict: "user_id,key" });
           if (localTripSyncError) throw localTripSyncError;
         } else if (cloudTrips) {
-          const cloudTripList = Array.isArray(cloudTrips) ? cloudTrips : [];
-          const localOnlyTrips = (trips || []).filter(localTrip =>
+          const cloudTripList = (Array.isArray(cloudTrips) ? cloudTrips : []).filter(trip => !trip.localOnly);
+          const localOnlyTrips = localRegularTrips.filter(localTrip =>
             !cloudTripList.some(cloudTrip => String(cloudTrip.id) === String(localTrip.id))
           );
-          const mergedTrips = [...cloudTripList, ...localOnlyTrips];
+          const mergedTrips = [...cloudTripList, ...localTestTrips, ...localOnlyTrips];
           setTrips(mergedTrips);
           writeStoredJson("world_pro_trips_v1", mergedTrips);
           mergedTripCount = localOnlyTrips.length;
           if (localOnlyTrips.length > 0) {
-            const { error: mergeTripError } = await supabase.from("user_state").upsert({ user_id: session.user.id, key: "world_pro_trips_v1", value: mergedTrips }, { onConflict: "user_id,key" });
+            const { error: mergeTripError } = await supabase.from("user_state").upsert({ user_id: session.user.id, key: "world_pro_trips_v1", value: [...cloudTripList, ...localOnlyTrips] }, { onConflict: "user_id,key" });
             if (mergeTripError) throw mergeTripError;
           }
         }
@@ -799,6 +932,23 @@ function App() {
     syncFavoritesToCloud(newFavs);
   };
 
+  const updateFavoriteCurrencies = (nextCurrencies) => {
+    const safeCurrencies = Array.from(new Set(
+      (nextCurrencies || []).filter(code => SUPPORTED_CURRENCY_CODES.includes(code))
+    ));
+    setFavoriteCurrencies(safeCurrencies);
+    writeStoredJson(CURRENCY_FAVORITES_STORAGE_KEY, safeCurrencies);
+  };
+
+  const addFavoriteCurrency = (code) => {
+    if (!code || !SUPPORTED_CURRENCY_CODES.includes(code)) return;
+    updateFavoriteCurrencies([...(favoriteCurrencies || []), code]);
+  };
+
+  const removeFavoriteCurrency = (code) => {
+    updateFavoriteCurrencies((favoriteCurrencies || []).filter(currencyCode => currencyCode !== code));
+  };
+
   const syncTripsToCloud = async (newTrips) => {
     setSyncStatus('saving');
     setTrips(newTrips);
@@ -807,13 +957,15 @@ function App() {
       return;
     }
     
-    // 1. Sync to private user_state
+    const cloudTrips = (newTrips || []).filter(trip => !trip.localOnly);
+
+    // 1. Sync regular trips to private user_state. Local-only test data stays in localStorage only.
     if (session?.user?.id) {
       try {
         const { error } = await supabase
           .from('user_state')
           .upsert(
-            { user_id: session.user.id, key: 'world_pro_trips_v1', value: newTrips },
+            { user_id: session.user.id, key: 'world_pro_trips_v1', value: cloudTrips },
             { onConflict: 'user_id,key' }
           );
         if (error) throw error;
@@ -825,7 +977,7 @@ function App() {
     }
 
     // 2. Sync individual shared trips to shared_trips table
-    for (const trip of newTrips) {
+    for (const trip of cloudTrips) {
       if (trip.sharedId) {
         try {
           const { error } = await supabase
@@ -846,6 +998,11 @@ function App() {
   const shareTrip = async (tripId) => {
     const trip = (trips || []).find(t => t.id === tripId);
     if (!trip) return;
+    if (trip.localOnly) {
+      setModalConfig({ type: 'error', title: '로컬 테스트 데이터', message: '로컬 테스트 여행은 공유하거나 데이터베이스에 저장할 수 없습니다.' });
+      setShowCustomModal(true);
+      return;
+    }
     if (trip.sharedId) {
       copyToClipboard(trip.sharedId, tripId);
       return;
@@ -1212,11 +1369,13 @@ function App() {
 
   const exportBudgetAsCsv = (trip = activeTrip) => {
     if (!trip) return;
-    const header = ['일차', '날짜', '지출 내용', '금액(원화)', '소비 시간'].join(',');
+    const header = ['일차', '날짜', '지출 내용', '금액', '통화', '원화 환산', '소비 시간'].join(',');
     const rows = (trip.expenses || []).map(expense => [
       expense.day === 0 ? '여행 전' : `${expense.day}일차`,
       expense.day === 0 ? '' : getActualDateForDay(trip.startDate, expense.day),
       expense.desc,
+      expense.amount,
+      expense.currency || 'KRW',
       expense.amountKRW ?? expense.amount,
       expense.time || ''
     ].map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(','));
@@ -1904,7 +2063,17 @@ function App() {
 
   const totalSpots = (itinerary || []).reduce((acc, day) => acc + (day.items || []).length, 0);
   const totalSpentKRW = (expenses || []).reduce((acc, curr) => acc + (curr.amountKRW || 0), 0);
+  const editingExpense = (expenses || []).find(expense => expense.id === editingExpenseId);
   const budgetProgress = budgetSettings.limitKRW > 0 ? Math.min((totalSpentKRW / budgetSettings.limitKRW) * 100, 100) : 0;
+  const expenseCurrencyCode = expenseInput.currency || budgetSettings.travelCurrency || 'KRW';
+  const expenseCurrencySymbol = getCurrencySymbol(expenseCurrencyCode);
+  const expenseCurrencyChoices = Array.from(new Set([
+    expenseInput.currency,
+    budgetSettings.travelCurrency,
+    ...(favoriteCurrencies || []),
+    'USD',
+    'KRW'
+  ].filter(Boolean)));
   const useFloatingPlacePanel = true;
 
   // Robust Error Boundaries
@@ -2530,7 +2699,7 @@ function App() {
                                     map?.setZoom(16);
                                     if (windowSize.width < 768 && sheetMode === 'full') setSheetMode('half');
                                   }}
-                                  style={{ margin: 0, color: item.lat && item.lng ? '#2563eb' : '#111827', textDecoration: item.lat && item.lng ? 'underline' : 'none', textDecorationColor: '#93c5fd', fontSize: (item.displayName || item.name || '').length > 18 ? '12px' : '15px', fontWeight: '900', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: item.lat && item.lng ? 'pointer' : 'default' }}
+                                  style={{ margin: 0, color: item.lat && item.lng ? '#2563eb' : '#111827', textDecoration: item.lat && item.lng ? 'underline' : 'none', textDecorationColor: '#93c5fd', fontSize: '15px', fontWeight: '900', lineHeight: 1.3, whiteSpace: 'normal', overflow: 'visible', overflowWrap: 'anywhere', wordBreak: 'keep-all', cursor: item.lat && item.lng ? 'pointer' : 'default' }}
                                   title={item.lat && item.lng ? '지도에서 위치 보기' : undefined}
                                 >
                                   {item.displayName || item.name || '장소 이름 정보 없음'}
@@ -2726,17 +2895,18 @@ function App() {
                                           }
                                         }}
                                         style={{ 
-                                          fontSize: ((item.displayName || item.name)?.length > 15 ? '12px' : (item.displayName || item.name)?.length > 10 ? '14px' : '17px'),
+                                          fontSize: '15px',
                                           fontWeight: '900', 
                                           color: (item.lat && item.lng) ? '#2563eb' : '#000000',
                                           textDecoration: (item.lat && item.lng) ? 'underline' : 'none',
                                           textDecorationColor: (item.lat && item.lng) ? '#93c5fd' : 'transparent',
                                           margin: 0, 
-                                          whiteSpace: 'nowrap',
+                                          whiteSpace: 'normal',
                                           minWidth: 0,
-                                          overflow: 'hidden',
-                                          textOverflow: 'ellipsis',
-                                          flexShrink: 1,
+                                          flex: '1 1 140px',
+                                          overflow: 'visible',
+                                          overflowWrap: 'anywhere',
+                                          wordBreak: 'keep-all',
                                           cursor: (item.lat && item.lng) ? 'pointer' : 'default',
                                           transition: 'all 0.2s ease'
                                         }}
@@ -2907,6 +3077,57 @@ function App() {
                   <button type="button" onClick={() => exportBudgetAsCsv(activeTrip)} aria-label="예산 CSV 내보내기" title="예산 CSV 내보내기" style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '8px 11px', border: 'none', borderRadius: '12px', backgroundColor: '#ecfdf5', color: '#059669', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}><FileText size={14} /> CSV</button>
                 </div>
 
+                <div style={{ padding: '14px 16px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', marginBottom: '20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '10px' }}>
+                    <div>
+                      <div style={{ fontSize: '12px', fontWeight: '900', color: '#334155' }}>즐겨찾기 통화</div>
+                      <p style={{ margin: '3px 0 0', fontSize: '10px', fontWeight: '700', color: '#94a3b8' }}>지출 입력에서 빠르게 선택할 통화를 관리하세요.</p>
+                    </div>
+                    <select
+                      value=""
+                      onChange={(e) => addFavoriteCurrency(e.target.value)}
+                      aria-label="즐겨찾기 통화 추가"
+                      style={{ maxWidth: '150px', padding: '8px 9px', border: '1px solid #cbd5e1', borderRadius: '10px', backgroundColor: 'white', color: '#334155', fontSize: '11px', fontWeight: '800', outline: 'none' }}
+                    >
+                      <option value="">＋ 통화 추가</option>
+                      {SUPPORTED_CURRENCY_CODES
+                        .filter(code => !(favoriteCurrencies || []).includes(code))
+                        .map(code => (
+                          <option key={`favorite-currency-option-${code}`} value={code}>
+                            {getCurrencySymbol(code)} {getCurrencyNameKO(code)} ({code})
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    {(favoriteCurrencies || []).length === 0 ? (
+                      <span style={{ fontSize: '10px', fontWeight: '700', color: '#94a3b8' }}>즐겨찾기 통화가 없습니다.</span>
+                    ) : (
+                      (favoriteCurrencies || []).map(code => (
+                        <div key={`favorite-currency-${code}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '6px 7px 6px 10px', borderRadius: '999px', backgroundColor: expenseCurrencyCode === code ? '#dbeafe' : 'white', border: expenseCurrencyCode === code ? '1px solid #93c5fd' : '1px solid #e2e8f0' }}>
+                          <button
+                            type="button"
+                            onClick={() => setExpenseInput(current => ({ ...current, currency: code }))}
+                            style={{ padding: 0, border: 'none', background: 'none', color: '#334155', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}
+                            title={`${getCurrencyNameKO(code)}를 지출 입력 통화로 선택`}
+                          >
+                            {getCurrencySymbol(code)} {code}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeFavoriteCurrency(code)}
+                            aria-label={`${getCurrencyNameKO(code)} 즐겨찾기에서 제거`}
+                            title="즐겨찾기에서 제거"
+                            style={{ width: '18px', height: '18px', padding: 0, border: 'none', borderRadius: '50%', backgroundColor: '#f1f5f9', color: '#64748b', fontSize: '12px', lineHeight: 1, cursor: 'pointer' }}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
                 {/* Progress Card */}
                 <div style={{ backgroundColor: '#ecfdf5', padding: '20px', borderRadius: '16px', marginBottom: '24px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '12px' }}>
@@ -2917,12 +3138,16 @@ function App() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
                       <div style={{ textAlign: 'right' }}>
                         <p style={{ fontSize: '10px', fontWeight: '800', color: '#34d399', textTransform: 'uppercase', margin: '0 0 4px 0' }}>예산 한도</p>
-                        <input 
-                          type="number"
-                          value={budgetSettings.limitKRW}
-                          onChange={(e) => saveBudgetSettings({ ...budgetSettings, limitKRW: Number(e.target.value) })}
-                          style={{ fontSize: '14px', fontWeight: '800', color: '#064e3b', backgroundColor: 'transparent', border: 'none', borderBottom: '2px solid #a7f3d0', width: '100px', textAlign: 'right', outline: 'none' }}
-                        />
+                        <div style={{ display: 'inline-flex', alignItems: 'center', borderBottom: '2px solid #a7f3d0' }}>
+                          <span style={{ fontSize: '14px', fontWeight: '900', color: '#064e3b' }}>₩</span>
+                          <input
+                            type="number"
+                            value={budgetSettings.limitKRW}
+                            onChange={(e) => saveBudgetSettings({ ...budgetSettings, limitKRW: Number(e.target.value) })}
+                            aria-label="예산 한도(원화)"
+                            style={{ fontSize: '14px', fontWeight: '800', color: '#064e3b', backgroundColor: 'transparent', border: 'none', width: '92px', textAlign: 'right', outline: 'none' }}
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -2969,13 +3194,17 @@ function App() {
                       onChange={e => setExpenseInput({...expenseInput, desc: e.target.value})}
                       style={{ flex: 2, minWidth: 0, boxSizing: 'border-box', padding: '10px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '12px', fontWeight: '700', outline: 'none' }}
                     />
-                    <input 
-                      type="number" 
-                      placeholder="금액"
-                      value={expenseInput.amount}
-                      onChange={e => setExpenseInput({...expenseInput, amount: e.target.value})}
-                      style={{ flex: 1, minWidth: 0, boxSizing: 'border-box', padding: '10px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '12px', fontWeight: '700', outline: 'none' }}
-                    />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1, minWidth: 0, boxSizing: 'border-box', padding: '0 10px', borderRadius: '10px', border: '1px solid #e5e7eb', backgroundColor: 'white' }}>
+                      <span aria-hidden="true" style={{ flexShrink: 0, fontSize: '13px', fontWeight: '900', color: '#64748b' }}>{expenseCurrencySymbol}</span>
+                      <input
+                        type="number"
+                        placeholder="금액"
+                        value={expenseInput.amount}
+                        onChange={e => setExpenseInput({...expenseInput, amount: e.target.value})}
+                        aria-label={`지출 금액(${expenseCurrencyCode})`}
+                        style={{ flex: 1, minWidth: 0, boxSizing: 'border-box', padding: '10px 0', border: 'none', backgroundColor: 'transparent', fontSize: '12px', fontWeight: '700', outline: 'none' }}
+                      />
+                    </div>
                   </div>
                   <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
                     <select
@@ -2984,32 +3213,21 @@ function App() {
                       aria-label="지출 입력 통화"
                       style={{ width: '100%', minWidth: 0, boxSizing: 'border-box', padding: '10px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '12px', fontWeight: '700', outline: 'none' }}
                     >
-                      {expenseInput.currency && expenseInput.currency !== budgetSettings.travelCurrency && expenseInput.currency !== 'KRW' && (
-                        <option value={expenseInput.currency}>💱 {getCurrencyNameKO(expenseInput.currency)} ({expenseInput.currency})</option>
-                      )}
-                      {budgetSettings.travelCurrency !== 'KRW' && (
-                        <option value={budgetSettings.travelCurrency}>⭐️ {getCurrencyNameKO(budgetSettings.travelCurrency)} ({budgetSettings.travelCurrency})</option>
-                      )}
-                      <option value="KRW">🇰🇷 대한민국 원 (KRW)</option>
+                      {expenseCurrencyChoices.map(code => (
+                        <option key={`expense-currency-${code}`} value={code}>
+                          {code === budgetSettings.travelCurrency ? '⭐️ ' : ''}{getCurrencySymbol(code)} {getCurrencyNameKO(code)} ({code})
+                        </option>
+                      ))}
                     </select>
                   </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button
                       type="button"
-                      onClick={editingExpenseId ? saveExpenseEdit : addExpense}
-                      style={{ flex: 1, width: editingExpenseId ? 'auto' : '100%', padding: '12px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 4px 10px rgba(16, 185, 129, 0.2)' }}
+                      onClick={addExpense}
+                      style={{ flex: 1, width: '100%', padding: '12px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 4px 10px rgba(16, 185, 129, 0.2)' }}
                     >
-                      {editingExpenseId ? '지출 수정 저장' : '+ 지출 추가'}
+                      + 지출 추가
                     </button>
-                    {editingExpenseId && (
-                      <button
-                        type="button"
-                        onClick={cancelEditingExpense}
-                        style={{ padding: '12px 16px', backgroundColor: '#f1f5f9', color: '#64748b', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '900', cursor: 'pointer' }}
-                      >
-                        취소
-                      </button>
-                    )}
                   </div>
                 </div>
 
@@ -3037,20 +3255,30 @@ function App() {
                           </div>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             {dayExpenses.map((exp, expenseIndex) => {
+                              const localAmount = Number(exp.amount) || 0;
                               const amountKRW = Number(exp.amountKRW ?? exp.amount) || 0;
+                              const expenseCurrency = exp.currency || 'KRW';
 
                               return (
                               <div key={exp.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '12px 16px', backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
                                 <div style={{ minWidth: 0, flex: 1 }}>
                                   <h5 style={{ fontSize: '13px', fontWeight: '800', color: '#111827', margin: '0 0 4px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{exp.desc}</h5>
-                                  {exp.time && (
-                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '10px', fontWeight: '700', color: '#94a3b8', whiteSpace: 'nowrap' }}>
-                                      <Clock size={10} /> {exp.time}
-                                    </span>
-                                  )}
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                    {expenseCurrency !== 'KRW' && (
+                                      <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', whiteSpace: 'nowrap' }}>
+                                        현지 {getCurrencySymbol(expenseCurrency)}{localAmount.toLocaleString()} ({expenseCurrency})
+                                      </span>
+                                    )}
+                                    {exp.time && (
+                                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '10px', fontWeight: '700', color: '#94a3b8', whiteSpace: 'nowrap' }}>
+                                        <Clock size={10} /> {exp.time}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
                                   <span style={{ fontSize: '13px', fontWeight: '900', color: '#059669', whiteSpace: 'nowrap' }}>
+                                    <span style={{ fontSize: '9px', marginRight: '3px', color: '#10b981' }}>한화</span>
                                     ₩{amountKRW.toLocaleString()}
                                   </span>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -3621,38 +3849,40 @@ function App() {
             onTouchMove={(event) => event.stopPropagation()}
           >
             <div className="mobile-place-add-handle" aria-hidden="true" />
-            <button
-              type="button"
-              className="mobile-place-add-close"
-              onClick={() => setSelectedPlace(null)}
-              aria-label="장소 추가 창 닫기"
-            >
-              <X size={18} />
-            </button>
-
             <div className="mobile-place-add-content">
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '10px', paddingRight: '52px' }}>
-                <div style={{ width: '42px', height: '42px', backgroundColor: '#f9fafb', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '21px', border: '1px solid #f3f4f6', flexShrink: 0 }}>
-                  {selectedPlace.emoji}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
-                    <h3 style={{ fontSize: '16px', fontWeight: '900', margin: '0 0 2px', color: '#111827', lineHeight: 1.25, flex: 1 }}>
+              <div className="mobile-place-add-header">
+                <div className="mobile-place-add-header-main">
+                  <div className="mobile-place-add-place-icon">
+                    {selectedPlace.emoji}
+                  </div>
+                  <div className="mobile-place-add-place-info">
+                    <h3>
                       {selectedPlace.name}
                     </h3>
-                    <button
-                      type="button"
-                      onClick={() => toggleFavorite(selectedPlace)}
-                      aria-label="즐겨찾기"
-                      style={{ padding: '5px', borderRadius: '8px', border: 'none', backgroundColor: isFavorite(selectedPlace) ? '#fee2e2' : '#f1f5f9', color: isFavorite(selectedPlace) ? '#ef4444' : '#9ca3af', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-                    >
-                      <Heart size={16} fill={isFavorite(selectedPlace) ? 'currentColor' : 'none'} />
-                    </button>
-                  </div>
-                  <p style={{ fontSize: '10px', fontWeight: '800', color: '#9ca3af', margin: 0, display: 'flex', alignItems: 'flex-start', gap: '4px', lineHeight: 1.25 }}>
+                    <p>
                     <MapPin size={10} color="#3b82f6" style={{ marginTop: '1px', flexShrink: 0 }} />
                     <span style={{ overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{selectedPlace.loc}</span>
-                  </p>
+                    </p>
+                  </div>
+                </div>
+                <div className="mobile-place-add-header-actions">
+                  <button
+                    type="button"
+                    className="mobile-place-add-favorite"
+                    onClick={() => toggleFavorite(selectedPlace)}
+                    aria-label="즐겨찾기"
+                    style={{ backgroundColor: isFavorite(selectedPlace) ? '#fee2e2' : '#f1f5f9', color: isFavorite(selectedPlace) ? '#ef4444' : '#9ca3af' }}
+                  >
+                    <Heart size={16} fill={isFavorite(selectedPlace) ? 'currentColor' : 'none'} />
+                  </button>
+                  <button
+                    type="button"
+                    className="mobile-place-add-close"
+                    onClick={() => setSelectedPlace(null)}
+                    aria-label="장소 추가 창 닫기"
+                  >
+                    <X size={18} />
+                  </button>
                 </div>
               </div>
 
@@ -3897,7 +4127,7 @@ function App() {
               />
             </div>
 
-            <PremiumTimeInput 
+            <ScrollTimeInput
               value={editingTimeItem.time}
               onChange={(newTime) => setEditingTimeItem({ ...editingTimeItem, time: newTime })}
               label="일정 시간 선택"
@@ -3920,6 +4150,103 @@ function App() {
                   setEditingTimeItem(null);
                 }}
                 style={{ flex: 2, padding: '16px', borderRadius: '16px', border: 'none', backgroundColor: '#3b82f6', color: 'white', fontSize: '15px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 10px 15px -3px rgba(59, 130, 246, 0.3)' }}
+              >
+                저장
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingExpenseId && editingExpense && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '20px', animation: 'fadeIn 0.2s ease-out' }}>
+          <div style={{ backgroundColor: 'white', borderRadius: '32px', width: '100%', maxWidth: '420px', maxHeight: 'calc(100vh - 40px)', overflowY: 'auto', padding: '24px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', position: 'relative', animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}>
+            <button
+              type="button"
+              onClick={cancelEditingExpense}
+              aria-label="지출 수정 창 닫기"
+              style={{ position: 'absolute', top: '20px', right: '20px', border: 'none', background: '#f1f5f9', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', cursor: 'pointer' }}
+            >
+              <X size={18} />
+            </button>
+
+            <div style={{ marginBottom: '22px', paddingRight: '42px' }}>
+              <div style={{ fontSize: '12px', fontWeight: '900', color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>지출 수정</div>
+              <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#0f172a', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{editingExpense.desc || '지출 내역 수정'}</h3>
+            </div>
+
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b', marginBottom: '8px' }}>소비 일자</label>
+              <select
+                value={expenseInput.day}
+                onChange={(e) => setExpenseInput(current => ({ ...current, day: e.target.value }))}
+                style={{ width: '100%', boxSizing: 'border-box', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', backgroundColor: 'white', fontSize: '14px', fontWeight: '700', outline: 'none' }}
+              >
+                <option value={0}>여행 전 (항공권)</option>
+                {itinerary.map(dayPlan => <option key={`expense-edit-day-${dayPlan.day}`} value={dayPlan.day}>{dayPlan.day}일차</option>)}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b', marginBottom: '8px' }}>지출 내용</label>
+              <input
+                type="text"
+                value={expenseInput.desc}
+                onChange={(e) => setExpenseInput(current => ({ ...current, desc: e.target.value }))}
+                placeholder="지출 내용"
+                style={{ width: '100%', boxSizing: 'border-box', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '14px', fontWeight: '700', outline: 'none' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '14px' }}>
+              <div style={{ flex: '1 1 150px', minWidth: 0 }}>
+                <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b', marginBottom: '8px' }}>금액</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', width: '100%', boxSizing: 'border-box', padding: '0 12px', borderRadius: '12px', border: '1px solid #e2e8f0', backgroundColor: 'white' }}>
+                  <span aria-hidden="true" style={{ flexShrink: 0, fontSize: '15px', fontWeight: '900', color: '#64748b' }}>{expenseCurrencySymbol}</span>
+                  <input
+                    type="number"
+                    value={expenseInput.amount}
+                    onChange={(e) => setExpenseInput(current => ({ ...current, amount: e.target.value }))}
+                    aria-label={`지출 금액(${expenseCurrencyCode})`}
+                    style={{ flex: 1, minWidth: 0, boxSizing: 'border-box', padding: '12px 0', border: 'none', backgroundColor: 'transparent', fontSize: '14px', fontWeight: '700', outline: 'none' }}
+                  />
+                </div>
+              </div>
+              <div style={{ flex: '1 1 180px', minWidth: 0 }}>
+                <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b', marginBottom: '8px' }}>통화</label>
+                <select
+                  value={expenseInput.currency || budgetSettings.travelCurrency}
+                  onChange={(e) => setExpenseInput(current => ({ ...current, currency: e.target.value }))}
+                  aria-label="지출 수정 통화"
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', backgroundColor: 'white', fontSize: '13px', fontWeight: '700', outline: 'none' }}
+                >
+                  {expenseCurrencyChoices.map(code => (
+                    <option key={`expense-edit-currency-${code}`} value={code}>
+                      {code === budgetSettings.travelCurrency ? '⭐️ ' : ''}{getCurrencySymbol(code)} {getCurrencyNameKO(code)} ({code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <ScrollTimeInput
+              value={expenseInput.time}
+              onChange={(newTime) => setExpenseInput(current => ({ ...current, time: newTime }))}
+              label="소비 시간"
+            />
+
+            <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+              <button
+                type="button"
+                onClick={cancelEditingExpense}
+                style={{ flex: 1, padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', backgroundColor: 'white', color: '#64748b', fontSize: '15px', fontWeight: '900', cursor: 'pointer' }}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={saveExpenseEdit}
+                style={{ flex: 2, padding: '16px', borderRadius: '16px', border: 'none', backgroundColor: '#10b981', color: 'white', fontSize: '15px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 10px 15px -3px rgba(16, 185, 129, 0.3)' }}
               >
                 저장
               </button>
