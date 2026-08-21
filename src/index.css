@@ -329,6 +329,230 @@ body {
   font-weight: 700;
 }
 
+.cash-reconciliation-toggle,
+.currency-manager-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.cash-reconciliation-toggle:focus-visible,
+.currency-manager-toggle:focus-visible {
+  outline: 2px solid #f59e0b;
+  outline-offset: 4px;
+  border-radius: 10px;
+}
+
+.cash-reconciliation-toggle-title,
+.currency-manager-toggle-title {
+  display: block;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.cash-reconciliation-toggle-title {
+  color: #92400e;
+}
+
+.currency-manager-toggle-title {
+  color: #334155;
+  font-size: 12px;
+}
+
+.cash-reconciliation-toggle-description,
+.currency-manager-toggle-description {
+  display: block;
+  margin-top: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.cash-reconciliation-toggle-description {
+  color: #b45309;
+}
+
+.currency-manager-toggle-description {
+  color: #94a3b8;
+}
+
+.cash-reconciliation-status-chip,
+.currency-manager-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 6px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.cash-reconciliation-status-chip {
+  color: #92400e;
+  background: #fef3c7;
+}
+
+.cash-reconciliation-status-chip.is-pending {
+  color: #92400e;
+  background: #fef3c7;
+}
+
+.cash-reconciliation-status-chip.is-matched {
+  color: #047857;
+  background: #d1fae5;
+}
+
+.cash-reconciliation-status-chip.is-mismatch {
+  color: #b91c1c;
+  background: #fee2e2;
+}
+
+.cash-reconciliation-status-chip svg,
+.currency-manager-count svg {
+  transition: transform 0.2s ease;
+}
+
+.cash-reconciliation-status-chip svg.is-open,
+.currency-manager-count svg.is-open {
+  transform: rotate(180deg);
+}
+
+.cash-reconciliation-panel,
+.currency-manager-panel {
+  margin-top: 14px;
+}
+
+.cash-reconciliation-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+  color: #92400e;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.cash-reconciliation-panel-heading select,
+.currency-manager-panel > select {
+  max-width: 180px;
+  padding: 8px 9px;
+  border: 1px solid #fcd34d;
+  border-radius: 10px;
+  background: white;
+  color: #92400e;
+  font-size: 11px;
+  font-weight: 800;
+  outline: none;
+}
+
+.currency-manager-panel > select {
+  width: 100%;
+  max-width: none;
+  border-color: #cbd5e1;
+  color: #334155;
+}
+
+.currency-manager-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.currency-manager-chips > span {
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.currency-manager-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 7px 6px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: white;
+}
+
+.currency-manager-chip.is-selected {
+  border-color: #93c5fd;
+  background: #dbeafe;
+}
+
+.currency-manager-chip button {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.currency-manager-chip button:last-child {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.expense-item-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-bottom: 4px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.expense-subtotal-summary {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  max-width: 62%;
+  padding: 6px 9px;
+  border-radius: 9px;
+  background: #ecfdf5;
+  color: #059669;
+  text-align: right;
+}
+
+.expense-subtotal-summary strong {
+  font-size: 11px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.expense-subtotal-breakdown {
+  max-width: 100%;
+  color: #047857;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1.35;
+  white-space: normal;
+  word-break: keep-all;
+}
+
 .expense-payment-badge {
   display: inline-flex;
   align-items: center;
