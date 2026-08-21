@@ -248,6 +248,20 @@ body {
   white-space: nowrap;
 }
 
+.budget-spend-summary-values {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.budget-spend-summary-values small {
+  color: #059669;
+  font-size: 9px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .budget-spend-summary-empty strong {
   color: #6b7280;
 }

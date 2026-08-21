@@ -1993,6 +1993,16 @@ function App() {
     totals[currency] = (totals[currency] || 0) + amount;
     return totals;
   }, {}), [expenses]);
+  const expenseKRWTotalsByCurrency = useMemo(() => (expenses || []).reduce((totals, expense) => {
+    const currency = expense.currency || 'KRW';
+    const numericAmount = Number(expense.amount) || 0;
+    const convertedAmount = currency !== 'KRW' && exchangeRates[currency]
+      ? Math.round(numericAmount / exchangeRates[currency])
+      : Math.round(numericAmount);
+    const amountKRW = Number(expense.amountKRW ?? convertedAmount) || 0;
+    totals[currency] = (totals[currency] || 0) + amountKRW;
+    return totals;
+  }, {}), [expenses, exchangeRates]);
   const cashSpentByCurrency = useMemo(() => (expenses || []).reduce((totals, expense) => {
     if (expense.paymentMethod !== 'cash') return totals;
     const currency = expense.currency || 'KRW';
@@ -3092,7 +3102,10 @@ function App() {
                     {localCurrencyTotals.length > 0 ? localCurrencyTotals.map(([currency, amount]) => (
                       <div className="budget-spend-summary-item" key={`summary-currency-${currency}`}>
                         <span>{getCurrencyNameKO(currency)} ({currency})</span>
-                        <strong>{getCurrencySymbol(currency)}{amount.toLocaleString()}</strong>
+                        <div className="budget-spend-summary-values">
+                          <strong>{getCurrencySymbol(currency)}{amount.toLocaleString()}</strong>
+                          <small>₩{(expenseKRWTotalsByCurrency[currency] || 0).toLocaleString()}</small>
+                        </div>
                       </div>
                     )) : (
                       <div className="budget-spend-summary-item budget-spend-summary-empty">
