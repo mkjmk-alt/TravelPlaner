@@ -1142,15 +1142,16 @@ function App() {
   };
 
   // --- PHOTO HELPERS ---
-  const handlePhotoUpload = (file, dayNumber, itemId) => {
+  const handlePhotoUpload = (file, dayNumber, itemId, onUploaded) => {
     if (!file) return;
     const reader = new FileReader();
     reader.onloadend = () => {
+      const image = reader.result;
       const nextTrips = (trips || []).map(t => {
         if (t.id === activeTripId) {
           const newItin = (t.itinerary || []).map(day => {
             if (day.day === dayNumber) {
-              return { ...day, items: day.items.map(it => it.id === itemId ? { ...it, image: reader.result } : it) };
+              return { ...day, items: day.items.map(it => it.id === itemId ? { ...it, image } : it) };
             }
             return day;
           });
@@ -1159,11 +1160,12 @@ function App() {
         return t;
       });
       syncTripsToCloud(nextTrips);
+      onUploaded?.(image);
     };
     reader.readAsDataURL(file);
   };
 
-  const handlePhotoDelete = (dayNumber, itemId) => {
+  const handlePhotoDelete = (dayNumber, itemId, onDeleted) => {
     const nextTrips = (trips || []).map(t => {
       if (t.id === activeTripId) {
         const newItin = (t.itinerary || []).map(day => {
@@ -1177,6 +1179,7 @@ function App() {
       return t;
     });
     syncTripsToCloud(nextTrips);
+    onDeleted?.();
   };
 
   // Collect all photos for slideshow
@@ -1844,7 +1847,8 @@ function App() {
       id: item.id,
       time: item.time || '09:00',
       displayName: item.displayName || item.name || '',
-      originalName: item.name || ''
+      originalName: item.name || '',
+      image: item.image || null
     });
   };
 
@@ -2869,33 +2873,6 @@ function App() {
                                       >
                                         {item.displayName || item.name || '장소 이름 정보 없음'}
                                       </h4>
-                                      <button
-                                        type="button"
-                                        className="itinerary-item-edit-button"
-                                        aria-label={`${item.displayName || item.name || '일정'} 편집`}
-                                        title="일정 편집: 이름, 시간, 일차 변경"
-                                        onClick={(event) => { event.stopPropagation(); startEditingItineraryItem(dayPlan.day, item); }}
-                                        style={{
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          gap: '4px',
-                                          flex: '0 0 auto',
-                                          minHeight: '30px',
-                                          padding: '5px 9px',
-                                          border: '1px solid #bfdbfe',
-                                          borderRadius: '9px',
-                                          backgroundColor: '#eff6ff',
-                                          color: '#2563eb',
-                                          fontFamily: 'inherit',
-                                          fontSize: '11px',
-                                          fontWeight: '900',
-                                          cursor: 'pointer',
-                                          whiteSpace: 'nowrap'
-                                        }}
-                                      >
-                                        <Edit2 size={12} /> 편집
-                                      </button>
                                     </div>
                                   </div>
                                   <div className="itinerary-item-actions" style={{
@@ -2930,25 +2907,22 @@ function App() {
                                       </button>
                                     </div>
 
-                                    {/* Camera Button */}
-                                    <label style={{ 
-                                      cursor: 'pointer', 
-                                      height: '44px', width: '44px',
-                                      color: item.image ? '#8b5cf6' : '#9ca3af', 
-                                      backgroundColor: item.image ? '#f5f3ff' : '#f8fafc', 
-                                      borderRadius: '12px', 
-                                      border: `1px solid ${item.image ? '#ddd6fe' : '#f1f5f9'}`,
-                                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                      transition: 'all 0.2s'
-                                    }} title="사진 추가">
-                                      <Camera size={18} />
-                                      <input 
-                                        type="file" 
-                                        accept="image/*" 
-                                        style={{ display: 'none' }} 
-                                        onChange={(e) => { handlePhotoUpload(e.target.files[0], dayPlan.day, item.id); e.target.value = ''; }}
-                                      />
-                                    </label>
+                                    {/* Edit Button */}
+                                    <button
+                                      type="button"
+                                      aria-label={`${item.displayName || item.name || '일정'} 편집`}
+                                      title="일정 편집: 이름, 시간, 일차 변경"
+                                      onClick={(event) => { event.stopPropagation(); startEditingItineraryItem(dayPlan.day, item); }}
+                                      style={{
+                                        height: '44px', width: '44px',
+                                        color: '#2563eb', backgroundColor: '#eff6ff',
+                                        border: '1px solid #bfdbfe', borderRadius: '12px',
+                                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        transition: 'all 0.2s'
+                                      }}
+                                    >
+                                      <Edit2 size={18} />
+                                    </button>
 
                                     {/* Navigation Button */}
                                     <button 
@@ -3298,29 +3272,20 @@ function App() {
                                     )}
                                   </div>
                                 </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '7px', flexShrink: 0 }}>
                                   <span style={{ fontSize: '13px', fontWeight: '900', color: '#059669', whiteSpace: 'nowrap' }}>
                                     <span style={{ fontSize: '9px', marginRight: '3px', color: '#10b981' }}>한화</span>
                                     ₩{amountKRW.toLocaleString()}
                                   </span>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    <button
-                                      type="button"
-                                      onClick={() => startEditingExpense(exp)}
-                                      aria-label={`${exp.desc} 지출 수정`}
-                                      title="지출 수정"
-                                      style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, border: '1px solid #e0e7ff', borderRadius: '8px', backgroundColor: '#f5f7ff', color: '#4f46e5', cursor: 'pointer' }}
-                                    >
-                                      <Edit2 size={13} />
-                                    </button>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', width: '28px', padding: '2px', border: '1px solid #f1f5f9', borderRadius: '8px', backgroundColor: '#f8fafc' }}>
+                                  <div className="expense-item-actions" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', width: '32px', height: '40px', padding: '2px', boxSizing: 'border-box', border: '1px solid #f1f5f9', borderRadius: '10px', backgroundColor: '#f8fafc' }}>
                                       <button
                                         type="button"
                                         onClick={() => moveExpense(exp.id, -1)}
                                         disabled={expenseIndex === 0}
                                         aria-label={`${exp.desc} 위로 이동`}
                                         title="위로 이동"
-                                        style={{ width: '24px', height: '17px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, border: 'none', borderRadius: '5px', backgroundColor: 'transparent', color: expenseIndex === 0 ? '#d1d5db' : '#64748b', cursor: expenseIndex === 0 ? 'default' : 'pointer' }}
+                                        style={{ width: '26px', height: '17px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, border: 'none', borderRadius: '5px', backgroundColor: 'transparent', color: expenseIndex === 0 ? '#d1d5db' : '#64748b', cursor: expenseIndex === 0 ? 'default' : 'pointer' }}
                                       >
                                         <ChevronUp size={13} />
                                       </button>
@@ -3330,20 +3295,30 @@ function App() {
                                         disabled={expenseIndex === dayExpenses.length - 1}
                                         aria-label={`${exp.desc} 아래로 이동`}
                                         title="아래로 이동"
-                                        style={{ width: '24px', height: '17px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, border: 'none', borderTop: '1px solid #e5e7eb', borderRadius: '0 0 5px 5px', backgroundColor: 'transparent', color: expenseIndex === dayExpenses.length - 1 ? '#d1d5db' : '#64748b', cursor: expenseIndex === dayExpenses.length - 1 ? 'default' : 'pointer' }}
+                                        style={{ width: '26px', height: '17px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, border: 'none', borderTop: '1px solid #e5e7eb', borderRadius: '0 0 5px 5px', backgroundColor: 'transparent', color: expenseIndex === dayExpenses.length - 1 ? '#d1d5db' : '#64748b', cursor: expenseIndex === dayExpenses.length - 1 ? 'default' : 'pointer' }}
                                       >
                                         <ChevronDown size={13} />
                                       </button>
                                     </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => startEditingExpense(exp)}
+                                      aria-label={`${exp.desc} 지출 수정`}
+                                      title="지출 수정"
+                                      style={{ width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, border: '1px solid #bfdbfe', borderRadius: '10px', backgroundColor: '#eff6ff', color: '#2563eb', cursor: 'pointer', transition: 'all 0.2s' }}
+                                    >
+                                      <Edit2 size={17} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => handleInlineDelete(e, `exp-${exp.id}`, () => deleteExpense(exp.id))}
+                                      aria-label={`${exp.desc} 지출 삭제`}
+                                      title="지출 삭제"
+                                      style={{ minWidth: confirmDeleteId === `exp-${exp.id}` ? '40px' : '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: confirmDeleteId === `exp-${exp.id}` ? '6px 8px' : '6px', backgroundColor: confirmDeleteId === `exp-${exp.id}` ? '#ef4444' : '#fef2f2', color: confirmDeleteId === `exp-${exp.id}` ? 'white' : '#ef4444', border: '1px solid #fee2e2', borderRadius: '10px', cursor: 'pointer', fontSize: '11px', fontWeight: '800' }}
+                                    >
+                                      {confirmDeleteId === `exp-${exp.id}` ? '확인' : <Trash2 size={16} />}
+                                    </button>
                                   </div>
-                                  <button 
-                                    onClick={(e) => handleInlineDelete(e, `exp-${exp.id}`, () => deleteExpense(exp.id))} 
-                                    aria-label={`${exp.desc} 지출 삭제`}
-                                    title="지출 삭제"
-                                    style={{ padding: confirmDeleteId === `exp-${exp.id}` ? '6px 10px' : '6px', backgroundColor: confirmDeleteId === `exp-${exp.id}` ? '#ef4444' : '#fef2f2', color: confirmDeleteId === `exp-${exp.id}` ? 'white' : '#ef4444', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '11px', fontWeight: '800' }}
-                                  >
-                                    {confirmDeleteId === `exp-${exp.id}` ? '확인' : <Trash2 size={14} />}
-                                  </button>
                                 </div>
                               </div>
                               );
@@ -4154,6 +4129,45 @@ function App() {
               onChange={(newTime) => setEditingTimeItem({ ...editingTimeItem, time: newTime })}
               label="일정 시간 선택"
             />
+
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b', marginBottom: '8px' }}>사진</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {editingTimeItem.image && (
+                  <img
+                    src={editingTimeItem.image}
+                    alt="일정 사진 미리보기"
+                    style={{ width: '52px', height: '52px', objectFit: 'cover', borderRadius: '10px', border: '1px solid #e2e8f0', flexShrink: 0 }}
+                  />
+                )}
+                <label style={{ flex: 1, minWidth: 0, minHeight: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: '12px', backgroundColor: '#f8fafc', color: '#475569', fontSize: '12px', fontWeight: '800', cursor: 'pointer' }}>
+                  <Camera size={15} /> {editingTimeItem.image ? '사진 변경' : '사진 추가'}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      handlePhotoUpload(file, editingTimeItem.sourceDay, editingTimeItem.id, (image) => {
+                        setEditingTimeItem(current => current ? { ...current, image } : current);
+                      });
+                      event.target.value = '';
+                    }}
+                  />
+                </label>
+                {editingTimeItem.image && (
+                  <button
+                    type="button"
+                    onClick={() => handlePhotoDelete(editingTimeItem.sourceDay, editingTimeItem.id, () => setEditingTimeItem(current => current ? { ...current, image: null } : current))}
+                    aria-label="일정 사진 삭제"
+                    title="사진 삭제"
+                    style={{ width: '42px', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid #fee2e2', borderRadius: '12px', backgroundColor: '#fff5f5', color: '#f87171', cursor: 'pointer' }}
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                )}
+              </div>
+            </div>
 
             <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
               <button 
