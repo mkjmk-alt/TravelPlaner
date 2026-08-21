@@ -559,6 +559,29 @@ function App() {
   const budgetSettings = activeTrip?.budgetSettings || { limitKRW: 1000000, travelCurrency: 'USD' };
   const expenses = activeTrip?.expenses || [];
 
+  const getTodayExpenseDay = (trip) => {
+    const availableDays = (trip?.itinerary || [])
+      .map(day => parseDay(day.day))
+      .filter(day => day > 0);
+    if (!trip?.startDate || availableDays.length === 0) return 1;
+
+    const tripStart = new Date(`${trip.startDate}T00:00:00`);
+    if (Number.isNaN(tripStart.getTime())) return 1;
+
+    const today = new Date();
+    const todayAtMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const tripStartAtMidnight = new Date(tripStart.getFullYear(), tripStart.getMonth(), tripStart.getDate());
+    const todayDay = Math.round((todayAtMidnight - tripStartAtMidnight) / 86400000) + 1;
+
+    return availableDays.includes(todayDay) ? todayDay : 1;
+  };
+
+  const openBudget = () => {
+    setIsMobileHeaderHidden(false);
+    setExpenseInput(current => ({ ...current, day: getTodayExpenseDay(activeTrip) }));
+    setViewMode('budget');
+  };
+
   const requestNotificationPermission = async () => {
     if (typeof Notification === 'undefined') return 'unsupported';
     const permission = Notification.permission === 'default'
@@ -1928,7 +1951,7 @@ function App() {
                     <Calendar size={18} />
                   </button>
                   <button 
-                    onClick={() => { setIsMobileHeaderHidden(false); setViewMode('budget'); }}
+                    onClick={openBudget}
                     style={{ width: '40px', height: '40px', borderRadius: '12px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.2s', backgroundColor: viewMode === 'budget' ? '#10b981' : '#f3f4f6', color: viewMode === 'budget' ? 'white' : '#9ca3af' }}
                     aria-label="예산" title="예산"
                   >
@@ -2444,6 +2467,38 @@ function App() {
                                   </div>
                                   <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                                      <button
+                                        type="button"
+                                        aria-label={`${item.displayName || item.name || '일정'} 도착 시간 ${item.time || '09:00'} 수정`}
+                                        title="도착 시간 수정"
+                                        onClick={() => setEditingTimeItem({ sourceDay: dayPlan.day, day: dayPlan.day, id: item.id, time: item.time || '09:00', displayName: item.displayName || item.name || '', originalName: item.name || '' })}
+                                        style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '4px',
+                                          backgroundColor: '#f1f5f9',
+                                          padding: '4px 10px',
+                                          borderRadius: '8px',
+                                          border: '1px solid #e2e8f0',
+                                          flexShrink: 0,
+                                          cursor: 'pointer',
+                                          transition: 'all 0.2s',
+                                          fontFamily: 'inherit',
+                                          whiteSpace: 'nowrap',
+                                          textAlign: 'left'
+                                        }}
+                                      >
+                                        <Clock size={11} color="#64748b" />
+                                        <Edit2 size={10} color="#3b82f6" />
+                                        <span style={{
+                                          fontSize: '12px',
+                                          fontWeight: '800',
+                                          color: '#475569',
+                                          fontVariantNumeric: 'tabular-nums'
+                                        }}>
+                                          {item.time || '09:00'}
+                                        </span>
+                                      </button>
                                       <h4 
                                         onClick={() => {
                                           if (item.lat && item.lng) {
@@ -2466,6 +2521,9 @@ function App() {
                                           textDecorationColor: (item.lat && item.lng) ? '#93c5fd' : 'transparent',
                                           margin: 0, 
                                           whiteSpace: 'nowrap',
+                                          minWidth: 0,
+                                          overflow: 'hidden',
+                                          textOverflow: 'ellipsis',
                                           flexShrink: 1,
                                           cursor: (item.lat && item.lng) ? 'pointer' : 'default',
                                           transition: 'all 0.2s ease'
@@ -2474,33 +2532,6 @@ function App() {
                                       >
                                         {item.displayName || item.name || '장소 이름 정보 없음'}
                                       </h4>
-                                      <div 
-                                        onClick={() => setEditingTimeItem({ sourceDay: dayPlan.day, day: dayPlan.day, id: item.id, time: item.time || '09:00', displayName: item.displayName || item.name || '', originalName: item.name || '' })}
-                                        style={{ 
-                                          display: 'flex', 
-                                          alignItems: 'center', 
-                                          gap: '4px', 
-                                          backgroundColor: '#f1f5f9', 
-                                          padding: '4px 10px', 
-                                          borderRadius: '8px', 
-                                          border: '1px solid #e2e8f0', 
-                                          flexShrink: 0,
-                                          cursor: 'pointer',
-                                          transition: 'all 0.2s',
-                                          hover: { backgroundColor: '#e2e8f0' }
-                                        }}
-                                      >
-                                        <Clock size={11} color="#64748b" />
-                                        <Edit2 size={10} color="#3b82f6" />
-                                        <span style={{ 
-                                          fontSize: '12px', 
-                                          fontWeight: '800', 
-                                          color: '#475569', 
-                                          fontVariantNumeric: 'tabular-nums'
-                                        }}>
-                                          {item.time || '09:00'}
-                                        </span>
-                                      </div>
                                     </div>
                                   </div>
                                   <div className="itinerary-item-actions" style={{
@@ -2766,12 +2797,18 @@ function App() {
                     [0, ...itinerary.map(d=>d.day)].map(dayNum => {
                       const dayExpenses = expenses.filter(e => e.day === dayNum);
                       if (dayExpenses.length === 0) return null;
+                      const daySubtotalKRW = dayExpenses.reduce((sum, expense) => sum + Number(expense.amountKRW || 0), 0);
                       
                       return (
                         <div key={`exp-day-${dayNum}`} style={{ marginBottom: '16px' }}>
-                          <h4 style={{ fontSize: '10px', fontWeight: '900', color: '#9ca3af', textTransform: 'uppercase', marginBottom: '8px' }}>
-                            {dayNum === 0 ? '여행 전 (예약 등)' : `${dayNum}일차 ${activeTrip?.startDate ? `(${getActualDateForDay(activeTrip.startDate, dayNum)})` : ''}`}
-                          </h4>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '8px' }}>
+                            <h4 style={{ flex: 1, minWidth: 0, fontSize: '10px', fontWeight: '900', color: '#9ca3af', textTransform: 'uppercase', margin: 0 }}>
+                              {dayNum === 0 ? '여행 전 (예약 등)' : `${dayNum}일차 ${activeTrip?.startDate ? `(${getActualDateForDay(activeTrip.startDate, dayNum)})` : ''}`}
+                            </h4>
+                            <span style={{ flexShrink: 0, padding: '6px 9px', borderRadius: '9px', backgroundColor: '#ecfdf5', color: '#059669', fontSize: '11px', fontWeight: '900', whiteSpace: 'nowrap' }}>
+                              소계 ₩{daySubtotalKRW.toLocaleString()}
+                            </span>
+                          </div>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             {dayExpenses.map(exp => (
                               <div key={exp.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
@@ -3296,7 +3333,7 @@ function App() {
             </button>
 
             <div className="mobile-place-add-content">
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '10px', paddingRight: '28px' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '10px', paddingRight: '52px' }}>
                 <div style={{ width: '42px', height: '42px', backgroundColor: '#f9fafb', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '21px', border: '1px solid #f3f4f6', flexShrink: 0 }}>
                   {selectedPlace.emoji}
                 </div>

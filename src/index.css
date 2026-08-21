@@ -421,7 +421,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
   .mobile-place-add-close {
     position: absolute;
-    top: 12px;
+    top: 28px;
     right: 12px;
     width: 32px;
     height: 32px;
@@ -552,7 +552,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
   .mobile-place-add-close {
     position: absolute;
-    top: 12px;
+    top: 20px;
     right: 12px;
     width: 32px;
     height: 32px;
