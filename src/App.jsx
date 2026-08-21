@@ -407,7 +407,8 @@ function App() {
   const [activeTripId, setActiveTripId] = useState(null);
 
   const [exchangeRates, setExchangeRates] = useState({});
-  const [expenseInput, setExpenseInput] = useState({ desc: '', amount: '', currency: '', day: 1 });
+  const [expenseInput, setExpenseInput] = useState({ desc: '', amount: '', currency: '', day: 1, time: '' });
+  const [editingExpenseId, setEditingExpenseId] = useState(null);
 
   const sharedTripCount = (trips || []).filter(t => t.sharedId).length;
   const autocompleteRef = useRef(null);
@@ -558,6 +559,15 @@ function App() {
   const itinerary = useMemo(() => activeTrip?.itinerary || [], [activeTrip]);
   const budgetSettings = activeTrip?.budgetSettings || { limitKRW: 1000000, travelCurrency: 'USD' };
   const expenses = activeTrip?.expenses || [];
+
+  const getExpenseAmountKRW = (amount, currency) => {
+    const numericAmount = Number(amount);
+    if (!Number.isFinite(numericAmount)) return 0;
+    if (currency !== 'KRW' && exchangeRates[currency]) {
+      return Math.round(numericAmount / exchangeRates[currency]);
+    }
+    return Math.round(numericAmount);
+  };
 
   const getTodayExpenseDay = (trip) => {
     const availableDays = (trip?.itinerary || [])
@@ -1195,14 +1205,15 @@ function App() {
 
   const exportBudgetAsCsv = (trip = activeTrip) => {
     if (!trip) return;
-    const header = ['일차', '날짜', '지출 내용', '금액', '통화', '원화 환산'].join(',');
+    const header = ['일차', '날짜', '지출 내용', '금액', '통화', '원화 환산', '소비 시간'].join(',');
     const rows = (trip.expenses || []).map(expense => [
       expense.day === 0 ? '여행 전' : `${expense.day}일차`,
       expense.day === 0 ? '' : getActualDateForDay(trip.startDate, expense.day),
       expense.desc,
       expense.amount,
       expense.currency,
-      expense.amountKRW
+      expense.amountKRW,
+      expense.time || ''
     ].map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(','));
     downloadTextFile(`${(trip.name || 'travel-plan').replace(/[^\w가-힣-]+/g, '_')}-budget.csv`, `\uFEFF${[header, ...rows].join('\r\n')}`, 'text/csv;charset=utf-8');
     setModalConfig({ type: 'success', title: 'CSV 내보내기 완료', message: '예산 및 지출 내역을 CSV 파일로 저장했습니다.' });
@@ -1509,32 +1520,79 @@ function App() {
   };
 
   const addExpense = () => {
-    if (!activeTripId || !expenseInput.desc || !expenseInput.amount) return;
-    
-    let amountKRW = parseFloat(expenseInput.amount);
-    
-    // Convert to KRW if it's a foreign currency
+    if (!activeTripId || !expenseInput.desc.trim() || !expenseInput.amount) return;
+
     const currentCurrency = expenseInput.currency || budgetSettings.travelCurrency || 'USD';
-    if (currentCurrency !== 'KRW' && exchangeRates[currentCurrency]) {
-      // API returns how much foreign currency 1 KRW buys. 
-      amountKRW = parseFloat(expenseInput.amount) / exchangeRates[currentCurrency];
-    }
 
     const newExpense = {
       id: makeEntityId(),
-      desc: expenseInput.desc,
-      amount: parseFloat(expenseInput.amount),
+      desc: expenseInput.desc.trim(),
+      amount: Number(expenseInput.amount),
       currency: currentCurrency,
-      amountKRW: Math.round(amountKRW),
-      day: parseInt(expenseInput.day)
+      amountKRW: getExpenseAmountKRW(expenseInput.amount, currentCurrency),
+      day: parseInt(expenseInput.day, 10) || 0,
+      time: expenseInput.time || ''
     };
 
     saveExpenses([...expenses, newExpense]);
-    setExpenseInput({ ...expenseInput, desc: '', amount: '' });
+    setExpenseInput({ ...expenseInput, desc: '', amount: '', time: '' });
+  };
+
+  const startEditingExpense = (expense) => {
+    setEditingExpenseId(expense.id);
+    setExpenseInput({
+      desc: expense.desc || '',
+      amount: String(expense.amount ?? ''),
+      currency: expense.currency || budgetSettings.travelCurrency || 'USD',
+      day: expense.day ?? 1,
+      time: expense.time || ''
+    });
+  };
+
+  const cancelEditingExpense = () => {
+    setEditingExpenseId(null);
+    setExpenseInput(current => ({ ...current, desc: '', amount: '', time: '' }));
+  };
+
+  const saveExpenseEdit = () => {
+    if (!activeTripId || !editingExpenseId || !expenseInput.desc.trim() || !expenseInput.amount) return;
+
+    const currentCurrency = expenseInput.currency || budgetSettings.travelCurrency || 'USD';
+    const nextExpenses = expenses.map(expense => expense.id === editingExpenseId ? {
+      ...expense,
+      desc: expenseInput.desc.trim(),
+      amount: Number(expenseInput.amount),
+      currency: currentCurrency,
+      amountKRW: getExpenseAmountKRW(expenseInput.amount, currentCurrency),
+      day: parseInt(expenseInput.day, 10) || 0,
+      time: expenseInput.time || ''
+    } : expense);
+
+    saveExpenses(nextExpenses);
+    cancelEditingExpense();
+  };
+
+  const moveExpense = (id, direction) => {
+    const targetExpense = expenses.find(expense => expense.id === id);
+    if (!targetExpense) return;
+
+    const sameDayIndices = expenses
+      .map((expense, index) => parseDay(expense.day) === parseDay(targetExpense.day) ? index : -1)
+      .filter(index => index !== -1);
+    const currentPosition = sameDayIndices.indexOf(expenses.findIndex(expense => expense.id === id));
+    const targetPosition = currentPosition + direction;
+    if (currentPosition === -1 || targetPosition < 0 || targetPosition >= sameDayIndices.length) return;
+
+    const nextExpenses = [...expenses];
+    const currentIndex = sameDayIndices[currentPosition];
+    const targetIndex = sameDayIndices[targetPosition];
+    [nextExpenses[currentIndex], nextExpenses[targetIndex]] = [nextExpenses[targetIndex], nextExpenses[currentIndex]];
+    saveExpenses(nextExpenses);
   };
 
   const deleteExpense = (id) => {
     saveExpenses(expenses.filter(e => e.id !== id));
+    if (editingExpenseId === id) cancelEditingExpense();
   };
 
   const toggleFavorite = (place) => {
@@ -2757,6 +2815,9 @@ function App() {
                       onChange={e => setExpenseInput({...expenseInput, currency: e.target.value})}
                       style={{ flex: 1, minWidth: 0, boxSizing: 'border-box', padding: '10px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '12px', fontWeight: '700', outline: 'none' }}
                     >
+                      {expenseInput.currency && expenseInput.currency !== budgetSettings.travelCurrency && expenseInput.currency !== 'KRW' && (
+                        <option value={expenseInput.currency}>💱 {getCurrencyNameKO(expenseInput.currency)} ({expenseInput.currency})</option>
+                      )}
                       {budgetSettings.travelCurrency !== 'KRW' && (
                         <option value={budgetSettings.travelCurrency}>⭐️ {getCurrencyNameKO(budgetSettings.travelCurrency)} ({budgetSettings.travelCurrency})</option>
                       )}
@@ -2779,12 +2840,35 @@ function App() {
                       style={{ flex: 1, minWidth: 0, boxSizing: 'border-box', padding: '10px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '12px', fontWeight: '700', outline: 'none' }}
                     />
                   </div>
-                  <button 
-                    onClick={addExpense}
-                    style={{ width: '100%', padding: '12px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 4px 10px rgba(16, 185, 129, 0.2)' }}
-                  >
-                    + 지출 추가
-                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                    <span style={{ flexShrink: 0, fontSize: '10px', fontWeight: '800', color: '#64748b' }}>소비 시간</span>
+                    <input
+                      type="time"
+                      aria-label="소비 시간"
+                      value={expenseInput.time || ''}
+                      onChange={e => setExpenseInput({...expenseInput, time: e.target.value})}
+                      style={{ flex: 1, minWidth: 0, boxSizing: 'border-box', padding: '9px 10px', borderRadius: '10px', border: '1px solid #e5e7eb', backgroundColor: 'white', fontSize: '12px', fontWeight: '700', outline: 'none' }}
+                    />
+                    <span style={{ flexShrink: 0, fontSize: '9px', color: '#94a3b8' }}>선택 입력</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      type="button"
+                      onClick={editingExpenseId ? saveExpenseEdit : addExpense}
+                      style={{ flex: 1, width: editingExpenseId ? 'auto' : '100%', padding: '12px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 4px 10px rgba(16, 185, 129, 0.2)' }}
+                    >
+                      {editingExpenseId ? '지출 수정 저장' : '+ 지출 추가'}
+                    </button>
+                    {editingExpenseId && (
+                      <button
+                        type="button"
+                        onClick={cancelEditingExpense}
+                        style={{ padding: '12px 16px', backgroundColor: '#f1f5f9', color: '#64748b', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '900', cursor: 'pointer' }}
+                      >
+                        취소
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Expenses List */}
@@ -2810,27 +2894,76 @@ function App() {
                             </span>
                           </div>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            {dayExpenses.map(exp => (
-                              <div key={exp.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-                                <div>
-                                  <h5 style={{ fontSize: '13px', fontWeight: '800', color: '#111827', margin: '0 0 2px 0' }}>{exp.desc}</h5>
-                                  <p style={{ fontSize: '10px', fontWeight: '700', color: '#9ca3af', margin: 0 }}>
-                                    {exp.currency === 'KRW' ? '' : `${exp.amount.toLocaleString()} ${exp.currency}`}
-                                  </p>
+                            {dayExpenses.map((exp, expenseIndex) => {
+                              const localAmount = Number(exp.amount) || 0;
+                              const amountKRW = Number(exp.amountKRW) || 0;
+                              const expenseCurrency = exp.currency || 'KRW';
+
+                              return (
+                              <div key={exp.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '12px 16px', backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+                                <div style={{ minWidth: 0, flex: 1 }}>
+                                  <h5 style={{ fontSize: '13px', fontWeight: '800', color: '#111827', margin: '0 0 4px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{exp.desc}</h5>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                    <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', whiteSpace: 'nowrap' }}>
+                                      현지 {localAmount.toLocaleString()} {expenseCurrency}
+                                    </span>
+                                    {exp.time && (
+                                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '10px', fontWeight: '700', color: '#94a3b8', whiteSpace: 'nowrap' }}>
+                                        <Clock size={10} /> {exp.time}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                  <span style={{ fontSize: '14px', fontWeight: '900', color: '#059669' }}>
-                                    ₩{exp.amountKRW.toLocaleString()}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+                                  <span style={{ fontSize: '13px', fontWeight: '900', color: '#059669', whiteSpace: 'nowrap' }}>
+                                    <span style={{ fontSize: '9px', marginRight: '3px', color: '#10b981' }}>한화</span>
+                                    ₩{amountKRW.toLocaleString()}
                                   </span>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <button
+                                      type="button"
+                                      onClick={() => startEditingExpense(exp)}
+                                      aria-label={`${exp.desc} 지출 수정`}
+                                      title="지출 수정"
+                                      style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, border: '1px solid #e0e7ff', borderRadius: '8px', backgroundColor: '#f5f7ff', color: '#4f46e5', cursor: 'pointer' }}
+                                    >
+                                      <Edit2 size={13} />
+                                    </button>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', width: '28px', padding: '2px', border: '1px solid #f1f5f9', borderRadius: '8px', backgroundColor: '#f8fafc' }}>
+                                      <button
+                                        type="button"
+                                        onClick={() => moveExpense(exp.id, -1)}
+                                        disabled={expenseIndex === 0}
+                                        aria-label={`${exp.desc} 위로 이동`}
+                                        title="위로 이동"
+                                        style={{ width: '24px', height: '17px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, border: 'none', borderRadius: '5px', backgroundColor: 'transparent', color: expenseIndex === 0 ? '#d1d5db' : '#64748b', cursor: expenseIndex === 0 ? 'default' : 'pointer' }}
+                                      >
+                                        <ChevronUp size={13} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => moveExpense(exp.id, 1)}
+                                        disabled={expenseIndex === dayExpenses.length - 1}
+                                        aria-label={`${exp.desc} 아래로 이동`}
+                                        title="아래로 이동"
+                                        style={{ width: '24px', height: '17px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, border: 'none', borderTop: '1px solid #e5e7eb', borderRadius: '0 0 5px 5px', backgroundColor: 'transparent', color: expenseIndex === dayExpenses.length - 1 ? '#d1d5db' : '#64748b', cursor: expenseIndex === dayExpenses.length - 1 ? 'default' : 'pointer' }}
+                                      >
+                                        <ChevronDown size={13} />
+                                      </button>
+                                    </div>
+                                  </div>
                                   <button 
                                     onClick={(e) => handleInlineDelete(e, `exp-${exp.id}`, () => deleteExpense(exp.id))} 
+                                    aria-label={`${exp.desc} 지출 삭제`}
+                                    title="지출 삭제"
                                     style={{ padding: confirmDeleteId === `exp-${exp.id}` ? '6px 10px' : '6px', backgroundColor: confirmDeleteId === `exp-${exp.id}` ? '#ef4444' : '#fef2f2', color: confirmDeleteId === `exp-${exp.id}` ? 'white' : '#ef4444', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '11px', fontWeight: '800' }}
                                   >
                                     {confirmDeleteId === `exp-${exp.id}` ? '확인' : <Trash2 size={14} />}
                                   </button>
                                 </div>
                               </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       );
