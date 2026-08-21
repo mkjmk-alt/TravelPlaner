@@ -438,8 +438,6 @@ function App() {
   const [showOnboarding, setShowOnboarding] = useState(() => !readStoredJson(ONBOARDING_STORAGE_KEY, false));
   const [onboardingStep, setOnboardingStep] = useState(0);
   const [mergeNotice, setMergeNotice] = useState(null);
-  const [selectedItineraryItems, setSelectedItineraryItems] = useState([]);
-  const [bulkMoveTarget, setBulkMoveTarget] = useState('');
   const [notificationPermission, setNotificationPermission] = useState(() => (
     typeof Notification === 'undefined' ? 'unsupported' : Notification.permission
   ));
@@ -569,8 +567,6 @@ function App() {
     // Intentionally reset the selected day when switching trips.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setActiveDay(null);
-    setSelectedItineraryItems([]);
-    setBulkMoveTarget('');
   }, [activeTripId]);
 
   // Reset the custom itinerary name when the selected place changes
@@ -1253,8 +1249,6 @@ function App() {
     }
 
     await updateActiveTrip({ itinerary: newItinerary, endDate: newEndDate });
-    setSelectedItineraryItems([]);
-    setBulkMoveTarget('');
     setActiveDay(Math.min(targetDay, newItinerary.length));
   };
 
@@ -1750,14 +1744,15 @@ function App() {
   };
 
   const addExpense = () => {
-    if (!activeTripId || !expenseInput.desc.trim() || !expenseInput.amount) return;
+    const numericAmount = Number(expenseInput.amount);
+    if (!activeTripId || !expenseInput.desc.trim() || !Number.isFinite(numericAmount) || numericAmount <= 0) return;
 
     const currentCurrency = expenseInput.currency || budgetSettings.travelCurrency || 'USD';
 
     const newExpense = {
       id: makeEntityId(),
       desc: expenseInput.desc.trim(),
-      amount: Number(expenseInput.amount),
+      amount: numericAmount,
       currency: currentCurrency,
       amountKRW: getExpenseAmountKRW(expenseInput.amount, currentCurrency),
       day: parseInt(expenseInput.day, 10) || 0,
@@ -1923,43 +1918,6 @@ function App() {
     syncTripsToCloud(nextTrips);
   };
 
-  const toggleItineraryItemSelection = (dayNumber, itemId) => {
-    const key = `${parseDay(dayNumber)}::${itemId}`;
-    setSelectedItineraryItems((current) => current.includes(key)
-      ? current.filter(itemKey => itemKey !== key)
-      : [...current, key]);
-  };
-
-  const moveSelectedItineraryItems = () => {
-    if (!activeTrip || selectedItineraryItems.length === 0) return;
-    const targetIsReserve = bulkMoveTarget === 'reserve';
-    const targetDay = parseDay(bulkMoveTarget);
-    if (!targetIsReserve && !targetDay) return;
-    const selected = new Set(selectedItineraryItems);
-    const movingItems = [];
-    const newItinerary = itinerary.map(day => {
-        const remainingItems = [];
-      (day.items || []).forEach(item => {
-        if (selected.has(`${parseDay(day.day)}::${item.id}`)) movingItems.push(item);
-        else remainingItems.push(item);
-      });
-      return { ...day, items: remainingItems };
-    }).map(day => {
-      if (targetIsReserve || parseDay(day.day) !== targetDay) return day;
-      const items = [...day.items, ...movingItems].sort((a, b) => (a.time || '00:00').localeCompare(b.time || '00:00'));
-      return { ...day, items };
-    });
-
-    if (movingItems.length === 0) return;
-    updateActiveTrip({
-      itinerary: newItinerary,
-      ...(targetIsReserve ? { reserveItems: [...reserveItems, ...movingItems] } : {})
-    });
-    setSelectedItineraryItems([]);
-    setBulkMoveTarget('');
-    setActiveDay(targetIsReserve ? 'reserve' : targetDay);
-  };
-
   const removeFromItinerary = (dayNumber, itemId) => {
     const targetDayNum = parseDay(dayNumber);
 
@@ -2079,6 +2037,18 @@ function App() {
   const budgetProgress = budgetSettings.limitKRW > 0 ? Math.min((totalSpentKRW / budgetSettings.limitKRW) * 100, 100) : 0;
   const expenseCurrencyCode = expenseInput.currency || budgetSettings.travelCurrency || 'KRW';
   const expenseCurrencySymbol = getCurrencySymbol(expenseCurrencyCode);
+  const expenseAmountValue = Number(expenseInput.amount);
+  const expenseFormIsValid = Boolean(
+    activeTripId
+    && expenseInput.desc.trim()
+    && Number.isFinite(expenseAmountValue)
+    && expenseAmountValue > 0
+  );
+  const expenseFormHint = !expenseInput.desc.trim()
+    ? '지출 내용을 입력하면 추가할 수 있어요.'
+    : !Number.isFinite(expenseAmountValue) || expenseAmountValue <= 0
+      ? '0보다 큰 금액을 입력하면 추가할 수 있어요.'
+      : `${getCurrencyNameKO(expenseCurrencyCode)} 기준 금액으로 저장하고 한화로 자동 환산합니다.`;
   const expenseCurrencyChoices = Array.from(new Set([
     expenseInput.currency,
     budgetSettings.travelCurrency,
@@ -2649,19 +2619,6 @@ function App() {
                 </div>
                 </div>
 
-                {selectedItineraryItems.length > 0 && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', padding: '12px 14px', marginBottom: '16px', backgroundColor: '#eff6ff', border: '1px solid #dbeafe', borderRadius: '14px' }}>
-                    <span style={{ fontSize: '12px', fontWeight: '900', color: '#2563eb' }}>{selectedItineraryItems.length}개 선택</span>
-                    <select value={bulkMoveTarget} onChange={(e) => setBulkMoveTarget(e.target.value)} style={{ flex: 1, minWidth: '110px', padding: '8px 10px', border: '1px solid #bfdbfe', borderRadius: '10px', backgroundColor: 'white', color: '#1d4ed8', fontSize: '12px', fontWeight: '800' }}>
-                      <option value="">이동할 일차 선택</option>
-                      <option value="reserve">예비 목록</option>
-                      {itinerary.map(day => <option key={`bulk-day-${day.day}`} value={parseDay(day.day)}>{parseDay(day.day)}일차</option>)}
-                    </select>
-                    <button type="button" onClick={moveSelectedItineraryItems} disabled={!bulkMoveTarget} style={{ padding: '8px 12px', border: 'none', borderRadius: '10px', backgroundColor: bulkMoveTarget ? '#2563eb' : '#93c5fd', color: 'white', fontSize: '12px', fontWeight: '900', cursor: bulkMoveTarget ? 'pointer' : 'not-allowed' }}>선택 이동</button>
-                    <button type="button" onClick={() => setSelectedItineraryItems([])} style={{ padding: '8px 10px', border: 'none', borderRadius: '10px', backgroundColor: 'white', color: '#64748b', fontSize: '12px', fontWeight: '800', cursor: 'pointer' }}>취소</button>
-                  </div>
-                )}
-
                 {/* Reserve list: places saved before assigning them to a day. */}
                 <div
                   className="itinerary-reserve-card"
@@ -2831,14 +2788,6 @@ function App() {
                                 }}
                               >
                                 <div className="itinerary-item-main" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                  <input
-                                      className="itinerary-item-checkbox"
-                                      type="checkbox"
-                                      aria-label={`${item.displayName || item.name || '일정'} 선택`}
-                                      checked={selectedItineraryItems.includes(`${parseDay(dayPlan.day)}::${item.id}`)}
-                                      onChange={() => toggleItineraryItemSelection(dayPlan.day, item.id)}
-                                      style={{ width: '18px', height: '18px', accentColor: '#2563eb', flexShrink: 0, cursor: 'pointer' }}
-                                  />
                                   <div
                                     className="itinerary-item-number"
                                     aria-label={`${iIdx + 1}번째 일정`}
@@ -3198,70 +3147,110 @@ function App() {
                 </div>
 
                 {/* Add Expense Form */}
-                <div style={{ padding: '16px', backgroundColor: '#f9fafb', border: '1px solid #f3f4f6', borderRadius: '16px', marginBottom: '24px' }}>
-                  <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                    <select 
-                      value={expenseInput.day} 
-                      onChange={e => setExpenseInput({...expenseInput, day: e.target.value})}
-                      style={{ flex: '1 1 0', minWidth: 0, boxSizing: 'border-box', padding: '10px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '12px', fontWeight: '700', outline: 'none' }}
-                    >
-                      <option value={0}>여행 전 준비</option>
-                      {itinerary.map(d => <option key={`opt-day-${d.day}`} value={d.day}>{d.day}일차</option>)}
-                    </select>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: '1 1 0', minWidth: 0, padding: '0 8px', border: '1px solid #e5e7eb', borderRadius: '10px', backgroundColor: 'white' }}>
-                      <span style={{ flexShrink: 0, fontSize: '10px', fontWeight: '800', color: '#64748b' }}>소비 시간</span>
+                <div className="expense-form-card" style={{ padding: '16px', backgroundColor: '#f9fafb', border: '1px solid #f3f4f6', borderRadius: '16px', marginBottom: '24px' }}>
+                  <div className="expense-form-heading" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '14px' }}>
+                    <div>
+                      <h3 style={{ margin: 0, color: '#0f172a', fontSize: '15px', fontWeight: '900' }}>지출 추가</h3>
+                      <p style={{ margin: '4px 0 0', color: '#94a3b8', fontSize: '10px', fontWeight: '700' }}>여행 일차와 통화를 확인한 뒤 내용을 입력하세요.</p>
+                    </div>
+                    <span className="expense-form-required" style={{ flexShrink: 0, padding: '5px 8px', borderRadius: '8px', backgroundColor: '#ecfdf5', color: '#059669', fontSize: '10px', fontWeight: '900' }}>내용 · 금액 필수</span>
+                  </div>
+
+                  <div className="expense-form-row expense-form-day-time">
+                    <div className="expense-form-field" style={{ flex: '1 1 0' }}>
+                      <label className="expense-form-label" htmlFor="expense-day-select">사용 일차</label>
+                      <select
+                        id="expense-day-select"
+                        className="expense-form-control"
+                        value={expenseInput.day}
+                        onChange={e => setExpenseInput({ ...expenseInput, day: e.target.value })}
+                        aria-label="지출 사용 일차"
+                      >
+                        <option value={0}>여행 전 준비</option>
+                        {itinerary.map(dayPlan => {
+                          const dayNumber = parseInt(dayPlan.day, 10);
+                          const actualDate = activeTrip?.startDate ? getActualDateForDay(activeTrip.startDate, dayNumber) : '';
+                          return <option key={`opt-day-${dayNumber}`} value={dayNumber}>{dayNumber}일차{actualDate ? ` · ${actualDate}` : ''}</option>;
+                        })}
+                      </select>
+                    </div>
+                    <div className="expense-form-field" style={{ flex: '1 1 0' }}>
+                      <label className="expense-form-label" htmlFor="expense-time-input">소비 시간</label>
+                      <div className="expense-form-time-control">
+                        <Clock size={14} color="#64748b" aria-hidden="true" />
+                        <input
+                          id="expense-time-input"
+                          type="time"
+                          value={expenseInput.time || ''}
+                          onChange={e => setExpenseInput({ ...expenseInput, time: e.target.value })}
+                          aria-label="소비 시간"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="expense-form-row">
+                    <div className="expense-form-field" style={{ flex: '1 1 100%' }}>
+                      <label className="expense-form-label" htmlFor="expense-description-input">지출 내용</label>
                       <input
-                        type="time"
-                        aria-label="소비 시간"
-                        value={expenseInput.time || ''}
-                        onChange={e => setExpenseInput({...expenseInput, time: e.target.value})}
-                        style={{ flex: 1, minWidth: 0, boxSizing: 'border-box', padding: '9px 0', border: 'none', backgroundColor: 'transparent', fontSize: '12px', fontWeight: '700', outline: 'none' }}
+                        id="expense-description-input"
+                        className="expense-form-control"
+                        type="text"
+                        placeholder="예: 저녁 식사, 택시비"
+                        value={expenseInput.desc}
+                        onChange={e => setExpenseInput({ ...expenseInput, desc: e.target.value })}
+                        aria-label="지출 내용"
+                        maxLength={120}
                       />
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                    <input 
-                      type="text" 
-                      placeholder="지출 내용"
-                      value={expenseInput.desc}
-                      onChange={e => setExpenseInput({...expenseInput, desc: e.target.value})}
-                      style={{ flex: 2, minWidth: 0, boxSizing: 'border-box', padding: '10px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '12px', fontWeight: '700', outline: 'none' }}
-                    />
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1, minWidth: 0, boxSizing: 'border-box', padding: '0 10px', borderRadius: '10px', border: '1px solid #e5e7eb', backgroundColor: 'white' }}>
-                      <span aria-hidden="true" style={{ flexShrink: 0, fontSize: '13px', fontWeight: '900', color: '#64748b' }}>{expenseCurrencySymbol}</span>
-                      <input
-                        type="number"
-                        placeholder="금액"
-                        value={expenseInput.amount}
-                        onChange={e => setExpenseInput({...expenseInput, amount: e.target.value})}
-                        aria-label={`지출 금액(${expenseCurrencyCode})`}
-                        style={{ flex: 1, minWidth: 0, boxSizing: 'border-box', padding: '10px 0', border: 'none', backgroundColor: 'transparent', fontSize: '12px', fontWeight: '700', outline: 'none' }}
-                      />
+
+                  <div className="expense-form-row expense-form-currency-amount">
+                    <div className="expense-form-field" style={{ flex: '1.2 1 0' }}>
+                      <label className="expense-form-label" htmlFor="expense-currency-select">사용 통화</label>
+                      <select
+                        id="expense-currency-select"
+                        className="expense-form-control"
+                        value={expenseInput.currency || budgetSettings.travelCurrency}
+                        onChange={e => setExpenseInput({ ...expenseInput, currency: e.target.value })}
+                        aria-label="지출 입력 통화"
+                      >
+                        {expenseCurrencyChoices.map(code => (
+                          <option key={`expense-currency-${code}`} value={code}>
+                            {code === budgetSettings.travelCurrency ? '기본 · ' : ''}{getCurrencySymbol(code)} {getCurrencyNameKO(code)} ({code})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="expense-form-field" style={{ flex: '0.8 1 0' }}>
+                      <label className="expense-form-label" htmlFor="expense-amount-input">금액 · {expenseCurrencySymbol} {expenseCurrencyCode}</label>
+                      <div className="expense-form-amount-control">
+                        <span aria-hidden="true">{expenseCurrencySymbol}</span>
+                        <input
+                          id="expense-amount-input"
+                          type="number"
+                          min="0"
+                          step="any"
+                          inputMode="decimal"
+                          placeholder="0"
+                          value={expenseInput.amount}
+                          onChange={e => setExpenseInput({ ...expenseInput, amount: e.target.value })}
+                          aria-label={`지출 금액(${expenseCurrencyCode})`}
+                        />
+                      </div>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                    <select
-                      value={expenseInput.currency || budgetSettings.travelCurrency}
-                      onChange={e => setExpenseInput({...expenseInput, currency: e.target.value})}
-                      aria-label="지출 입력 통화"
-                      style={{ width: '100%', minWidth: 0, boxSizing: 'border-box', padding: '10px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '12px', fontWeight: '700', outline: 'none' }}
-                    >
-                      {expenseCurrencyChoices.map(code => (
-                        <option key={`expense-currency-${code}`} value={code}>
-                          {code === budgetSettings.travelCurrency ? '⭐️ ' : ''}{getCurrencySymbol(code)} {getCurrencyNameKO(code)} ({code})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button
-                      type="button"
-                      onClick={addExpense}
-                      style={{ flex: 1, width: '100%', padding: '12px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 4px 10px rgba(16, 185, 129, 0.2)' }}
-                    >
-                      + 지출 추가
-                    </button>
-                  </div>
+
+                  <p className={`expense-form-hint${expenseFormIsValid ? ' expense-form-hint-valid' : ''}`} role="status" aria-live="polite">{expenseFormHint}</p>
+                  <button
+                    type="button"
+                    onClick={addExpense}
+                    disabled={!expenseFormIsValid}
+                    aria-disabled={!expenseFormIsValid}
+                    style={{ width: '100%', padding: '12px', backgroundColor: expenseFormIsValid ? '#10b981' : '#cbd5e1', color: 'white', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '900', cursor: expenseFormIsValid ? 'pointer' : 'not-allowed', boxShadow: expenseFormIsValid ? '0 4px 10px rgba(16, 185, 129, 0.2)' : 'none', transition: 'all 0.2s' }}
+                  >
+                    + 지출 추가
+                  </button>
                 </div>
 
                 {/* Expenses List */}
@@ -4216,7 +4205,11 @@ function App() {
                 style={{ width: '100%', boxSizing: 'border-box', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', backgroundColor: 'white', fontSize: '14px', fontWeight: '700', outline: 'none' }}
               >
                 <option value={0}>여행 전 준비</option>
-                {itinerary.map(dayPlan => <option key={`expense-edit-day-${dayPlan.day}`} value={dayPlan.day}>{dayPlan.day}일차</option>)}
+                {itinerary.map(dayPlan => {
+                  const dayNumber = parseInt(dayPlan.day, 10);
+                  const actualDate = activeTrip?.startDate ? getActualDateForDay(activeTrip.startDate, dayNumber) : '';
+                  return <option key={`expense-edit-day-${dayNumber}`} value={dayNumber}>{dayNumber}일차{actualDate ? ` · ${actualDate}` : ''}</option>;
+                })}
               </select>
             </div>
 
@@ -4233,7 +4226,7 @@ function App() {
 
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '14px' }}>
               <div style={{ flex: '1 1 150px', minWidth: 0 }}>
-                <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b', marginBottom: '8px' }}>금액</label>
+                <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b', marginBottom: '8px' }}>금액 · {expenseCurrencySymbol} {expenseCurrencyCode}</label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px', width: '100%', boxSizing: 'border-box', padding: '0 12px', borderRadius: '12px', border: '1px solid #e2e8f0', backgroundColor: 'white' }}>
                   <span aria-hidden="true" style={{ flexShrink: 0, fontSize: '15px', fontWeight: '900', color: '#64748b' }}>{expenseCurrencySymbol}</span>
                   <input
@@ -4255,7 +4248,7 @@ function App() {
                 >
                   {expenseCurrencyChoices.map(code => (
                     <option key={`expense-edit-currency-${code}`} value={code}>
-                      {code === budgetSettings.travelCurrency ? '⭐️ ' : ''}{getCurrencySymbol(code)} {getCurrencyNameKO(code)} ({code})
+                        {code === budgetSettings.travelCurrency ? '기본 · ' : ''}{getCurrencySymbol(code)} {getCurrencyNameKO(code)} ({code})
                     </option>
                   ))}
                 </select>

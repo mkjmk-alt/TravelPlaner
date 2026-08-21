@@ -197,6 +197,111 @@ body {
   white-space: nowrap;
 }
 
+/* Expense entry form */
+.expense-form-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.expense-form-field {
+  min-width: 0;
+}
+
+.expense-form-label {
+  display: block;
+  margin-bottom: 6px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.expense-form-control {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: white;
+  color: #1f2937;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  outline: none;
+}
+
+.expense-form-time-control,
+.expense-form-amount-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 0 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: white;
+}
+
+.expense-form-time-control input,
+.expense-form-amount-control input {
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 10px 0;
+  border: none;
+  background: transparent;
+  color: #1f2937;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  outline: none;
+}
+
+.expense-form-amount-control span {
+  flex-shrink: 0;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.expense-form-hint {
+  margin: -2px 0 10px;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.expense-form-hint-valid {
+  color: #059669;
+}
+
+@media (max-width: 390px) {
+  .expense-form-card {
+    padding: 14px !important;
+  }
+
+  .expense-form-heading {
+    align-items: flex-start !important;
+    flex-direction: column;
+  }
+
+  .expense-form-required {
+    align-self: flex-start;
+  }
+
+  .expense-form-row {
+    flex-direction: column;
+  }
+
+  .expense-form-field {
+    width: 100% !important;
+    flex: 1 1 auto !important;
+  }
+}
+
 @media (max-width: 768px) {
   .mobile-only-flex {
     display: flex !important;
@@ -348,11 +453,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
   .itinerary-item-main {
     gap: 8px !important;
-  }
-
-  .itinerary-item-checkbox {
-    width: 16px !important;
-    height: 16px !important;
   }
 
   .itinerary-item-number {
