@@ -255,6 +255,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   outline-offset: 2px;
 }
 
+/* Keep the floating search field clean when it receives focus. */
+.search-input:focus,
+.search-input:focus-visible {
+  outline: none !important;
+  outline-offset: 0;
+  box-shadow: none !important;
+}
+
 @media (max-width: 768px) {
   .search-bar-container {
     top: calc(20px + env(safe-area-inset-top)) !important;

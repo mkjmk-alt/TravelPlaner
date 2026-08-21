@@ -47,6 +47,11 @@ const getIcsDateTime = (startDate, dayNumber, time, offsetMinutes = 0) => {
   return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}T${pad(date.getHours())}${pad(date.getMinutes())}00`;
 };
 
+const getCurrentTimeInputValue = () => {
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+};
+
 const countryToCurrency = {
   "대한민국": "KRW",
   "일본": "JPY",
@@ -383,7 +388,12 @@ function App() {
 
   const [trips, setTrips] = useState(() => {
     const savedTrips = readStoredJson("world_pro_trips_v1", null);
-    if (Array.isArray(savedTrips)) return savedTrips;
+    if (Array.isArray(savedTrips)) {
+      return savedTrips.map(trip => ({
+        ...trip,
+        reserveItems: Array.isArray(trip.reserveItems) ? trip.reserveItems : []
+      }));
+    }
     
     const oldItinerary = readStoredJson("world_pro_v16", []);
     const oldBudget = readStoredJson("world_pro_budget_v1", { limitKRW: 1000000, travelCurrency: "USD" });
@@ -394,6 +404,7 @@ function App() {
         id: Date.now().toString(),
         name: "첫 여행",
         itinerary: oldItinerary.length > 0 ? oldItinerary : [{ day: 1, items: [] }],
+        reserveItems: [],
         budgetSettings: oldBudget,
         expenses: oldExpenses,
         createdAt: Date.now()
@@ -407,7 +418,7 @@ function App() {
   const [activeTripId, setActiveTripId] = useState(null);
 
   const [exchangeRates, setExchangeRates] = useState({});
-  const [expenseInput, setExpenseInput] = useState({ desc: '', amount: '', currency: '', day: 1, time: '' });
+  const [expenseInput, setExpenseInput] = useState(() => ({ desc: '', amount: '', currency: '', day: 1, time: getCurrentTimeInputValue() }));
   const [editingExpenseId, setEditingExpenseId] = useState(null);
 
   const sharedTripCount = (trips || []).filter(t => t.sharedId).length;
@@ -557,6 +568,7 @@ function App() {
   // --- DERIVED STATE ---
   const activeTrip = (trips || []).find(t => String(t.id) === String(activeTripId));
   const itinerary = useMemo(() => activeTrip?.itinerary || [], [activeTrip]);
+  const reserveItems = useMemo(() => activeTrip?.reserveItems || [], [activeTrip]);
   const budgetSettings = activeTrip?.budgetSettings || { limitKRW: 1000000, travelCurrency: 'USD' };
   const expenses = activeTrip?.expenses || [];
 
@@ -588,7 +600,11 @@ function App() {
 
   const openBudget = () => {
     setIsMobileHeaderHidden(false);
-    setExpenseInput(current => ({ ...current, day: getTodayExpenseDay(activeTrip) }));
+    setExpenseInput(current => ({
+      ...current,
+      day: getTodayExpenseDay(activeTrip),
+      time: editingExpenseId ? current.time : getCurrentTimeInputValue()
+    }));
     setViewMode('budget');
   };
 
@@ -655,16 +671,6 @@ function App() {
       return code;
     }
   };
-
-  const sortedCurrencies = useMemo(() => {
-    if (Object.keys(exchangeRates).length === 0) return [];
-    const list = Object.keys(exchangeRates).map(code => ({
-      code,
-      name: getCurrencyNameKO(code)
-    }));
-    list.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
-    return list;
-  }, [exchangeRates]);
 
   const getCountryFromAddress = (address) => {
     if (!address) return '기타';
@@ -1110,6 +1116,7 @@ function App() {
       startDate: today,
       endDate: today,
       itinerary: [{ day: 1, items: [] }],
+      reserveItems: [],
       budgetSettings: { limitKRW: 1000000, travelCurrency: 'USD' },
       expenses: [],
       reminders: { enabled: false, minutesBefore: 30 },
@@ -1205,14 +1212,12 @@ function App() {
 
   const exportBudgetAsCsv = (trip = activeTrip) => {
     if (!trip) return;
-    const header = ['일차', '날짜', '지출 내용', '금액', '통화', '원화 환산', '소비 시간'].join(',');
+    const header = ['일차', '날짜', '지출 내용', '금액(원화)', '소비 시간'].join(',');
     const rows = (trip.expenses || []).map(expense => [
       expense.day === 0 ? '여행 전' : `${expense.day}일차`,
       expense.day === 0 ? '' : getActualDateForDay(trip.startDate, expense.day),
       expense.desc,
-      expense.amount,
-      expense.currency,
-      expense.amountKRW,
+      expense.amountKRW ?? expense.amount,
       expense.time || ''
     ].map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(','));
     downloadTextFile(`${(trip.name || 'travel-plan').replace(/[^\w가-힣-]+/g, '_')}-budget.csv`, `\uFEFF${[header, ...rows].join('\r\n')}`, 'text/csv;charset=utf-8');
@@ -1236,6 +1241,10 @@ function App() {
           ...item,
           id: duplicateId + "-" + dayIndex + "-" + itemIndex
         }))
+      })),
+      reserveItems: (trip.reserveItems || []).map((item, itemIndex) => ({
+        ...item,
+        id: `${duplicateId}-reserve-${itemIndex}`
       }))
     };
     syncTripsToCloud([duplicate, ...(trips || [])]);
@@ -1281,6 +1290,10 @@ function App() {
                 ...item,
                 id: item.id || Math.random().toString(36).substr(2, 9)
               }))
+            })),
+            reserveItems: (Array.isArray(data.reserveItems) ? data.reserveItems : []).map(item => ({
+              ...item,
+              id: item.id || Math.random().toString(36).substr(2, 9)
             })),
             budgetSettings: data.budgetSettings || { limitKRW: 1000000, travelCurrency: 'USD' },
             expenses: (data.expenses || []).map(exp => ({
@@ -1345,6 +1358,10 @@ function App() {
             ...item,
             id: item.id || Math.random().toString(36).substr(2, 9)
           }))
+        })),
+        reserveItems: (Array.isArray(data.reserveItems) ? data.reserveItems : []).map(item => ({
+          ...item,
+          id: item.id || Math.random().toString(36).substr(2, 9)
         })),
         budgetSettings: data.budgetSettings || { limitKRW: 1000000, travelCurrency: 'USD' },
         expenses: (data.expenses || []).map(exp => ({
@@ -1480,6 +1497,23 @@ function App() {
   const addToItinerary = (place) => {
     const targetDay = parseDay(activeDay);
     const displayName = itineraryDisplayName.trim() || place.displayName || place.name || '장소 이름 정보 없음';
+
+    if (activeDay === 'reserve') {
+      const reserveItem = {
+        ...place,
+        id: makeEntityId(),
+        emoji: place.emoji || '📍',
+        displayName,
+        time: itineraryTime || ''
+      };
+      updateActiveTrip({ reserveItems: [...reserveItems, reserveItem] });
+      setItineraryTime('');
+      setItineraryDisplayName('');
+      openItinerary();
+      return;
+    }
+
+    if (!targetDay) return;
     const newItinerary = (itinerary || []).map(d => ({ ...d, items: [...(d.items || [])] }));
     const dayIndex = newItinerary.findIndex(d => parseDay(d.day) === targetDay);
     
@@ -1519,6 +1553,43 @@ function App() {
     openItinerary();
   };
 
+  const moveReserveItem = (itemId, direction) => {
+    const itemIndex = reserveItems.findIndex(item => item.id === itemId);
+    if (itemIndex === -1) return;
+    const targetIndex = direction === 'up' ? itemIndex - 1 : itemIndex + 1;
+    if (targetIndex < 0 || targetIndex >= reserveItems.length) return;
+
+    const nextReserveItems = [...reserveItems];
+    [nextReserveItems[itemIndex], nextReserveItems[targetIndex]] = [nextReserveItems[targetIndex], nextReserveItems[itemIndex]];
+    updateActiveTrip({ reserveItems: nextReserveItems });
+  };
+
+  const moveReserveItemToDay = (itemId, dayNumber) => {
+    const targetDay = parseDay(dayNumber);
+    if (!targetDay) return;
+
+    const reserveItem = reserveItems.find(item => item.id === itemId);
+    if (!reserveItem) return;
+
+    const nextItinerary = (itinerary || []).map(dayPlan => {
+      if (parseDay(dayPlan.day) !== targetDay) return dayPlan;
+      const items = [...(dayPlan.items || []), { ...reserveItem, time: reserveItem.time || '09:00' }]
+        .sort((a, b) => (a.time || '00:00').localeCompare(b.time || '00:00'));
+      return { ...dayPlan, items };
+    });
+
+    if (!nextItinerary.some(dayPlan => parseDay(dayPlan.day) === targetDay)) return;
+    updateActiveTrip({
+      itinerary: nextItinerary,
+      reserveItems: reserveItems.filter(item => item.id !== itemId)
+    });
+    setActiveDay(targetDay);
+  };
+
+  const removeReserveItem = (itemId) => {
+    updateActiveTrip({ reserveItems: reserveItems.filter(item => item.id !== itemId) });
+  };
+
   const addExpense = () => {
     if (!activeTripId || !expenseInput.desc.trim() || !expenseInput.amount) return;
 
@@ -1535,7 +1606,7 @@ function App() {
     };
 
     saveExpenses([...expenses, newExpense]);
-    setExpenseInput({ ...expenseInput, desc: '', amount: '', time: '' });
+    setExpenseInput({ ...expenseInput, desc: '', amount: '', time: getCurrentTimeInputValue() });
   };
 
   const startEditingExpense = (expense) => {
@@ -1551,7 +1622,7 @@ function App() {
 
   const cancelEditingExpense = () => {
     setEditingExpenseId(null);
-    setExpenseInput(current => ({ ...current, desc: '', amount: '', time: '' }));
+    setExpenseInput(current => ({ ...current, desc: '', amount: '', time: getCurrentTimeInputValue() }));
   };
 
   const saveExpenseEdit = () => {
@@ -1690,28 +1761,32 @@ function App() {
 
   const moveSelectedItineraryItems = () => {
     if (!activeTrip || selectedItineraryItems.length === 0) return;
+    const targetIsReserve = bulkMoveTarget === 'reserve';
     const targetDay = parseDay(bulkMoveTarget);
-    if (!targetDay) return;
+    if (!targetIsReserve && !targetDay) return;
     const selected = new Set(selectedItineraryItems);
     const movingItems = [];
     const newItinerary = itinerary.map(day => {
-      const remainingItems = [];
+        const remainingItems = [];
       (day.items || []).forEach(item => {
         if (selected.has(`${parseDay(day.day)}::${item.id}`)) movingItems.push(item);
         else remainingItems.push(item);
       });
       return { ...day, items: remainingItems };
     }).map(day => {
-      if (parseDay(day.day) !== targetDay) return day;
+      if (targetIsReserve || parseDay(day.day) !== targetDay) return day;
       const items = [...day.items, ...movingItems].sort((a, b) => (a.time || '00:00').localeCompare(b.time || '00:00'));
       return { ...day, items };
     });
 
     if (movingItems.length === 0) return;
-    saveItinerary(newItinerary);
+    updateActiveTrip({
+      itinerary: newItinerary,
+      ...(targetIsReserve ? { reserveItems: [...reserveItems, ...movingItems] } : {})
+    });
     setSelectedItineraryItems([]);
     setBulkMoveTarget('');
-    setActiveDay(targetDay);
+    setActiveDay(targetIsReserve ? 'reserve' : targetDay);
   };
 
   const removeFromItinerary = (dayNumber, itemId) => {
@@ -1896,6 +1971,7 @@ function App() {
                >
                  <input 
                     type="text"
+                    className="search-input"
                     value={searchInput}
                     onChange={(e) => { setSearchInput(e.target.value); setSearchQuery(e.target.value); }}
                     onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleSearchSubmit(); } }}
@@ -2397,12 +2473,90 @@ function App() {
                     <span style={{ fontSize: '12px', fontWeight: '900', color: '#2563eb' }}>{selectedItineraryItems.length}개 선택</span>
                     <select value={bulkMoveTarget} onChange={(e) => setBulkMoveTarget(e.target.value)} style={{ flex: 1, minWidth: '110px', padding: '8px 10px', border: '1px solid #bfdbfe', borderRadius: '10px', backgroundColor: 'white', color: '#1d4ed8', fontSize: '12px', fontWeight: '800' }}>
                       <option value="">이동할 일차 선택</option>
+                      <option value="reserve">예비 목록</option>
                       {itinerary.map(day => <option key={`bulk-day-${day.day}`} value={parseDay(day.day)}>{parseDay(day.day)}일차</option>)}
                     </select>
                     <button type="button" onClick={moveSelectedItineraryItems} disabled={!bulkMoveTarget} style={{ padding: '8px 12px', border: 'none', borderRadius: '10px', backgroundColor: bulkMoveTarget ? '#2563eb' : '#93c5fd', color: 'white', fontSize: '12px', fontWeight: '900', cursor: bulkMoveTarget ? 'pointer' : 'not-allowed' }}>선택 이동</button>
                     <button type="button" onClick={() => setSelectedItineraryItems([])} style={{ padding: '8px 10px', border: 'none', borderRadius: '10px', backgroundColor: 'white', color: '#64748b', fontSize: '12px', fontWeight: '800', cursor: 'pointer' }}>취소</button>
                   </div>
                 )}
+
+                {/* Reserve list: places saved before assigning them to a day. */}
+                <div
+                  className="itinerary-reserve-card"
+                  onClick={() => setActiveDay('reserve')}
+                  style={{
+                    backgroundColor: activeDay === 'reserve' ? '#fffbeb' : 'white',
+                    borderRadius: '24px',
+                    border: `1px solid ${activeDay === 'reserve' ? '#fcd34d' : '#fef3c7'}`,
+                    boxShadow: '0 4px 20px rgba(245, 158, 11, 0.08)',
+                    overflow: 'hidden',
+                    marginBottom: '32px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <div style={{ padding: '20px 24px', backgroundColor: activeDay === 'reserve' ? '#fef3c7' : '#fffbeb', borderBottom: '1px solid #fef3c7', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                      <div style={{ width: '44px', height: '44px', borderRadius: '14px', backgroundColor: '#f59e0b', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Star size={21} fill="currentColor" />
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <h3 style={{ margin: 0, color: '#92400e', fontSize: '17px', fontWeight: '900' }}>예비 목록</h3>
+                        <p style={{ margin: '4px 0 0', color: '#b45309', fontSize: '11px', fontWeight: '700' }}>일차를 정하기 전 잠시 보관하는 장소</p>
+                      </div>
+                    </div>
+                    <span style={{ flexShrink: 0, padding: '7px 10px', borderRadius: '10px', backgroundColor: 'white', color: '#b45309', fontSize: '11px', fontWeight: '900' }}>{reserveItems.length} 장소</span>
+                  </div>
+
+                  <div onClick={(event) => event.stopPropagation()} style={{ padding: '20px 24px' }}>
+                    {reserveItems.length === 0 ? (
+                      <div style={{ padding: '24px 16px', textAlign: 'center', border: '2px dashed #fde68a', borderRadius: '16px' }}>
+                        <p style={{ margin: 0, color: '#d97706', fontSize: '12px', fontWeight: '800' }}>장소 추가 창에서 예비 목록을 선택해 보관할 수 있습니다.</p>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {reserveItems.map((item, reserveIndex) => {
+                          const reserveDeleteId = `reserve-${item.id}`;
+                          return (
+                            <div key={item.id} className="reserve-item-card" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', padding: '14px', backgroundColor: 'white', border: '1px solid #fef3c7', borderRadius: '18px', boxShadow: '0 2px 8px rgba(245, 158, 11, 0.05)' }}>
+                              <div aria-label={`${reserveIndex + 1}번째 예비 장소`} style={{ width: '34px', height: '34px', borderRadius: '50%', backgroundColor: '#f59e0b', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', fontWeight: '900', flexShrink: 0 }}>{reserveIndex + 1}</div>
+                              <div style={{ flex: '1 1 150px', minWidth: 0 }}>
+                                <h4
+                                  onClick={() => {
+                                    if (!item.lat || !item.lng) return;
+                                    const newPos = { lat: Number(item.lat), lng: Number(item.lng) };
+                                    setSelectedPlace(item);
+                                    map?.panTo(newPos);
+                                    map?.setZoom(16);
+                                    if (windowSize.width < 768 && sheetMode === 'full') setSheetMode('half');
+                                  }}
+                                  style={{ margin: 0, color: item.lat && item.lng ? '#2563eb' : '#111827', textDecoration: item.lat && item.lng ? 'underline' : 'none', textDecorationColor: '#93c5fd', fontSize: (item.displayName || item.name || '').length > 18 ? '12px' : '15px', fontWeight: '900', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: item.lat && item.lng ? 'pointer' : 'default' }}
+                                  title={item.lat && item.lng ? '지도에서 위치 보기' : undefined}
+                                >
+                                  {item.displayName || item.name || '장소 이름 정보 없음'}
+                                </h4>
+                                {item.loc && <p style={{ display: 'flex', alignItems: 'center', gap: '3px', margin: '4px 0 0', color: '#94a3b8', fontSize: '10px', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><MapPin size={10} />{item.loc}</p>}
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: '1 1 230px', justifyContent: 'flex-end' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', backgroundColor: '#fffbeb', border: '1px solid #fef3c7', borderRadius: '10px', overflow: 'hidden' }}>
+                                  <button type="button" aria-label="예비 장소 위로 이동" onClick={() => moveReserveItem(item.id, 'up')} disabled={reserveIndex === 0} style={{ width: '28px', height: '20px', padding: 0, border: 'none', background: 'transparent', color: reserveIndex === 0 ? '#fcd34d' : '#b45309', cursor: reserveIndex === 0 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChevronUp size={14} /></button>
+                                  <button type="button" aria-label="예비 장소 아래로 이동" onClick={() => moveReserveItem(item.id, 'down')} disabled={reserveIndex === reserveItems.length - 1} style={{ width: '28px', height: '20px', padding: 0, border: 'none', borderTop: '1px solid #fef3c7', background: 'transparent', color: reserveIndex === reserveItems.length - 1 ? '#fcd34d' : '#b45309', cursor: reserveIndex === reserveItems.length - 1 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChevronDown size={14} /></button>
+                                </div>
+                                <select value="" aria-label={`${item.displayName || item.name || '예비 장소'} 일차로 이동`} onChange={(event) => moveReserveItemToDay(item.id, event.target.value)} onClick={(event) => event.stopPropagation()} style={{ minWidth: '116px', maxWidth: '140px', padding: '8px 8px', border: '1px solid #fde68a', borderRadius: '10px', backgroundColor: '#fffdf5', color: '#92400e', fontSize: '11px', fontWeight: '800', outline: 'none' }}>
+                                  <option value="">일차로 이동</option>
+                                  {itinerary.map(dayPlan => <option key={`reserve-move-${item.id}-${dayPlan.day}`} value={parseDay(dayPlan.day)}>{parseDay(dayPlan.day)}일차</option>)}
+                                </select>
+                                <button type="button" aria-label="예비 장소 삭제" onClick={(event) => { event.stopPropagation(); handleInlineDelete(event, reserveDeleteId, () => removeReserveItem(item.id)); }} style={{ width: '36px', height: '36px', flexShrink: 0, border: `1px solid ${confirmDeleteId === reserveDeleteId ? '#dc2626' : '#fee2e2'}`, borderRadius: '10px', backgroundColor: confirmDeleteId === reserveDeleteId ? '#ef4444' : '#fff5f5', color: confirmDeleteId === reserveDeleteId ? 'white' : '#f87171', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '900' }}>
+                                  {confirmDeleteId === reserveDeleteId ? '확인' : <Trash2 size={16} />}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
 
                 {(itinerary || []).map((dayPlan, dIdx) => (
                   <div 
@@ -2770,20 +2924,6 @@ function App() {
                           style={{ fontSize: '14px', fontWeight: '800', color: '#064e3b', backgroundColor: 'transparent', border: 'none', borderBottom: '2px solid #a7f3d0', width: '100px', textAlign: 'right', outline: 'none' }}
                         />
                       </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <p style={{ fontSize: '10px', fontWeight: '800', color: '#34d399', textTransform: 'uppercase', margin: '0 0 4px 0' }}>현지 통화</p>
-                        <select 
-                          value={budgetSettings.travelCurrency}
-                          onChange={(e) => saveBudgetSettings({ ...budgetSettings, travelCurrency: e.target.value })}
-                          style={{ fontSize: '14px', fontWeight: '800', color: '#064e3b', backgroundColor: 'transparent', border: 'none', borderBottom: '2px solid #a7f3d0', width: '130px', textAlign: 'right', outline: 'none', cursor: 'pointer', textOverflow: 'ellipsis' }}
-                        >
-                          {sortedCurrencies.length > 0 ? (
-                            sortedCurrencies.map(c => <option key={`lc-${c.code}`} value={c.code}>{c.name} ({c.code})</option>)
-                          ) : (
-                            <option value="USD">미국 달러 (USD)</option>
-                          )}
-                        </select>
-                      </div>
                     </div>
                   </div>
                   <div style={{ width: '100%', height: '8px', backgroundColor: '#d1fae5', borderRadius: '4px', overflow: 'hidden' }}>
@@ -2805,24 +2945,21 @@ function App() {
                     <select 
                       value={expenseInput.day} 
                       onChange={e => setExpenseInput({...expenseInput, day: e.target.value})}
-                      style={{ flex: 1, minWidth: 0, boxSizing: 'border-box', padding: '10px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '12px', fontWeight: '700', outline: 'none' }}
+                      style={{ flex: '1 1 0', minWidth: 0, boxSizing: 'border-box', padding: '10px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '12px', fontWeight: '700', outline: 'none' }}
                     >
                       <option value={0}>여행 전 (항공권)</option>
                       {itinerary.map(d => <option key={`opt-day-${d.day}`} value={d.day}>{d.day}일차</option>)}
                     </select>
-                    <select 
-                      value={expenseInput.currency || budgetSettings.travelCurrency} 
-                      onChange={e => setExpenseInput({...expenseInput, currency: e.target.value})}
-                      style={{ flex: 1, minWidth: 0, boxSizing: 'border-box', padding: '10px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '12px', fontWeight: '700', outline: 'none' }}
-                    >
-                      {expenseInput.currency && expenseInput.currency !== budgetSettings.travelCurrency && expenseInput.currency !== 'KRW' && (
-                        <option value={expenseInput.currency}>💱 {getCurrencyNameKO(expenseInput.currency)} ({expenseInput.currency})</option>
-                      )}
-                      {budgetSettings.travelCurrency !== 'KRW' && (
-                        <option value={budgetSettings.travelCurrency}>⭐️ {getCurrencyNameKO(budgetSettings.travelCurrency)} ({budgetSettings.travelCurrency})</option>
-                      )}
-                      <option value="KRW">🇰🇷 대한민국 원 (KRW)</option>
-                    </select>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: '1 1 0', minWidth: 0, padding: '0 8px', border: '1px solid #e5e7eb', borderRadius: '10px', backgroundColor: 'white' }}>
+                      <span style={{ flexShrink: 0, fontSize: '10px', fontWeight: '800', color: '#64748b' }}>소비 시간</span>
+                      <input
+                        type="time"
+                        aria-label="소비 시간"
+                        value={expenseInput.time || ''}
+                        onChange={e => setExpenseInput({...expenseInput, time: e.target.value})}
+                        style={{ flex: 1, minWidth: 0, boxSizing: 'border-box', padding: '9px 0', border: 'none', backgroundColor: 'transparent', fontSize: '12px', fontWeight: '700', outline: 'none' }}
+                      />
+                    </div>
                   </div>
                   <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
                     <input 
@@ -2840,16 +2977,21 @@ function App() {
                       style={{ flex: 1, minWidth: 0, boxSizing: 'border-box', padding: '10px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '12px', fontWeight: '700', outline: 'none' }}
                     />
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                    <span style={{ flexShrink: 0, fontSize: '10px', fontWeight: '800', color: '#64748b' }}>소비 시간</span>
-                    <input
-                      type="time"
-                      aria-label="소비 시간"
-                      value={expenseInput.time || ''}
-                      onChange={e => setExpenseInput({...expenseInput, time: e.target.value})}
-                      style={{ flex: 1, minWidth: 0, boxSizing: 'border-box', padding: '9px 10px', borderRadius: '10px', border: '1px solid #e5e7eb', backgroundColor: 'white', fontSize: '12px', fontWeight: '700', outline: 'none' }}
-                    />
-                    <span style={{ flexShrink: 0, fontSize: '9px', color: '#94a3b8' }}>선택 입력</span>
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                    <select
+                      value={expenseInput.currency || budgetSettings.travelCurrency}
+                      onChange={e => setExpenseInput({...expenseInput, currency: e.target.value})}
+                      aria-label="지출 입력 통화"
+                      style={{ width: '100%', minWidth: 0, boxSizing: 'border-box', padding: '10px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '12px', fontWeight: '700', outline: 'none' }}
+                    >
+                      {expenseInput.currency && expenseInput.currency !== budgetSettings.travelCurrency && expenseInput.currency !== 'KRW' && (
+                        <option value={expenseInput.currency}>💱 {getCurrencyNameKO(expenseInput.currency)} ({expenseInput.currency})</option>
+                      )}
+                      {budgetSettings.travelCurrency !== 'KRW' && (
+                        <option value={budgetSettings.travelCurrency}>⭐️ {getCurrencyNameKO(budgetSettings.travelCurrency)} ({budgetSettings.travelCurrency})</option>
+                      )}
+                      <option value="KRW">🇰🇷 대한민국 원 (KRW)</option>
+                    </select>
                   </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button
@@ -2895,28 +3037,20 @@ function App() {
                           </div>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             {dayExpenses.map((exp, expenseIndex) => {
-                              const localAmount = Number(exp.amount) || 0;
-                              const amountKRW = Number(exp.amountKRW) || 0;
-                              const expenseCurrency = exp.currency || 'KRW';
+                              const amountKRW = Number(exp.amountKRW ?? exp.amount) || 0;
 
                               return (
                               <div key={exp.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '12px 16px', backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
                                 <div style={{ minWidth: 0, flex: 1 }}>
                                   <h5 style={{ fontSize: '13px', fontWeight: '800', color: '#111827', margin: '0 0 4px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{exp.desc}</h5>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                    <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', whiteSpace: 'nowrap' }}>
-                                      현지 {localAmount.toLocaleString()} {expenseCurrency}
+                                  {exp.time && (
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '10px', fontWeight: '700', color: '#94a3b8', whiteSpace: 'nowrap' }}>
+                                      <Clock size={10} /> {exp.time}
                                     </span>
-                                    {exp.time && (
-                                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '10px', fontWeight: '700', color: '#94a3b8', whiteSpace: 'nowrap' }}>
-                                        <Clock size={10} /> {exp.time}
-                                      </span>
-                                    )}
-                                  </div>
+                                  )}
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
                                   <span style={{ fontSize: '13px', fontWeight: '900', color: '#059669', whiteSpace: 'nowrap' }}>
-                                    <span style={{ fontSize: '9px', marginRight: '3px', color: '#10b981' }}>한화</span>
                                     ₩{amountKRW.toLocaleString()}
                                   </span>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -3269,6 +3403,30 @@ function App() {
             </React.Fragment>
           )}
 
+          {/* Reserve markers: numbered only, without a route or directional arrows. */}
+          {!showFullRoute && activeDay === 'reserve' && (
+            <React.Fragment key="markers-reserve">
+              {reserveItems
+                .filter(item => item.lat && item.lng)
+                .map((item, idx) => (
+                  <Marker
+                    key={`reserve-mark-${item.id}`}
+                    position={{ lat: Number(item.lat), lng: Number(item.lng) }}
+                    label={{ text: `${idx + 1}`, color: 'white', fontSize: '14px', fontWeight: '900' }}
+                    onClick={() => setSelectedPlace(item)}
+                    icon={{
+                      url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                        <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <circle cx="20" cy="20" r="16" fill="#f59e0b" stroke="white" stroke-width="3"/>
+                        </svg>
+                      `)}`,
+                      scaledSize: new window.google.maps.Size(40, 40), anchor: new window.google.maps.Point(20, 20)
+                    }}
+                  />
+                ))}
+            </React.Fragment>
+          )}
+
           {showFullRoute && itinerary.map((day, dIdx) => (
             <React.Fragment key={`markers-full-${dIdx}`}>
               {(day.items || [])
@@ -3354,6 +3512,13 @@ function App() {
                   <div style={{ backgroundColor: '#f8fafc', padding: window.innerWidth < 768 ? '10px' : '16px', borderRadius: '14px', border: '1px solid #f1f5f9' }}>
                     <div style={{ fontSize: '9px', fontWeight: '900', color: '#9ca3af', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.05em' }}>일차 선택</div>
                     <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', overflowX: 'auto', paddingBottom: '2px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setActiveDay('reserve')}
+                        style={{ flex: '0 0 auto', minWidth: '74px', padding: '8px 6px', borderRadius: '10px', border: '1px solid', borderColor: activeDay === 'reserve' ? '#f59e0b' : '#e2e8f0', backgroundColor: activeDay === 'reserve' ? '#fffbeb' : 'white', color: activeDay === 'reserve' ? '#d97706' : '#64748b', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}
+                      >
+                        예비 목록
+                      </button>
                       {(itinerary || []).map((dayPlan, dayIndex) => {
                         const day = parseDay(dayPlan?.day) || dayIndex + 1;
                         return (
@@ -3410,8 +3575,8 @@ function App() {
                         if (!activeDay) {
                           setModalConfig({ 
                             type: 'error', 
-                            title: '일차 미선택', 
-                            message: '추가할 일차를 먼저 선택해주세요! 상단의 일차 버튼 중 하나를 클릭하면 됩니다.'
+                            title: '추가 위치 미선택',
+                            message: '일차 또는 예비 목록을 먼저 선택해주세요.'
                           });
                           setShowCustomModal(true);
                           return;
@@ -3438,7 +3603,7 @@ function App() {
                       }}
                     >
                       <PlusCircle size={14} /> 
-                      {activeDay ? `${activeDay}일차 일정에 추가` : '일차를 선택해주세요'}
+                      {activeDay === 'reserve' ? '예비 목록에 추가' : activeDay ? `${activeDay}일차 일정에 추가` : '일차 또는 예비 목록을 선택해주세요'}
                     </button>
                   </div>
                 )}
@@ -3495,6 +3660,17 @@ function App() {
                 <div style={{ backgroundColor: '#f8fafc', padding: '12px', borderRadius: '14px', border: '1px solid #f1f5f9' }}>
                   <div style={{ fontSize: '10px', fontWeight: '900', color: '#64748b', marginBottom: '8px' }}>일차 선택</div>
                   <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', overflowX: 'auto', paddingBottom: '2px' }}>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        setActiveDay('reserve');
+                      }}
+                      style={{ flex: '0 0 auto', minWidth: '74px', padding: '8px 6px', borderRadius: '10px', border: '1px solid', borderColor: activeDay === 'reserve' ? '#f59e0b' : '#e2e8f0', backgroundColor: activeDay === 'reserve' ? '#fffbeb' : 'white', color: activeDay === 'reserve' ? '#d97706' : '#64748b', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}
+                    >
+                      예비 목록
+                    </button>
                     {(itinerary || []).map((dayPlan, dayIndex) => {
                       const day = parseDay(dayPlan?.day) || dayIndex + 1;
                       return (
@@ -3544,8 +3720,8 @@ function App() {
                       if (!activeDay) {
                         setModalConfig({
                           type: 'error',
-                          title: '일차 미선택',
-                          message: '추가할 일차를 먼저 선택해주세요! 상단의 일차 버튼 중 하나를 클릭하면 됩니다.'
+                          title: '추가 위치 미선택',
+                          message: '일차 또는 예비 목록을 먼저 선택해주세요.'
                         });
                         setShowCustomModal(true);
                         return;
@@ -3556,7 +3732,7 @@ function App() {
                     style={{ width: '100%', minHeight: '44px', marginTop: '10px', padding: '10px', backgroundColor: activeDay ? '#2563eb' : '#94a3b8', color: 'white', borderRadius: '10px', fontSize: '12px', fontWeight: '900', border: 'none', cursor: activeDay ? 'pointer' : 'not-allowed', boxShadow: activeDay ? '0 4px 12px rgba(37, 99, 235, 0.2)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', opacity: activeDay ? 1 : 0.7 }}
                   >
                     <PlusCircle size={16} />
-                    {activeDay ? activeDay + '일차 일정에 추가' : '일차를 선택해주세요'}
+                    {activeDay === 'reserve' ? '예비 목록에 추가' : activeDay ? activeDay + '일차 일정에 추가' : '일차 또는 예비 목록을 선택해주세요'}
                   </button>
                 </div>
               )}
