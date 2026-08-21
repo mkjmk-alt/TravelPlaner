@@ -321,6 +321,7 @@ body {
   min-height: 18px;
   padding: 2px 6px;
   border-radius: 999px;
+  border: 1px solid transparent;
   background: #eff6ff;
   color: #2563eb;
   font-size: 9px;
@@ -329,8 +330,27 @@ body {
   white-space: nowrap;
 }
 
+.expense-payment-badge.is-cash {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #047857;
+}
+
+.expense-payment-badge.is-card {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
+.expense-payment-badge.is-transfer {
+  background: #f5f3ff;
+  border-color: #ddd6fe;
+  color: #7c3aed;
+}
+
 .expense-payment-badge.is-unassigned {
   background: #fef3c7;
+  border-color: #fde68a;
   color: #b45309;
 }
 

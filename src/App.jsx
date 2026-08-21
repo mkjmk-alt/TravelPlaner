@@ -3363,7 +3363,7 @@ function App() {
                                 <div style={{ minWidth: 0, flex: 1 }}>
                                   <h5 style={{ fontSize: '13px', fontWeight: '800', color: '#111827', margin: '0 0 4px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{exp.desc}</h5>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                    <span className={`expense-payment-badge${exp.paymentMethod ? '' : ' is-unassigned'}`}>
+                                    <span className={`expense-payment-badge${exp.paymentMethod ? ` is-${exp.paymentMethod}` : ' is-unassigned'}`}>
                                       {getPaymentMethodLabel(exp.paymentMethod)}
                                     </span>
                                     {expenseCurrency !== 'KRW' && (
