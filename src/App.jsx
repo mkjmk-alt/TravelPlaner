@@ -1371,7 +1371,7 @@ function App() {
     if (!trip) return;
     const header = ['일차', '날짜', '지출 내용', '금액', '통화', '원화 환산', '소비 시간'].join(',');
     const rows = (trip.expenses || []).map(expense => [
-      expense.day === 0 ? '여행 전' : `${expense.day}일차`,
+      expense.day === 0 ? '여행 전 준비' : `${expense.day}일차`,
       expense.day === 0 ? '' : getActualDateForDay(trip.startDate, expense.day),
       expense.desc,
       expense.amount,
@@ -1839,6 +1839,18 @@ function App() {
   const isFavorite = (place) => {
     if (!place) return false;
     return (favorites || []).some(f => f.name === place.name);
+  };
+
+  const startEditingItineraryItem = (dayNumber, item) => {
+    const day = parseDay(dayNumber);
+    setEditingTimeItem({
+      sourceDay: day,
+      day,
+      id: item.id,
+      time: item.time || '09:00',
+      displayName: item.displayName || item.name || '',
+      originalName: item.name || ''
+    });
   };
 
 
@@ -2848,11 +2860,8 @@ function App() {
                                   </div>
                                   <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                                      <button
-                                        type="button"
-                                        aria-label={`${item.displayName || item.name || '일정'} 도착 시간 ${item.time || '09:00'} 수정`}
-                                        title="도착 시간 수정"
-                                        onClick={() => setEditingTimeItem({ sourceDay: dayPlan.day, day: dayPlan.day, id: item.id, time: item.time || '09:00', displayName: item.displayName || item.name || '', originalName: item.name || '' })}
+                                      <div
+                                        aria-label={`${item.displayName || item.name || '일정'} 도착 시간 ${item.time || '09:00'}`}
                                         style={{
                                           display: 'flex',
                                           alignItems: 'center',
@@ -2862,15 +2871,12 @@ function App() {
                                           borderRadius: '8px',
                                           border: '1px solid #e2e8f0',
                                           flexShrink: 0,
-                                          cursor: 'pointer',
-                                          transition: 'all 0.2s',
                                           fontFamily: 'inherit',
                                           whiteSpace: 'nowrap',
                                           textAlign: 'left'
                                         }}
                                       >
                                         <Clock size={11} color="#64748b" />
-                                        <Edit2 size={10} color="#3b82f6" />
                                         <span style={{
                                           fontSize: '12px',
                                           fontWeight: '800',
@@ -2879,7 +2885,7 @@ function App() {
                                         }}>
                                           {item.time || '09:00'}
                                         </span>
-                                      </button>
+                                      </div>
                                       <h4 
                                         onClick={() => {
                                           if (item.lat && item.lng) {
@@ -2914,6 +2920,33 @@ function App() {
                                       >
                                         {item.displayName || item.name || '장소 이름 정보 없음'}
                                       </h4>
+                                      <button
+                                        type="button"
+                                        className="itinerary-item-edit-button"
+                                        aria-label={`${item.displayName || item.name || '일정'} 편집`}
+                                        title="일정 편집: 이름, 시간, 일차 변경"
+                                        onClick={(event) => { event.stopPropagation(); startEditingItineraryItem(dayPlan.day, item); }}
+                                        style={{
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          gap: '4px',
+                                          flex: '0 0 auto',
+                                          minHeight: '30px',
+                                          padding: '5px 9px',
+                                          border: '1px solid #bfdbfe',
+                                          borderRadius: '9px',
+                                          backgroundColor: '#eff6ff',
+                                          color: '#2563eb',
+                                          fontFamily: 'inherit',
+                                          fontSize: '11px',
+                                          fontWeight: '900',
+                                          cursor: 'pointer',
+                                          whiteSpace: 'nowrap'
+                                        }}
+                                      >
+                                        <Edit2 size={12} /> 편집
+                                      </button>
                                     </div>
                                   </div>
                                   <div className="itinerary-item-actions" style={{
@@ -3172,7 +3205,7 @@ function App() {
                       onChange={e => setExpenseInput({...expenseInput, day: e.target.value})}
                       style={{ flex: '1 1 0', minWidth: 0, boxSizing: 'border-box', padding: '10px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '12px', fontWeight: '700', outline: 'none' }}
                     >
-                      <option value={0}>여행 전 (항공권)</option>
+                      <option value={0}>여행 전 준비</option>
                       {itinerary.map(d => <option key={`opt-day-${d.day}`} value={d.day}>{d.day}일차</option>)}
                     </select>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: '1 1 0', minWidth: 0, padding: '0 8px', border: '1px solid #e5e7eb', borderRadius: '10px', backgroundColor: 'white' }}>
@@ -3247,7 +3280,7 @@ function App() {
                         <div key={`exp-day-${dayNum}`} style={{ marginBottom: '16px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '8px' }}>
                             <h4 style={{ flex: 1, minWidth: 0, fontSize: '10px', fontWeight: '900', color: '#9ca3af', textTransform: 'uppercase', margin: 0 }}>
-                              {dayNum === 0 ? '여행 전 (예약 등)' : `${dayNum}일차 ${activeTrip?.startDate ? `(${getActualDateForDay(activeTrip.startDate, dayNum)})` : ''}`}
+                              {dayNum === 0 ? '여행 전 준비' : `${dayNum}일차 ${activeTrip?.startDate ? `(${getActualDateForDay(activeTrip.startDate, dayNum)})` : ''}`}
                             </h4>
                             <span style={{ flexShrink: 0, padding: '6px 9px', borderRadius: '9px', backgroundColor: '#ecfdf5', color: '#059669', fontSize: '11px', fontWeight: '900', whiteSpace: 'nowrap' }}>
                               소계 ₩{daySubtotalKRW.toLocaleString()}
@@ -4098,7 +4131,7 @@ function App() {
             </button>
 
             <div style={{ marginBottom: '24px' }}>
-              <div style={{ fontSize: '12px', fontWeight: '900', color: '#3b82f6', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>일정 수정</div>
+              <div style={{ fontSize: '12px', fontWeight: '900', color: '#3b82f6', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>일정 편집</div>
               <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#0f172a', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{editingTimeItem.originalName || '일정 수정'}</h3>
             </div>
 
@@ -4182,7 +4215,7 @@ function App() {
                 onChange={(e) => setExpenseInput(current => ({ ...current, day: e.target.value }))}
                 style={{ width: '100%', boxSizing: 'border-box', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', backgroundColor: 'white', fontSize: '14px', fontWeight: '700', outline: 'none' }}
               >
-                <option value={0}>여행 전 (항공권)</option>
+                <option value={0}>여행 전 준비</option>
                 {itinerary.map(dayPlan => <option key={`expense-edit-day-${dayPlan.day}`} value={dayPlan.day}>{dayPlan.day}일차</option>)}
               </select>
             </div>
