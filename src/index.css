@@ -204,6 +204,136 @@ body {
   margin-bottom: 12px;
 }
 
+.expense-form-currency-payment-amount {
+  display: grid !important;
+  grid-template-columns: 1.2fr 0.9fr 0.9fr;
+}
+
+.expense-edit-currency-payment-amount {
+  width: 100%;
+}
+
+.budget-spend-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 16px 0 12px;
+}
+
+.budget-spend-summary-item {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid rgba(167, 243, 208, 0.8);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.budget-spend-summary-item span,
+.cash-reconciliation-summary span {
+  display: block;
+  color: #059669;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.budget-spend-summary-item strong {
+  display: block;
+  overflow: hidden;
+  margin-top: 3px;
+  color: #065f46;
+  font-size: 12px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.budget-spend-summary-empty strong {
+  color: #6b7280;
+}
+
+.cash-reconciliation-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.cash-reconciliation-input {
+  border-color: #fcd34d;
+}
+
+.cash-reconciliation-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.cash-reconciliation-summary > div {
+  min-width: 0;
+}
+
+.cash-reconciliation-summary span {
+  color: #b45309;
+}
+
+.cash-reconciliation-summary strong {
+  display: block;
+  overflow: hidden;
+  margin-top: 3px;
+  color: #78350f;
+  font-size: 12px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cash-reconciliation-summary .is-matched strong,
+.cash-reconciliation-status.is-matched {
+  color: #047857;
+}
+
+.cash-reconciliation-summary .is-mismatch strong,
+.cash-reconciliation-status.is-mismatch {
+  color: #dc2626;
+}
+
+.cash-reconciliation-status,
+.cash-reconciliation-note {
+  margin: 10px 0 0;
+  color: #b45309;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.cash-reconciliation-note {
+  color: #92400e;
+  font-weight: 700;
+}
+
+.expense-payment-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.expense-payment-badge.is-unassigned {
+  background: #fef3c7;
+  color: #b45309;
+}
+
 .expense-form-field {
   min-width: 0;
 }
@@ -300,6 +430,19 @@ body {
     width: 100% !important;
     flex: 1 1 auto !important;
   }
+
+  .expense-form-currency-payment-amount,
+  .expense-edit-currency-payment-amount {
+    grid-template-columns: 1fr !important;
+  }
+
+  .expense-edit-amount-field {
+    grid-column: auto !important;
+  }
+
+  .cash-reconciliation-summary {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 768px) {
@@ -313,6 +456,40 @@ body {
 
   .desktop-only {
     display: none !important;
+  }
+
+  .expense-form-currency-payment-amount,
+  .expense-edit-currency-payment-amount {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .expense-form-currency-payment-amount .expense-form-amount-field,
+  .expense-edit-currency-payment-amount .expense-edit-amount-field {
+    grid-column: 1 / -1;
+  }
+
+  .cash-reconciliation-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .budget-spend-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 390px) {
+  .expense-form-currency-payment-amount,
+  .expense-edit-currency-payment-amount {
+    grid-template-columns: 1fr !important;
+  }
+
+  .expense-form-currency-payment-amount .expense-form-amount-field,
+  .expense-edit-currency-payment-amount .expense-edit-amount-field {
+    grid-column: auto !important;
+  }
+
+  .cash-reconciliation-summary {
+    grid-template-columns: 1fr !important;
   }
 }
 .map-controls-group {

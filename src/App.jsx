@@ -1,7 +1,7 @@
 // Build Version: v1.2.2-build-trigger-fix
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete, Polyline } from '@react-google-maps/api';
-import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Camera, Play, Image, Clock, Upload, Clipboard, LocateFixed, Download, Bell, FileText } from 'lucide-react';
+import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronUp, ChevronDown, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Clock, Upload, Clipboard, LocateFixed, Download, Bell, FileText } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import './index.css';
 
@@ -91,6 +91,16 @@ const SUPPORTED_CURRENCY_CODES = [
   'SGD', 'PHP', 'MYR', 'IDR', 'MNT', 'CAD', 'AUD', 'NZD', 'GBP', 'CHF',
   'CZK', 'HUF', 'TRY'
 ];
+
+const PAYMENT_METHODS = [
+  { value: 'cash', label: '현금' },
+  { value: 'card', label: '카드' },
+  { value: 'transfer', label: '계좌이체' }
+];
+
+const getPaymentMethodLabel = (method) => (
+  PAYMENT_METHODS.find(option => option.value === method)?.label || '결제수단 미지정'
+);
 
 const getCurrencySymbol = (code = 'KRW') => {
   try {
@@ -423,14 +433,11 @@ function App() {
   const [syncStatus, setSyncStatus] = useState('saved');
   const [showShareToast, setShowShareToast] = useState(false);
   const [hasTriggeredToast, setHasTriggeredToast] = useState(false);
-  const [showSlideshow, setShowSlideshow] = useState(false);
-  const [slideshowIndex, setSlideshowIndex] = useState(0);
   const [itineraryTime, setItineraryTime] = useState('');
   const [itineraryDisplayName, setItineraryDisplayName] = useState('');
   const [editingTimeItem, setEditingTimeItem] = useState(null); // { day, id, time, displayName, originalName }
   const [showCustomModal, setShowCustomModal] = useState(false);
   const [modalConfig, setModalConfig] = useState({ type: 'success', title: '', message: '' });
-  const slideshowTimerRef = useRef(null);
   const [showPasteModal, setShowPasteModal] = useState(false);
   const [pasteText, setPasteText] = useState('');
   const [showFullRoute, setShowFullRoute] = useState(false);
@@ -537,7 +544,7 @@ function App() {
   const [activeTripId, setActiveTripId] = useState(null);
 
   const [exchangeRates, setExchangeRates] = useState({});
-  const [expenseInput, setExpenseInput] = useState(() => ({ desc: '', amount: '', currency: '', day: 1, time: getCurrentTimeInputValue() }));
+  const [expenseInput, setExpenseInput] = useState(() => ({ desc: '', amount: '', currency: '', paymentMethod: '', day: 1, time: getCurrentTimeInputValue() }));
   const [editingExpenseId, setEditingExpenseId] = useState(null);
 
   const sharedTripCount = (trips || []).filter(t => t.sharedId).length;
@@ -699,7 +706,7 @@ function App() {
   const itinerary = useMemo(() => activeTrip?.itinerary || [], [activeTrip]);
   const reserveItems = useMemo(() => activeTrip?.reserveItems || [], [activeTrip]);
   const budgetSettings = activeTrip?.budgetSettings || { limitKRW: 1000000, travelCurrency: 'USD' };
-  const expenses = activeTrip?.expenses || [];
+  const expenses = useMemo(() => activeTrip?.expenses || [], [activeTrip]);
 
   const getExpenseAmountKRW = (amount, currency) => {
     const numericAmount = Number(amount);
@@ -1141,66 +1148,6 @@ function App() {
     await syncTripsToCloud(nextTrips);
   };
 
-  // --- PHOTO HELPERS ---
-  const handlePhotoUpload = (file, dayNumber, itemId, onUploaded) => {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const image = reader.result;
-      const nextTrips = (trips || []).map(t => {
-        if (t.id === activeTripId) {
-          const newItin = (t.itinerary || []).map(day => {
-            if (day.day === dayNumber) {
-              return { ...day, items: day.items.map(it => it.id === itemId ? { ...it, image } : it) };
-            }
-            return day;
-          });
-          return { ...t, itinerary: newItin };
-        }
-        return t;
-      });
-      syncTripsToCloud(nextTrips);
-      onUploaded?.(image);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handlePhotoDelete = (dayNumber, itemId, onDeleted) => {
-    const nextTrips = (trips || []).map(t => {
-      if (t.id === activeTripId) {
-        const newItin = (t.itinerary || []).map(day => {
-          if (day.day === dayNumber) {
-            return { ...day, items: day.items.map(it => it.id === itemId ? { ...it, image: null } : it) };
-          }
-          return day;
-        });
-        return { ...t, itinerary: newItin };
-      }
-      return t;
-    });
-    syncTripsToCloud(nextTrips);
-    onDeleted?.();
-  };
-
-  // Collect all photos for slideshow
-  const allPhotos = (activeTrip?.itinerary || []).flatMap(day =>
-    (day.items || []).filter(item => item.image).map(item => ({
-      image: item.image, name: item.name, emoji: item.emoji, day: day.day, cat: item.cat
-    }))
-  );
-
-  // Slideshow auto-play
-  useEffect(() => {
-    if (showSlideshow && allPhotos.length > 1) {
-      slideshowTimerRef.current = setInterval(() => {
-        setSlideshowIndex(prev => (prev + 1) % allPhotos.length);
-      }, 4000);
-    }
-    return () => {
-      if (slideshowTimerRef.current) clearInterval(slideshowTimerRef.current);
-    };
-  }, [showSlideshow, allPhotos.length]);
-
   const addDay = async () => {
     if (!activeTrip) return;
     if (itinerary.length >= 100) {
@@ -1366,13 +1313,14 @@ function App() {
 
   const exportBudgetAsCsv = (trip = activeTrip) => {
     if (!trip) return;
-    const header = ['일차', '날짜', '지출 내용', '금액', '통화', '원화 환산', '소비 시간'].join(',');
+    const header = ['일차', '날짜', '지출 내용', '금액', '통화', '결제 수단', '원화 환산', '소비 시간'].join(',');
     const rows = (trip.expenses || []).map(expense => [
       expense.day === 0 ? '여행 전 준비' : `${expense.day}일차`,
       expense.day === 0 ? '' : getActualDateForDay(trip.startDate, expense.day),
       expense.desc,
       expense.amount,
       expense.currency || 'KRW',
+      getPaymentMethodLabel(expense.paymentMethod),
       expense.amountKRW ?? expense.amount,
       expense.time || ''
     ].map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(','));
@@ -1748,7 +1696,7 @@ function App() {
 
   const addExpense = () => {
     const numericAmount = Number(expenseInput.amount);
-    if (!activeTripId || !expenseInput.desc.trim() || !Number.isFinite(numericAmount) || numericAmount <= 0) return;
+    if (!activeTripId || !expenseInput.desc.trim() || !expenseInput.paymentMethod || !Number.isFinite(numericAmount) || numericAmount <= 0) return;
 
     const currentCurrency = expenseInput.currency || budgetSettings.travelCurrency || 'USD';
 
@@ -1757,6 +1705,7 @@ function App() {
       desc: expenseInput.desc.trim(),
       amount: numericAmount,
       currency: currentCurrency,
+      paymentMethod: expenseInput.paymentMethod,
       amountKRW: getExpenseAmountKRW(expenseInput.amount, currentCurrency),
       day: parseInt(expenseInput.day, 10) || 0,
       time: expenseInput.time || ''
@@ -1772,6 +1721,7 @@ function App() {
       desc: expense.desc || '',
       amount: String(expense.amount ?? ''),
       currency: expense.currency || budgetSettings.travelCurrency || 'USD',
+      paymentMethod: expense.paymentMethod || '',
       day: expense.day ?? 1,
       time: expense.time || ''
     });
@@ -1783,7 +1733,7 @@ function App() {
   };
 
   const saveExpenseEdit = () => {
-    if (!activeTripId || !editingExpenseId || !expenseInput.desc.trim() || !expenseInput.amount) return;
+    if (!activeTripId || !editingExpenseId || !expenseInput.desc.trim() || !expenseInput.paymentMethod || !expenseInput.amount) return;
 
     const currentCurrency = expenseInput.currency || budgetSettings.travelCurrency || 'USD';
     const nextExpenses = expenses.map(expense => expense.id === editingExpenseId ? {
@@ -1791,6 +1741,7 @@ function App() {
       desc: expenseInput.desc.trim(),
       amount: Number(expenseInput.amount),
       currency: currentCurrency,
+      paymentMethod: expenseInput.paymentMethod,
       amountKRW: getExpenseAmountKRW(expenseInput.amount, currentCurrency),
       day: parseInt(expenseInput.day, 10) || 0,
       time: expenseInput.time || ''
@@ -1848,7 +1799,6 @@ function App() {
       time: item.time || '09:00',
       displayName: item.displayName || item.name || '',
       originalName: item.name || '',
-      image: item.image || null
     });
   };
 
@@ -2036,7 +1986,62 @@ function App() {
   };
 
   const totalSpots = (itinerary || []).reduce((acc, day) => acc + (day.items || []).length, 0);
-  const totalSpentKRW = (expenses || []).reduce((acc, curr) => acc + (curr.amountKRW || 0), 0);
+  const totalSpentKRW = (expenses || []).reduce((acc, curr) => acc + (Number(curr.amountKRW) || 0), 0);
+  const expenseTotalsByCurrency = useMemo(() => (expenses || []).reduce((totals, expense) => {
+    const currency = expense.currency || 'KRW';
+    const amount = Number(expense.amount) || 0;
+    totals[currency] = (totals[currency] || 0) + amount;
+    return totals;
+  }, {}), [expenses]);
+  const cashSpentByCurrency = useMemo(() => (expenses || []).reduce((totals, expense) => {
+    if (expense.paymentMethod !== 'cash') return totals;
+    const currency = expense.currency || 'KRW';
+    const amount = Number(expense.amount) || 0;
+    totals[currency] = (totals[currency] || 0) + amount;
+    return totals;
+  }, {}), [expenses]);
+  const krwSpent = expenseTotalsByCurrency.KRW || 0;
+  const localCurrencyTotals = Object.entries(expenseTotalsByCurrency)
+    .filter(([currency]) => currency !== 'KRW')
+    .sort(([first], [second]) => first.localeCompare(second));
+  const cashCurrencyChoices = Array.from(new Set([
+    budgetSettings.cashLedgerCurrency,
+    budgetSettings.travelCurrency,
+    ...Object.keys(expenseTotalsByCurrency),
+    ...(favoriteCurrencies || []),
+    'USD',
+    'VND',
+    'KRW'
+  ].filter(currency => SUPPORTED_CURRENCY_CODES.includes(currency))));
+  const cashLedgerCurrency = cashCurrencyChoices.includes(budgetSettings.cashLedgerCurrency)
+    ? budgetSettings.cashLedgerCurrency
+    : cashCurrencyChoices.find(currency => currency !== 'KRW' && (cashSpentByCurrency[currency] || expenseTotalsByCurrency[currency]))
+      || budgetSettings.travelCurrency
+      || 'USD';
+  const cashLedgers = budgetSettings.cashLedgers || {};
+  const cashLedger = cashLedgers[cashLedgerCurrency] || {};
+  const cashInitialAmount = Number(cashLedger.initial) || 0;
+  const cashAdditionalAmount = Number(cashLedger.additional) || 0;
+  const cashUsedAmount = cashSpentByCurrency[cashLedgerCurrency] || 0;
+  const expectedCashBalance = cashInitialAmount + cashAdditionalAmount - cashUsedAmount;
+  const actualCashBalance = cashLedger.actualRemaining === '' || cashLedger.actualRemaining === null || cashLedger.actualRemaining === undefined
+    ? null
+    : Number(cashLedger.actualRemaining);
+  const cashDifference = actualCashBalance === null || !Number.isFinite(actualCashBalance)
+    ? null
+    : actualCashBalance - expectedCashBalance;
+  const unassignedPaymentCount = (expenses || []).filter(expense => !expense.paymentMethod).length;
+  const updateCashLedger = (updates) => {
+    const currentLedger = cashLedgers[cashLedgerCurrency] || {};
+    saveBudgetSettings({
+      ...budgetSettings,
+      cashLedgerCurrency,
+      cashLedgers: {
+        ...cashLedgers,
+        [cashLedgerCurrency]: { ...currentLedger, ...updates }
+      }
+    });
+  };
   const editingExpense = (expenses || []).find(expense => expense.id === editingExpenseId);
   const budgetProgress = budgetSettings.limitKRW > 0 ? Math.min((totalSpentKRW / budgetSettings.limitKRW) * 100, 100) : 0;
   const expenseCurrencyCode = expenseInput.currency || budgetSettings.travelCurrency || 'KRW';
@@ -2045,11 +2050,14 @@ function App() {
   const expenseFormIsValid = Boolean(
     activeTripId
     && expenseInput.desc.trim()
+    && expenseInput.paymentMethod
     && Number.isFinite(expenseAmountValue)
     && expenseAmountValue > 0
   );
   const expenseFormHint = !expenseInput.desc.trim()
     ? '지출 내용을 입력하면 추가할 수 있어요.'
+    : !expenseInput.paymentMethod
+      ? '현금, 카드 또는 계좌이체를 선택해 주세요.'
     : !Number.isFinite(expenseAmountValue) || expenseAmountValue <= 0
       ? '0보다 큰 금액을 입력하면 추가할 수 있어요.'
       : `${getCurrencyNameKO(expenseCurrencyCode)} 기준 금액으로 저장하고 한화로 자동 환산합니다.`;
@@ -2580,16 +2588,6 @@ function App() {
                       >
                         <Bell size={14} /> {activeTrip?.reminders?.enabled ? '알림 켜짐' : '알림 설정'}
                     </button>
-                    {allPhotos.length > 0 && (
-                      <button 
-                        onClick={() => { setSlideshowIndex(0); setShowSlideshow(true); }} 
-                        style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '800', color: '#8b5cf6', backgroundColor: '#f5f3ff', padding: '10px 14px', borderRadius: '16px', border: 'none', cursor: 'pointer', transition: 'all 0.2s' }}
-                        onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#ede9fe'}
-                        onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#f5f3ff'}
-                      >
-                        <Play size={15} /> 사진 보기
-                      </button>
-                    )}
                     <button
                       onClick={() => exportTripAsJson(activeTrip)}
                       type="button"
@@ -2994,27 +2992,6 @@ function App() {
                                   </div>
                                 </div>
 
-                                {/* Photo Display */}
-                                {item.image && (
-                                  <div style={{ position: 'relative', width: '100%', height: '180px', borderRadius: '16px', overflow: 'hidden', backgroundColor: '#f3f4f6' }}>
-                                    <img src={item.image} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                    <div style={{ 
-                                      position: 'absolute', bottom: 0, left: 0, right: 0, 
-                                      background: 'linear-gradient(transparent, rgba(0,0,0,0.6))', 
-                                      padding: '24px 16px 12px', 
-                                      display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' 
-                                    }}>
-                                      <span style={{ color: 'white', fontSize: '13px', fontWeight: '800', textShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>{item.emoji} {item.name}</span>
-                                    </div>
-                                    <button 
-                                      onClick={() => handlePhotoDelete(dayPlan.day, item.id)}
-                                      style={{ position: 'absolute', top: '8px', right: '8px', backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', color: 'white', border: 'none', borderRadius: '10px', padding: '6px', cursor: 'pointer', display: 'flex' }}
-                                    >
-                                      <X size={14} />
-                                    </button>
-                                  </div>
-                                )}
-
                               </div>
                           ))}
                         </div>
@@ -3088,7 +3065,7 @@ function App() {
                 <div style={{ backgroundColor: '#ecfdf5', padding: '20px', borderRadius: '16px', marginBottom: '24px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '12px' }}>
                     <div>
-                      <p style={{ fontSize: '10px', fontWeight: '800', color: '#059669', textTransform: 'uppercase', margin: '0 0 4px 0' }}>총 지출 (KRW)</p>
+                      <p style={{ fontSize: '10px', fontWeight: '800', color: '#059669', textTransform: 'uppercase', margin: '0 0 4px 0' }}>총 지출 (한화 환산)</p>
                       <h3 style={{ fontSize: '24px', fontWeight: '900', color: '#064e3b', margin: 0 }}>₩ {totalSpentKRW.toLocaleString()}</h3>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
@@ -3107,6 +3084,23 @@ function App() {
                       </div>
                     </div>
                   </div>
+                  <div className="budget-spend-summary-grid">
+                    <div className="budget-spend-summary-item">
+                      <span>한화로 입력한 지출</span>
+                      <strong>₩{krwSpent.toLocaleString()}</strong>
+                    </div>
+                    {localCurrencyTotals.length > 0 ? localCurrencyTotals.map(([currency, amount]) => (
+                      <div className="budget-spend-summary-item" key={`summary-currency-${currency}`}>
+                        <span>{getCurrencyNameKO(currency)} ({currency})</span>
+                        <strong>{getCurrencySymbol(currency)}{amount.toLocaleString()}</strong>
+                      </div>
+                    )) : (
+                      <div className="budget-spend-summary-item budget-spend-summary-empty">
+                        <span>현지 통화 지출</span>
+                        <strong>기록 없음</strong>
+                      </div>
+                    )}
+                  </div>
                   <div style={{ width: '100%', height: '8px', backgroundColor: '#d1fae5', borderRadius: '4px', overflow: 'hidden' }}>
                     <div style={{ width: `${budgetProgress}%`, height: '100%', backgroundColor: budgetProgress > 90 ? '#ef4444' : '#10b981', transition: 'width 0.3s ease' }}></div>
                   </div>
@@ -3120,6 +3114,102 @@ function App() {
                   </p>
                 </div>
 
+                {/* Cash Reconciliation */}
+                <div className="cash-reconciliation-card" style={{ padding: '16px', backgroundColor: '#fffaf0', border: '1px solid #fde68a', borderRadius: '16px', marginBottom: '24px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px', marginBottom: '14px' }}>
+                    <div>
+                      <h3 style={{ margin: 0, color: '#92400e', fontSize: '15px', fontWeight: '900' }}>현금 정산</h3>
+                      <p style={{ margin: '4px 0 0', color: '#b45309', fontSize: '10px', fontWeight: '700', lineHeight: 1.4 }}>환전·인출한 금액과 현금 지출을 비교해 잔액을 확인하세요.</p>
+                    </div>
+                    <select
+                      value={cashLedgerCurrency}
+                      onChange={(e) => saveBudgetSettings({ ...budgetSettings, cashLedgerCurrency: e.target.value })}
+                      aria-label="현금 정산 통화"
+                      style={{ maxWidth: '150px', padding: '8px 9px', border: '1px solid #fcd34d', borderRadius: '10px', backgroundColor: 'white', color: '#92400e', fontSize: '11px', fontWeight: '800', outline: 'none' }}
+                    >
+                      {cashCurrencyChoices.map(code => (
+                        <option key={`cash-ledger-currency-${code}`} value={code}>
+                          {getCurrencySymbol(code)} {getCurrencyNameKO(code)} ({code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="cash-reconciliation-fields">
+                    <div className="expense-form-field">
+                      <label className="expense-form-label" htmlFor="cash-initial-input">여행 전 환전·인출</label>
+                      <div className="expense-form-amount-control cash-reconciliation-input">
+                        <span aria-hidden="true">{getCurrencySymbol(cashLedgerCurrency)}</span>
+                        <input
+                          id="cash-initial-input"
+                          type="number"
+                          min="0"
+                          step="any"
+                          inputMode="decimal"
+                          value={cashLedger.initial ?? ''}
+                          onChange={(e) => updateCashLedger({ initial: e.target.value })}
+                          placeholder="0"
+                          aria-label={`여행 전 환전·인출 금액(${cashLedgerCurrency})`}
+                        />
+                      </div>
+                    </div>
+                    <div className="expense-form-field">
+                      <label className="expense-form-label" htmlFor="cash-additional-input">추가 환전·인출</label>
+                      <div className="expense-form-amount-control cash-reconciliation-input">
+                        <span aria-hidden="true">{getCurrencySymbol(cashLedgerCurrency)}</span>
+                        <input
+                          id="cash-additional-input"
+                          type="number"
+                          min="0"
+                          step="any"
+                          inputMode="decimal"
+                          value={cashLedger.additional ?? ''}
+                          onChange={(e) => updateCashLedger({ additional: e.target.value })}
+                          placeholder="0"
+                          aria-label={`추가 환전·인출 금액(${cashLedgerCurrency})`}
+                        />
+                      </div>
+                    </div>
+                    <div className="expense-form-field">
+                      <label className="expense-form-label" htmlFor="cash-actual-input">실제 남은 현금</label>
+                      <div className="expense-form-amount-control cash-reconciliation-input">
+                        <span aria-hidden="true">{getCurrencySymbol(cashLedgerCurrency)}</span>
+                        <input
+                          id="cash-actual-input"
+                          type="number"
+                          min="0"
+                          step="any"
+                          inputMode="decimal"
+                          value={cashLedger.actualRemaining ?? ''}
+                          onChange={(e) => updateCashLedger({ actualRemaining: e.target.value })}
+                          placeholder="확인 후 입력"
+                          aria-label={`실제 남은 현금(${cashLedgerCurrency})`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="cash-reconciliation-summary">
+                    <div><span>현금 사용</span><strong>{getCurrencySymbol(cashLedgerCurrency)}{cashUsedAmount.toLocaleString()}</strong></div>
+                    <div><span>예상 잔액</span><strong>{getCurrencySymbol(cashLedgerCurrency)}{expectedCashBalance.toLocaleString()}</strong></div>
+                    <div className={cashDifference === null ? '' : cashDifference === 0 ? 'is-matched' : 'is-mismatch'}>
+                      <span>차이</span>
+                      <strong>{cashDifference === null ? '실제 잔액 입력 필요' : `${cashDifference >= 0 ? '+' : ''}${getCurrencySymbol(cashLedgerCurrency)}${cashDifference.toLocaleString()}`}</strong>
+                    </div>
+                  </div>
+
+                  <p className={`cash-reconciliation-status${cashDifference === 0 ? ' is-matched' : cashDifference !== null ? ' is-mismatch' : ''}`} role="status" aria-live="polite">
+                    {cashDifference === null
+                      ? '실제 남은 현금을 입력하면 예상 잔액과 비교할 수 있어요.'
+                      : cashDifference === 0
+                        ? '정산 일치 · 입력한 현금과 예상 잔액이 같습니다.'
+                        : `확인 필요 · 실제 잔액이 예상보다 ${getCurrencySymbol(cashLedgerCurrency)}${Math.abs(cashDifference).toLocaleString()} ${cashDifference > 0 ? '많습니다.' : '적습니다.'}`}
+                  </p>
+                  {unassignedPaymentCount > 0 && (
+                    <p className="cash-reconciliation-note">결제 수단이 지정된 현금 지출만 현금 사용액에 반영됩니다. 아직 결제 수단이 없는 지출 {unassignedPaymentCount}건이 있습니다.</p>
+                  )}
+                </div>
+
                 {/* Add Expense Form */}
                 <div className="expense-form-card" style={{ padding: '16px', backgroundColor: '#f9fafb', border: '1px solid #f3f4f6', borderRadius: '16px', marginBottom: '24px' }}>
                   <div className="expense-form-heading" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '14px' }}>
@@ -3127,7 +3217,7 @@ function App() {
                       <h3 style={{ margin: 0, color: '#0f172a', fontSize: '15px', fontWeight: '900' }}>지출 추가</h3>
                       <p style={{ margin: '4px 0 0', color: '#94a3b8', fontSize: '10px', fontWeight: '700' }}>여행 일차와 통화를 확인한 뒤 내용을 입력하세요.</p>
                     </div>
-                    <span className="expense-form-required" style={{ flexShrink: 0, padding: '5px 8px', borderRadius: '8px', backgroundColor: '#ecfdf5', color: '#059669', fontSize: '10px', fontWeight: '900' }}>내용 · 금액 필수</span>
+                    <span className="expense-form-required" style={{ flexShrink: 0, padding: '5px 8px', borderRadius: '8px', backgroundColor: '#ecfdf5', color: '#059669', fontSize: '10px', fontWeight: '900' }}>내용 · 결제수단 · 금액 필수</span>
                   </div>
 
                   <div className="expense-form-row expense-form-day-time">
@@ -3179,7 +3269,7 @@ function App() {
                     </div>
                   </div>
 
-                  <div className="expense-form-row expense-form-currency-amount">
+                  <div className="expense-form-row expense-form-currency-payment-amount">
                     <div className="expense-form-field" style={{ flex: '1.2 1 0' }}>
                       <label className="expense-form-label" htmlFor="expense-currency-select">사용 통화</label>
                       <select
@@ -3196,7 +3286,20 @@ function App() {
                         ))}
                       </select>
                     </div>
-                    <div className="expense-form-field" style={{ flex: '0.8 1 0' }}>
+                    <div className="expense-form-field">
+                      <label className="expense-form-label" htmlFor="expense-payment-method-select">결제 수단</label>
+                      <select
+                        id="expense-payment-method-select"
+                        className="expense-form-control"
+                        value={expenseInput.paymentMethod}
+                        onChange={e => setExpenseInput({ ...expenseInput, paymentMethod: e.target.value })}
+                        aria-label="지출 결제 수단"
+                      >
+                        <option value="">결제 수단 선택</option>
+                        {PAYMENT_METHODS.map(method => <option key={`expense-payment-${method.value}`} value={method.value}>{method.label}</option>)}
+                      </select>
+                    </div>
+                    <div className="expense-form-field expense-form-amount-field">
                       <label className="expense-form-label" htmlFor="expense-amount-input">금액 · {expenseCurrencySymbol} {expenseCurrencyCode}</label>
                       <div className="expense-form-amount-control">
                         <span aria-hidden="true">{expenseCurrencySymbol}</span>
@@ -3260,6 +3363,9 @@ function App() {
                                 <div style={{ minWidth: 0, flex: 1 }}>
                                   <h5 style={{ fontSize: '13px', fontWeight: '800', color: '#111827', margin: '0 0 4px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{exp.desc}</h5>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                    <span className={`expense-payment-badge${exp.paymentMethod ? '' : ' is-unassigned'}`}>
+                                      {getPaymentMethodLabel(exp.paymentMethod)}
+                                    </span>
                                     {expenseCurrency !== 'KRW' && (
                                       <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', whiteSpace: 'nowrap' }}>
                                         현지 {getCurrencySymbol(expenseCurrency)}{localAmount.toLocaleString()} ({expenseCurrency})
@@ -3983,83 +4089,6 @@ function App() {
           <Menu size={16} /> 메뉴 열기
         </button>
       )}
-    {/* === SLIDESHOW MODAL === */}
-    {showSlideshow && allPhotos.length > 0 && (
-      <div style={{
-        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999,
-        backgroundColor: '#000', display: 'flex', flexDirection: 'column',
-        animation: 'fadeIn 0.5s ease'
-      }}>
-        {/* Photo */}
-        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-          <img
-            key={slideshowIndex}
-            src={allPhotos[slideshowIndex]?.image}
-            alt={allPhotos[slideshowIndex]?.name}
-            style={{ width: '100%', height: '100%', objectFit: 'cover', animation: 'fadeIn 1s ease' }}
-          />
-          {/* Gradient overlay */}
-          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(transparent 0%, rgba(0,0,0,0.8) 100%)', padding: '60px 32px 32px' }}>
-            <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.15em', margin: '0 0 8px 0' }}>
-              DAY {allPhotos[slideshowIndex]?.day}
-            </p>
-            <h2 style={{ color: 'white', fontSize: '24px', fontWeight: '900', margin: '0 0 4px 0', textShadow: '0 2px 8px rgba(0,0,0,0.5)' }}>
-              {allPhotos[slideshowIndex]?.emoji} {allPhotos[slideshowIndex]?.name}
-            </h2>
-            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '700', margin: 0 }}>
-              {activeTrip?.name}
-            </p>
-          </div>
-          {/* Top bar */}
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'linear-gradient(rgba(0,0,0,0.5), transparent)' }}>
-            <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px', fontWeight: '800', letterSpacing: '0.1em' }}>
-              {slideshowIndex + 1} / {allPhotos.length}
-            </span>
-            <button 
-              onClick={() => setShowSlideshow(false)} 
-              style={{ backgroundColor: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)', color: 'white', border: 'none', borderRadius: '12px', padding: '8px 16px', cursor: 'pointer', fontWeight: '800', fontSize: '12px' }}
-            >
-              닫기
-            </button>
-          </div>
-          {/* Nav buttons */}
-          {allPhotos.length > 1 && (
-            <>
-              <button 
-                onClick={() => setSlideshowIndex(prev => (prev - 1 + allPhotos.length) % allPhotos.length)}
-                style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', backgroundColor: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)', color: 'white', border: 'none', borderRadius: '50%', width: '44px', height: '44px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              >
-                <ChevronLeft size={22} />
-              </button>
-              <button 
-                onClick={() => setSlideshowIndex(prev => (prev + 1) % allPhotos.length)}
-                style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', backgroundColor: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)', color: 'white', border: 'none', borderRadius: '50%', width: '44px', height: '44px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              >
-                <ChevronRight size={22} />
-              </button>
-            </>
-          )}
-          {/* Progress dots */}
-          <div style={{ position: 'absolute', bottom: '120px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '6px' }}>
-            {allPhotos.map((_, i) => (
-              <div 
-                key={i} 
-                onClick={() => setSlideshowIndex(i)}
-                style={{ 
-                  width: i === slideshowIndex ? '24px' : '8px', 
-                  height: '8px', 
-                  borderRadius: '4px', 
-                  backgroundColor: i === slideshowIndex ? 'white' : 'rgba(255,255,255,0.3)', 
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease' 
-                }} 
-              />
-            ))}
-          </div>
-        </div>
-      </div>
-    )}
-
       {/* Premium Time Edit Modal */}
       {editingTimeItem && (
         <div style={{
@@ -4130,45 +4159,6 @@ function App() {
               label="일정 시간 선택"
             />
 
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b', marginBottom: '8px' }}>사진</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                {editingTimeItem.image && (
-                  <img
-                    src={editingTimeItem.image}
-                    alt="일정 사진 미리보기"
-                    style={{ width: '52px', height: '52px', objectFit: 'cover', borderRadius: '10px', border: '1px solid #e2e8f0', flexShrink: 0 }}
-                  />
-                )}
-                <label style={{ flex: 1, minWidth: 0, minHeight: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: '12px', backgroundColor: '#f8fafc', color: '#475569', fontSize: '12px', fontWeight: '800', cursor: 'pointer' }}>
-                  <Camera size={15} /> {editingTimeItem.image ? '사진 변경' : '사진 추가'}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    style={{ display: 'none' }}
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      handlePhotoUpload(file, editingTimeItem.sourceDay, editingTimeItem.id, (image) => {
-                        setEditingTimeItem(current => current ? { ...current, image } : current);
-                      });
-                      event.target.value = '';
-                    }}
-                  />
-                </label>
-                {editingTimeItem.image && (
-                  <button
-                    type="button"
-                    onClick={() => handlePhotoDelete(editingTimeItem.sourceDay, editingTimeItem.id, () => setEditingTimeItem(current => current ? { ...current, image: null } : current))}
-                    aria-label="일정 사진 삭제"
-                    title="사진 삭제"
-                    style={{ width: '42px', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid #fee2e2', borderRadius: '12px', backgroundColor: '#fff5f5', color: '#f87171', cursor: 'pointer' }}
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                )}
-              </div>
-            </div>
-
             <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
               <button 
                 onClick={() => setEditingTimeItem(null)}
@@ -4238,8 +4228,35 @@ function App() {
               />
             </div>
 
-            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '14px' }}>
-              <div style={{ flex: '1 1 150px', minWidth: 0 }}>
+            <div className="expense-edit-currency-payment-amount" style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.9fr 0.9fr', gap: '10px', marginBottom: '14px' }}>
+              <div style={{ minWidth: 0 }}>
+                <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b', marginBottom: '8px' }}>사용 통화</label>
+                <select
+                  value={expenseInput.currency || budgetSettings.travelCurrency}
+                  onChange={(e) => setExpenseInput(current => ({ ...current, currency: e.target.value }))}
+                  aria-label="지출 수정 통화"
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', backgroundColor: 'white', fontSize: '13px', fontWeight: '700', outline: 'none' }}
+                >
+                  {expenseCurrencyChoices.map(code => (
+                    <option key={`expense-edit-currency-${code}`} value={code}>
+                      {code === budgetSettings.travelCurrency ? '기본 · ' : ''}{getCurrencySymbol(code)} {getCurrencyNameKO(code)} ({code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b', marginBottom: '8px' }}>결제 수단</label>
+                <select
+                  value={expenseInput.paymentMethod}
+                  onChange={(e) => setExpenseInput(current => ({ ...current, paymentMethod: e.target.value }))}
+                  aria-label="지출 수정 결제 수단"
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', backgroundColor: 'white', fontSize: '13px', fontWeight: '700', outline: 'none' }}
+                >
+                  <option value="">결제 수단 선택</option>
+                  {PAYMENT_METHODS.map(method => <option key={`expense-edit-payment-${method.value}`} value={method.value}>{method.label}</option>)}
+                </select>
+              </div>
+              <div className="expense-edit-amount-field" style={{ minWidth: 0 }}>
                 <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b', marginBottom: '8px' }}>금액 · {expenseCurrencySymbol} {expenseCurrencyCode}</label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px', width: '100%', boxSizing: 'border-box', padding: '0 12px', borderRadius: '12px', border: '1px solid #e2e8f0', backgroundColor: 'white' }}>
                   <span aria-hidden="true" style={{ flexShrink: 0, fontSize: '15px', fontWeight: '900', color: '#64748b' }}>{expenseCurrencySymbol}</span>
@@ -4251,21 +4268,6 @@ function App() {
                     style={{ flex: 1, minWidth: 0, boxSizing: 'border-box', padding: '12px 0', border: 'none', backgroundColor: 'transparent', fontSize: '14px', fontWeight: '700', outline: 'none' }}
                   />
                 </div>
-              </div>
-              <div style={{ flex: '1 1 180px', minWidth: 0 }}>
-                <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b', marginBottom: '8px' }}>통화</label>
-                <select
-                  value={expenseInput.currency || budgetSettings.travelCurrency}
-                  onChange={(e) => setExpenseInput(current => ({ ...current, currency: e.target.value }))}
-                  aria-label="지출 수정 통화"
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', backgroundColor: 'white', fontSize: '13px', fontWeight: '700', outline: 'none' }}
-                >
-                  {expenseCurrencyChoices.map(code => (
-                    <option key={`expense-edit-currency-${code}`} value={code}>
-                        {code === budgetSettings.travelCurrency ? '기본 · ' : ''}{getCurrencySymbol(code)} {getCurrencyNameKO(code)} ({code})
-                    </option>
-                  ))}
-                </select>
               </div>
             </div>
 
@@ -4286,7 +4288,8 @@ function App() {
               <button
                 type="button"
                 onClick={saveExpenseEdit}
-                style={{ flex: 2, padding: '16px', borderRadius: '16px', border: 'none', backgroundColor: '#10b981', color: 'white', fontSize: '15px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 10px 15px -3px rgba(16, 185, 129, 0.3)' }}
+                disabled={!expenseFormIsValid}
+                style={{ flex: 2, padding: '16px', borderRadius: '16px', border: 'none', backgroundColor: expenseFormIsValid ? '#10b981' : '#cbd5e1', color: 'white', fontSize: '15px', fontWeight: '900', cursor: expenseFormIsValid ? 'pointer' : 'not-allowed', boxShadow: expenseFormIsValid ? '0 10px 15px -3px rgba(16, 185, 129, 0.3)' : 'none' }}
               >
                 저장
               </button>
