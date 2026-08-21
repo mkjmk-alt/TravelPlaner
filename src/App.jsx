@@ -1,6 +1,6 @@
 // Build Version: v1.2.2-build-trigger-fix
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete, Polyline } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, OverlayView, InfoWindow, Polyline } from '@react-google-maps/api';
 import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronUp, ChevronDown, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Clock, Upload, Clipboard, LocateFixed, Download, Bell, FileText } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import './index.css';
@@ -50,6 +50,85 @@ const getIcsDateTime = (startDate, dayNumber, time, offsetMinutes = 0) => {
 const getCurrentTimeInputValue = () => {
   const now = new Date();
   return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+};
+
+const formatLocalDate = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getEndDateForDayCount = (startDate, dayCount) => {
+  if (!startDate || !Number.isFinite(dayCount) || dayCount < 1) return startDate;
+  const endDate = new Date(`${startDate}T00:00:00`);
+  if (Number.isNaN(endDate.getTime())) return startDate;
+  endDate.setDate(endDate.getDate() + dayCount - 1);
+  return formatLocalDate(endDate);
+};
+
+const buildItineraryForDayCount = (existingItinerary, dayCount) => (
+  Array.from({ length: dayCount }, (_, index) => {
+    const existingDay = (existingItinerary || [])[index];
+    return existingDay
+      ? { ...existingDay, day: index + 1 }
+      : { day: index + 1, items: [] };
+  })
+);
+
+const getFormattableText = (value) => {
+  if (typeof value === 'string') return value;
+  return value?.text || '';
+};
+
+const CustomMapMarker = ({ position, onClick, icon, label, ariaLabel }) => {
+  const width = Number(icon?.scaledSize?.width) || 40;
+  const height = Number(icon?.scaledSize?.height) || width;
+
+  return (
+    <OverlayView
+      position={position}
+      mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+      getPixelPositionOffset={() => ({ x: -width / 2, y: -height / 2 })}
+    >
+      <button
+        type="button"
+        aria-label={ariaLabel || (label?.text ? `지도 ${label.text}` : '지도 장소')}
+        onClick={onClick}
+        style={{
+          position: 'relative',
+          display: 'block',
+          width: `${width}px`,
+          height: `${height}px`,
+          padding: 0,
+          border: 0,
+          background: 'transparent',
+          cursor: onClick ? 'pointer' : 'default'
+        }}
+      >
+        {icon?.url && <img src={icon.url} alt="" width={width} height={height} draggable="false" style={{ display: 'block' }} />}
+        {label?.text && (
+          <span
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: label.color || 'white',
+              fontSize: label.fontSize || '14px',
+              fontWeight: label.fontWeight || '700',
+              pointerEvents: 'none',
+              lineHeight: 1
+            }}
+          >
+            {label.text}
+          </span>
+        )}
+      </button>
+    </OverlayView>
+  );
 };
 
 const countryToCurrency = {
@@ -256,6 +335,7 @@ const ScrollTimeInput = ({ value, onChange, label }) => {
             <button
               key={`${type}-${item}`}
               type="button"
+              aria-label={`${type === 'hour' ? '시간' : '분'} ${String(item).padStart(2, '0')} 선택`}
               onClick={() => emitTime(type === 'hour' ? item : hour, type === 'minute' ? item : minute)}
               style={{ display: 'block', width: '100%', height: `${ITEM_HEIGHT}px`, padding: 0, border: 'none', backgroundColor: item === selectedValue ? '#dbeafe' : 'transparent', color: item === selectedValue ? '#1d4ed8' : '#94a3b8', fontSize: item === selectedValue ? '20px' : '14px', fontWeight: item === selectedValue ? '900' : '700', fontVariantNumeric: 'tabular-nums', scrollSnapAlign: 'center', cursor: 'pointer' }}
             >
@@ -548,9 +628,11 @@ function App() {
   const [exchangeRates, setExchangeRates] = useState({});
   const [expenseInput, setExpenseInput] = useState(() => ({ desc: '', amount: '', currency: '', paymentMethod: '', day: 1, time: getCurrentTimeInputValue() }));
   const [editingExpenseId, setEditingExpenseId] = useState(null);
+  const [placeSuggestions, setPlaceSuggestions] = useState([]);
 
   const sharedTripCount = (trips || []).filter(t => t.sharedId).length;
-  const autocompleteRef = useRef(null);
+  const suggestionRequestRef = useRef(0);
+  const autocompleteSessionTokenRef = useRef(null);
   const makeEntityId = () => crypto.randomUUID();
 
   // --- EFFECTS ---
@@ -1160,18 +1242,9 @@ function App() {
     
     const newItinerary = [...itinerary, { day: itinerary.length + 1, items: [] }];
     const totalDays = newItinerary.length;
-    let newEndDate = activeTrip.endDate;
-    
-    if (activeTrip.startDate) {
-      const startDateObj = new Date(activeTrip.startDate + "T00:00:00");
-      startDateObj.setDate(startDateObj.getDate() + (totalDays - 1));
-      
-      // Construct YYYY-MM-DD manually using local date methods to avoid UTC shift
-      const y = startDateObj.getFullYear();
-      const m = String(startDateObj.getMonth() + 1).padStart(2, '0');
-      const d = String(startDateObj.getDate()).padStart(2, '0');
-      newEndDate = `${y}-${m}-${d}`;
-    }
+    const newEndDate = activeTrip.startDate
+      ? getEndDateForDayCount(activeTrip.startDate, totalDays)
+      : activeTrip.endDate;
     
     await updateActiveTrip({ 
       itinerary: newItinerary, 
@@ -1193,12 +1266,9 @@ function App() {
     const newItinerary = itinerary
       .filter(day => parseDay(day.day) !== targetDay)
       .map((day, index) => ({ ...day, day: index + 1 }));
-    let newEndDate = activeTrip.endDate;
-    if (activeTrip.endDate) {
-      const endDate = new Date(`${activeTrip.endDate}T00:00:00`);
-      endDate.setDate(endDate.getDate() - 1);
-      newEndDate = endDate.toISOString().slice(0, 10);
-    }
+    const newEndDate = activeTrip.startDate
+      ? getEndDateForDayCount(activeTrip.startDate, newItinerary.length)
+      : activeTrip.endDate;
 
     await updateActiveTrip({ itinerary: newItinerary, endDate: newEndDate });
     setActiveDay(Math.min(targetDay, newItinerary.length));
@@ -1537,16 +1607,37 @@ function App() {
             return;
           }
           if (diffDays > 0 && diffDays <= 100) {
-             newItinerary = Array.from({length: diffDays}, (_, i) => ({ day: i + 1, items: [] }));
+             newItinerary = buildItineraryForDayCount(
+               (trips || []).find(trip => trip.id === id)?.itinerary,
+               diffDays
+             );
           }
         }
+      }
+
+      const targetTrip = (trips || []).find(trip => trip.id === id);
+      const currentItinerary = targetTrip?.itinerary || [];
+      const removedTrailingItems = newItinerary && newItinerary.length < currentItinerary.length
+        ? currentItinerary
+          .slice(newItinerary.length)
+          .flatMap(dayPlan => dayPlan?.items || [])
+        : [];
+
+      if (removedTrailingItems.length > 0) {
+        setModalConfig({
+          type: "error",
+          title: "일정이 있는 일차는 줄일 수 없습니다",
+          message: "마지막 일차에 일정이 남아 있습니다. 해당 일정을 예비 목록으로 이동하거나 삭제한 뒤 여행 기간을 줄여주세요."
+        });
+        setShowCustomModal(true);
+        return;
       }
 
       const nextTrips = (trips || []).map(t => {
         if (t.id === id) {
           const tripToUpdate = { ...t, name: name.trim(), startDate, endDate, country };
           if (newItinerary) {
-             tripToUpdate.itinerary = newItinerary.map((newDay, idx) => t.itinerary[idx] || newDay);
+             tripToUpdate.itinerary = buildItineraryForDayCount(t.itinerary, newItinerary.length);
           }
           if (travelCurrency) {
             tripToUpdate.budgetSettings = { ...t.budgetSettings, travelCurrency };
@@ -1807,7 +1898,8 @@ function App() {
 
   const updateItineraryItem = (dayNumber, itemId, updates) => {
     const sourceDayNum = parseDay(dayNumber);
-    const destinationDayNum = parseDay(updates.day ?? dayNumber);
+    const destinationIsReserve = updates.day === 'reserve';
+    const destinationDayNum = destinationIsReserve ? null : parseDay(updates.day ?? dayNumber);
     const itemUpdates = { ...updates };
     delete itemUpdates.day;
 
@@ -1825,6 +1917,9 @@ function App() {
       const updatedItem = { ...sourceItem, ...itemUpdates };
       const newItin = (t.itinerary || []).map(day => {
         const dayNum = parseDay(day.day);
+        if (destinationIsReserve && dayNum === sourceDayNum) {
+          return { ...day, items: day.items.filter(item => item.id !== itemId) };
+        }
         if (dayNum === sourceDayNum && dayNum === destinationDayNum) {
           return { ...day, items: sortItems(day.items.map(item => item.id === itemId ? updatedItem : item)) };
         }
@@ -1836,7 +1931,9 @@ function App() {
         }
         return day;
       });
-      return { ...t, itinerary: newItin };
+      return destinationIsReserve
+        ? { ...t, itinerary: newItin, reserveItems: [...(t.reserveItems || []), updatedItem] }
+        : { ...t, itinerary: newItin };
     });
     syncTripsToCloud(nextTrips);
   };
@@ -1886,45 +1983,91 @@ function App() {
     saveItinerary(newItinerary);
   };
 
-  const onPlaceSelected = () => {
-    const autocomplete = autocompleteRef.current;
-    if (!autocomplete) return;
-    const place = autocomplete.getPlace();
-    if (!place.geometry || !place.geometry.location) return;
+  const requestPlaceSuggestions = async (value) => {
+    const query = value.trim();
+    const requestId = ++suggestionRequestRef.current;
+    if (query.length < 2 || !window.google?.maps) {
+      setPlaceSuggestions([]);
+      return;
+    }
 
-    const newPlace = {
-      name: place.name,
-      lat: place.geometry.location.lat(),
-      lng: place.geometry.location.lng(),
-      loc: place.formatted_address,
-      desc: place.formatted_address,
-      emoji: '📍',
-      type: 'search'
-    };
-
-    setSearchResult(newPlace);
-    setSelectedPlace(newPlace);
-    setSearchInput(place.name || '');
-    setSearchQuery(place.formatted_address || place.name || '');
-    
-    if (map) {
-      if (place.geometry.viewport) {
-        map.fitBounds(place.geometry.viewport);
-      } else {
-        map.panTo(place.geometry.location);
-        map.setZoom(18);
+    try {
+      const placesLibrary = window.google.maps.places?.AutocompleteSuggestion
+        ? window.google.maps.places
+        : await window.google.maps.importLibrary?.('places');
+      const AutocompleteSuggestion = placesLibrary?.AutocompleteSuggestion;
+      if (!AutocompleteSuggestion) {
+        setPlaceSuggestions([]);
+        return;
       }
+      if (!autocompleteSessionTokenRef.current && placesLibrary.AutocompleteSessionToken) {
+        autocompleteSessionTokenRef.current = new placesLibrary.AutocompleteSessionToken();
+      }
+      const response = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
+        input: query,
+        includedRegionCodes: ['kr'],
+        sessionToken: autocompleteSessionTokenRef.current || undefined
+      });
+      if (requestId !== suggestionRequestRef.current) return;
+      setPlaceSuggestions((response?.suggestions || []).filter(item => item?.placePrediction).slice(0, 6));
+    } catch (error) {
+      if (requestId === suggestionRequestRef.current) setPlaceSuggestions([]);
+      console.warn('장소 자동완성 제안을 불러오지 못했습니다.', error);
+    }
+  };
+
+  const selectPlaceSuggestion = async (suggestion) => {
+    const prediction = suggestion?.placePrediction;
+    if (!prediction) return;
+
+    try {
+      const place = prediction.toPlace();
+      await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location', 'viewport'] });
+      const location = place.location;
+      if (!location) return;
+
+      const name = getFormattableText(place.displayName) || getFormattableText(prediction.mainText) || getFormattableText(prediction.text) || '선택한 장소';
+      const address = getFormattableText(place.formattedAddress) || getFormattableText(prediction.secondaryText) || '';
+      const newPlace = {
+        name,
+        lat: location.lat(),
+        lng: location.lng(),
+        loc: address,
+        desc: address,
+        emoji: '📍',
+        type: 'search'
+      };
+
+      setSearchResult(newPlace);
+      setSelectedPlace(newPlace);
+      setSearchInput(name);
+      setSearchQuery(address || name);
+      setPlaceSuggestions([]);
+      autocompleteSessionTokenRef.current = null;
+
+      if (map) {
+        if (place.viewport) {
+          map.fitBounds(place.viewport);
+        } else {
+          map.panTo(location);
+          map.setZoom(18);
+        }
+      }
+    } catch (error) {
+      console.warn('선택한 장소 정보를 불러오지 못했습니다.', error);
     }
   };
 
   const handleSearchSubmit = () => {
-    const query = searchQuery.trim();
-    const autocompletePlace = autocompleteRef.current?.getPlace?.();
-    if (autocompletePlace?.geometry?.location) {
-      onPlaceSelected();
+    const query = searchInput.trim() || searchQuery.trim();
+    if (!query) {
+      setSearchInput('');
+      setSearchQuery('');
+      setSearchResult(null);
+      setSelectedPlace(null);
       return;
     }
-    if (!query || !window.google?.maps) return;
+    if (!window.google?.maps) return;
 
     const geocoder = new window.google.maps.Geocoder();
     geocoder.geocode({ address: query }, (results, status) => {
@@ -2139,35 +2282,65 @@ function App() {
           pointerEvents: 'auto'
         }}>
            <div style={{ flex: 1, padding: '0 16px', display: 'flex', alignItems: 'center', height: '48px' }}>
-             <div style={{ width: '100%' }}>
-               <Autocomplete 
-                  onLoad={(a) => { autocompleteRef.current = a; }} 
-                  onPlaceChanged={onPlaceSelected}
-               >
-                 <input 
-                    type="text"
-                    className="search-input"
-                    value={searchInput}
-                    onChange={(e) => { setSearchInput(e.target.value); setSearchQuery(e.target.value); }}
-                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleSearchSubmit(); } }}
-                    aria-label="장소 또는 주소 검색"
-                    placeholder="어디로 떠나시나요?" 
-                    style={{ 
-                      width: '100%', 
-                      height: '48px', 
-                      lineHeight: 'normal', 
-                      background: 'transparent', 
-                      border: 'none', 
-                      outline: 'none', 
-                      fontSize: '16px', 
-                      fontWeight: 'bold', 
-                      color: '#1f2937', 
-                      padding: 0, 
-                      margin: 0, 
-                      display: 'block' 
-                    }}
-                 />
-               </Autocomplete>
+             <div style={{ width: '100%', position: 'relative' }}>
+               <input
+                  type="text"
+                  className="search-input"
+                  value={searchInput}
+                  onChange={(e) => {
+                    const nextValue = e.target.value;
+                    setSearchInput(nextValue);
+                    setSearchQuery(nextValue);
+                    setSearchResult(null);
+                    requestPlaceSuggestions(nextValue);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") setPlaceSuggestions([]);
+                    if (e.key === "Enter") { e.preventDefault(); setPlaceSuggestions([]); handleSearchSubmit(); }
+                  }}
+                  aria-label="장소 또는 주소 검색"
+                  placeholder="어디로 떠나시나요?"
+                  autoComplete="off"
+                  style={{
+                    width: '100%',
+                    height: '48px',
+                    lineHeight: 'normal',
+                    background: 'transparent',
+                    border: 'none',
+                    outline: 'none',
+                    fontSize: '16px',
+                    fontWeight: 'bold',
+                    color: '#1f2937',
+                    padding: 0,
+                    margin: 0,
+                    display: 'block'
+                  }}
+               />
+               {placeSuggestions.length > 0 && (
+                 <div role="listbox" aria-label="장소 검색 제안" className="search-suggestions">
+                   {placeSuggestions.map((suggestion, index) => {
+                     const prediction = suggestion.placePrediction;
+                     const primary = getFormattableText(prediction?.mainText) || getFormattableText(prediction?.text) || '장소';
+                     const secondary = getFormattableText(prediction?.secondaryText);
+                     return (
+                       <button
+                         type="button"
+                         role="option"
+                         key={`place-suggestion-${index}`}
+                         onMouseDown={(event) => event.preventDefault()}
+                         onClick={() => selectPlaceSuggestion(suggestion)}
+                         className="search-suggestion-item"
+                       >
+                         <MapPin size={16} aria-hidden="true" />
+                         <span>
+                           <strong>{primary}</strong>
+                           {secondary && <small>{secondary}</small>}
+                         </span>
+                       </button>
+                     );
+                   })}
+                 </div>
+               )}
              </div>
            </div>
            <button type="button" onClick={handleSearchSubmit} aria-label="장소 검색" style={{ width: '48px', height: '48px', backgroundColor: '#2563eb', color: 'white', borderRadius: '16px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)' }}>
@@ -2339,6 +2512,16 @@ function App() {
                       <div 
                         key={trip.id} 
                         onClick={() => { setActiveTripId(trip.id); openItinerary(); }}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`${trip.name} 여행 열기`}
+                        onKeyDown={(event) => {
+                          if ((event.key === 'Enter' || event.key === ' ') && editingTripId !== trip.id) {
+                            event.preventDefault();
+                            setActiveTripId(trip.id);
+                            openItinerary();
+                          }
+                        }}
                         style={{ padding: '24px', backgroundColor: activeTripId === trip.id ? '#f5f3ff' : 'white', border: activeTripId === trip.id ? '2px solid #ddd6fe' : '1px solid #f3f4f6', borderRadius: '20px', cursor: 'pointer', transition: '0.2s', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
@@ -2414,6 +2597,9 @@ function App() {
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', borderRight: '1px solid #f3f4f6', paddingRight: '8px' }}>
                                   <button 
+                                    type="button"
+                                    aria-label={`${trip.name} 목록에서 위로 이동`}
+                                    title="여행을 위로 이동"
                                     onClick={(e) => { e.stopPropagation(); moveTrip(trip.id, 'up'); }}
                                     style={{ background: 'none', border: 'none', color: (trips || []).indexOf(trip) === 0 ? '#f3f4f6' : '#cbd5e1', cursor: (trips || []).indexOf(trip) === 0 ? 'default' : 'pointer', padding: '1px', display: 'flex' }}
                                     disabled={(trips || []).indexOf(trip) === 0}
@@ -2421,6 +2607,9 @@ function App() {
                                     <ChevronUp size={14} />
                                   </button>
                                   <button 
+                                    type="button"
+                                    aria-label={`${trip.name} 목록에서 아래로 이동`}
+                                    title="여행을 아래로 이동"
                                     onClick={(e) => { e.stopPropagation(); moveTrip(trip.id, 'down'); }}
                                     style={{ background: 'none', border: 'none', color: (trips || []).indexOf(trip) === (trips || []).length - 1 ? '#f3f4f6' : '#cbd5e1', cursor: (trips || []).indexOf(trip) === (trips || []).length - 1 ? 'default' : 'pointer', padding: '1px', display: 'flex' }}
                                     disabled={(trips || []).indexOf(trip) === (trips || []).length - 1}
@@ -2431,6 +2620,8 @@ function App() {
 
                                 <div style={{ display: 'flex', gap: '4px' }}>
                                   <button 
+                                    type="button"
+                                    aria-label={trip.sharedId ? `${trip.name} 초대 코드 복사` : `${trip.name} 친구 초대`}
                                     onClick={(e) => { e.stopPropagation(); trip.sharedId ? copyToClipboard(trip.sharedId, trip.id) : shareTrip(trip.id); }}
                                     style={{ width: '36px', height: '36px', borderRadius: '10px', border: 'none', backgroundColor: trip.sharedId ? '#f3f4f6' : '#f5f3ff', color: trip.sharedId ? '#6b7280' : '#8b5cf6', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s' }}
                                     title={trip.sharedId ? "초대 코드 복사" : "친구 초대하기"}
@@ -2438,6 +2629,7 @@ function App() {
                                     {copiedId === trip.id ? <Check size={16} color="#10b981" /> : <Share2 size={16} />}
                                   </button>
                                   <button
+                                    type="button"
                                     onClick={(e) => { e.stopPropagation(); duplicateTrip(trip); }}
                                     style={{ width: "36px", height: "36px", borderRadius: "10px", border: "none", backgroundColor: "#f8fafc", color: "#64748b", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.2s" }}
                                     title="여행 복제"
@@ -2446,6 +2638,8 @@ function App() {
                                     <Copy size={16} />
                                   </button>
                                   <button
+                                    type="button"
+                                    aria-label={`${trip.name} 여행 정보 수정`}
                                     onClick={(e) => { e.stopPropagation(); startRenameTrip(trip); }}
                                     style={{ width: '36px', height: '36px', borderRadius: '10px', border: 'none', backgroundColor: '#f8fafc', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s' }}
                                     title="여행 정보 수정"
@@ -2453,6 +2647,8 @@ function App() {
                                     <Edit2 size={16} />
                                   </button>
                                   <button 
+                                    type="button"
+                                    aria-label={`${trip.name} 여행 삭제`}
                                     onClick={(e) => handleInlineDelete(e, `trip-${trip.id}`, () => deleteTrip(trip.id))}
                                     style={{ 
                                       minWidth: confirmDeleteId === `trip-${trip.id}` ? '60px' : '36px', 
@@ -2727,6 +2923,15 @@ function App() {
                     <div 
                       className="itinerary-day-header"
                       onClick={() => dayPlan?.day && setActiveDay(parseDay(dayPlan.day))}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`${dayPlan?.day}일차 선택`}
+                      onKeyDown={(event) => {
+                        if ((event.key === 'Enter' || event.key === ' ') && dayPlan?.day) {
+                          event.preventDefault();
+                          setActiveDay(parseDay(dayPlan.day));
+                        }
+                      }}
                       style={{ 
                         padding: '20px 24px', 
                         backgroundColor: parseDay(activeDay) === parseDay(dayPlan?.day) ? '#eff6ff' : '#f9fafb', 
@@ -2902,6 +3107,9 @@ function App() {
                                       border: '1px solid #f1f5f9'
                                     }}>
                                       <button 
+                                        type="button"
+                                        aria-label={`${item.displayName || item.name || '일정'} 위로 이동`}
+                                        title="위로 이동"
                                         onClick={() => moveItineraryItem(dayPlan.day, item.id, 'up')}
                                         style={{ background: 'none', border: 'none', color: iIdx === 0 ? '#e5e7eb' : '#9ca3af', cursor: iIdx === 0 ? 'default' : 'pointer', padding: '4px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                         disabled={iIdx === 0}
@@ -2909,6 +3117,9 @@ function App() {
                                         <ChevronUp size={14} />
                                       </button>
                                       <button 
+                                        type="button"
+                                        aria-label={`${item.displayName || item.name || '일정'} 아래로 이동`}
+                                        title="아래로 이동"
                                         onClick={() => moveItineraryItem(dayPlan.day, item.id, 'down')}
                                         style={{ background: 'none', border: 'none', color: iIdx === dayPlan.items.length - 1 ? '#e5e7eb' : '#9ca3af', cursor: iIdx === dayPlan.items.length - 1 ? 'default' : 'pointer', padding: '4px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderTop: '1px solid #f1f5f9' }}
                                         disabled={iIdx === dayPlan.items.length - 1}
@@ -2921,7 +3132,7 @@ function App() {
                                     <button
                                       type="button"
                                       aria-label={`${item.displayName || item.name || '일정'} 편집`}
-                                      title="일정 편집: 이름, 시간, 일차 변경"
+                                      title="일정 편집: 이름, 시간, 일정 위치 변경"
                                       onClick={(event) => { event.stopPropagation(); startEditingItineraryItem(dayPlan.day, item); }}
                                       style={{
                                         height: '44px', width: '44px',
@@ -2936,6 +3147,9 @@ function App() {
 
                                     {/* Navigation Button */}
                                     <button 
+                                      type="button"
+                                      aria-label={`${item.displayName || item.name || '일정'} 길찾기`}
+                                      title="길찾기"
                                       onClick={(e) => { 
                                         e.stopPropagation(); 
                                         const isKoreaTrip = activeTrip?.country === '대한민국';
@@ -2967,7 +3181,6 @@ function App() {
                                         cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
                                         transition: 'all 0.2s'
                                       }}
-                                      title="길찾기"
                                     >
                                       <Navigation size={18} />
                                     </button>
@@ -2975,6 +3188,9 @@ function App() {
                                     {/* Delete Button */}
                                     <div style={{ position: 'relative', width: '44px', height: '44px' }}>
                                       <button 
+                                        type="button"
+                                        aria-label={`${item.displayName || item.name || '일정'} 일정 삭제`}
+                                        title={confirmDeleteId === `itin-${item.id}` ? '삭제 확인' : '일정 삭제'}
                                         onClick={(e) => { e.stopPropagation(); handleInlineDelete(e, `itin-${item.id}`, () => removeFromItinerary(dayPlan.day, item.id)); }}
                                         style={{ 
                                           position: confirmDeleteId === `itin-${item.id}` ? 'absolute' : 'relative',
@@ -3607,7 +3823,7 @@ function App() {
         >
           {/* Favorite Markers */}
           {(favorites || []).map(fav => (
-            <Marker
+            <CustomMapMarker
               key={`fav-${fav.name}`}
               position={{ lat: fav.lat, lng: fav.lng }}
               onClick={() => setSelectedPlace(fav)}
@@ -3626,7 +3842,7 @@ function App() {
 
           {/* User Current Location Marker */}
           {userLocation && (
-            <Marker
+            <CustomMapMarker
               position={userLocation}
               icon={{
                 url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
@@ -3704,7 +3920,7 @@ function App() {
 
               {/* 3. Day Markers (Labels for the start of each day) */}
               {fullTripPaths.map((path, idx) => (
-                <Marker
+                <CustomMapMarker
                   key={`day-label-${idx}`}
                   position={path[0]}
                   label={{
@@ -3737,7 +3953,7 @@ function App() {
                 return (dayPlan?.items || [])
                   .filter(item => item.lat && item.lng)
                   .map((item, idx) => (
-                  <Marker
+                  <CustomMapMarker
                     key={`itin-mark-${activeDay}-${item.id}`}
                     position={{ lat: Number(item.lat), lng: Number(item.lng) }}
                     label={{ text: `${idx + 1}`, color: 'white', fontSize: '14px', fontWeight: '900' }}
@@ -3762,7 +3978,7 @@ function App() {
               {reserveItems
                 .filter(item => item.lat && item.lng)
                 .map((item, idx) => (
-                  <Marker
+                  <CustomMapMarker
                     key={`reserve-mark-${item.id}`}
                     position={{ lat: Number(item.lat), lng: Number(item.lng) }}
                     label={{ text: `${idx + 1}`, color: 'white', fontSize: '14px', fontWeight: '900' }}
@@ -3785,7 +4001,7 @@ function App() {
               {(day.items || [])
                 .filter(item => item.lat && item.lng)
                 .map((item, idx) => (
-                  <Marker
+                  <CustomMapMarker
                     key={`full-itin-mark-${dIdx}-${item.id}`}
                     position={{ lat: Number(item.lat), lng: Number(item.lng) }}
                     label={{ text: `${day.day}-${idx + 1}`, color: 'white', fontSize: '11px', fontWeight: '800' }}
@@ -3805,7 +4021,7 @@ function App() {
 
           {/* Dynamic Search Result Marker */}
           {searchResult && searchResult.name !== selectedPlace?.name && (
-             <Marker
+             <CustomMapMarker
                 position={{ lat: searchResult.lat, lng: searchResult.lng }}
                 onClick={() => setSelectedPlace(searchResult)}
                 icon={{
@@ -4139,6 +4355,9 @@ function App() {
             animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
           }}>
             <button 
+              type="button"
+              aria-label="일정 수정 창 닫기"
+              title="일정 수정 창 닫기"
               onClick={() => setEditingTimeItem(null)}
               style={{ position: 'absolute', top: '20px', right: '20px', border: 'none', background: '#f1f5f9', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', cursor: 'pointer' }}
             >
@@ -4151,12 +4370,13 @@ function App() {
             </div>
 
             <div style={{ marginBottom: "14px" }}>
-              <label style={{ display: "block", fontSize: "10px", fontWeight: "900", color: "#64748b", marginBottom: "8px" }}>일정 일차</label>
+              <label style={{ display: "block", fontSize: "10px", fontWeight: "900", color: "#64748b", marginBottom: "8px" }}>일정 위치</label>
               <select
                 value={editingTimeItem.day}
-                onChange={(e) => setEditingTimeItem({ ...editingTimeItem, day: Number(e.target.value) })}
+                onChange={(e) => setEditingTimeItem({ ...editingTimeItem, day: e.target.value === 'reserve' ? 'reserve' : Number(e.target.value) })}
                 style={{ width: "100%", boxSizing: "border-box", padding: "12px", borderRadius: "12px", border: "1px solid #e2e8f0", backgroundColor: "white", fontSize: "14px", fontWeight: "700", outline: "none" }}
               >
+                <option value="reserve">예비 목록</option>
                 {itinerary.map(dayPlan => (
                   <option key={dayPlan.day} value={parseDay(dayPlan.day)}>{parseDay(dayPlan.day)}일차</option>
                 ))}
@@ -4190,11 +4410,12 @@ function App() {
               </button>
               <button 
                 onClick={() => {
-                  updateItineraryItem(editingTimeItem.sourceDay ?? editingTimeItem.day, editingTimeItem.id, {
+                  updateItineraryItem(editingTimeItem.sourceDay, editingTimeItem.id, {
                     day: editingTimeItem.day,
                     time: editingTimeItem.time,
                     displayName: editingTimeItem.displayName.trim() || editingTimeItem.originalName
                   });
+                  if (editingTimeItem.day === 'reserve') setActiveDay('reserve');
                   setEditingTimeItem(null);
                 }}
                 style={{ flex: 2, padding: '16px', borderRadius: '16px', border: 'none', backgroundColor: '#3b82f6', color: 'white', fontSize: '15px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 10px 15px -3px rgba(59, 130, 246, 0.3)' }}
