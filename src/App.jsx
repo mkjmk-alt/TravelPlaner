@@ -556,6 +556,10 @@ function App() {
   const [expandedCountries, setExpandedCountries] = useState({});
   const [editingTripId, setEditingTripId] = useState(null);
   const [editTripData, setEditTripData] = useState({ name: "", startDate: "", endDate: "", country: "" });
+  const [showCreateTripModal, setShowCreateTripModal] = useState(false);
+  const [createTripData, setCreateTripData] = useState({ name: "", startDate: "", endDate: "", country: "" });
+  const [createTripError, setCreateTripError] = useState('');
+  const [openItineraryAfterCreate, setOpenItineraryAfterCreate] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
   const [map, setMap] = useState(null);
@@ -564,6 +568,10 @@ function App() {
   const [syncStatus, setSyncStatus] = useState('saved');
   const [showShareToast, setShowShareToast] = useState(false);
   const [hasTriggeredToast, setHasTriggeredToast] = useState(false);
+  const [showJoinTripModal, setShowJoinTripModal] = useState(false);
+  const [joinTripCode, setJoinTripCode] = useState('');
+  const [joinTripError, setJoinTripError] = useState('');
+  const [isJoiningTrip, setIsJoiningTrip] = useState(false);
   const [itineraryTime, setItineraryTime] = useState('');
   const [itineraryDisplayName, setItineraryDisplayName] = useState('');
   const [editingTimeItem, setEditingTimeItem] = useState(null); // { day, id, time, displayName, originalName }
@@ -842,6 +850,13 @@ function App() {
   const reserveItems = useMemo(() => activeTrip?.reserveItems || [], [activeTrip]);
   const budgetSettings = activeTrip?.budgetSettings || { limitKRW: 1000000, travelCurrency: 'USD' };
   const expenses = useMemo(() => activeTrip?.expenses || [], [activeTrip]);
+  const createTripDayCount = useMemo(() => {
+    if (!createTripData.startDate || !createTripData.endDate) return 0;
+    const start = new Date(`${createTripData.startDate}T00:00:00`);
+    const end = new Date(`${createTripData.endDate}T00:00:00`);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) return 0;
+    return Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+  }, [createTripData.startDate, createTripData.endDate]);
 
   const getExpenseAmountKRW = (amount, currency) => {
     const numericAmount = Number(amount);
@@ -1172,9 +1187,47 @@ function App() {
     }
   };
 
+  const openJoinTripModal = () => {
+    setJoinTripCode('');
+    setJoinTripError('');
+    setShowJoinTripModal(true);
+  };
+
+  const cancelJoinTrip = () => {
+    if (isJoiningTrip) return;
+    setShowJoinTripModal(false);
+    setJoinTripCode('');
+    setJoinTripError('');
+  };
+
+  const pasteJoinTripCode = async () => {
+    try {
+      if (!navigator.clipboard?.readText) throw new Error('Clipboard unavailable');
+      const clipboardText = await navigator.clipboard.readText();
+      if (!clipboardText.trim()) {
+        setJoinTripError('클립보드에 공유 코드가 없습니다.');
+        return;
+      }
+      setJoinTripCode(clipboardText.trim());
+      setJoinTripError('');
+    } catch {
+      setJoinTripError('클립보드에 접근할 수 없습니다. 공유 코드를 직접 입력해주세요.');
+    }
+  };
+
   const joinSharedTrip = async () => {
-    const code = prompt("친구에게 받은 공유 코드를 입력하세요:");
-    if (!code || code.trim().length < 10) return;
+    const code = joinTripCode.trim();
+    if (!code) {
+      setJoinTripError('친구에게 받은 공유 코드를 입력해주세요.');
+      return;
+    }
+    if (code.length < 10) {
+      setJoinTripError('공유 코드가 너무 짧습니다. 코드를 다시 확인해주세요.');
+      return;
+    }
+
+    setIsJoiningTrip(true);
+    setJoinTripError('');
 
     try {
       const { data, error } = await supabase
@@ -1183,11 +1236,13 @@ function App() {
         .eq('id', code.trim())
         .single();
 
-      if (error || !data) throw new Error("Invalid Code");
+      if (error || !data) {
+        setJoinTripError('올바른 공유 코드를 찾을 수 없습니다. 코드를 다시 확인해주세요.');
+        return;
+      }
 
       if ((trips || []).some(t => t.sharedId === data.id)) {
-        setModalConfig({ type: 'error', title: '참여 불가', message: "이미 참여 중인 여행입니다." });
-        setShowCustomModal(true);
+        setJoinTripError('이미 참여 중인 여행입니다.');
         return;
       }
 
@@ -1196,11 +1251,14 @@ function App() {
       await syncTripsToCloud(newTrips);
       setActiveTripId(joinedTrip.id);
       openItinerary();
+      setShowJoinTripModal(false);
+      setJoinTripCode('');
       setModalConfig({ type: 'success', title: '참여 완료', message: `'${joinedTrip.name}' 일정에 참여했습니다!` });
       setShowCustomModal(true);
     } catch {
-      setModalConfig({ type: 'error', title: '참여 실패', message: "올바른 공유 코드를 입력해 주세요." });
-      setShowCustomModal(true);
+      setJoinTripError('참여에 실패했습니다. 네트워크 상태와 공유 코드를 확인해주세요.');
+    } finally {
+      setIsJoiningTrip(false);
     }
   };
 
@@ -1355,32 +1413,71 @@ function App() {
 
   // --- TRIP CRUD ---
   const createNewTrip = (openAfterCreate = false) => {
+    const today = formatLocalDate(new Date());
+    setCreateTripData({ name: '', startDate: today, endDate: today, country: '' });
+    setCreateTripError('');
+    setOpenItineraryAfterCreate(openAfterCreate);
+    setShowCreateTripModal(true);
+  };
+
+  const cancelCreateTrip = () => {
+    setShowCreateTripModal(false);
+    setCreateTripError('');
+    setOpenItineraryAfterCreate(false);
+  };
+
+  const saveNewTrip = async () => {
+    const { name, startDate, endDate, country } = createTripData;
+    const trimmedName = name.trim();
+    const shouldOpenItinerary = openItineraryAfterCreate;
+
+    if (!trimmedName) {
+      setCreateTripError('여행 이름을 입력해주세요.');
+      return;
+    }
+    if (!startDate || !endDate) {
+      setCreateTripError('여행 시작일과 종료일을 모두 선택해주세요.');
+      return;
+    }
+
+    const start = new Date(`${startDate}T00:00:00`);
+    const end = new Date(`${endDate}T00:00:00`);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
+      setCreateTripError('시작일은 종료일보다 늦을 수 없습니다.');
+      return;
+    }
+
+    const dayCount = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+    if (dayCount > 100) {
+      setCreateTripError('여행 기간은 최대 100일까지 설정할 수 있습니다.');
+      return;
+    }
+
     const newId = Date.now().toString();
-    const today = new Date().toISOString().split('T')[0];
     const newTrip = {
       id: newId,
-      name: "새 여행",
-      country: "",
-      startDate: today,
-      endDate: today,
-      itinerary: [{ day: 1, items: [] }],
+      name: trimmedName,
+      country,
+      startDate,
+      endDate,
+      itinerary: buildItineraryForDayCount([], dayCount),
       reserveItems: [],
-      budgetSettings: { limitKRW: 1000000, travelCurrency: 'USD' },
+      budgetSettings: { limitKRW: 1000000, travelCurrency: countryToCurrency[country] || 'USD' },
       expenses: [],
       reminders: { enabled: false, minutesBefore: 30 },
       createdAt: Date.now()
     };
-    
-    const newTrips = [newTrip, ...trips];
-    syncTripsToCloud(newTrips);
-    
-    // Auto-enter inline edit mode
-    setEditingTripId(newId);
-    setEditTripData({ name: "새 여행", startDate: today, endDate: today, country: "" });
-    if (openAfterCreate) {
-      setEditingTripId(null);
+
+    const newTrips = [newTrip, ...(trips || [])];
+    await syncTripsToCloud(newTrips);
+    setShowCreateTripModal(false);
+    setCreateTripError('');
+    setOpenItineraryAfterCreate(false);
+
+    if (shouldOpenItinerary) {
       setActiveTripId(newId);
       openItinerary();
+      setShowOnboarding(false);
       setOnboardingStep(1);
     }
   };
@@ -1404,7 +1501,7 @@ function App() {
     dismissOnboarding();
   };
 
-  const exportTripAsJson = (trip = activeTrip) => {
+  const exportTripBackupAsJson = (trip = activeTrip) => {
     if (!trip) return;
 
     const exportData = { ...trip };
@@ -1414,12 +1511,12 @@ function App() {
     const link = document.createElement("a");
     const safeName = (trip.name || "travel-plan").replace(/[^\w가-힣-]+/g, "_");
     link.href = url;
-    link.download = safeName + ".json";
+    link.download = safeName + "-backup.json";
     document.body.appendChild(link);
     link.click();
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-    setModalConfig({ type: "success", title: "내보내기 완료", message: "일정 JSON 파일을 저장했습니다." });
+    setModalConfig({ type: "success", title: "여행 데이터 백업 완료", message: "일정·지출·예산이 포함된 여행 데이터 백업 파일을 저장했습니다." });
     setShowCustomModal(true);
   };
 
@@ -2568,7 +2665,7 @@ function App() {
                         <button onClick={createNewTrip} className="trip-action-button" style={{ fontSize: '14px', color: 'white', backgroundColor: '#8b5cf6', borderColor: '#8b5cf6', boxShadow: '0 10px 15px -3px rgba(139, 92, 246, 0.3)' }}>
                           <PlusCircle size={18} /> 새 여행 계획하기
                         </button>
-                        <button onClick={joinSharedTrip} className="trip-action-button" style={{ color: '#059669', backgroundColor: '#f0fdf4', borderColor: '#dcfce7' }}>
+                        <button onClick={openJoinTripModal} className="trip-action-button" style={{ color: '#059669', backgroundColor: '#f0fdf4', borderColor: '#dcfce7' }}>
                           <Users size={18} /> 참여하기
                         </button>
                       </div>
@@ -2872,15 +2969,6 @@ function App() {
                         <Bell size={14} /> {activeTrip?.reminders?.enabled ? '알림 켜짐' : '알림 설정'}
                     </button>
                     <button
-                      onClick={() => exportTripAsJson(activeTrip)}
-                      type="button"
-                      aria-label="일정 JSON 내보내기"
-                      title="일정 JSON 내보내기"
-                      style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", fontWeight: "800", color: "#475569", backgroundColor: "#f8fafc", padding: "8px 12px", borderRadius: "14px", border: "none", cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.2s" }}
-                    >
-                      <Download size={14} /> 내보내기
-                    </button>
-                    <button
                       onClick={() => exportTripAsIcal(activeTrip)}
                       type="button"
                       aria-label="캘린더 파일 내보내기"
@@ -2900,6 +2988,15 @@ function App() {
                       onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#eff6ff'}
                     >
                       <PlusCircle size={14} /> 일차 추가
+                    </button>
+                    <button
+                      onClick={() => exportTripBackupAsJson(activeTrip)}
+                      type="button"
+                      aria-label="여행 데이터 백업 내보내기"
+                      title="일정·지출·예산이 포함된 여행 데이터 백업"
+                      style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: '800', color: '#64748b', backgroundColor: '#f8fafc', padding: '8px 12px', borderRadius: '14px', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                    >
+                      <Download size={14} /> 데이터 백업
                     </button>
                 </div>
                 </div>
@@ -3816,6 +3913,219 @@ function App() {
         </div>
       )}
 
+      {showCreateTripModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="create-trip-modal-title"
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') cancelCreateTrip();
+          }}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 13000,
+            backgroundColor: 'rgba(15, 23, 42, 0.45)', backdropFilter: 'blur(8px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '20px', animation: 'fadeIn 0.2s ease-out'
+          }}
+        >
+          <form
+            onSubmit={(event) => { event.preventDefault(); saveNewTrip(); }}
+            style={{
+              backgroundColor: 'white', borderRadius: '28px', width: '100%', maxWidth: '440px',
+              maxHeight: 'calc(100vh - 40px)', overflowY: 'auto', padding: '28px 24px',
+              boxShadow: '0 25px 60px rgba(15, 23, 42, 0.25)', position: 'relative',
+              animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+          >
+            <button
+              type="button"
+              aria-label="새 여행 만들기 창 닫기"
+              title="닫기"
+              onClick={cancelCreateTrip}
+              style={{ position: 'absolute', top: '20px', right: '20px', border: 'none', background: '#f1f5f9', width: '34px', height: '34px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', cursor: 'pointer' }}
+            >
+              <X size={18} />
+            </button>
+
+            <div style={{ paddingRight: '44px', marginBottom: '24px' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 9px', borderRadius: '999px', backgroundColor: '#f5f3ff', color: '#7c3aed', fontSize: '11px', fontWeight: '900', marginBottom: '10px' }}>
+                <PlusCircle size={14} /> 새 여행
+              </div>
+              <h2 id="create-trip-modal-title" style={{ margin: 0, color: '#0f172a', fontSize: '22px', fontWeight: '900', letterSpacing: '-0.04em' }}>여행 기본 정보</h2>
+              <p style={{ margin: '7px 0 0', color: '#64748b', fontSize: '12px', lineHeight: 1.5 }}>일정을 추가하기 전에 여행 이름과 기간을 입력해주세요.</p>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                <span style={{ color: '#475569', fontSize: '11px', fontWeight: '900' }}>여행 이름 <span style={{ color: '#ef4444' }}>*</span></span>
+                <input
+                  autoFocus
+                  type="text"
+                  value={createTripData.name}
+                  onChange={(event) => { setCreateTripData({ ...createTripData, name: event.target.value }); setCreateTripError(''); }}
+                  placeholder="예: 나트랑 4박 5일 여행"
+                  maxLength={80}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '13px 14px', border: '1px solid #e2e8f0', borderRadius: '13px', backgroundColor: '#f8fafc', color: '#0f172a', fontSize: '14px', fontWeight: '700', outline: 'none' }}
+                />
+              </label>
+
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                <span style={{ color: '#475569', fontSize: '11px', fontWeight: '900' }}>여행 국가 <span style={{ color: '#94a3b8', fontWeight: '700' }}>(선택)</span></span>
+                <select
+                  value={createTripData.country}
+                  onChange={(event) => setCreateTripData({ ...createTripData, country: event.target.value })}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '13px 14px', border: '1px solid #e2e8f0', borderRadius: '13px', backgroundColor: '#f8fafc', color: '#0f172a', fontSize: '14px', fontWeight: '700', outline: 'none' }}
+                >
+                  <option value="">나라를 선택해주세요</option>
+                  {Object.keys(countryToCurrency).map((countryName) => (
+                    <option key={`create-trip-country-${countryName}`} value={countryName}>{countryName}</option>
+                  ))}
+                </select>
+              </label>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                  <span style={{ color: '#475569', fontSize: '11px', fontWeight: '900' }}>시작일 <span style={{ color: '#ef4444' }}>*</span></span>
+                  <input
+                    type="date"
+                    value={createTripData.startDate}
+                    onChange={(event) => setCreateTripData({ ...createTripData, startDate: event.target.value })}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '13px 10px', border: '1px solid #e2e8f0', borderRadius: '13px', backgroundColor: '#f8fafc', color: '#0f172a', fontSize: '13px', fontWeight: '700', outline: 'none' }}
+                  />
+                </label>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                  <span style={{ color: '#475569', fontSize: '11px', fontWeight: '900' }}>종료일 <span style={{ color: '#ef4444' }}>*</span></span>
+                  <input
+                    type="date"
+                    value={createTripData.endDate}
+                    onChange={(event) => setCreateTripData({ ...createTripData, endDate: event.target.value })}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '13px 10px', border: '1px solid #e2e8f0', borderRadius: '13px', backgroundColor: '#f8fafc', color: '#0f172a', fontSize: '13px', fontWeight: '700', outline: 'none' }}
+                  />
+                </label>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '12px 14px', borderRadius: '13px', backgroundColor: createTripDayCount > 0 ? '#eff6ff' : '#f8fafc', color: createTripDayCount > 0 ? '#2563eb' : '#94a3b8', fontSize: '12px', fontWeight: '800' }}>
+                <span>생성될 일정</span>
+                <strong>{createTripDayCount > 0 ? `${createTripDayCount}일차` : '날짜를 확인해주세요'}</strong>
+              </div>
+            </div>
+
+            {createTripError && (
+              <p role="alert" style={{ margin: '14px 0 0', padding: '10px 12px', borderRadius: '11px', backgroundColor: '#fef2f2', color: '#dc2626', fontSize: '12px', fontWeight: '800', lineHeight: 1.45 }}>{createTripError}</p>
+            )}
+
+            <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
+              <button
+                type="button"
+                onClick={cancelCreateTrip}
+                style={{ flex: 1, padding: '14px', border: '1px solid #e2e8f0', borderRadius: '14px', backgroundColor: 'white', color: '#64748b', fontSize: '14px', fontWeight: '900', cursor: 'pointer' }}
+              >
+                취소
+              </button>
+              <button
+                type="submit"
+                style={{ flex: 1.6, padding: '14px', border: 'none', borderRadius: '14px', backgroundColor: '#8b5cf6', color: 'white', fontSize: '14px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 10px 20px rgba(139, 92, 246, 0.22)' }}
+              >
+                여행 만들기
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {showJoinTripModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="join-trip-modal-title"
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') cancelJoinTrip();
+          }}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 13000,
+            backgroundColor: 'rgba(15, 23, 42, 0.45)', backdropFilter: 'blur(8px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '20px', animation: 'fadeIn 0.2s ease-out'
+          }}
+        >
+          <form
+            onSubmit={(event) => { event.preventDefault(); joinSharedTrip(); }}
+            style={{
+              backgroundColor: 'white', borderRadius: '28px', width: '100%', maxWidth: '420px',
+              padding: '28px 24px', boxShadow: '0 25px 60px rgba(15, 23, 42, 0.25)',
+              position: 'relative', animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+          >
+            <button
+              type="button"
+              aria-label="참여하기 창 닫기"
+              title="닫기"
+              onClick={cancelJoinTrip}
+              disabled={isJoiningTrip}
+              style={{ position: 'absolute', top: '20px', right: '20px', border: 'none', background: '#f1f5f9', width: '34px', height: '34px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', cursor: isJoiningTrip ? 'not-allowed' : 'pointer', opacity: isJoiningTrip ? 0.5 : 1 }}
+            >
+              <X size={18} />
+            </button>
+
+            <div style={{ paddingRight: '44px', marginBottom: '22px' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 9px', borderRadius: '999px', backgroundColor: '#ecfdf5', color: '#059669', fontSize: '11px', fontWeight: '900', marginBottom: '10px' }}>
+                <Users size={14} /> 공유 일정
+              </div>
+              <h2 id="join-trip-modal-title" style={{ margin: 0, color: '#0f172a', fontSize: '22px', fontWeight: '900', letterSpacing: '-0.04em' }}>여행에 참여하기</h2>
+              <p style={{ margin: '7px 0 0', color: '#64748b', fontSize: '12px', lineHeight: 1.5 }}>친구에게 받은 공유 코드를 입력하면 여행 일정이 내 목록에 추가됩니다.</p>
+            </div>
+
+            <label htmlFor="join-trip-code" style={{ display: 'block', color: '#475569', fontSize: '11px', fontWeight: '900', marginBottom: '8px' }}>공유 코드</label>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'stretch' }}>
+              <input
+                id="join-trip-code"
+                autoFocus
+                type="text"
+                value={joinTripCode}
+                onChange={(event) => { setJoinTripCode(event.target.value); setJoinTripError(''); }}
+                placeholder="공유 코드를 붙여넣어 주세요"
+                autoComplete="off"
+                spellCheck="false"
+                disabled={isJoiningTrip}
+                style={{ flex: 1, minWidth: 0, boxSizing: 'border-box', padding: '13px 14px', border: '1px solid #d1fae5', borderRadius: '13px', backgroundColor: '#f8fafc', color: '#0f172a', fontSize: '14px', fontWeight: '700', outline: 'none' }}
+              />
+              <button
+                type="button"
+                onClick={pasteJoinTripCode}
+                disabled={isJoiningTrip}
+                aria-label="클립보드에서 공유 코드 붙여넣기"
+                title="클립보드에서 붙여넣기"
+                style={{ flexShrink: 0, width: '48px', border: '1px solid #d1fae5', borderRadius: '13px', backgroundColor: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isJoiningTrip ? 'not-allowed' : 'pointer', opacity: isJoiningTrip ? 0.5 : 1 }}
+              >
+                <Clipboard size={18} />
+              </button>
+            </div>
+
+            {joinTripError && (
+              <p role="alert" style={{ margin: '12px 0 0', padding: '10px 12px', borderRadius: '11px', backgroundColor: '#fef2f2', color: '#dc2626', fontSize: '12px', fontWeight: '800', lineHeight: 1.45 }}>{joinTripError}</p>
+            )}
+
+            <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
+              <button
+                type="button"
+                onClick={cancelJoinTrip}
+                disabled={isJoiningTrip}
+                style={{ flex: 1, padding: '14px', border: '1px solid #e2e8f0', borderRadius: '14px', backgroundColor: 'white', color: '#64748b', fontSize: '14px', fontWeight: '900', cursor: isJoiningTrip ? 'not-allowed' : 'pointer', opacity: isJoiningTrip ? 0.5 : 1 }}
+              >
+                취소
+              </button>
+              <button
+                type="submit"
+                disabled={isJoiningTrip}
+                style={{ flex: 1.6, padding: '14px', border: 'none', borderRadius: '14px', backgroundColor: '#059669', color: 'white', fontSize: '14px', fontWeight: '900', cursor: isJoiningTrip ? 'wait' : 'pointer', boxShadow: '0 10px 20px rgba(5, 150, 105, 0.2)', opacity: isJoiningTrip ? 0.7 : 1 }}
+              >
+                {isJoiningTrip ? '참여 중...' : '일정에 참여하기'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {showOnboarding && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 12000, backgroundColor: 'rgba(15, 23, 42, 0.45)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <div style={{ width: '100%', maxWidth: '420px', backgroundColor: 'white', borderRadius: '28px', padding: '28px', boxShadow: '0 24px 80px rgba(15,23,42,0.25)' }}>
@@ -4637,7 +4947,7 @@ function App() {
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
           backgroundColor: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(8px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 3000, padding: '20px', animation: 'fadeIn 0.2s ease-out'
+          zIndex: 5000, padding: '20px', animation: 'fadeIn 0.2s ease-out'
         }}>
           <div style={{
             backgroundColor: 'white', borderRadius: '32px', width: '100%', maxWidth: '360px',
