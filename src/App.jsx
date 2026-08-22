@@ -32,6 +32,7 @@ const writeStoredJson = (key, value) => {
 };
 
 const ONBOARDING_STORAGE_KEY = 'travelplaner_onboarding_seen_v1';
+const SYNC_CONFLICT_DISMISSED_STORAGE_PREFIX = 'travelplaner_sync_conflict_dismissed_v1';
 
 const escapeIcsText = (value) => String(value || '')
   .replace(/\\/g, '\\\\')
@@ -556,9 +557,34 @@ const getSafeExternalUrl = (value) => {
 
 const getTripUpdatedAt = (trip) => Number(trip?.updatedAt || trip?.createdAt || 0);
 
+const sortSyncValue = (value) => {
+  if (Array.isArray(value)) return value.map(sortSyncValue);
+  if (!value || typeof value !== 'object') return value;
+  return Object.keys(value).sort().reduce((sorted, key) => {
+    sorted[key] = sortSyncValue(value[key]);
+    return sorted;
+  }, {});
+};
+
+const getComparableTrip = (trip) => {
+  const comparableTrip = { ...(trip || {}) };
+  // This is local bookkeeping and changes during every save. It is not trip content.
+  delete comparableTrip.updatedAt;
+  comparableTrip.reserveItems = Array.isArray(comparableTrip.reserveItems) ? comparableTrip.reserveItems : [];
+  comparableTrip.checklist = Array.isArray(comparableTrip.checklist) ? comparableTrip.checklist : getDefaultChecklist();
+  comparableTrip.expenses = Array.isArray(comparableTrip.expenses)
+    ? comparableTrip.expenses.map(expense => ({
+      ...expense,
+      category: expense.category || 'other',
+      memo: expense.memo || ''
+    }))
+    : [];
+  return sortSyncValue(comparableTrip);
+};
+
 const areTripsEqual = (left, right) => {
   try {
-    return JSON.stringify(left) === JSON.stringify(right);
+    return JSON.stringify(getComparableTrip(left)) === JSON.stringify(getComparableTrip(right));
   } catch {
     return false;
   }
@@ -1019,6 +1045,14 @@ function App() {
   const [sharedViewError, setSharedViewError] = useState('');
   const [isOnline, setIsOnline] = useState(() => typeof navigator === 'undefined' ? true : navigator.onLine);
 
+  const dismissSyncConflictNotice = () => {
+    const signature = syncConflictNotice?.signature;
+    if (signature && session?.user?.id) {
+      writeStoredJson(`${SYNC_CONFLICT_DISMISSED_STORAGE_PREFIX}_${session.user.id}`, signature);
+    }
+    setSyncConflictNotice(null);
+  };
+
   const handleMyLocation = () => {
     if (!navigator.geolocation) {
       setModalConfig({ 
@@ -1386,6 +1420,7 @@ function App() {
           let localWins = 0;
           let remoteWins = 0;
           let conflictCount = 0;
+          const conflictEntries = [];
 
           cloudTripList.forEach(cloudTrip => {
             const localTrip = localById.get(String(cloudTrip.id));
@@ -1399,6 +1434,11 @@ function App() {
             }
 
             conflictCount += 1;
+            conflictEntries.push({
+              id: String(localTrip.id),
+              local: getComparableTrip(localTrip),
+              remote: getComparableTrip(cloudTrip)
+            });
             if (getTripUpdatedAt(localTrip) > getTripUpdatedAt(cloudTrip)) {
               mergedTrips.push(localTrip);
               localWins += 1;
@@ -1414,8 +1454,18 @@ function App() {
           setTrips(mergedTrips);
           writeStoredJson("world_pro_trips_v1", mergedTrips);
           mergedTripCount = localOnlyTrips.length;
-          if (conflictCount > 0) {
-            setSyncConflictNotice({ conflicts: conflictCount, localWins, remoteWins });
+          if (conflictEntries.length > 0) {
+            const conflictSignature = conflictEntries
+              .sort((left, right) => left.id.localeCompare(right.id))
+              .map(entry => JSON.stringify(entry))
+              .join('|');
+            const dismissedSignature = readStoredJson(
+              `${SYNC_CONFLICT_DISMISSED_STORAGE_PREFIX}_${session.user.id}`,
+              ''
+            );
+            if (dismissedSignature !== conflictSignature) {
+              setSyncConflictNotice({ conflicts: conflictCount, localWins, remoteWins, signature: conflictSignature });
+            }
           }
           if (localOnlyTrips.length > 0 || localWins > 0) {
             const { error: mergeTripError } = await supabase.from("user_state").upsert({ user_id: session.user.id, key: "world_pro_trips_v1", value: mergedTrips.filter(trip => !trip.localOnly) }, { onConflict: "user_id,key" });
@@ -3612,8 +3662,10 @@ function App() {
             {syncConflictNotice && (
               <div role="status" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px', padding: '9px 11px', borderRadius: '10px', background: '#fff7ed', color: '#9a3412', fontSize: '10px', fontWeight: '800' }}>
                 <AlertCircle size={14} aria-hidden="true" />
-                <span style={{ flex: 1 }}>다른 기기에서 변경된 여행 {syncConflictNotice.conflicts}건을 확인해 최신 변경 기준으로 동기화했습니다.</span>
-                <button type="button" onClick={() => setSyncConflictNotice(null)} style={{ border: 'none', background: 'transparent', color: '#c2410c', fontSize: '10px', fontWeight: '900', cursor: 'pointer' }}>확인</button>
+                <span style={{ flex: 1 }}>
+                  여행 데이터 {syncConflictNotice.conflicts}건이 기기와 클라우드에서 달라 최신 변경 기준으로 정리되었습니다.
+                </span>
+                <button type="button" onClick={dismissSyncConflictNotice} style={{ border: 'none', background: 'transparent', color: '#c2410c', fontSize: '10px', fontWeight: '900', cursor: 'pointer' }}>확인</button>
               </div>
             )}
             {isReadOnlyTrip && (
