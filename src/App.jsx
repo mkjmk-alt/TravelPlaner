@@ -1,7 +1,7 @@
 // Build Version: v1.2.2-build-trigger-fix
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { GoogleMap, useJsApiLoader, OverlayView, InfoWindow, Polyline } from '@react-google-maps/api';
-import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronUp, ChevronDown, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Clock, Upload, Clipboard, LocateFixed, Download, Bell, FileText } from 'lucide-react';
+import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronUp, ChevronDown, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Clock, Upload, Clipboard, LocateFixed, Download, Bell, FileText, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import './index.css';
 
@@ -654,6 +654,15 @@ function App() {
 
   // --- GLOBAL UI & AUTH STATE ---
   const [session, setSession] = useState(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authMode, setAuthMode] = useState('login');
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authPasswordConfirm, setAuthPasswordConfirm] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [authMessage, setAuthMessage] = useState('');
+  const [authSubmitting, setAuthSubmitting] = useState(false);
+  const [showAuthPassword, setShowAuthPassword] = useState(false);
   
   const [windowSize, setWindowSize] = useState({
     width: window.innerWidth,
@@ -896,6 +905,118 @@ function App() {
   const autocompleteSessionTokenRef = useRef(null);
   const makeEntityId = () => crypto.randomUUID();
 
+  const getAuthRedirectUrl = () => (
+    typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}` : undefined
+  );
+
+  const resetAuthForm = () => {
+    setAuthEmail('');
+    setAuthPassword('');
+    setAuthPasswordConfirm('');
+    setAuthError('');
+    setAuthMessage('');
+    setShowAuthPassword(false);
+  };
+
+  const openAuthModal = (mode = 'login') => {
+    resetAuthForm();
+    setAuthMode(mode);
+    setShowAuthModal(true);
+  };
+
+  const closeAuthModal = () => {
+    if (authSubmitting) return;
+    setShowAuthModal(false);
+    resetAuthForm();
+  };
+
+  const handleGoogleLogin = async () => {
+    setAuthError('');
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: getAuthRedirectUrl() }
+    });
+    if (error) setAuthError(error.message || 'Google 로그인에 실패했습니다.');
+  };
+
+  const handleEmailAuthSubmit = async (event) => {
+    event.preventDefault();
+    const email = authEmail.trim();
+    setAuthError('');
+    setAuthMessage('');
+
+    if (authMode !== 'new-password' && (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) {
+      setAuthError('올바른 이메일 주소를 입력해주세요.');
+      return;
+    }
+
+    if (authMode === 'reset') {
+      setAuthSubmitting(true);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: getAuthRedirectUrl() });
+      setAuthSubmitting(false);
+      if (error) {
+        setAuthError(error.message || '비밀번호 재설정 메일을 보내지 못했습니다.');
+        return;
+      }
+      setAuthMessage('비밀번호 재설정 링크를 이메일로 보냈습니다. 메일의 링크를 눌러 새 비밀번호를 설정해주세요.');
+      return;
+    }
+
+    if (authPassword.length < 6) {
+      setAuthError('비밀번호는 6자 이상 입력해주세요.');
+      return;
+    }
+
+    if (authMode === 'signup' || authMode === 'new-password') {
+      if (authPassword !== authPasswordConfirm) {
+        setAuthError('비밀번호가 서로 일치하지 않습니다.');
+        return;
+      }
+    }
+
+    setAuthSubmitting(true);
+    if (authMode === 'new-password') {
+      const { error } = await supabase.auth.updateUser({ password: authPassword });
+      setAuthSubmitting(false);
+      if (error) {
+        setAuthError(error.message || '비밀번호를 변경하지 못했습니다.');
+        return;
+      }
+      setAuthMessage('비밀번호가 변경되었습니다.');
+      window.setTimeout(() => closeAuthModal(), 900);
+      return;
+    }
+
+    if (authMode === 'signup') {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password: authPassword,
+        options: { emailRedirectTo: getAuthRedirectUrl() }
+      });
+      setAuthSubmitting(false);
+      if (error) {
+        setAuthError(error.message || '회원가입에 실패했습니다.');
+        return;
+      }
+      if (data.session) {
+        setShowAuthModal(false);
+        resetAuthForm();
+      } else {
+        setAuthMessage('회원가입이 완료되었습니다. 이메일 인증 링크를 확인한 뒤 로그인해주세요.');
+      }
+      return;
+    }
+
+    const { error } = await supabase.auth.signInWithPassword({ email, password: authPassword });
+    setAuthSubmitting(false);
+    if (error) {
+      setAuthError('이메일 또는 비밀번호를 확인해주세요.');
+      return;
+    }
+    setShowAuthModal(false);
+    resetAuthForm();
+  };
+
   // --- EFFECTS ---
 
   // Also clear a test trip that may still be held by an already-open local page.
@@ -910,7 +1031,15 @@ function App() {
   // Auth listener
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setSession(session));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      setSession(nextSession);
+      if (event === 'PASSWORD_RECOVERY') {
+        setAuthMode('new-password');
+        setAuthError('');
+        setAuthMessage('새 비밀번호를 입력해주세요.');
+        setShowAuthModal(true);
+      }
+    });
     return () => subscription.unsubscribe();
   }, []);
 
@@ -1711,8 +1840,8 @@ function App() {
     if (shouldOpenItinerary) {
       setActiveTripId(newId);
       openItinerary();
-      setShowOnboarding(false);
       setOnboardingStep(1);
+      setShowOnboarding(true);
     }
   };
 
@@ -1730,6 +1859,7 @@ function App() {
       openItinerary();
       setShowOnboarding(false);
       setOnboardingStep(2);
+      window.setTimeout(() => document.querySelector('.search-input')?.focus(), 120);
       return;
     }
     dismissOnboarding();
@@ -2455,6 +2585,7 @@ function App() {
 
       setSearchResult(newPlace);
       setSelectedPlace(newPlace);
+      if (onboardingStep === 2) setShowOnboarding(true);
       setSearchInput(name);
       setSearchQuery(address || name);
       setPlaceSuggestions([]);
@@ -2507,6 +2638,7 @@ function App() {
       };
       setSearchResult(newPlace);
       setSelectedPlace(newPlace);
+      if (onboardingStep === 2) setShowOnboarding(true);
       setSearchInput(newPlace.name);
       if (map) {
         map.panTo({ lat: newPlace.lat, lng: newPlace.lng });
@@ -2536,6 +2668,7 @@ function App() {
           };
           setSearchResult(newPlace);
           setSelectedPlace(newPlace);
+          if (onboardingStep === 2) setShowOnboarding(true);
           setSearchInput(newPlace.name || '');
         }
       }
@@ -2817,9 +2950,9 @@ function App() {
                 {session ? (
                   <button onClick={() => supabase.auth.signOut()} style={{ background: '#f3f4f6', border: 'none', color: '#6b7280', fontWeight: '800', fontSize: '10px', cursor: 'pointer', padding: '8px 12px', borderRadius: '10px' }}>로그아웃</button>
                 ) : (
-                  <button onClick={() => supabase.auth.signInWithOAuth({ provider: 'google' })} style={{ background: 'white', border: '1px solid #e5e7eb', color: '#4b5563', padding: '8px 12px', borderRadius: '10px', fontWeight: '800', fontSize: '10px', cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <img src="https://www.google.com/favicon.ico" width="12" height="12" alt="Google" />
-                    로그인
+                  <button onClick={() => openAuthModal('login')} style={{ background: 'white', border: '1px solid #e5e7eb', color: '#4b5563', padding: '8px 12px', borderRadius: '10px', fontWeight: '800', fontSize: '10px', cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Lock size={12} />
+                    로그인 / 회원가입
                   </button>
                 )}
               </div>
@@ -2855,10 +2988,11 @@ function App() {
                   </button>
                   <button 
                     onClick={openBudget}
-                    style={{ width: '40px', height: '40px', borderRadius: '12px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.2s', backgroundColor: viewMode === 'budget' ? '#10b981' : '#f3f4f6', color: viewMode === 'budget' ? 'white' : '#9ca3af' }}
-                    aria-label="예산" title="예산"
+                    style={{ minWidth: '40px', height: '40px', padding: '0 12px', borderRadius: '12px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', cursor: 'pointer', transition: '0.2s', backgroundColor: viewMode === 'budget' ? '#10b981' : '#f3f4f6', color: viewMode === 'budget' ? 'white' : '#64748b', fontSize: '11px', fontWeight: '900', whiteSpace: 'nowrap' }}
+                    aria-label="예산·지출" title="예산·지출"
                   >
                     <Wallet size={18} />
+                    <span>예산·지출</span>
                   </button>
                   
                   {/* Unified Invite Action */}
@@ -2899,20 +3033,17 @@ function App() {
                   <h2 className="menu-section-title" style={{ marginBottom: '24px' }}>내 여행</h2>
                   
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      {/* Row 1: Import Options */}
+                      {/* Primary action: start a new trip first. */}
                       <div className="trip-action-grid">
-                        <button onClick={() => setShowPasteModal(true)} className="trip-action-button" style={{ color: '#4f46e5', backgroundColor: '#f5f7ff', borderColor: '#e0e7ff' }}>
-                          <Clipboard size={18} /> AI 일정 만들기
-                        </button>
-                        <button onClick={() => setShowPasteModal(true)} className="trip-action-button" style={{ color: '#2563eb', backgroundColor: '#f0f7ff', borderColor: '#dbeafe' }}>
-                          <Clipboard size={18} /> 일정 텍스트 붙여넣기
+                        <button onClick={createNewTrip} className="trip-action-button" style={{ gridColumn: '1 / -1', minHeight: '64px', fontSize: '15px', color: 'white', backgroundColor: '#8b5cf6', borderColor: '#8b5cf6', boxShadow: '0 10px 15px -3px rgba(139, 92, 246, 0.3)' }}>
+                          <PlusCircle size={18} /> 새 여행 계획하기
                         </button>
                       </div>
 
-                      {/* Row 2: Create & Join Options */}
+                      {/* Secondary actions: one clear import entry point and joining a shared trip. */}
                       <div className="trip-action-grid">
-                        <button onClick={createNewTrip} className="trip-action-button" style={{ fontSize: '14px', color: 'white', backgroundColor: '#8b5cf6', borderColor: '#8b5cf6', boxShadow: '0 10px 15px -3px rgba(139, 92, 246, 0.3)' }}>
-                          <PlusCircle size={18} /> 새 여행 계획하기
+                        <button onClick={() => setShowPasteModal(true)} className="trip-action-button" style={{ color: '#4f46e5', backgroundColor: '#f5f7ff', borderColor: '#e0e7ff' }}>
+                          <Clipboard size={18} /> AI로 일정 만들기
                         </button>
                         <button onClick={openJoinTripModal} className="trip-action-button" style={{ color: '#059669', backgroundColor: '#f0fdf4', borderColor: '#dcfce7' }}>
                           <Users size={18} /> 참여하기
@@ -2933,16 +3064,6 @@ function App() {
                       <div 
                         key={trip.id} 
                         onClick={() => { setActiveTripId(trip.id); openItinerary(); }}
-                        role="button"
-                        tabIndex={0}
-                        aria-label={`${trip.name} 여행 열기`}
-                        onKeyDown={(event) => {
-                          if ((event.key === 'Enter' || event.key === ' ') && editingTripId !== trip.id) {
-                            event.preventDefault();
-                            setActiveTripId(trip.id);
-                            openItinerary();
-                          }
-                        }}
                         style={{ padding: '24px', backgroundColor: activeTripId === trip.id ? '#f5f3ff' : 'white', border: activeTripId === trip.id ? '2px solid #ddd6fe' : '1px solid #f3f4f6', borderRadius: '20px', cursor: 'pointer', transition: '0.2s', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
@@ -3104,8 +3225,20 @@ function App() {
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
                               <Wallet size={13} color="#9ca3af" /> 
-                              <span style={{ color: '#111827' }}>₩ {(trip.expenses || []).reduce((sum, e) => sum + (e.amountKRW || 0), 0).toLocaleString()}</span>
+                              <span style={{ color: '#111827' }}>총 지출 ₩ {(trip.expenses || []).reduce((sum, e) => sum + (Number(e.amountKRW) || 0), 0).toLocaleString()}</span>
                             </div>
+                          </div>
+                        )}
+                        {editingTripId !== trip.id && (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginTop: '18px', paddingTop: '14px', borderTop: '1px solid #f1f5f9' }}>
+                            <span style={{ color: '#94a3b8', fontSize: '11px', fontWeight: '800' }}>{(trip.itinerary || []).reduce((sum, day) => sum + (day.items || []).length, 0)}개 일정</span>
+                            <button
+                              type="button"
+                              onClick={(event) => { event.stopPropagation(); setActiveTripId(trip.id); openItinerary(); }}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '9px 12px', border: 'none', borderRadius: '10px', backgroundColor: '#eff6ff', color: '#2563eb', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}
+                            >
+                              <Calendar size={14} /> 일정 보기
+                            </button>
                           </div>
                         )}
                       </div>
@@ -4193,6 +4326,106 @@ function App() {
         </div>
       )}
 
+      {showAuthModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="auth-modal-title"
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') closeAuthModal();
+          }}
+          style={{ position: 'fixed', inset: 0, zIndex: 14000, backgroundColor: 'rgba(15, 23, 42, 0.48)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', animation: 'fadeIn 0.2s ease-out' }}
+        >
+          <form
+            onSubmit={handleEmailAuthSubmit}
+            style={{ width: '100%', maxWidth: '420px', maxHeight: 'calc(100vh - 40px)', overflowY: 'auto', position: 'relative', padding: '28px 24px', borderRadius: '28px', backgroundColor: 'white', boxShadow: '0 25px 60px rgba(15, 23, 42, 0.25)', animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}
+          >
+            <button
+              type="button"
+              aria-label="로그인 창 닫기"
+              title="닫기"
+              onClick={closeAuthModal}
+              disabled={authSubmitting}
+              style={{ position: 'absolute', top: '20px', right: '20px', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', borderRadius: '50%', backgroundColor: '#f1f5f9', color: '#64748b', cursor: authSubmitting ? 'not-allowed' : 'pointer', opacity: authSubmitting ? 0.5 : 1 }}
+            >
+              <X size={18} />
+            </button>
+
+            <div style={{ paddingRight: '44px', marginBottom: '22px' }}>
+              <div style={{ width: '42px', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '12px', borderRadius: '14px', backgroundColor: '#eff6ff', color: '#2563eb' }}>
+                {authMode === 'reset' ? <Mail size={21} /> : <Lock size={21} />}
+              </div>
+              <h2 id="auth-modal-title" style={{ margin: 0, color: '#0f172a', fontSize: '22px', fontWeight: '900', letterSpacing: '-0.04em' }}>
+                {authMode === 'signup' ? '회원가입' : authMode === 'reset' ? '비밀번호 찾기' : authMode === 'new-password' ? '새 비밀번호 설정' : '로그인'}
+              </h2>
+              <p style={{ margin: '7px 0 0', color: '#64748b', fontSize: '12px', lineHeight: 1.5 }}>
+                {authMode === 'signup' ? '이메일로 계정을 만들고 여행 데이터를 안전하게 동기화하세요.' : authMode === 'reset' ? '가입한 이메일을 입력하면 비밀번호 재설정 링크를 보내드립니다.' : authMode === 'new-password' ? '새 비밀번호를 입력하면 계정 복구가 완료됩니다.' : 'Google 또는 이메일로 TravelPlaner를 이용하세요.'}
+              </p>
+            </div>
+
+            {authMode !== 'new-password' && (
+              <>
+                <button
+                  type="button"
+                  onClick={handleGoogleLogin}
+                  disabled={authSubmitting}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '13px', border: '1px solid #e2e8f0', borderRadius: '13px', backgroundColor: 'white', color: '#334155', fontSize: '13px', fontWeight: '900', cursor: authSubmitting ? 'not-allowed' : 'pointer', opacity: authSubmitting ? 0.6 : 1 }}
+                >
+                  <img src="https://www.google.com/favicon.ico" width="16" height="16" alt="Google" /> Google로 계속하기
+                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '18px 0', color: '#94a3b8', fontSize: '10px', fontWeight: '800' }}>
+                  <span style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }} /> 또는 이메일 사용 <span style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }} />
+                </div>
+              </>
+            )}
+
+            {authMode !== 'new-password' && (
+              <label htmlFor="auth-email" style={{ display: 'flex', flexDirection: 'column', gap: '7px', marginBottom: '14px' }}>
+                <span style={{ color: '#475569', fontSize: '11px', fontWeight: '900' }}>이메일</span>
+                <div style={{ position: 'relative' }}>
+                  <Mail size={16} color="#94a3b8" style={{ position: 'absolute', left: '13px', top: '14px' }} />
+                  <input id="auth-email" autoFocus type="email" value={authEmail} onChange={(event) => { setAuthEmail(event.target.value); setAuthError(''); }} placeholder="you@example.com" autoComplete="email" disabled={authSubmitting} style={{ width: '100%', boxSizing: 'border-box', padding: '13px 14px 13px 38px', border: '1px solid #e2e8f0', borderRadius: '13px', backgroundColor: '#f8fafc', color: '#0f172a', fontSize: '14px', fontWeight: '700', outline: 'none' }} />
+                </div>
+              </label>
+            )}
+
+            {authMode !== 'reset' && (
+              <label htmlFor="auth-password" style={{ display: 'flex', flexDirection: 'column', gap: '7px', marginBottom: '14px' }}>
+                <span style={{ color: '#475569', fontSize: '11px', fontWeight: '900' }}>비밀번호</span>
+                <div style={{ position: 'relative' }}>
+                  <Lock size={16} color="#94a3b8" style={{ position: 'absolute', left: '13px', top: '14px' }} />
+                  <input id="auth-password" type={showAuthPassword ? 'text' : 'password'} value={authPassword} onChange={(event) => { setAuthPassword(event.target.value); setAuthError(''); }} placeholder="6자 이상" autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'} disabled={authSubmitting} style={{ width: '100%', boxSizing: 'border-box', padding: '13px 42px 13px 38px', border: '1px solid #e2e8f0', borderRadius: '13px', backgroundColor: '#f8fafc', color: '#0f172a', fontSize: '14px', fontWeight: '700', outline: 'none' }} />
+                  <button type="button" aria-label={showAuthPassword ? '비밀번호 숨기기' : '비밀번호 보기'} onClick={() => setShowAuthPassword((visible) => !visible)} style={{ position: 'absolute', right: '8px', top: '7px', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', borderRadius: '8px', background: 'transparent', color: '#94a3b8', cursor: 'pointer' }}>{showAuthPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button>
+                </div>
+              </label>
+            )}
+
+            {(authMode === 'signup' || authMode === 'new-password') && (
+              <label htmlFor="auth-password-confirm" style={{ display: 'flex', flexDirection: 'column', gap: '7px', marginBottom: '14px' }}>
+                <span style={{ color: '#475569', fontSize: '11px', fontWeight: '900' }}>비밀번호 확인</span>
+                <input id="auth-password-confirm" type={showAuthPassword ? 'text' : 'password'} value={authPasswordConfirm} onChange={(event) => { setAuthPasswordConfirm(event.target.value); setAuthError(''); }} placeholder="비밀번호를 한 번 더 입력해주세요" autoComplete="new-password" disabled={authSubmitting} style={{ width: '100%', boxSizing: 'border-box', padding: '13px 14px', border: '1px solid #e2e8f0', borderRadius: '13px', backgroundColor: '#f8fafc', color: '#0f172a', fontSize: '14px', fontWeight: '700', outline: 'none' }} />
+              </label>
+            )}
+
+            {authError && <p role="alert" style={{ margin: '2px 0 12px', padding: '10px 12px', borderRadius: '11px', backgroundColor: '#fef2f2', color: '#dc2626', fontSize: '12px', fontWeight: '800', lineHeight: 1.45 }}>{authError}</p>}
+            {authMessage && <p role="status" style={{ margin: '2px 0 12px', padding: '10px 12px', borderRadius: '11px', backgroundColor: '#eff6ff', color: '#1d4ed8', fontSize: '12px', fontWeight: '800', lineHeight: 1.45 }}>{authMessage}</p>}
+
+            <button type="submit" disabled={authSubmitting} style={{ width: '100%', padding: '14px', border: 'none', borderRadius: '14px', backgroundColor: '#2563eb', color: 'white', fontSize: '14px', fontWeight: '900', cursor: authSubmitting ? 'wait' : 'pointer', opacity: authSubmitting ? 0.7 : 1, boxShadow: '0 10px 20px rgba(37, 99, 235, 0.2)' }}>
+              {authSubmitting ? '처리 중...' : authMode === 'signup' ? '이메일로 회원가입' : authMode === 'reset' ? '재설정 메일 보내기' : authMode === 'new-password' ? '비밀번호 저장' : '이메일로 로그인'}
+            </button>
+
+            {authMode === 'login' && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', marginTop: '16px' }}>
+                <button type="button" onClick={() => openAuthModal('signup')} style={{ padding: 0, border: 'none', background: 'none', color: '#2563eb', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}>회원가입</button>
+                <button type="button" onClick={() => openAuthModal('reset')} style={{ padding: 0, border: 'none', background: 'none', color: '#64748b', fontSize: '11px', fontWeight: '800', cursor: 'pointer' }}>비밀번호 찾기</button>
+              </div>
+            )}
+            {authMode === 'signup' && <button type="button" onClick={() => openAuthModal('login')} style={{ width: '100%', marginTop: '16px', padding: 0, border: 'none', background: 'none', color: '#2563eb', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}>이미 계정이 있나요? 로그인</button>}
+            {authMode === 'reset' && <button type="button" onClick={() => openAuthModal('login')} style={{ width: '100%', marginTop: '16px', padding: 0, border: 'none', background: 'none', color: '#2563eb', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}>로그인으로 돌아가기</button>}
+          </form>
+        </div>
+      )}
+
       {showCreateTripModal && (
         <div
           role="dialog"
@@ -4426,7 +4659,7 @@ function App() {
             </div>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button type="button" onClick={dismissOnboarding} style={{ flex: 1, padding: '13px', border: 'none', borderRadius: '14px', backgroundColor: '#f1f5f9', color: '#64748b', fontSize: '13px', fontWeight: '800', cursor: 'pointer' }}>나중에</button>
-              <button type="button" onClick={handleOnboardingAction} style={{ flex: 1.5, padding: '13px', border: 'none', borderRadius: '14px', backgroundColor: '#2563eb', color: 'white', fontSize: '13px', fontWeight: '900', cursor: 'pointer' }}>{onboardingStep === 0 ? '여행 만들기' : onboardingStep === 1 ? '장소 검색하기' : '시작하기'}</button>
+              <button type="button" onClick={handleOnboardingAction} style={{ flex: 1.5, padding: '13px', border: 'none', borderRadius: '14px', backgroundColor: '#2563eb', color: 'white', fontSize: '13px', fontWeight: '900', cursor: 'pointer' }}>{onboardingStep === 0 ? '여행 만들기' : onboardingStep === 1 ? '장소 검색하기' : '일정 추가하기'}</button>
             </div>
           </div>
         </div>
@@ -5280,8 +5513,8 @@ function App() {
             maxHeight: 'calc(100vh - 40px)',
             overflowY: 'auto'
           }}>
-            <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#0f172a', margin: '0 0 8px 0' }}>일정 가져오기</h3>
-            <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 16px 0', lineHeight: 1.5 }}>LLM이 만들어 준 JSON 일정이나 직접 작성한 일정 JSON을 아래에 붙여넣어 주세요.</p>
+            <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#0f172a', margin: '0 0 8px 0' }}>AI로 일정 만들기</h3>
+            <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 16px 0', lineHeight: 1.5 }}>AI가 작성한 일정 JSON을 붙여넣거나, 직접 작성한 JSON을 불러와 여행 일정으로 저장하세요.</p>
 
             <div style={{ padding: '16px', marginBottom: '16px', borderRadius: '18px', backgroundColor: '#eff6ff', border: '1px solid #dbeafe' }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '10px' }}>
