@@ -59,6 +59,44 @@ const formatLocalDate = (date) => {
   return `${year}-${month}-${day}`;
 };
 
+const getTripStatusMeta = (trip) => {
+  const startDate = trip?.startDate || '';
+  const endDate = trip?.endDate || startDate;
+
+  if (!startDate || !endDate) {
+    return {
+      key: 'unknown',
+      label: '날짜 미정',
+      backgroundColor: '#f8fafc',
+      color: '#64748b'
+    };
+  }
+
+  const today = formatLocalDate(new Date());
+  if (today < startDate) {
+    return {
+      key: 'upcoming',
+      label: '다가오는 여행',
+      backgroundColor: '#eff6ff',
+      color: '#2563eb'
+    };
+  }
+  if (today > endDate) {
+    return {
+      key: 'past',
+      label: '지난 여행',
+      backgroundColor: '#f1f5f9',
+      color: '#64748b'
+    };
+  }
+  return {
+    key: 'ongoing',
+    label: '여행 중',
+    backgroundColor: '#ecfdf5',
+    color: '#059669'
+  };
+};
+
 const getEndDateForDayCount = (startDate, dayCount) => {
   if (!startDate || !Number.isFinite(dayCount) || dayCount < 1) return startDate;
   const endDate = new Date(`${startDate}T00:00:00`);
@@ -600,8 +638,9 @@ const ScrollTimeInput = ({ value, onChange, label, compact = false }) => {
   };
 
   const renderScrollColumn = (items, selectedValue, ref, type, formatItem = (item) => String(item).padStart(2, '0')) => (
-    <div style={{ flex: 1, minWidth: 0 }}>
+    <div className="expense-time-picker-column" style={{ flex: type === 'period' ? '1.2 1 0' : '1 1 0', minWidth: 0 }}>
       <div
+        className="expense-time-picker-wheel"
         ref={ref}
         onScroll={(event) => handleScroll(type, event)}
         role="listbox"
@@ -631,10 +670,11 @@ const ScrollTimeInput = ({ value, onChange, label, compact = false }) => {
   );
 
   return (
-    <div ref={pickerRef} style={{ position: 'relative', width: '100%', marginBottom: compact ? 0 : (window.innerWidth < 768 ? '8px' : '20px') }}>
+    <div className="expense-time-picker" ref={pickerRef} style={{ position: 'relative', width: '100%', minWidth: 0, marginBottom: compact ? 0 : (window.innerWidth < 768 ? '8px' : '20px') }}>
       {label && <div className="expense-form-label" style={{ marginBottom: compact ? '6px' : '8px' }}>{label}</div>}
       <button
         type="button"
+        className="expense-time-picker-trigger"
         onClick={() => setIsOpen(open => !open)}
         aria-label={`${label || '시간'} ${period === 'AM' ? '오전' : '오후'} ${String(hour12).padStart(2, '0')}:${String(minute).padStart(2, '0')}`}
         aria-expanded={isOpen}
@@ -647,19 +687,19 @@ const ScrollTimeInput = ({ value, onChange, label, compact = false }) => {
       </button>
 
       {isOpen && (
-        <div role="dialog" aria-label="소비 시간 선택" style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, zIndex: 60, width: 'min(320px, calc(100vw - 48px))', padding: '12px', border: '1px solid #dbe3ef', borderRadius: '18px', backgroundColor: 'white', boxShadow: '0 18px 40px rgba(15, 23, 42, 0.2)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px', borderRadius: '15px', backgroundColor: '#eef4ff' }}>
+        <div className="expense-time-picker-popover" role="dialog" aria-label="소비 시간 선택" style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, zIndex: 60, width: '100%', maxWidth: '100%', boxSizing: 'border-box', padding: '8px', border: '1px solid #dbe3ef', borderRadius: '18px', backgroundColor: 'white', boxShadow: '0 18px 40px rgba(15, 23, 42, 0.2)' }}>
+          <div className="expense-time-picker-wheels" style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0, padding: '4px', borderRadius: '15px', backgroundColor: '#eef4ff' }}>
             {renderScrollColumn(TIME_PERIOD_OPTIONS, period, periodRef, 'period', item => item === 'AM' ? '오전' : '오후')}
             <span style={{ color: '#94a3b8', fontSize: '18px', fontWeight: '900' }}>·</span>
             {renderScrollColumn(hours, hour12, hourRef, 'hour')}
             <span style={{ color: '#94a3b8', fontSize: '18px', fontWeight: '900' }}>:</span>
             {renderScrollColumn(minutes, minute, minuteRef, 'minute')}
           </div>
-          <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
-            <button type="button" onClick={setNow} style={{ flex: 1, padding: '8px', border: 'none', borderRadius: '9px', backgroundColor: '#f1f5f9', color: '#64748b', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}>현재 시간</button>
-            <button type="button" onClick={() => adjustMinutes(-30)} style={{ padding: '8px 10px', border: 'none', borderRadius: '9px', backgroundColor: '#f1f5f9', color: '#64748b', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}>-30</button>
-            <button type="button" onClick={() => adjustMinutes(30)} style={{ padding: '8px 10px', border: 'none', borderRadius: '9px', backgroundColor: '#eff6ff', color: '#2563eb', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}>+30</button>
-            <button type="button" onClick={() => setIsOpen(false)} style={{ flex: 1, padding: '8px', border: 'none', borderRadius: '9px', backgroundColor: '#2563eb', color: 'white', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}>완료</button>
+          <div className="expense-time-picker-actions" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.5fr) repeat(2, minmax(32px, 0.65fr)) minmax(0, 1fr)', gap: '4px', marginTop: '8px' }}>
+            <button type="button" onClick={setNow} style={{ minWidth: 0, padding: '8px 4px', border: 'none', borderRadius: '9px', backgroundColor: '#f1f5f9', color: '#64748b', fontSize: '10px', fontWeight: '900', cursor: 'pointer', whiteSpace: 'nowrap' }}>현재 시간</button>
+            <button type="button" onClick={() => adjustMinutes(-30)} style={{ minWidth: 0, padding: '8px 4px', border: 'none', borderRadius: '9px', backgroundColor: '#f1f5f9', color: '#64748b', fontSize: '10px', fontWeight: '900', cursor: 'pointer' }}>-30</button>
+            <button type="button" onClick={() => adjustMinutes(30)} style={{ minWidth: 0, padding: '8px 4px', border: 'none', borderRadius: '9px', backgroundColor: '#eff6ff', color: '#2563eb', fontSize: '10px', fontWeight: '900', cursor: 'pointer' }}>+30</button>
+            <button type="button" onClick={() => setIsOpen(false)} style={{ minWidth: 0, padding: '8px 4px', border: 'none', borderRadius: '9px', backgroundColor: '#2563eb', color: 'white', fontSize: '10px', fontWeight: '900', cursor: 'pointer' }}>완료</button>
           </div>
         </div>
       )}
@@ -3148,7 +3188,9 @@ function App() {
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {(trips || []).map(trip => (
+                    {(trips || []).map(trip => {
+                      const tripStatus = getTripStatusMeta(trip);
+                      return (
                       <div 
                         key={trip.id} 
                         onClick={() => { setActiveTripId(trip.id); openItinerary(); }}
@@ -3219,9 +3261,19 @@ function App() {
                             </div>
                           ) : (
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%', gap: '12px' }}>
-                              <h3 style={{ fontSize: '18px', fontWeight: '900', color: '#111827', margin: 0, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {trip.name}
-                              </h3>
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '8px', flex: 1, minWidth: 0 }}>
+                                <h3 style={{ fontSize: '18px', fontWeight: '900', color: '#111827', margin: 0, width: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {trip.name}
+                                </h3>
+                                <span
+                                  role="status"
+                                  aria-label={`${trip.name} 상태: ${tripStatus.label}`}
+                                  title={`여행 상태: ${tripStatus.label}`}
+                                  style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 8px', borderRadius: '999px', backgroundColor: tripStatus.backgroundColor, color: tripStatus.color, fontSize: '10px', fontWeight: '900', whiteSpace: 'nowrap' }}
+                                >
+                                  {tripStatus.label}
+                                </span>
+                              </div>
                               
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', borderRight: '1px solid #f3f4f6', paddingRight: '8px' }}>
@@ -3326,7 +3378,8 @@ function App() {
                             </button>
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </>
