@@ -31,6 +31,15 @@ const writeStoredJson = (key, value) => {
   }
 };
 
+const dataUrlToBlob = (dataUrl) => {
+  const [header, encoded] = dataUrl.split(',');
+  const mimeMatch = header.match(/data:(.*?);base64/);
+  const binary = atob(encoded);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return new Blob([bytes], { type: mimeMatch?.[1] || 'image/png' });
+};
+
 const ONBOARDING_STORAGE_KEY = 'travelplaner_onboarding_seen_v1';
 const SYNC_CONFLICT_DISMISSED_STORAGE_PREFIX = 'travelplaner_sync_conflict_dismissed_v1';
 
@@ -2985,20 +2994,24 @@ function App() {
   };
 
   const moveSelectedItineraryItems = () => {
-    const targetDay = parseDay(bulkMoveTargetDay);
-    if (!targetDay || selectedItineraryItems.length === 0) return;
+    const moveToReserve = bulkMoveTargetDay === 'reserve';
+    const targetDay = moveToReserve ? null : parseDay(bulkMoveTargetDay);
+    if ((!moveToReserve && !targetDay) || selectedItineraryItems.length === 0) return;
     const currentTrip = (trips || []).find(trip => trip.id === activeTripId);
     if (!currentTrip) return;
     const selected = new Set(selectedItineraryItems);
     const movingItems = [];
-    const nextItinerary = (currentTrip.itinerary || []).map(dayPlan => {
+    const itineraryWithoutSelected = (currentTrip.itinerary || []).map(dayPlan => {
       const remaining = [];
       (dayPlan.items || []).forEach(item => {
         if (selected.has(item.id)) movingItems.push(item);
         else remaining.push(item);
       });
       return { ...dayPlan, items: remaining };
-    }).map(dayPlan => parseDay(dayPlan.day) === targetDay
+    });
+    const nextItinerary = moveToReserve
+      ? itineraryWithoutSelected
+      : itineraryWithoutSelected.map(dayPlan => parseDay(dayPlan.day) === targetDay
       ? {
         ...dayPlan,
         items: [...dayPlan.items, ...movingItems].sort((a, b) => (a.time || '23:59').localeCompare(b.time || '23:59'))
@@ -3007,11 +3020,15 @@ function App() {
     if (movingItems.length === 0) return;
     rememberTripForUndo(currentTrip);
     syncTripsToCloud((trips || []).map(trip => trip.id === activeTripId
-      ? { ...trip, itinerary: nextItinerary }
+      ? {
+        ...trip,
+        itinerary: nextItinerary,
+        ...(moveToReserve ? { reserveItems: [...(trip.reserveItems || []), ...movingItems] } : {})
+      }
       : trip));
     setSelectedItineraryItems([]);
     setIsBulkMoveMode(false);
-    setActiveDay(targetDay);
+    setActiveDay(moveToReserve ? 'reserve' : targetDay);
   };
 
   const updateChecklist = (nextChecklist) => {
@@ -3442,11 +3459,194 @@ function App() {
     </div>
   );
 
-  const renderBudgetStatisticsPanel = () => {
+  const exportBudgetStatisticsAsImage = () => {
+    if (!activeTrip) return;
     const paymentLabels = { cash: '현금', card: '카드', transfer: '계좌이체', unassigned: '미지정' };
+    const paymentColors = { cash: '#10b981', card: '#2563eb', transfer: '#8b5cf6', unassigned: '#f59e0b' };
     const categoryColors = ['#8b5cf6', '#2563eb', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4', '#64748b'];
     const categoryStats = categoryBudgetEntries.filter(category => category.spent > 0);
     const categoryTotalKRW = categoryStats.reduce((sum, category) => sum + category.spent, 0);
+    const paymentStats = Object.entries(paymentLabels).map(([key, label]) => ({ key, label, amount: paymentTotalsKRW[key] || 0 }));
+    const dailyStats = Object.entries(dailyExpenseTotalsKRW).sort(([first], [second]) => Number(first) - Number(second));
+    const canvas = document.createElement('canvas');
+    canvas.width = 1200;
+    canvas.height = Math.max(1420, 1110 + Math.max(0, dailyStats.length - 1) * 38);
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    const ctx = context;
+    const roundedRect = (x, y, width, height, radius) => {
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.arcTo(x + width, y, x + width, y + height, radius);
+      ctx.arcTo(x + width, y + height, x, y + height, radius);
+      ctx.arcTo(x, y + height, x, y, radius);
+      ctx.arcTo(x, y, x + width, y, radius);
+      ctx.closePath();
+    };
+    const drawText = (value, x, y, size, color, weight = 600, align = 'left') => {
+      ctx.font = `${weight} ${size}px Arial, "Apple SD Gothic Neo", sans-serif`;
+      ctx.fillStyle = color;
+      ctx.textAlign = align;
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillText(String(value), x, y);
+    };
+    const formatKRW = (value) => `₩${Math.round(Number(value) || 0).toLocaleString('ko-KR')}`;
+    const truncate = (value, maxLength = 24) => {
+      const text = String(value || '');
+      return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
+    };
+    const drawCard = (x, y, width, height, fill = '#ffffff', stroke = '#e2e8f0') => {
+      roundedRect(x, y, width, height, 22);
+      ctx.fillStyle = fill;
+      ctx.fill();
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    };
+
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    drawCard(40, 36, 1120, 105, '#ffffff', '#e9d5ff');
+    drawText('TRAVELPLANER', 72, 78, 17, '#7c3aed', 900);
+    drawText(truncate(activeTrip.name || '여행 지출 통계', 34), 72, 116, 28, '#0f172a', 900);
+    drawText(`${expenses.length}건 · ${itinerary.length}일`, 1128, 91, 13, '#64748b', 800, 'right');
+    drawText('지출 통계 리포트', 1128, 116, 12, '#8b5cf6', 800, 'right');
+
+    const heroGradient = ctx.createLinearGradient(40, 170, 1160, 390);
+    heroGradient.addColorStop(0, '#6d28d9');
+    heroGradient.addColorStop(1, '#4f46e5');
+    roundedRect(40, 170, 1120, 220, 24);
+    ctx.fillStyle = heroGradient;
+    ctx.fill();
+    drawText('총 지출 · 한화 환산', 74, 215, 14, '#ddd6fe', 800);
+    drawText(formatKRW(totalSpentKRW), 74, 270, 42, '#ffffff', 900);
+    drawText(`일평균 ${formatKRW(averageDailySpendKRW)}`, 76, 310, 14, '#ede9fe', 800);
+    drawText('예산 사용률', 1124, 215, 13, '#ddd6fe', 800, 'right');
+    drawText(`${budgetProgress.toFixed(1)}%`, 1124, 264, 30, '#ffffff', 900, 'right');
+    drawText(`예산 한도 ${formatKRW(budgetSettings.limitKRW)}`, 1124, 300, 13, '#ede9fe', 700, 'right');
+    roundedRect(74, 344, 1052, 10, 5);
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.fill();
+    roundedRect(74, 344, Math.max(10, 1052 * Math.min(budgetProgress, 100) / 100), 10, 5);
+    ctx.fillStyle = '#fef08a';
+    ctx.fill();
+    drawText(budgetSettings.limitKRW - totalSpentKRW >= 0 ? `남은 예산 ${formatKRW(budgetSettings.limitKRW - totalSpentKRW)}` : `예산 초과 ${formatKRW(Math.abs(budgetSettings.limitKRW - totalSpentKRW))}`, 1124, 378, 12, '#fef9c3', 800, 'right');
+
+    const kpiItems = [
+      ['기록된 지출', `${expenses.length}건`],
+      ['평균 지출', formatKRW(expenses.length ? totalSpentKRW / expenses.length : 0)],
+      ['가장 큰 카테고리', categoryStats.length ? `${categoryStats.slice().sort((a, b) => b.spent - a.spent)[0].emoji} ${truncate(categoryStats.slice().sort((a, b) => b.spent - a.spent)[0].label, 13)}` : '기록 없음']
+    ];
+    kpiItems.forEach(([label, value], index) => {
+      const x = 40 + index * 373;
+      drawCard(x, 410, 354, 82, '#ffffff', '#e9d5ff');
+      drawText(label, x + 18, 441, 11, '#8b7bb5', 800);
+      drawText(value, x + 18, 472, 19, '#4c1d95', 900);
+    });
+
+    drawCard(40, 520, 680, 430, '#ffffff', '#e9d5ff');
+    drawText('카테고리별 지출 비중', 68, 562, 16, '#5b21b6', 900);
+    drawText('원화 환산 기준', 692, 562, 11, '#a78bfa', 800, 'right');
+    const donutX = 220;
+    const donutY = 730;
+    const donutRadius = 132;
+    ctx.beginPath();
+    ctx.arc(donutX, donutY, donutRadius, 0, Math.PI * 2);
+    ctx.fillStyle = '#ede9fe';
+    ctx.fill();
+    let startAngle = -Math.PI / 2;
+    categoryStats.forEach((category, index) => {
+      const slice = categoryTotalKRW > 0 ? (category.spent / categoryTotalKRW) * Math.PI * 2 : 0;
+      ctx.beginPath();
+      ctx.moveTo(donutX, donutY);
+      ctx.arc(donutX, donutY, donutRadius, startAngle, startAngle + slice);
+      ctx.closePath();
+      ctx.fillStyle = categoryColors[index % categoryColors.length];
+      ctx.fill();
+      startAngle += slice;
+    });
+    ctx.beginPath();
+    ctx.arc(donutX, donutY, 82, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    drawText(`${categoryStats.length}개`, donutX, donutY + 2, 22, '#5b21b6', 900, 'center');
+    drawText('카테고리', donutX, donutY + 24, 11, '#8b7bb5', 800, 'center');
+    if (categoryStats.length === 0) drawText('기록 없음', 220, 875, 12, '#94a3b8', 800, 'center');
+    categoryStats.forEach((category, index) => {
+      const y = 602 + index * 35;
+      const percentage = categoryTotalKRW ? (category.spent / categoryTotalKRW) * 100 : 0;
+      ctx.fillStyle = categoryColors[index % categoryColors.length];
+      ctx.beginPath();
+      ctx.arc(390, y - 4, 6, 0, Math.PI * 2);
+      ctx.fill();
+      drawText(`${category.emoji} ${truncate(category.label, 18)}`, 407, y, 12, '#475569', 800);
+      drawText(`${percentage.toFixed(1)}%`, 682, y, 12, '#6d28d9', 900, 'right');
+      drawText(formatKRW(category.spent), 682, y + 17, 10, '#94a3b8', 700, 'right');
+    });
+
+    drawCard(740, 520, 420, 430, '#ffffff', '#e9d5ff');
+    drawText('결제 수단별 지출', 768, 562, 16, '#5b21b6', 900);
+    drawText('총액 비교', 1132, 562, 11, '#a78bfa', 800, 'right');
+    const paymentTotal = paymentStats.reduce((sum, payment) => sum + payment.amount, 0) || 1;
+    paymentStats.forEach((payment, index) => {
+      const y = 612 + index * 78;
+      const percentage = payment.amount / paymentTotal * 100;
+      drawText(payment.label, 768, y, 12, '#475569', 800);
+      drawText(formatKRW(payment.amount), 1132, y, 12, '#475569', 900, 'right');
+      roundedRect(768, y + 14, 364, 9, 5);
+      ctx.fillStyle = '#f1f5f9';
+      ctx.fill();
+      roundedRect(768, y + 14, Math.max(3, 364 * percentage / 100), 9, 5);
+      ctx.fillStyle = paymentColors[payment.key];
+      ctx.fill();
+      drawText(`${percentage.toFixed(1)}%`, 768, y + 45, 10, paymentColors[payment.key], 800);
+    });
+
+    drawCard(40, 980, 1120, Math.max(170, 80 + dailyStats.length * 38), '#ffffff', '#e9d5ff');
+    drawText('일차별 지출', 68, 1022, 16, '#5b21b6', 900);
+    drawText('여행 흐름을 한눈에 확인', 1132, 1022, 11, '#a78bfa', 800, 'right');
+    const maxDailyAmount = Math.max(...dailyStats.map(([, amount]) => amount), 1);
+    dailyStats.forEach(([day, amount], index) => {
+      const y = 1062 + index * 38;
+      const label = Number(day) === 0 ? '여행 전 준비' : `${day}일차`;
+      drawText(label, 68, y, 11, '#64748b', 800);
+      roundedRect(180, y - 10, 730, 10, 5);
+      ctx.fillStyle = '#f1f5f9';
+      ctx.fill();
+      roundedRect(180, y - 10, Math.max(8, 730 * amount / maxDailyAmount), 10, 5);
+      ctx.fillStyle = '#8b5cf6';
+      ctx.fill();
+      drawText(formatKRW(amount), 1132, y, 11, '#6d28d9', 900, 'right');
+    });
+    if (dailyStats.length === 0) drawText('아직 기록된 지출이 없습니다.', 600, 1065, 12, '#94a3b8', 800, 'center');
+    drawText('TravelPlaner · 모든 금액은 저장된 환율 기준으로 원화 환산되었습니다.', 600, canvas.height - 32, 11, '#94a3b8', 700, 'center');
+
+    const saveImage = (blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${(activeTrip.name || 'travel-plan').replace(/[^\w가-힣-]+/g, '_')}-expense-statistics.png`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setModalConfig({ type: 'success', title: '통계 이미지 저장 완료', message: '현재 지출 통계를 PNG 이미지로 저장했습니다.' });
+      setShowCustomModal(true);
+    };
+    if (canvas.toBlob) canvas.toBlob(saveImage, 'image/png');
+    else saveImage(dataUrlToBlob(canvas.toDataURL('image/png')));
+  };
+
+  const renderBudgetStatisticsPanel = () => {
+    const paymentLabels = { cash: '현금', card: '카드', transfer: '계좌이체', unassigned: '미지정' };
+    const paymentColors = { cash: '#10b981', card: '#2563eb', transfer: '#8b5cf6', unassigned: '#f59e0b' };
+    const categoryColors = ['#8b5cf6', '#2563eb', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4', '#64748b'];
+    const categoryStats = categoryBudgetEntries.filter(category => category.spent > 0);
+    const categoryTotalKRW = categoryStats.reduce((sum, category) => sum + category.spent, 0);
+    const paymentStats = Object.entries(paymentLabels).map(([key, label]) => ({ key, label, amount: paymentTotalsKRW[key] || 0 }));
+    const paymentTotalKRW = paymentStats.reduce((sum, payment) => sum + payment.amount, 0) || 1;
+    const dailyStats = Object.entries(dailyExpenseTotalsKRW).sort(([first], [second]) => Number(first) - Number(second));
     let categoryCursor = 0;
     const categoryGradient = categoryTotalKRW > 0
       ? `conic-gradient(${categoryStats.map((category, index) => {
@@ -3455,22 +3655,47 @@ function App() {
         return `${categoryColors[index % categoryColors.length]} ${start}% ${categoryCursor}%`;
       }).join(', ')})`
       : '#ede9fe';
-    return <div className="budget-statistics-panel" style={{ padding: '16px', marginBottom: '18px', border: '1px solid #ddd6fe', borderRadius: '16px', background: '#faf5ff' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginBottom: '12px' }}><strong style={{ color: '#6d28d9', fontSize: '13px' }}>지출 통계</strong><span style={{ color: '#8b5cf6', fontSize: '10px', fontWeight: '800' }}>{expenses.length}건 · {itinerary.length}일</span></div>
-      <div className="budget-spend-summary-grid"><div className="budget-spend-summary-item"><span>총 지출</span><strong>₩{totalSpentKRW.toLocaleString()}</strong></div><div className="budget-spend-summary-item"><span>일평균</span><strong>₩{averageDailySpendKRW.toLocaleString()}</strong></div></div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px', marginTop: '10px' }}>{Object.entries(paymentLabels).map(([method, label]) => <span key={`payment-stat-${method}`} style={{ padding: '6px 8px', borderRadius: '9px', background: 'white', color: '#475569', fontSize: '10px', fontWeight: '800' }}>{label} ₩{(paymentTotalsKRW[method] || 0).toLocaleString()}</span>)}</div>
-      <div style={{ marginTop: '14px' }}>
-        <strong style={{ color: '#7c3aed', fontSize: '11px' }}>카테고리별 지출 비중</strong>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '18px', marginTop: '10px' }}>
-          <div role="img" aria-label={categoryTotalKRW > 0 ? `카테고리별 지출 비중, 총 ${categoryTotalKRW.toLocaleString()}원` : '기록된 카테고리별 지출 없음'} style={{ position: 'relative', width: '132px', height: '132px', flexShrink: 0, borderRadius: '50%', background: categoryGradient }}>
-            <div style={{ position: 'absolute', inset: '25px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', background: '#faf5ff' }}><strong style={{ color: '#6d28d9', fontSize: '17px', fontWeight: '900' }}>{categoryStats.length}</strong><span style={{ color: '#8b5cf6', fontSize: '9px', fontWeight: '800' }}>카테고리</span></div>
+    const topCategory = categoryStats.slice().sort((first, second) => second.spent - first.spent)[0];
+    const maxDailyAmount = Math.max(...dailyStats.map(([, amount]) => amount), 1);
+    return <div className="budget-statistics-panel" aria-labelledby="budget-statistics-title">
+      <div className="budget-stats-header">
+        <div><span className="budget-stats-eyebrow">Analytics</span><strong id="budget-statistics-title" className="budget-stats-title">지출 통계</strong><span className="budget-stats-description">여행 지출 흐름과 사용 비중을 한눈에 확인하세요.</span></div>
+        <button type="button" className="budget-stats-download" onClick={exportBudgetStatisticsAsImage} disabled={!expenses.length} aria-label="지출 통계를 이미지로 저장"><Download size={14} /> 이미지 저장</button>
+      </div>
+      <div className="budget-stats-hero">
+        <div><span className="budget-stats-hero-label">총 지출 · 한화 환산</span><strong className="budget-stats-hero-total">₩{totalSpentKRW.toLocaleString()}</strong><span className="budget-stats-hero-label">일평균 ₩{averageDailySpendKRW.toLocaleString()}</span></div>
+        <div className="budget-stats-hero-budget"><span className="budget-stats-hero-label">예산 사용률</span><strong>{budgetProgress.toFixed(1)}%</strong><span className="budget-stats-hero-label">한도 ₩{Number(budgetSettings.limitKRW || 0).toLocaleString()}</span></div>
+        <div className="budget-stats-progress"><span style={{ width: `${budgetProgress}%` }} /></div>
+      </div>
+      <div className="budget-stats-kpi-grid">
+        <div className="budget-stats-kpi"><span>기록된 지출</span><strong>{expenses.length}건</strong></div>
+        <div className="budget-stats-kpi"><span>평균 지출</span><strong>₩{Math.round(expenses.length ? totalSpentKRW / expenses.length : 0).toLocaleString()}</strong></div>
+        <div className="budget-stats-kpi"><span>가장 큰 카테고리</span><strong>{topCategory ? `${topCategory.emoji} ${topCategory.label}` : '기록 없음'}</strong></div>
+      </div>
+      <div className="budget-stats-chart-grid">
+        <div className="budget-stats-chart-card">
+          <div className="budget-stats-section-heading"><strong>카테고리별 지출 비중</strong><span>원화 환산 기준</span></div>
+          <div className="budget-stats-category-layout">
+            <div className="budget-stats-donut" data-center={`${categoryStats.length}개`} role="img" aria-label={categoryTotalKRW > 0 ? `카테고리별 지출 비중, 총 ${categoryTotalKRW.toLocaleString()}원` : '기록된 카테고리별 지출 없음'} style={{ background: categoryGradient }} />
+            <div className="budget-stats-legend">
+              {categoryStats.length === 0 ? <div className="budget-stats-empty">아직 기록된 지출이 없습니다.</div> : categoryStats.map((category, index) => <div className="budget-stats-legend-row" key={`category-stat-${category.value}`}><span className="budget-stats-legend-dot" style={{ background: categoryColors[index % categoryColors.length] }} /><span>{category.emoji} {category.label}</span><strong>{((category.spent / categoryTotalKRW) * 100).toFixed(1)}%</strong></div>)}
+            </div>
           </div>
-          <div style={{ display: 'flex', flex: 1, minWidth: 0, flexDirection: 'column', gap: '7px' }}>
-            {categoryStats.length === 0 ? <p style={{ margin: 0, color: '#94a3b8', fontSize: '10px', fontWeight: '700' }}>아직 기록된 지출이 없습니다.</p> : categoryStats.map((category, index) => <div key={`category-stat-${category.value}`} style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, color: '#475569', fontSize: '10px', fontWeight: '800' }}><span style={{ width: '8px', height: '8px', flexShrink: 0, borderRadius: '50%', background: categoryColors[index % categoryColors.length] }} /><span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{category.emoji} {category.label}</span><span style={{ color: '#6d28d9', whiteSpace: 'nowrap' }}>{((category.spent / categoryTotalKRW) * 100).toFixed(1)}%</span></div>)}
+        </div>
+        <div className="budget-stats-chart-card">
+          <div className="budget-stats-section-heading"><strong>결제 수단별 지출</strong><span>총액 비교</span></div>
+          <div className="budget-stats-payment-list">
+            {paymentStats.map(payment => { const percentage = payment.amount / paymentTotalKRW * 100; return <div key={`payment-stat-${payment.key}`}><div className="budget-stats-payment-row"><span className="budget-stats-payment-name"><span className="budget-stats-legend-dot" style={{ background: paymentColors[payment.key] }} />{payment.label}</span><strong>₩{payment.amount.toLocaleString()}</strong></div><div className="budget-stats-bar"><span style={{ width: `${Math.max(payment.amount ? 2 : 0, percentage)}%`, background: paymentColors[payment.key] }} /></div></div>; })}
           </div>
         </div>
       </div>
-      <div style={{ marginTop: '14px' }}><strong style={{ color: '#7c3aed', fontSize: '11px' }}>일차별 지출</strong><div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: '7px' }}>{Object.entries(dailyExpenseTotalsKRW).sort(([a], [b]) => Number(a) - Number(b)).map(([day, amount]) => <div key={`day-stat-${day}`} style={{ display: 'flex', justifyContent: 'space-between', color: '#475569', fontSize: '10px', fontWeight: '800' }}><span>{Number(day) === 0 ? '여행 전 준비' : `${day}일차`}</span><span>₩{amount.toLocaleString()}</span></div>)}</div></div>
+      <div className="budget-stats-daily-card">
+        <div className="budget-stats-section-heading"><strong>일차별 지출</strong><span>여행 흐름</span></div>
+        <div className="budget-stats-daily-list">
+          {dailyStats.length === 0 ? <div className="budget-stats-empty">아직 기록된 지출이 없습니다.</div> : dailyStats.map(([day, amount]) => <div className="budget-stats-daily-row" key={`day-stat-${day}`}><span>{Number(day) === 0 ? '여행 전 준비' : `${day}일차`}</span><div className="budget-stats-bar"><span style={{ width: `${Math.max(2, (amount / maxDailyAmount) * 100)}%`, background: '#8b5cf6' }} /></div><strong>₩{amount.toLocaleString()}</strong></div>)}
+        </div>
+      </div>
+      <p style={{ margin: '12px 2px 0', color: '#8b7bb5', fontSize: '9px', fontWeight: '700' }}>모든 금액은 저장된 환율 기준으로 원화 환산되어 표시됩니다.</p>
     </div>;
   };
 
@@ -4189,8 +4414,9 @@ function App() {
                 {isBulkMoveMode && (
                   <div className="bulk-move-toolbar" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', padding: '12px', marginBottom: '18px', background: '#f8fbff', border: '1px solid #bfdbfe', borderRadius: '14px' }}>
                     <span style={{ color: '#1d4ed8', fontSize: '11px', fontWeight: '900' }}>{selectedItineraryItems.length}개 선택</span>
-                    <select value={bulkMoveTargetDay} onChange={(event) => setBulkMoveTargetDay(Number(event.target.value))} aria-label="선택 일정 이동 일차" style={{ padding: '8px 10px', border: '1px solid #bfdbfe', borderRadius: '9px', background: 'white', color: '#1d4ed8', fontSize: '11px', fontWeight: '800' }}>
-                      {itinerary.map(dayPlan => <option key={`bulk-day-${dayPlan.day}`} value={parseDay(dayPlan.day)}>{parseDay(dayPlan.day)}일차로 이동</option>)}
+                    <select value={bulkMoveTargetDay === 'reserve' ? 'reserve' : String(bulkMoveTargetDay)} onChange={(event) => setBulkMoveTargetDay(event.target.value === 'reserve' ? 'reserve' : Number(event.target.value))} aria-label="선택 일정 이동 대상" style={{ padding: '8px 10px', border: '1px solid #bfdbfe', borderRadius: '9px', background: 'white', color: '#1d4ed8', fontSize: '11px', fontWeight: '800' }}>
+                      <option value="reserve">예비 목록으로 이동</option>
+                      {itinerary.map(dayPlan => <option key={`bulk-day-${dayPlan.day}`} value={String(parseDay(dayPlan.day))}>{parseDay(dayPlan.day)}일차로 이동</option>)}
                     </select>
                     <button type="button" onClick={moveSelectedItineraryItems} disabled={selectedItineraryItems.length === 0} style={{ padding: '8px 11px', border: 'none', borderRadius: '9px', background: selectedItineraryItems.length ? '#2563eb' : '#cbd5e1', color: 'white', fontSize: '11px', fontWeight: '900', cursor: selectedItineraryItems.length ? 'pointer' : 'default' }}>이동</button>
                   </div>
