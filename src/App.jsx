@@ -81,6 +81,32 @@ const getFormattableText = (value) => {
   return value?.text || '';
 };
 
+const getAddressComponentText = (component) => (
+  getFormattableText(component?.longText)
+  || getFormattableText(component?.long_name)
+  || getFormattableText(component?.shortText)
+  || getFormattableText(component?.short_name)
+  || ''
+);
+
+const getPlaceAddressGrouping = (components) => {
+  if (!Array.isArray(components)) return { country: '', region: '' };
+
+  const findComponent = (types) => components.find(component => (
+    Array.isArray(component?.types) && types.some(type => component.types.includes(type))
+  ));
+
+  const country = getAddressComponentText(findComponent(['country']));
+  const region = getAddressComponentText(findComponent([
+    'locality',
+    'postal_town',
+    'administrative_area_level_2',
+    'administrative_area_level_1'
+  ]));
+
+  return { country, region };
+};
+
 const LLM_IMPORT_TEMPLATE = JSON.stringify({
   name: '나트랑 4박 5일 여행',
   country: '베트남',
@@ -135,12 +161,16 @@ const parseImportedJsonText = (text) => {
 const CustomMapMarker = ({ position, onClick, icon, label, ariaLabel }) => {
   const width = Number(icon?.scaledSize?.width) || 40;
   const height = Number(icon?.scaledSize?.height) || width;
+  const anchorX = Number(icon?.anchor?.x);
+  const anchorY = Number(icon?.anchor?.y);
+  const offsetX = Number.isFinite(anchorX) ? -anchorX : -width / 2;
+  const offsetY = Number.isFinite(anchorY) ? -anchorY : -height / 2;
 
   return (
     <OverlayView
       position={position}
       mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-      getPixelPositionOffset={() => ({ x: -width / 2, y: -height / 2 })}
+      getPixelPositionOffset={() => ({ x: offsetX, y: offsetY })}
     >
       <button
         type="button"
@@ -183,43 +213,214 @@ const CustomMapMarker = ({ position, onClick, icon, label, ariaLabel }) => {
 };
 
 const countryToCurrency = {
+  "가나": "GHS",
+  "가봉": "XAF",
+  "가이아나": "GYD",
+  "감비아": "GMD",
+  "과테말라": "GTQ",
+  "그레나다": "XCD",
+  "그리스": "EUR",
+  "기니": "GNF",
+  "기니비사우": "XOF",
+  "나미비아": "NAD",
+  "나우루": "AUD",
+  "나이지리아": "NGN",
+  "남아프리카공화국": "ZAR",
+  "남수단": "SSP",
+  "네덜란드": "EUR",
+  "네팔": "NPR",
+  "노르웨이": "NOK",
+  "뉴질랜드": "NZD",
+  "니제르": "XOF",
+  "니카라과": "NIO",
   "대한민국": "KRW",
-  "일본": "JPY",
-  "홍콩": "HKD",
+  "덴마크": "DKK",
+  "도미니카": "XCD",
+  "도미니카공화국": "DOP",
+  "독일": "EUR",
+  "동티모르": "USD",
+  "라오스": "LAK",
+  "라트비아": "EUR",
+  "러시아": "RUB",
+  "레바논": "LBP",
+  "레소토": "LSL",
+  "루마니아": "RON",
+  "룩셈부르크": "EUR",
+  "르완다": "RWF",
+  "리비아": "LYD",
+  "라이베리아": "LRD",
+  "리투아니아": "EUR",
+  "리히텐슈타인": "CHF",
+  "마다가스카르": "MGA",
+  "마셜 제도": "USD",
   "마카오": "MOP",
-  "대만": "TWD",
-  "중국": "CNY",
-  "태국": "THB",
-  "베트남": "VND",
-  "싱가포르": "SGD",
-  "필리핀": "PHP",
+  "말라위": "MWK",
   "말레이시아": "MYR",
-  "인도네시아": "IDR",
+  "말리": "XOF",
+  "멕시코": "MXN",
+  "모나코": "EUR",
+  "모로코": "MAD",
+  "모리셔스": "MUR",
+  "모리타니": "MRU",
+  "모잠비크": "MZN",
+  "몬테네그로": "EUR",
+  "몰도바": "MDL",
+  "몰디브": "MVR",
+  "몰타": "EUR",
   "몽골": "MNT",
   "미국": "USD",
-  "괌/사이판": "USD",
-  "캐나다": "CAD",
-  "호주": "AUD",
-  "뉴질랜드": "NZD",
-  "영국": "GBP",
-  "프랑스": "EUR",
-  "독일": "EUR",
-  "이탈리아": "EUR",
-  "스페인": "EUR",
-  "포르투갈": "EUR",
-  "네덜란드": "EUR",
+  "미얀마": "MMK",
+  "미크로네시아": "USD",
+  "바누아투": "VUV",
+  "바레인": "BHD",
+  "바베이도스": "BBD",
+  "바티칸 시국": "EUR",
+  "바하마": "BSD",
+  "방글라데시": "BDT",
+  "베냉": "XOF",
+  "베네수엘라": "VES",
+  "베트남": "VND",
+  "벨기에": "EUR",
+  "벨라루스": "BYN",
+  "벨리즈": "BZD",
+  "보스니아 헤르체고비나": "BAM",
+  "보츠와나": "BWP",
+  "볼리비아": "BOB",
+  "부룬디": "BIF",
+  "부르키나파소": "XOF",
+  "부탄": "BTN",
+  "북마케도니아": "MKD",
+  "북한": "KPW",
+  "불가리아": "BGN",
+  "브라질": "BRL",
+  "브루나이": "BND",
+  "사모아": "WST",
+  "산마리노": "EUR",
+  "사우디아라비아": "SAR",
+  "상투메 프린시페": "STN",
+  "세네갈": "XOF",
+  "세르비아": "RSD",
+  "세이셸": "SCR",
+  "세인트루시아": "XCD",
+  "세인트빈센트 그레나딘": "XCD",
+  "세인트키츠 네비스": "XCD",
+  "소말리아": "SOS",
+  "솔로몬 제도": "SBD",
+  "수단": "SDG",
+  "수리남": "SRD",
+  "스리랑카": "LKR",
+  "스웨덴": "SEK",
   "스위스": "CHF",
+  "스페인": "EUR",
+  "슬로바키아": "EUR",
+  "슬로베니아": "EUR",
+  "시리아": "SYP",
+  "시에라리온": "SLE",
+  "싱가포르": "SGD",
+  "아랍에미리트": "AED",
+  "아르메니아": "AMD",
+  "아르헨티나": "ARS",
+  "아이슬란드": "ISK",
+  "아이티": "HTG",
+  "아일랜드": "EUR",
+  "아제르바이잔": "AZN",
+  "아프가니스탄": "AFN",
+  "안도라": "EUR",
+  "앤티가 바부다": "XCD",
+  "알바니아": "ALL",
+  "알제리": "DZD",
+  "앙골라": "AOA",
+  "에콰도르": "USD",
+  "에리트레아": "ERN",
+  "에스토니아": "EUR",
+  "에스와티니": "SZL",
+  "에티오피아": "ETB",
+  "엘살바도르": "USD",
+  "영국": "GBP",
+  "예멘": "YER",
+  "오만": "OMR",
   "오스트리아": "EUR",
-  "체코": "CZK",
+  "온두라스": "HNL",
+  "요르단": "JOD",
+  "우간다": "UGX",
+  "우루과이": "UYU",
+  "우즈베키스탄": "UZS",
+  "우크라이나": "UAH",
+  "이라크": "IQD",
+  "이란": "IRR",
+  "이스라엘": "ILS",
+  "이집트": "EGP",
+  "이탈리아": "EUR",
+  "인도": "INR",
+  "인도네시아": "IDR",
+  "일본": "JPY",
+  "자메이카": "JMD",
+  "잠비아": "ZMW",
+  "적도 기니": "XAF",
+  "조지아": "GEL",
+  "중국": "CNY",
+  "중앙아프리카공화국": "XAF",
+  "지부티": "DJF",
+  "짐바브웨": "ZWG",
+  "차드": "XAF",
+  "칠레": "CLP",
+  "카메룬": "XAF",
+  "카보베르데": "CVE",
+  "카자흐스탄": "KZT",
+  "카타르": "QAR",
+  "캄보디아": "KHR",
+  "캐나다": "CAD",
+  "케냐": "KES",
+  "코모로": "KMF",
+  "코트디부아르": "XOF",
+  "코스타리카": "CRC",
+  "코소보": "EUR",
+  "콜롬비아": "COP",
+  "콩고 공화국": "XAF",
+  "콩고 민주공화국": "CDF",
+  "쿠바": "CUP",
+  "쿠웨이트": "KWD",
+  "크로아티아": "EUR",
+  "키르기스스탄": "KGS",
+  "키리바시": "AUD",
+  "키프로스": "EUR",
+  "타지키스탄": "TJS",
+  "탄자니아": "TZS",
+  "태국": "THB",
+  "터키": "TRY",
+  "토고": "XOF",
+  "통가": "TOP",
+  "투르크메니스탄": "TMT",
+  "투발루": "AUD",
+  "튀니지": "TND",
+  "트리니다드 토바고": "TTD",
+  "파나마": "PAB",
+  "파라과이": "PYG",
+  "파키스탄": "PKR",
+  "파푸아뉴기니": "PGK",
+  "팔라우": "USD",
+  "팔레스타인": "ILS",
+  "페루": "PEN",
+  "포르투갈": "EUR",
+  "폴란드": "PLN",
+  "프랑스": "EUR",
+  "피지": "FJD",
+  "핀란드": "EUR",
+  "필리핀": "PHP",
   "헝가리": "HUF",
-  "터키": "TRY"
+  "호주": "AUD",
+  "홍콩": "HKD",
+  "괌/사이판": "USD",
+  "대만": "TWD"
 };
 
 const CURRENCY_FAVORITES_STORAGE_KEY = 'world_pro_currency_favorites_v1';
-const SUPPORTED_CURRENCY_CODES = [
-  'USD', 'KRW', 'VND', 'EUR', 'JPY', 'CNY', 'TWD', 'HKD', 'MOP', 'THB',
-  'SGD', 'PHP', 'MYR', 'IDR', 'MNT', 'CAD', 'AUD', 'NZD', 'GBP', 'CHF',
-  'CZK', 'HUF', 'TRY'
+const SUPPORTED_CURRENCY_CODES = Array.from(new Set(Object.values(countryToCurrency)));
+const COUNTRY_OPTIONS = [
+  '대한민국',
+  ...Object.keys(countryToCurrency)
+    .filter((country) => country !== '대한민국')
+    .sort((a, b) => a.localeCompare(b, 'ko'))
 ];
 
 const PAYMENT_METHODS = [
@@ -554,6 +755,7 @@ function App() {
   const [searchResult, setSearchResult] = useState(null);
   const [activeDay, setActiveDay] = useState(null);
   const [expandedCountries, setExpandedCountries] = useState({});
+  const [expandedRegions, setExpandedRegions] = useState({});
   const [editingTripId, setEditingTripId] = useState(null);
   const [editTripData, setEditTripData] = useState({ name: "", startDate: "", endDate: "", country: "" });
   const [showCreateTripModal, setShowCreateTripModal] = useState(false);
@@ -989,6 +1191,25 @@ function App() {
     return country;
   };
 
+  const getRegionFromAddress = (address, country = '') => {
+    if (!address) return '지역 미분류';
+
+    const parts = String(address)
+      .split(',')
+      .map(part => part.replace(/[0-9]{5,}/g, '').trim())
+      .filter(Boolean);
+    if (parts.length === 0) return '지역 미분류';
+
+    const countryIndex = parts.findIndex(part => part === country);
+    const partsBeforeCountry = countryIndex > 0 ? parts.slice(0, countryIndex) : parts;
+    const candidate = partsBeforeCountry[partsBeforeCountry.length - 1];
+
+    if (!candidate || candidate === country || /^[A-Z0-9]{4,}\+[A-Z0-9]{2,}$/i.test(candidate)) {
+      return '지역 미분류';
+    }
+    return candidate;
+  };
+
   const getActualDateForDay = (startDate, dayNumber) => {
     if (!startDate) return '';
     try {
@@ -1004,9 +1225,14 @@ function App() {
     const groups = {};
     (favorites || []).forEach(fav => {
       if (!fav || !fav.loc) return;
-      const country = getCountryFromAddress(fav.loc);
-      if (!groups[country]) groups[country] = [];
-      groups[country].push(fav);
+      const addressGrouping = getPlaceAddressGrouping(
+        fav.addressComponents || fav.address_components
+      );
+      const country = fav.country || addressGrouping.country || getCountryFromAddress(fav.loc) || '기타';
+      const region = fav.region || addressGrouping.region || getRegionFromAddress(fav.loc, country) || '지역 미분류';
+      if (!groups[country]) groups[country] = {};
+      if (!groups[country][region]) groups[country][region] = [];
+      groups[country][region].push(fav);
     });
     return groups;
   }, [favorites]);
@@ -1051,6 +1277,14 @@ function App() {
     setExpandedCountries(prev => ({
       ...prev,
       [country]: !prev[country]
+    }));
+  };
+
+  const toggleRegion = (country, region) => {
+    const key = `${country}::${region}`;
+    setExpandedRegions(prev => ({
+      ...prev,
+      [key]: !prev[key]
     }));
   };
 
@@ -2043,9 +2277,15 @@ function App() {
     if (!place) return;
     const safeFavs = favorites || [];
     const isFav = safeFavs.some(f => f.name === place.name);
+    const addressGrouping = getPlaceAddressGrouping(place.addressComponents || place.address_components);
+    const favoritePlace = {
+      ...place,
+      country: place.country || addressGrouping.country || getCountryFromAddress(place.loc),
+      region: place.region || addressGrouping.region || getRegionFromAddress(place.loc, place.country || addressGrouping.country)
+    };
     const nextFavs = isFav 
       ? safeFavs.filter(f => f.name !== place.name)
-      : [...safeFavs, { ...place, id: makeEntityId() }];
+      : [...safeFavs, { ...favoritePlace, id: makeEntityId() }];
     
     saveFavorites(nextFavs);
   };
@@ -2194,18 +2434,21 @@ function App() {
 
     try {
       const place = prediction.toPlace();
-      await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location', 'viewport'] });
+      await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location', 'viewport', 'addressComponents'] });
       const location = place.location;
       if (!location) return;
 
       const name = getFormattableText(place.displayName) || getFormattableText(prediction.mainText) || getFormattableText(prediction.text) || '선택한 장소';
       const address = getFormattableText(place.formattedAddress) || getFormattableText(prediction.secondaryText) || '';
+      const addressGrouping = getPlaceAddressGrouping(place.addressComponents);
       const newPlace = {
         name,
         lat: location.lat(),
         lng: location.lng(),
         loc: address,
         desc: address,
+        country: addressGrouping.country,
+        region: addressGrouping.region,
         emoji: '📍',
         type: 'search'
       };
@@ -2250,12 +2493,15 @@ function App() {
         return;
       }
       const location = result.geometry.location;
+      const addressGrouping = getPlaceAddressGrouping(result.address_components);
       const newPlace = {
         name: result.formatted_address || query,
         lat: location.lat(),
         lng: location.lng(),
         loc: result.formatted_address || query,
         desc: result.formatted_address || query,
+        country: addressGrouping.country,
+        region: addressGrouping.region,
         emoji: '📍',
         type: 'geocoded-search'
       };
@@ -2273,15 +2519,18 @@ function App() {
     if (!map || !window.google) return;
     const service = new window.google.maps.places.PlacesService(map);
     service.getDetails(
-      { placeId, fields: ['name', 'geometry', 'formatted_address'] },
+      { placeId, fields: ['name', 'geometry', 'formatted_address', 'address_components'] },
       (place, status) => {
         if (status === window.google.maps.places.PlacesServiceStatus.OK && place.geometry && place.geometry.location) {
+          const addressGrouping = getPlaceAddressGrouping(place.address_components);
           const newPlace = {
             name: place.name,
             lat: place.geometry.location.lat(),
             lng: place.geometry.location.lng(),
             loc: place.formatted_address || 'Selected from Map',
             desc: place.formatted_address || 'Selected from Map',
+            country: addressGrouping.country,
+            region: addressGrouping.region,
             emoji: '📍',
             type: 'poi'
           };
@@ -2713,9 +2962,8 @@ function App() {
                                     >
                                       <option value="">나라 선택</option>
                                       <option value="대한민국">대한민국</option>
-                                      {Object.keys(countryToCurrency)
+                                      {COUNTRY_OPTIONS
                                         .filter(c => c !== "대한민국")
-                                        .sort()
                                         .map(c => (
                                           <option key={c} value={c}>{c}</option>
                                       ))}
@@ -2879,63 +3127,95 @@ function App() {
                     <p style={{ fontSize: '12px', color: '#9ca3af', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>저장한 장소가 없습니다</p>
                   </div>
                 ) : (
-                  Object.entries(groupedFavorites).map(([country, places]) => (
-                    <div key={`country-${country}`} style={{ marginBottom: '20px' }}>
-                      <div 
-                        onClick={() => toggleCountry(country)}
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', backgroundColor: '#fef2f2', borderRadius: '16px', cursor: 'pointer', marginBottom: '12px' }}
-                      >
-                        <h3 style={{ fontSize: '16px', fontWeight: '900', color: '#ef4444', margin: 0 }}>{country}</h3>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontSize: '12px', fontWeight: '800', color: '#f87171' }}>{places.length} 장소</span>
-                          <ChevronRight size={18} color="#f87171" style={{ transform: expandedCountries[country] ? 'rotate(90deg)' : 'rotate(0deg)', transition: '0.2s' }} />
-                        </div>
-                      </div>
+                  Object.entries(groupedFavorites).map(([country, regionGroups]) => {
+                    const countryPlaces = Object.values(regionGroups).flat();
+                    return (
+                      <div key={`country-${country}`} style={{ marginBottom: '20px' }}>
+                        <button
+                          type="button"
+                          aria-expanded={Boolean(expandedCountries[country])}
+                          onClick={() => toggleCountry(country)}
+                          style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', backgroundColor: '#fef2f2', border: 'none', borderRadius: '16px', cursor: 'pointer', marginBottom: '12px', textAlign: 'left', font: 'inherit' }}
+                        >
+                          <span style={{ fontSize: '16px', fontWeight: '900', color: '#ef4444', margin: 0 }}>{country}</span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '12px', fontWeight: '800', color: '#f87171' }}>{countryPlaces.length} 장소</span>
+                            <ChevronRight size={18} color="#f87171" style={{ transform: expandedCountries[country] ? 'rotate(90deg)' : 'rotate(0deg)', transition: '0.2s' }} />
+                          </span>
+                        </button>
 
-                      {expandedCountries[country] && (
-                        <div style={{ paddingLeft: '12px', borderLeft: '2px solid #fecaca', marginLeft: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                          {places.map((loc) => (
-                            <div 
-                              key={`fav-list-${loc.name}`}
-                              onClick={() => {
-                                setSelectedPlace(loc);
-                                map?.panTo({ lat: loc.lat, lng: loc.lng });
-                                map?.setZoom(18);
-                              }}
-                              style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '12px', backgroundColor: selectedPlace?.name === loc.name ? '#fef2f2' : 'transparent', borderRadius: '16px', cursor: 'pointer', border: '1px solid transparent' }}
-                            >
-                              <div style={{ width: '48px', height: '48px', backgroundColor: 'white', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', border: '1px solid #f3f4f6', flexShrink: 0 }}>{loc.emoji}</div>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <h3 style={{ fontSize: '14px', fontWeight: '800', color: '#111827', margin: '0 0 4px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{loc.name}</h3>
-                                <p style={{ fontSize: '11px', fontWeight: '700', color: '#9ca3af', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{loc.loc}</p>
-                              </div>
-                              <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                                {activeTripId && (
-                                  <button 
-                                    onClick={(e) => { 
-                                      e.stopPropagation(); 
-                                      addToItinerary(loc);
-                                    }} 
-                                    style={{ padding: '10px', backgroundColor: '#eff6ff', border: 'none', color: '#3b82f6', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                    title={`${activeDay}일차 일정에 추가`}
+                        {expandedCountries[country] && (
+                          <div style={{ paddingLeft: '12px', borderLeft: '2px solid #fecaca', marginLeft: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {Object.entries(regionGroups).map(([region, places]) => {
+                              const regionKey = `${country}::${region}`;
+                              return (
+                                <div key={`region-${regionKey}`}>
+                                  <button
+                                    type="button"
+                                    aria-expanded={Boolean(expandedRegions[regionKey])}
+                                    onClick={() => toggleRegion(country, region)}
+                                    style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', backgroundColor: '#fff7f7', border: '1px solid #fee2e2', borderRadius: '12px', cursor: 'pointer', textAlign: 'left', font: 'inherit' }}
                                   >
-                                    <Plus size={18} />
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                                      <MapPin size={14} color="#f87171" style={{ flexShrink: 0 }} />
+                                      <span style={{ fontSize: '13px', fontWeight: '900', color: '#b91c1c', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{region}</span>
+                                    </span>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                                      <span style={{ fontSize: '11px', fontWeight: '800', color: '#f87171' }}>{places.length} 장소</span>
+                                      <ChevronRight size={16} color="#f87171" style={{ transform: expandedRegions[regionKey] ? 'rotate(90deg)' : 'rotate(0deg)', transition: '0.2s' }} />
+                                    </span>
                                   </button>
-                                )}
-                                <button 
-                                  onClick={(e) => { e.stopPropagation(); toggleFavorite(loc); }} 
-                                  style={{ padding: '10px', backgroundColor: '#fef2f2', border: 'none', color: '#ef4444', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                  title="즐겨찾기에서 제거"
-                                >
-                                  <Heart size={18} fill="currentColor" />
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))
+
+                                  {expandedRegions[regionKey] && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '8px 0 0 8px' }}>
+                                      {places.map((loc) => (
+                                        <div
+                                          key={`fav-list-${loc.id || loc.name}`}
+                                          onClick={() => {
+                                            setSelectedPlace(loc);
+                                            map?.panTo({ lat: loc.lat, lng: loc.lng });
+                                            map?.setZoom(18);
+                                          }}
+                                          style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px', backgroundColor: selectedPlace?.name === loc.name ? '#fef2f2' : 'transparent', borderRadius: '12px', cursor: 'pointer', border: '1px solid transparent' }}
+                                        >
+                                          <div style={{ width: '42px', height: '42px', backgroundColor: 'white', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '21px', border: '1px solid #f3f4f6', flexShrink: 0 }}>{loc.emoji}</div>
+                                          <div style={{ flex: 1, minWidth: 0 }}>
+                                            <h3 style={{ fontSize: '13px', fontWeight: '800', color: '#111827', margin: '0 0 4px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{loc.name}</h3>
+                                            <p style={{ fontSize: '10px', fontWeight: '700', color: '#9ca3af', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{loc.loc}</p>
+                                          </div>
+                                          <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                                            {activeTripId && (
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  addToItinerary(loc);
+                                                }}
+                                                style={{ padding: '8px', backgroundColor: '#eff6ff', border: 'none', color: '#3b82f6', borderRadius: '9px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                                title={`${activeDay}일차 일정에 추가`}
+                                              >
+                                                <Plus size={16} />
+                                              </button>
+                                            )}
+                                            <button
+                                              onClick={(e) => { e.stopPropagation(); toggleFavorite(loc); }}
+                                              style={{ padding: '8px', backgroundColor: '#fef2f2', border: 'none', color: '#ef4444', borderRadius: '9px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                              title="즐겨찾기에서 제거"
+                                            >
+                                              <Heart size={16} fill="currentColor" />
+                                            </button>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
                 )}
               </>
             )}
@@ -3006,40 +3286,40 @@ function App() {
                   className="itinerary-reserve-card"
                   onClick={() => setActiveDay('reserve')}
                   style={{
-                    backgroundColor: activeDay === 'reserve' ? '#fffbeb' : 'white',
+                    backgroundColor: activeDay === 'reserve' ? '#eff6ff' : 'white',
                     borderRadius: '24px',
-                    border: `1px solid ${activeDay === 'reserve' ? '#fcd34d' : '#fef3c7'}`,
-                    boxShadow: '0 4px 20px rgba(245, 158, 11, 0.08)',
+                    border: `1px solid ${activeDay === 'reserve' ? '#93c5fd' : '#dbeafe'}`,
+                    boxShadow: '0 4px 20px rgba(37, 99, 235, 0.08)',
                     overflow: 'hidden',
                     marginBottom: '32px',
                     cursor: 'pointer'
                   }}
                 >
-                  <div style={{ padding: '20px 24px', backgroundColor: activeDay === 'reserve' ? '#fef3c7' : '#fffbeb', borderBottom: '1px solid #fef3c7', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ padding: '20px 24px', backgroundColor: activeDay === 'reserve' ? '#dbeafe' : '#eff6ff', borderBottom: '1px solid #dbeafe', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
-                      <div style={{ width: '44px', height: '44px', borderRadius: '14px', backgroundColor: '#f59e0b', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <div style={{ width: '44px', height: '44px', borderRadius: '14px', backgroundColor: '#2563eb', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         <Star size={21} fill="currentColor" />
                       </div>
                       <div style={{ minWidth: 0 }}>
-                        <h3 style={{ margin: 0, color: '#92400e', fontSize: '17px', fontWeight: '900' }}>예비 목록</h3>
-                        <p style={{ margin: '4px 0 0', color: '#b45309', fontSize: '11px', fontWeight: '700' }}>일차를 정하기 전 잠시 보관하는 장소</p>
+                        <h3 style={{ margin: 0, color: '#1e3a8a', fontSize: '17px', fontWeight: '900' }}>예비 목록</h3>
+                        <p style={{ margin: '4px 0 0', color: '#2563eb', fontSize: '11px', fontWeight: '700' }}>일차를 정하기 전 잠시 보관하는 장소</p>
                       </div>
                     </div>
-                    <span style={{ flexShrink: 0, padding: '7px 10px', borderRadius: '10px', backgroundColor: 'white', color: '#b45309', fontSize: '11px', fontWeight: '900' }}>{reserveItems.length} 장소</span>
+                    <span style={{ flexShrink: 0, padding: '7px 10px', borderRadius: '10px', backgroundColor: 'white', color: '#2563eb', fontSize: '11px', fontWeight: '900' }}>{reserveItems.length} 장소</span>
                   </div>
 
                   <div onClick={(event) => event.stopPropagation()} style={{ padding: '20px 24px' }}>
                     {reserveItems.length === 0 ? (
-                      <div style={{ padding: '24px 16px', textAlign: 'center', border: '2px dashed #fde68a', borderRadius: '16px' }}>
-                        <p style={{ margin: 0, color: '#d97706', fontSize: '12px', fontWeight: '800' }}>장소 추가 창에서 예비 목록을 선택해 보관할 수 있습니다.</p>
+                      <div style={{ padding: '24px 16px', textAlign: 'center', border: '2px dashed #bfdbfe', borderRadius: '16px' }}>
+                        <p style={{ margin: 0, color: '#2563eb', fontSize: '12px', fontWeight: '800' }}>장소 추가 창에서 예비 목록을 선택해 보관할 수 있습니다.</p>
                       </div>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         {reserveItems.map((item, reserveIndex) => {
                           const reserveDeleteId = `reserve-${item.id}`;
                           return (
-                            <div key={item.id} className="reserve-item-card" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', padding: '14px', backgroundColor: 'white', border: '1px solid #fef3c7', borderRadius: '18px', boxShadow: '0 2px 8px rgba(245, 158, 11, 0.05)' }}>
-                              <div aria-label={`${reserveIndex + 1}번째 예비 장소`} style={{ width: '34px', height: '34px', borderRadius: '50%', backgroundColor: '#f59e0b', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', fontWeight: '900', flexShrink: 0 }}>{reserveIndex + 1}</div>
+                            <div key={item.id} className="reserve-item-card" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', padding: '14px', backgroundColor: 'white', border: '1px solid #dbeafe', borderRadius: '18px', boxShadow: '0 2px 8px rgba(37, 99, 235, 0.05)' }}>
+                              <div aria-label={`${reserveIndex + 1}번째 예비 장소`} style={{ width: '34px', height: '34px', borderRadius: '50%', backgroundColor: '#3b82f6', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', fontWeight: '900', flexShrink: 0 }}>{reserveIndex + 1}</div>
                               <div style={{ flex: '1 1 150px', minWidth: 0 }}>
                                 <h4
                                   onClick={() => {
@@ -3058,11 +3338,11 @@ function App() {
                                 {item.loc && <p style={{ display: 'flex', alignItems: 'center', gap: '3px', margin: '4px 0 0', color: '#94a3b8', fontSize: '10px', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><MapPin size={10} />{item.loc}</p>}
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: '1 1 230px', justifyContent: 'flex-end' }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', backgroundColor: '#fffbeb', border: '1px solid #fef3c7', borderRadius: '10px', overflow: 'hidden' }}>
-                                  <button type="button" aria-label="예비 장소 위로 이동" onClick={() => moveReserveItem(item.id, 'up')} disabled={reserveIndex === 0} style={{ width: '28px', height: '20px', padding: 0, border: 'none', background: 'transparent', color: reserveIndex === 0 ? '#fcd34d' : '#b45309', cursor: reserveIndex === 0 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChevronUp size={14} /></button>
-                                  <button type="button" aria-label="예비 장소 아래로 이동" onClick={() => moveReserveItem(item.id, 'down')} disabled={reserveIndex === reserveItems.length - 1} style={{ width: '28px', height: '20px', padding: 0, border: 'none', borderTop: '1px solid #fef3c7', background: 'transparent', color: reserveIndex === reserveItems.length - 1 ? '#fcd34d' : '#b45309', cursor: reserveIndex === reserveItems.length - 1 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChevronDown size={14} /></button>
+                                <div style={{ display: 'flex', flexDirection: 'column', backgroundColor: '#eff6ff', border: '1px solid #dbeafe', borderRadius: '10px', overflow: 'hidden' }}>
+                                  <button type="button" aria-label="예비 장소 위로 이동" onClick={() => moveReserveItem(item.id, 'up')} disabled={reserveIndex === 0} style={{ width: '28px', height: '20px', padding: 0, border: 'none', background: 'transparent', color: reserveIndex === 0 ? '#bfdbfe' : '#2563eb', cursor: reserveIndex === 0 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChevronUp size={14} /></button>
+                                  <button type="button" aria-label="예비 장소 아래로 이동" onClick={() => moveReserveItem(item.id, 'down')} disabled={reserveIndex === reserveItems.length - 1} style={{ width: '28px', height: '20px', padding: 0, border: 'none', borderTop: '1px solid #dbeafe', background: 'transparent', color: reserveIndex === reserveItems.length - 1 ? '#bfdbfe' : '#2563eb', cursor: reserveIndex === reserveItems.length - 1 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChevronDown size={14} /></button>
                                 </div>
-                                <select value="" aria-label={`${item.displayName || item.name || '예비 장소'} 일차로 이동`} onChange={(event) => moveReserveItemToDay(item.id, event.target.value)} onClick={(event) => event.stopPropagation()} style={{ minWidth: '116px', maxWidth: '140px', padding: '8px 8px', border: '1px solid #fde68a', borderRadius: '10px', backgroundColor: '#fffdf5', color: '#92400e', fontSize: '11px', fontWeight: '800', outline: 'none' }}>
+                                <select value="" aria-label={`${item.displayName || item.name || '예비 장소'} 일차로 이동`} onChange={(event) => moveReserveItemToDay(item.id, event.target.value)} onClick={(event) => event.stopPropagation()} style={{ minWidth: '116px', maxWidth: '140px', padding: '8px 8px', border: '1px solid #bfdbfe', borderRadius: '10px', backgroundColor: '#f8fbff', color: '#1d4ed8', fontSize: '11px', fontWeight: '800', outline: 'none' }}>
                                   <option value="">일차로 이동</option>
                                   {itinerary.map(dayPlan => <option key={`reserve-move-${item.id}-${dayPlan.day}`} value={parseDay(dayPlan.day)}>{parseDay(dayPlan.day)}일차</option>)}
                                 </select>
@@ -3977,7 +4257,7 @@ function App() {
                   style={{ width: '100%', boxSizing: 'border-box', padding: '13px 14px', border: '1px solid #e2e8f0', borderRadius: '13px', backgroundColor: '#f8fafc', color: '#0f172a', fontSize: '14px', fontWeight: '700', outline: 'none' }}
                 >
                   <option value="">나라를 선택해주세요</option>
-                  {Object.keys(countryToCurrency).map((countryName) => (
+                  {COUNTRY_OPTIONS.map((countryName) => (
                     <option key={`create-trip-country-${countryName}`} value={countryName}>{countryName}</option>
                   ))}
                 </select>
@@ -4405,19 +4685,21 @@ function App() {
           ))}
 
           {/* Dynamic Search Result Marker */}
-          {searchResult && searchResult.name !== selectedPlace?.name && (
+          {searchResult && ['search', 'geocoded-search'].includes(searchResult.type) && (
              <CustomMapMarker
                 position={{ lat: searchResult.lat, lng: searchResult.lng }}
                 onClick={() => setSelectedPlace(searchResult)}
+                ariaLabel={`검색한 장소 ${searchResult.name}`}
                 icon={{
                   url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-                    <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <circle cx="20" cy="20" r="18" fill="%23006ADC" stroke="white" stroke-width="3"/>
-                      <text x="20" y="27" font-size="20" text-anchor="middle">📍</text>
+                    <svg width="40" height="48" viewBox="0 0 40 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M20 46C20 46 5 31.2 5 20C5 11.7 11.7 5 20 5C28.3 5 35 11.7 35 20C35 31.2 20 46 20 46Z" fill="%23006ADC" stroke="white" stroke-width="3" stroke-linejoin="round"/>
+                      <circle cx="20" cy="20" r="8" fill="white"/>
+                      <circle cx="20" cy="20" r="4" fill="%23006ADC"/>
                     </svg>
                   `)}`,
-                  scaledSize: new window.google.maps.Size(40, 40),
-                  anchor: new window.google.maps.Point(20, 20)
+                  scaledSize: new window.google.maps.Size(40, 48),
+                  anchor: new window.google.maps.Point(20, 48)
                 }}
              />
           )}
