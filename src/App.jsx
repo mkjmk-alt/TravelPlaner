@@ -3282,10 +3282,9 @@ function App() {
   /* eslint-enable react-hooks/exhaustive-deps */
   const averageDailySpendKRW = itinerary.length > 0 ? Math.round(totalSpentKRW / itinerary.length) : 0;
   const budgetPanelItems = [
-    { key: 'exchange', label: '환율 기준 설정', activeColor: '#1d4ed8', activeBackground: '#dbeafe' },
+    { key: 'exchange', label: '통화 설정', activeColor: '#1d4ed8', activeBackground: '#dbeafe' },
     { key: 'category', label: '카테고리별 예산', activeColor: '#92400e', activeBackground: '#fef3c7' },
     { key: 'cash', label: '현금 정산', activeColor: '#92400e', activeBackground: '#fef3c7' },
-    { key: 'currency', label: '즐겨찾기 통화', activeColor: '#475569', activeBackground: '#e2e8f0' },
     { key: 'stats', label: '통계', activeColor: '#7c3aed', activeBackground: '#ede9fe' }
   ];
   const todayItinerarySummary = useMemo(() => {
@@ -4655,7 +4654,7 @@ function App() {
                 )}
 
                 {budgetPanel === 'cash' && renderCashReconciliationPanel()}
-                {budgetPanel === 'currency' && renderCurrencyManagerPanel()}
+                {budgetPanel === 'exchange' && renderCurrencyManagerPanel()}
                 {budgetPanel === 'stats' && renderBudgetStatisticsPanel()}
 
                 {/* Add Expense Form */}
