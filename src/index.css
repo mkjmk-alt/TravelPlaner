@@ -919,6 +919,25 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   }
 }
 
+/* Keep the desktop search field inside the map area when the window is
+   narrower than the full desktop layout. This prevents it from covering the
+   sidebar's login/logout control. */
+@media (min-width: 769px) and (max-width: 1023px) {
+  .search-bar-container {
+    left: calc(50% + 222px) !important;
+    width: min(448px, calc(100vw - 476px)) !important;
+    transform: translateX(-50%) !important;
+  }
+}
+
+@media (min-width: 1024px) and (max-width: 1535px) {
+  .search-bar-container {
+    left: calc(50% + 272px) !important;
+    width: min(448px, calc(100vw - 576px)) !important;
+    transform: translateX(-50%) !important;
+  }
+}
+
 @media (max-width: 768px) {
   .sidebar-header {
     max-height: 300px;

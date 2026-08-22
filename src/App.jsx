@@ -89,6 +89,10 @@ const getAddressComponentText = (component) => (
   || ''
 );
 
+const normalizeRegionLabel = (value) => String(value || '')
+  .replace(/^\d{4,6}\s+/u, '')
+  .trim();
+
 const getPlaceAddressGrouping = (components) => {
   if (!Array.isArray(components)) return { country: '', region: '' };
 
@@ -97,12 +101,12 @@ const getPlaceAddressGrouping = (components) => {
   ));
 
   const country = getAddressComponentText(findComponent(['country']));
-  const region = getAddressComponentText(findComponent([
+  const region = normalizeRegionLabel(getAddressComponentText(findComponent([
     'locality',
     'postal_town',
     'administrative_area_level_2',
     'administrative_area_level_1'
-  ]));
+  ])));
 
   return { country, region };
 };
@@ -767,6 +771,8 @@ function App() {
   const [expandedRegions, setExpandedRegions] = useState({});
   const [editingTripId, setEditingTripId] = useState(null);
   const [editTripData, setEditTripData] = useState({ name: "", startDate: "", endDate: "", country: "" });
+  const [showEditTripModal, setShowEditTripModal] = useState(false);
+  const [editTripError, setEditTripError] = useState('');
   const [showCreateTripModal, setShowCreateTripModal] = useState(false);
   const [createTripData, setCreateTripData] = useState({ name: "", startDate: "", endDate: "", country: "" });
   const [createTripError, setCreateTripError] = useState('');
@@ -1188,6 +1194,13 @@ function App() {
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) return 0;
     return Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
   }, [createTripData.startDate, createTripData.endDate]);
+  const editTripDayCount = useMemo(() => {
+    if (!editTripData.startDate || !editTripData.endDate) return 0;
+    const start = new Date(`${editTripData.startDate}T00:00:00`);
+    const end = new Date(`${editTripData.endDate}T00:00:00`);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) return 0;
+    return Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+  }, [editTripData.startDate, editTripData.endDate]);
 
   const getExpenseAmountKRW = (amount, currency) => {
     const numericAmount = Number(amount);
@@ -1325,7 +1338,7 @@ function App() {
 
     const parts = String(address)
       .split(',')
-      .map(part => part.replace(/[0-9]{5,}/g, '').trim())
+      .map(part => normalizeRegionLabel(part.replace(/[0-9]{5,}/g, '').trim()))
       .filter(Boolean);
     if (parts.length === 0) return '지역 미분류';
 
@@ -1358,7 +1371,7 @@ function App() {
         fav.addressComponents || fav.address_components
       );
       const country = fav.country || addressGrouping.country || getCountryFromAddress(fav.loc) || '기타';
-      const region = fav.region || addressGrouping.region || getRegionFromAddress(fav.loc, country) || '지역 미분류';
+      const region = normalizeRegionLabel(fav.region) || addressGrouping.region || getRegionFromAddress(fav.loc, country) || '지역 미분류';
       if (!groups[country]) groups[country] = {};
       if (!groups[country][region]) groups[country][region] = [];
       groups[country][region].push(fav);
@@ -2108,17 +2121,31 @@ function App() {
 
   const startRenameTrip = (trip) => {
     setEditingTripId(trip.id);
+    setEditTripError('');
     setEditTripData({ 
       name: trip.name, 
       startDate: trip.startDate || "", 
       endDate: trip.endDate || "",
       country: trip.country || ""
     });
+    setShowEditTripModal(true);
+  };
+
+  const cancelEditTrip = () => {
+    setShowEditTripModal(false);
+    setEditingTripId(null);
+    setEditTripError('');
   };
 
   const saveRenameTrip = (id) => {
-    if (editTripData.name.trim() !== "") {
-      const { name, startDate, endDate, country } = editTripData;
+    const trimmedName = editTripData.name.trim();
+    if (!trimmedName) {
+      setEditTripError('여행 이름을 입력해주세요.');
+      return;
+    }
+
+    {
+      const { startDate, endDate, country } = editTripData;
       let newItinerary = null;
       let travelCurrency = null;
       
@@ -2130,16 +2157,14 @@ function App() {
         const start = new Date(startDate + "T00:00:00");
         const end = new Date(endDate + "T00:00:00");
         if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
-          setModalConfig({ type: "error", title: "날짜를 확인해 주세요", message: "시작일은 종료일보다 늦을 수 없습니다." });
-          setShowCustomModal(true);
+          setEditTripError('시작일은 종료일보다 늦을 수 없습니다.');
           return;
         }
         if (start <= end) {
           const diffTime = Math.abs(end - start);
           const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
           if (diffDays > 100) {
-            setModalConfig({ type: "error", title: "여행 기간이 너무 깁니다", message: "여행 기간은 최대 100일까지 설정할 수 있습니다." });
-            setShowCustomModal(true);
+            setEditTripError('여행 기간은 최대 100일까지 설정할 수 있습니다.');
             return;
           }
           if (diffDays > 0 && diffDays <= 100) {
@@ -2160,18 +2185,13 @@ function App() {
         : [];
 
       if (removedTrailingItems.length > 0) {
-        setModalConfig({
-          type: "error",
-          title: "일정이 있는 일차는 줄일 수 없습니다",
-          message: "마지막 일차에 일정이 남아 있습니다. 해당 일정을 예비 목록으로 이동하거나 삭제한 뒤 여행 기간을 줄여주세요."
-        });
-        setShowCustomModal(true);
+        setEditTripError('마지막 일차에 일정이 남아 있습니다. 해당 일정을 예비 목록으로 이동하거나 삭제한 뒤 여행 기간을 줄여주세요.');
         return;
       }
 
       const nextTrips = (trips || []).map(t => {
         if (t.id === id) {
-          const tripToUpdate = { ...t, name: name.trim(), startDate, endDate, country };
+          const tripToUpdate = { ...t, name: trimmedName, startDate, endDate, country };
           if (newItinerary) {
              tripToUpdate.itinerary = buildItineraryForDayCount(t.itinerary, newItinerary.length);
           }
@@ -2185,7 +2205,7 @@ function App() {
       
       syncTripsToCloud(nextTrips);
     }
-    setEditingTripId(null);
+    cancelEditTrip();
   };
 
   const handleInlineDelete = (e, id, deleteAction) => {
@@ -2411,7 +2431,7 @@ function App() {
     const favoritePlace = {
       ...place,
       country: place.country || addressGrouping.country || getCountryFromAddress(place.loc),
-      region: place.region || addressGrouping.region || getRegionFromAddress(place.loc, place.country || addressGrouping.country)
+      region: normalizeRegionLabel(place.region) || addressGrouping.region || getRegionFromAddress(place.loc, place.country || addressGrouping.country)
     };
     const nextFavs = isFav 
       ? safeFavs.filter(f => f.name !== place.name)
@@ -2988,11 +3008,10 @@ function App() {
                   </button>
                   <button 
                     onClick={openBudget}
-                    style={{ minWidth: '40px', height: '40px', padding: '0 12px', borderRadius: '12px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', cursor: 'pointer', transition: '0.2s', backgroundColor: viewMode === 'budget' ? '#10b981' : '#f3f4f6', color: viewMode === 'budget' ? 'white' : '#64748b', fontSize: '11px', fontWeight: '900', whiteSpace: 'nowrap' }}
+                    style={{ width: '40px', height: '40px', padding: 0, borderRadius: '12px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.2s', backgroundColor: viewMode === 'budget' ? '#10b981' : '#f3f4f6', color: viewMode === 'budget' ? 'white' : '#64748b' }}
                     aria-label="예산·지출" title="예산·지출"
                   >
                     <Wallet size={18} />
-                    <span>예산·지출</span>
                   </button>
                   
                   {/* Unified Invite Action */}
@@ -3067,7 +3086,7 @@ function App() {
                         style={{ padding: '24px', backgroundColor: activeTripId === trip.id ? '#f5f3ff' : 'white', border: activeTripId === trip.id ? '2px solid #ddd6fe' : '1px solid #f3f4f6', borderRadius: '20px', cursor: 'pointer', transition: '0.2s', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-                          {editingTripId === trip.id ? (
+                          {editingTripId === trip.id && !showEditTripModal ? (
                             <div 
                               onClick={(e) => e.stopPropagation()} 
                               style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}
@@ -3210,8 +3229,7 @@ function App() {
                             </div>
                           )}
                         </div>
-                        {editingTripId !== trip.id && (
-                          <div style={{ display: 'flex', gap: '12px', fontSize: '11px', fontWeight: '800', color: '#6b7280', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', gap: '12px', fontSize: '11px', fontWeight: '800', color: '#6b7280', flexWrap: 'wrap' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
                               <Calendar size={13} color="#9ca3af" /> 
                               {trip.startDate ? (
@@ -3227,10 +3245,8 @@ function App() {
                               <Wallet size={13} color="#9ca3af" /> 
                               <span style={{ color: '#111827' }}>총 지출 ₩ {(trip.expenses || []).reduce((sum, e) => sum + (Number(e.amountKRW) || 0), 0).toLocaleString()}</span>
                             </div>
-                          </div>
-                        )}
-                        {editingTripId !== trip.id && (
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginTop: '18px', paddingTop: '14px', borderTop: '1px solid #f1f5f9' }}>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginTop: '18px', paddingTop: '14px', borderTop: '1px solid #f1f5f9' }}>
                             <span style={{ color: '#94a3b8', fontSize: '11px', fontWeight: '800' }}>{(trip.itinerary || []).reduce((sum, day) => sum + (day.items || []).length, 0)}개 일정</span>
                             <button
                               type="button"
@@ -3239,8 +3255,7 @@ function App() {
                             >
                               <Calendar size={14} /> 일정 보기
                             </button>
-                          </div>
-                        )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -4540,6 +4555,126 @@ function App() {
                 style={{ flex: 1.6, padding: '14px', border: 'none', borderRadius: '14px', backgroundColor: '#8b5cf6', color: 'white', fontSize: '14px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 10px 20px rgba(139, 92, 246, 0.22)' }}
               >
                 여행 만들기
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {showEditTripModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="edit-trip-modal-title"
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') cancelEditTrip();
+          }}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 13000,
+            backgroundColor: 'rgba(15, 23, 42, 0.45)', backdropFilter: 'blur(8px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '20px', animation: 'fadeIn 0.2s ease-out'
+          }}
+        >
+          <form
+            onSubmit={(event) => { event.preventDefault(); saveRenameTrip(editingTripId); }}
+            style={{
+              backgroundColor: 'white', borderRadius: '28px', width: '100%', maxWidth: '440px',
+              maxHeight: 'calc(100vh - 40px)', overflowY: 'auto', padding: '28px 24px',
+              boxShadow: '0 25px 60px rgba(15, 23, 42, 0.25)', position: 'relative',
+              animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+          >
+            <button
+              type="button"
+              aria-label="여행 정보 수정 창 닫기"
+              title="닫기"
+              onClick={cancelEditTrip}
+              style={{ position: 'absolute', top: '20px', right: '20px', border: 'none', background: '#f1f5f9', width: '34px', height: '34px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', cursor: 'pointer' }}
+            >
+              <X size={18} />
+            </button>
+
+            <div style={{ paddingRight: '44px', marginBottom: '24px' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 9px', borderRadius: '999px', backgroundColor: '#eff6ff', color: '#2563eb', fontSize: '11px', fontWeight: '900', marginBottom: '10px' }}>
+                <Edit2 size={14} /> 여행 정보 수정
+              </div>
+              <h2 id="edit-trip-modal-title" style={{ margin: 0, color: '#0f172a', fontSize: '22px', fontWeight: '900', letterSpacing: '-0.04em' }}>여행 기본 정보</h2>
+              <p style={{ margin: '7px 0 0', color: '#64748b', fontSize: '12px', lineHeight: 1.5 }}>여행 이름, 국가와 기간을 한 곳에서 수정할 수 있습니다.</p>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                <span style={{ color: '#475569', fontSize: '11px', fontWeight: '900' }}>여행 이름 <span style={{ color: '#ef4444' }}>*</span></span>
+                <input
+                  autoFocus
+                  type="text"
+                  value={editTripData.name}
+                  onChange={(event) => { setEditTripData({ ...editTripData, name: event.target.value }); setEditTripError(''); }}
+                  placeholder="예: 나트랑 4박 5일 여행"
+                  maxLength={80}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '13px 14px', border: '1px solid #e2e8f0', borderRadius: '13px', backgroundColor: '#f8fafc', color: '#0f172a', fontSize: '14px', fontWeight: '700', outline: 'none' }}
+                />
+              </label>
+
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                <span style={{ color: '#475569', fontSize: '11px', fontWeight: '900' }}>여행 국가 <span style={{ color: '#94a3b8', fontWeight: '700' }}>(선택)</span></span>
+                <select
+                  value={editTripData.country}
+                  onChange={(event) => { setEditTripData({ ...editTripData, country: event.target.value }); setEditTripError(''); }}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '13px 14px', border: '1px solid #e2e8f0', borderRadius: '13px', backgroundColor: '#f8fafc', color: '#0f172a', fontSize: '14px', fontWeight: '700', outline: 'none' }}
+                >
+                  <option value="">나라를 선택해주세요</option>
+                  {COUNTRY_OPTIONS.map((countryName) => (
+                    <option key={`edit-trip-country-${countryName}`} value={countryName}>{countryName}</option>
+                  ))}
+                </select>
+              </label>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                  <span style={{ color: '#475569', fontSize: '11px', fontWeight: '900' }}>시작일 <span style={{ color: '#ef4444' }}>*</span></span>
+                  <input
+                    type="date"
+                    value={editTripData.startDate}
+                    onChange={(event) => { setEditTripData({ ...editTripData, startDate: event.target.value }); setEditTripError(''); }}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '13px 10px', border: '1px solid #e2e8f0', borderRadius: '13px', backgroundColor: '#f8fafc', color: '#0f172a', fontSize: '13px', fontWeight: '700', outline: 'none' }}
+                  />
+                </label>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                  <span style={{ color: '#475569', fontSize: '11px', fontWeight: '900' }}>종료일 <span style={{ color: '#ef4444' }}>*</span></span>
+                  <input
+                    type="date"
+                    value={editTripData.endDate}
+                    onChange={(event) => { setEditTripData({ ...editTripData, endDate: event.target.value }); setEditTripError(''); }}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '13px 10px', border: '1px solid #e2e8f0', borderRadius: '13px', backgroundColor: '#f8fafc', color: '#0f172a', fontSize: '13px', fontWeight: '700', outline: 'none' }}
+                  />
+                </label>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '12px 14px', borderRadius: '13px', backgroundColor: editTripDayCount > 0 ? '#eff6ff' : '#f8fafc', color: editTripDayCount > 0 ? '#2563eb' : '#94a3b8', fontSize: '12px', fontWeight: '800' }}>
+                <span>변경될 일정</span>
+                <strong>{editTripDayCount > 0 ? `${editTripDayCount}일차` : '날짜를 확인해주세요'}</strong>
+              </div>
+            </div>
+
+            {editTripError && (
+              <p role="alert" style={{ margin: '14px 0 0', padding: '10px 12px', borderRadius: '11px', backgroundColor: '#fef2f2', color: '#dc2626', fontSize: '12px', fontWeight: '800', lineHeight: 1.45 }}>{editTripError}</p>
+            )}
+
+            <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
+              <button
+                type="button"
+                onClick={cancelEditTrip}
+                style={{ flex: 1, padding: '14px', border: '1px solid #e2e8f0', borderRadius: '14px', backgroundColor: 'white', color: '#64748b', fontSize: '14px', fontWeight: '900', cursor: 'pointer' }}
+              >
+                취소
+              </button>
+              <button
+                type="submit"
+                style={{ flex: 1.6, padding: '14px', border: 'none', borderRadius: '14px', backgroundColor: '#2563eb', color: 'white', fontSize: '14px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 10px 20px rgba(37, 99, 235, 0.22)' }}
+              >
+                저장
               </button>
             </div>
           </form>
