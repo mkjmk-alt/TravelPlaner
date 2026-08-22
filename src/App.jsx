@@ -1005,10 +1005,7 @@ function App() {
   const [notificationPermission, setNotificationPermission] = useState(() => (
     typeof Notification === 'undefined' ? 'unsupported' : Notification.permission
   ));
-  const [showCashReconciliation, setShowCashReconciliation] = useState(false);
-  const [showCurrencyManager, setShowCurrencyManager] = useState(false);
-  const [showExchangeRateSettings, setShowExchangeRateSettings] = useState(false);
-  const [showCategoryBudgetSettings, setShowCategoryBudgetSettings] = useState(false);
+  const [budgetPanel, setBudgetPanel] = useState(null);
   const [showChecklist, setShowChecklist] = useState(false);
   const [checklistDraft, setChecklistDraft] = useState('');
   const [cashWalletId, setCashWalletId] = useState(null);
@@ -3270,6 +3267,26 @@ function App() {
     spent: categoryTotalsKRW[category.value] || 0,
     budget: Number(budgetSettings.categoryBudgets?.[category.value]) || 0
   }));
+  /* eslint-disable react-hooks/exhaustive-deps */
+  const paymentTotalsKRW = useMemo(() => (expenses || []).reduce((totals, expense) => {
+    const paymentMethod = expense.paymentMethod || 'unassigned';
+    totals[paymentMethod] = (totals[paymentMethod] || 0) + getExpenseAmountKRW(expense.amount, expense.currency);
+    return totals;
+  }, {}), [expenses, exchangeRates, budgetSettings]);
+  const dailyExpenseTotalsKRW = useMemo(() => (expenses || []).reduce((totals, expense) => {
+    const day = parseDay(expense.day);
+    totals[day] = (totals[day] || 0) + getExpenseAmountKRW(expense.amount, expense.currency);
+    return totals;
+  }, {}), [expenses, exchangeRates, budgetSettings]);
+  /* eslint-enable react-hooks/exhaustive-deps */
+  const averageDailySpendKRW = itinerary.length > 0 ? Math.round(totalSpentKRW / itinerary.length) : 0;
+  const budgetPanelItems = [
+    { key: 'exchange', label: '환율 기준 설정', activeColor: '#1d4ed8', activeBackground: '#dbeafe' },
+    { key: 'category', label: '카테고리별 예산', activeColor: '#92400e', activeBackground: '#fef3c7' },
+    { key: 'cash', label: '현금 정산', activeColor: '#92400e', activeBackground: '#fef3c7' },
+    { key: 'currency', label: '즐겨찾기 통화', activeColor: '#475569', activeBackground: '#e2e8f0' },
+    { key: 'stats', label: '통계', activeColor: '#7c3aed', activeBackground: '#ede9fe' }
+  ];
   const todayItinerarySummary = useMemo(() => {
     if (!activeTrip || !activeTrip.startDate) return null;
     const start = new Date(`${activeTrip.startDate}T00:00:00`);
@@ -3333,6 +3350,59 @@ function App() {
   const useFloatingPlacePanel = true;
   const selectedPlaceOpeningHours = getOpeningHours(selectedPlace);
   const selectedPlaceBusinessStatus = getBusinessStatusLabel(selectedPlace?.businessStatus);
+
+  const renderCashReconciliationPanel = () => (
+    <div className="cash-reconciliation-card" style={{ padding: '16px', backgroundColor: '#fffaf0', border: '1px solid #fde68a', borderRadius: '16px', marginBottom: '18px' }}>
+      <div className="cash-reconciliation-panel-heading">
+        <span><strong className="cash-reconciliation-toggle-title">현금 정산</strong><span className="cash-reconciliation-toggle-description">환전·인출한 금액과 현금 지출을 비교해 잔액을 확인하세요.</span></span>
+        <span className={`cash-reconciliation-status-chip${cashDifference === null ? ' is-pending' : cashDifference === 0 ? ' is-matched' : ' is-mismatch'}`}>{cashDifference === null ? '입력 필요' : cashDifference === 0 ? '정산 일치' : '확인 필요'}</span>
+      </div>
+      <div className="cash-reconciliation-panel">
+        <div className="cash-reconciliation-panel-heading">
+          <span>정산 통화</span>
+          <select value={cashLedgerCurrency} onChange={(e) => { const wallet = cashWallets.find(candidate => candidate.currency === e.target.value); setCashWalletId(wallet?.id || null); saveBudgetSettings({ ...budgetSettings, cashLedgerCurrency: e.target.value }); }} aria-label="현금 정산 통화">
+            {cashCurrencyChoices.map(code => <option key={`cash-ledger-currency-${code}`} value={code}>{getCurrencySymbol(code)} {getCurrencyNameKO(code)} ({code})</option>)}
+          </select>
+        </div>
+        <div style={{ display: 'flex', gap: '7px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '12px' }}>
+          <span style={{ color: '#92400e', fontSize: '10px', fontWeight: '900' }}>통화별 현금 지갑</span>
+          {cashWallets.map(wallet => <button key={`cash-wallet-${wallet.id}`} type="button" onClick={() => { setCashWalletId(wallet.id); saveBudgetSettings({ ...budgetSettings, cashLedgerCurrency: wallet.currency }); }} style={{ padding: '6px 8px', border: `1px solid ${activeCashWalletId === wallet.id ? '#f59e0b' : '#fde68a'}`, borderRadius: '8px', background: activeCashWalletId === wallet.id ? '#fef3c7' : 'white', color: '#92400e', fontSize: '10px', fontWeight: '800', cursor: 'pointer' }}>{wallet.name} · {wallet.currency}</button>)}
+          {!isReadOnlyTrip && <button type="button" onClick={addCashWallet} style={{ padding: '6px 8px', border: '1px dashed #f59e0b', borderRadius: '8px', background: 'transparent', color: '#b45309', fontSize: '10px', fontWeight: '900', cursor: 'pointer' }}>+ 지갑 추가</button>}
+        </div>
+        {activeCashWalletId && <label style={{ display: 'block', marginBottom: '12px', color: '#92400e', fontSize: '10px', fontWeight: '900' }}>지갑 이름<input type="text" value={cashLedger.name || ''} onChange={(event) => updateCashLedger({ name: event.target.value })} placeholder="예: 지갑 1" style={{ width: '100%', boxSizing: 'border-box', marginTop: '6px', padding: '9px 10px', border: '1px solid #fde68a', borderRadius: '9px', background: 'white' }} /></label>}
+        <div className="cash-reconciliation-fields">
+          <div className="expense-form-field"><label className="expense-form-label" htmlFor="cash-initial-input">여행 전 환전·인출</label><div className="expense-form-amount-control cash-reconciliation-input"><span aria-hidden="true">{getCurrencySymbol(cashLedgerCurrency)}</span><input id="cash-initial-input" type="number" min="0" step="any" inputMode="decimal" value={cashLedger.initial ?? ''} onChange={(e) => updateCashLedger({ initial: e.target.value })} placeholder="0" aria-label={`여행 전 환전·인출 금액(${cashLedgerCurrency})`} /></div></div>
+          <div className="expense-form-field"><label className="expense-form-label" htmlFor="cash-additional-input">추가 환전·인출</label><div className="expense-form-amount-control cash-reconciliation-input"><span aria-hidden="true">{getCurrencySymbol(cashLedgerCurrency)}</span><input id="cash-additional-input" type="number" min="0" step="any" inputMode="decimal" value={cashLedger.additional ?? ''} onChange={(e) => updateCashLedger({ additional: e.target.value })} placeholder="0" aria-label={`추가 환전·인출 금액(${cashLedgerCurrency})`} /></div></div>
+          <div className="expense-form-field"><label className="expense-form-label" htmlFor="cash-actual-input">실제 남은 현금</label><div className="expense-form-amount-control cash-reconciliation-input"><span aria-hidden="true">{getCurrencySymbol(cashLedgerCurrency)}</span><input id="cash-actual-input" type="number" min="0" step="any" inputMode="decimal" value={cashLedger.actualRemaining ?? ''} onChange={(e) => updateCashLedger({ actualRemaining: e.target.value })} placeholder="확인 후 입력" aria-label={`실제 남은 현금(${cashLedgerCurrency})`} /></div></div>
+        </div>
+        <div className="cash-reconciliation-summary"><div><span>현금 사용</span><strong>{getCurrencySymbol(cashLedgerCurrency)}{cashUsedAmount.toLocaleString()}</strong></div><div><span>예상 잔액</span><strong>{getCurrencySymbol(cashLedgerCurrency)}{expectedCashBalance.toLocaleString()}</strong></div><div className={cashDifference === null ? '' : cashDifference === 0 ? 'is-matched' : 'is-mismatch'}><span>차이</span><strong>{cashDifference === null ? '실제 잔액 입력 필요' : `${cashDifference >= 0 ? '+' : ''}${getCurrencySymbol(cashLedgerCurrency)}${cashDifference.toLocaleString()}`}</strong></div></div>
+        <p className={`cash-reconciliation-status${cashDifference === 0 ? ' is-matched' : cashDifference !== null ? ' is-mismatch' : ''}`} role="status" aria-live="polite">{cashDifference === null ? '실제 남은 현금을 입력하면 예상 잔액과 비교할 수 있어요.' : cashDifference === 0 ? '정산 일치 · 입력한 현금과 예상 잔액이 같습니다.' : `확인 필요 · 실제 잔액이 예상보다 ${getCurrencySymbol(cashLedgerCurrency)}${Math.abs(cashDifference).toLocaleString()} ${cashDifference > 0 ? '많습니다.' : '적습니다.'}`}</p>
+        {unassignedPaymentCount > 0 && <p className="cash-reconciliation-note">결제 수단이 지정된 현금 지출만 현금 사용액에 반영됩니다. 아직 결제 수단이 없는 지출 {unassignedPaymentCount}건이 있습니다.</p>}
+      </div>
+    </div>
+  );
+
+  const renderCurrencyManagerPanel = () => (
+    <div className="currency-manager-card" style={{ padding: '14px 16px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', marginBottom: '18px' }}>
+      <div className="currency-manager-panel-heading"><span><strong className="currency-manager-toggle-title">즐겨찾기 통화</strong><span className="currency-manager-toggle-description">지출 입력에서 빠르게 선택할 통화를 관리하세요.</span></span><span className="currency-manager-count">{(favoriteCurrencies || []).length}개</span></div>
+      <div className="currency-manager-panel">
+        <select value="" onChange={(e) => addFavoriteCurrency(e.target.value)} aria-label="즐겨찾기 통화 추가"><option value="">＋ 통화 추가</option>{SUPPORTED_CURRENCY_CODES.filter(code => !(favoriteCurrencies || []).includes(code)).map(code => <option key={`favorite-currency-option-${code}`} value={code}>{getCurrencySymbol(code)} {getCurrencyNameKO(code)} ({code})</option>)}</select>
+        <div className="currency-manager-chips">{(favoriteCurrencies || []).length === 0 ? <span>즐겨찾기 통화가 없습니다.</span> : (favoriteCurrencies || []).map(code => <div key={`favorite-currency-${code}`} className={`currency-manager-chip${expenseCurrencyCode === code ? ' is-selected' : ''}`}><button type="button" onClick={() => setExpenseInput(current => ({ ...current, currency: code }))} title={`${getCurrencyNameKO(code)}를 지출 입력 통화로 선택`}>{getCurrencySymbol(code)} {code}</button><button type="button" onClick={() => removeFavoriteCurrency(code)} aria-label={`${getCurrencyNameKO(code)} 즐겨찾기에서 제거`} title="즐겨찾기에서 제거">×</button></div>)}</div>
+      </div>
+    </div>
+  );
+
+  const renderBudgetStatisticsPanel = () => {
+    const paymentLabels = { cash: '현금', card: '카드', transfer: '계좌이체', unassigned: '미지정' };
+    const maxCategorySpent = Math.max(...categoryBudgetEntries.map(category => category.spent), 1);
+    return <div className="budget-statistics-panel" style={{ padding: '16px', marginBottom: '18px', border: '1px solid #ddd6fe', borderRadius: '16px', background: '#faf5ff' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginBottom: '12px' }}><strong style={{ color: '#6d28d9', fontSize: '13px' }}>지출 통계</strong><span style={{ color: '#8b5cf6', fontSize: '10px', fontWeight: '800' }}>{expenses.length}건 · {itinerary.length}일</span></div>
+      <div className="budget-spend-summary-grid"><div className="budget-spend-summary-item"><span>총 지출</span><strong>₩{totalSpentKRW.toLocaleString()}</strong></div><div className="budget-spend-summary-item"><span>일평균</span><strong>₩{averageDailySpendKRW.toLocaleString()}</strong></div></div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px', marginTop: '10px' }}>{Object.entries(paymentLabels).map(([method, label]) => <span key={`payment-stat-${method}`} style={{ padding: '6px 8px', borderRadius: '9px', background: 'white', color: '#475569', fontSize: '10px', fontWeight: '800' }}>{label} ₩{(paymentTotalsKRW[method] || 0).toLocaleString()}</span>)}</div>
+      <div style={{ marginTop: '14px' }}><strong style={{ color: '#7c3aed', fontSize: '11px' }}>카테고리별 지출</strong>{categoryBudgetEntries.filter(category => category.spent > 0).map(category => <div key={`category-stat-${category.value}`} style={{ marginTop: '8px' }}><div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569', fontSize: '10px', fontWeight: '800' }}><span>{category.emoji} {category.label}</span><span>₩{category.spent.toLocaleString()}</span></div><div style={{ height: '6px', marginTop: '4px', borderRadius: '99px', background: '#ede9fe', overflow: 'hidden' }}><div style={{ width: `${Math.min((category.spent / maxCategorySpent) * 100, 100)}%`, height: '100%', borderRadius: '99px', background: '#8b5cf6' }} /></div></div>)}{categoryBudgetEntries.every(category => category.spent === 0) && <p style={{ color: '#94a3b8', fontSize: '10px' }}>아직 기록된 지출이 없습니다.</p>}</div>
+      <div style={{ marginTop: '14px' }}><strong style={{ color: '#7c3aed', fontSize: '11px' }}>일차별 지출</strong><div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: '7px' }}>{Object.entries(dailyExpenseTotalsKRW).sort(([a], [b]) => Number(a) - Number(b)).map(([day, amount]) => <div key={`day-stat-${day}`} style={{ display: 'flex', justifyContent: 'space-between', color: '#475569', fontSize: '10px', fontWeight: '800' }}><span>{Number(day) === 0 ? '여행 전 준비' : `${day}일차`}</span><span>₩{amount.toLocaleString()}</span></div>)}</div></div>
+    </div>;
+  };
 
   // Robust Error Boundaries
   if (loadError) {
@@ -4533,13 +4603,15 @@ function App() {
                   </p>
                 </div>
 
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '18px' }}>
-                  <button type="button" onClick={() => setShowExchangeRateSettings(show => !show)} style={{ padding: '8px 11px', border: 'none', borderRadius: '12px', background: showExchangeRateSettings ? '#dbeafe' : '#f8fafc', color: '#1d4ed8', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}>환율 기준 설정</button>
-                  <button type="button" onClick={() => setShowCategoryBudgetSettings(show => !show)} style={{ padding: '8px 11px', border: 'none', borderRadius: '12px', background: showCategoryBudgetSettings ? '#fef3c7' : '#f8fafc', color: '#92400e', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}>카테고리별 예산</button>
-                  {undoStack.length > 0 && <button type="button" className="read-only-hide" onClick={undoLastChange} style={{ padding: '8px 11px', border: 'none', borderRadius: '12px', background: '#fff7ed', color: '#c2410c', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}>실행 취소</button>}
+                <div role="tablist" aria-label="예산 및 지출 설정 메뉴" style={{ display: 'flex', gap: '7px', flexWrap: 'wrap', marginBottom: '18px' }}>
+                  {budgetPanelItems.map(panel => {
+                    const isActive = budgetPanel === panel.key;
+                    return <button key={`budget-panel-${panel.key}`} type="button" role="tab" aria-selected={isActive} onClick={() => setBudgetPanel(isActive ? null : panel.key)} style={{ padding: '8px 11px', border: isActive ? `1px solid ${panel.activeColor}` : '1px solid transparent', borderRadius: '12px', background: isActive ? panel.activeBackground : '#f8fafc', color: isActive ? panel.activeColor : '#64748b', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}>{panel.label}</button>;
+                  })}
+                  {undoStack.length > 0 && <button type="button" className="read-only-hide" onClick={undoLastChange} style={{ padding: '8px 11px', border: '1px solid transparent', borderRadius: '12px', background: '#fff7ed', color: '#c2410c', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}>실행 취소</button>}
                 </div>
 
-                {showExchangeRateSettings && (
+                {budgetPanel === 'exchange' && (
                   <div className="budget-settings-panel" style={{ padding: '14px 16px', marginBottom: '18px', border: '1px solid #bfdbfe', borderRadius: '16px', background: '#f8fbff' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'center', marginBottom: '10px' }}><strong style={{ color: '#1d4ed8', fontSize: '13px' }}>환율 기준일·수동 환율</strong><span style={{ color: '#64748b', fontSize: '10px', fontWeight: '700' }}>{budgetSettings.exchangeRateSource || exchangeRateInfo.source} · {budgetSettings.exchangeRateReferenceDate || exchangeRateInfo.date || '오늘'}</span></div>
                     <p style={{ margin: '0 0 10px', color: '#64748b', fontSize: '10px', lineHeight: 1.5 }}>1 외화가 몇 원인지 입력하면 자동 환율보다 우선해 정산합니다. 실제 환전 영수증 기준으로 조정할 때 사용하세요.</p>
@@ -4552,7 +4624,7 @@ function App() {
                   </div>
                 )}
 
-                {showCategoryBudgetSettings && (
+                {budgetPanel === 'category' && (
                   <div className="budget-settings-panel" style={{ padding: '14px 16px', marginBottom: '18px', border: '1px solid #fde68a', borderRadius: '16px', background: '#fffbeb' }}>
                     <strong style={{ color: '#92400e', fontSize: '13px' }}>카테고리별 예산</strong>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
@@ -4560,6 +4632,10 @@ function App() {
                     </div>
                   </div>
                 )}
+
+                {budgetPanel === 'cash' && renderCashReconciliationPanel()}
+                {budgetPanel === 'currency' && renderCurrencyManagerPanel()}
+                {budgetPanel === 'stats' && renderBudgetStatisticsPanel()}
 
                 {/* Add Expense Form */}
                 <div className="expense-form-card" style={{ padding: '16px', backgroundColor: '#f9fafb', border: '1px solid #f3f4f6', borderRadius: '16px', marginBottom: '24px' }}>
@@ -4818,13 +4894,15 @@ function App() {
                   )}
                 </div>
 
+                {budgetPanel === '__legacy_bottom_panels_disabled__' && (<>
+                {/* Legacy bottom panels kept out of the layout; the same controls are now in the top menu. */}
                 {/* Cash Reconciliation */}
                 <div className="cash-reconciliation-card" style={{ padding: '16px', backgroundColor: '#fffaf0', border: '1px solid #fde68a', borderRadius: '16px', marginTop: '24px', marginBottom: '16px' }}>
                   <button
                     type="button"
                     className="cash-reconciliation-toggle"
-                    onClick={() => setShowCashReconciliation((visible) => !visible)}
-                    aria-expanded={showCashReconciliation}
+                    onClick={() => setBudgetPanel(panel => panel === 'cash' ? null : 'cash')}
+                    aria-expanded={budgetPanel === 'cash'}
                     aria-controls="cash-reconciliation-panel"
                   >
                     <span>
@@ -4833,11 +4911,11 @@ function App() {
                     </span>
                     <span className={`cash-reconciliation-status-chip${cashDifference === null ? ' is-pending' : cashDifference === 0 ? ' is-matched' : ' is-mismatch'}`}>
                       {cashDifference === null ? '입력 필요' : cashDifference === 0 ? '정산 일치' : '확인 필요'}
-                      <ChevronDown size={15} className={showCashReconciliation ? 'is-open' : ''} aria-hidden="true" />
+                      <ChevronDown size={15} className={budgetPanel === 'cash' ? 'is-open' : ''} aria-hidden="true" />
                     </span>
                   </button>
 
-                  {showCashReconciliation && (
+                  {budgetPanel === 'cash' && (
                     <div id="cash-reconciliation-panel" className="cash-reconciliation-panel">
                       <div className="cash-reconciliation-panel-heading">
                         <span>정산 통화</span>
@@ -4916,18 +4994,18 @@ function App() {
                   <button
                     type="button"
                     className="currency-manager-toggle"
-                    onClick={() => setShowCurrencyManager((visible) => !visible)}
-                    aria-expanded={showCurrencyManager}
+                    onClick={() => setBudgetPanel(panel => panel === 'currency' ? null : 'currency')}
+                    aria-expanded={budgetPanel === 'currency'}
                     aria-controls="currency-manager-panel"
                   >
                     <span>
                       <strong className="currency-manager-toggle-title">즐겨찾기 통화</strong>
                       <span className="currency-manager-toggle-description">지출 입력에서 빠르게 선택할 통화를 관리하세요.</span>
                     </span>
-                    <span className="currency-manager-count">{(favoriteCurrencies || []).length}개 <ChevronDown size={15} className={showCurrencyManager ? 'is-open' : ''} aria-hidden="true" /></span>
+                    <span className="currency-manager-count">{(favoriteCurrencies || []).length}개 <ChevronDown size={15} className={budgetPanel === 'currency' ? 'is-open' : ''} aria-hidden="true" /></span>
                   </button>
 
-                  {showCurrencyManager && (
+                  {budgetPanel === 'currency' && (
                     <div id="currency-manager-panel" className="currency-manager-panel">
                       <select
                         value=""
@@ -4960,6 +5038,7 @@ function App() {
                     </div>
                   )}
                 </div>
+                </>)}
               </>
             )}
 
