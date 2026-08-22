@@ -533,21 +533,32 @@ const PremiumTimeInput = ({ value, onChange, label }) => {
   );
 };
 
-const ScrollTimeInput = ({ value, onChange, label }) => {
+const TIME_PERIOD_OPTIONS = ['AM', 'PM'];
+
+const ScrollTimeInput = ({ value, onChange, label, compact = false }) => {
   const timeValue = value && value.includes(':') ? value : '09:00';
   const [rawHour, rawMinute] = timeValue.split(':').map(Number);
-  const hour = Number.isFinite(rawHour) ? Math.min(Math.max(rawHour, 0), 23) : 9;
+  const hour24 = Number.isFinite(rawHour) ? Math.min(Math.max(rawHour, 0), 23) : 9;
   const minute = Number.isFinite(rawMinute) ? Math.min(Math.max(rawMinute, 0), 59) : 0;
+  const period = hour24 >= 12 ? 'PM' : 'AM';
+  const hour12 = hour24 % 12 || 12;
+  const [isOpen, setIsOpen] = useState(false);
+  const pickerRef = useRef(null);
+  const periodRef = useRef(null);
   const hourRef = useRef(null);
   const minuteRef = useRef(null);
-  const ITEM_HEIGHT = 36;
-  const hours = Array.from({ length: 24 }, (_, index) => index);
+  const ITEM_HEIGHT = 40;
+  const hours = Array.from({ length: 12 }, (_, index) => index + 1);
   const minutes = Array.from({ length: 60 }, (_, index) => index);
 
-  const emitTime = (nextHour, nextMinute) => {
-    const nextValue = `${String(nextHour).padStart(2, '0')}:${String(nextMinute).padStart(2, '0')}`;
-    if (nextValue !== timeValue) onChange(nextValue);
-  };
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const handleOutsidePointer = (event) => {
+      if (!pickerRef.current?.contains(event.target)) setIsOpen(false);
+    };
+    document.addEventListener('pointerdown', handleOutsidePointer);
+    return () => document.removeEventListener('pointerdown', handleOutsidePointer);
+  }, [isOpen]);
 
   const scrollToValue = (ref, index, behavior = 'auto') => {
     if (!ref.current) return;
@@ -555,75 +566,131 @@ const ScrollTimeInput = ({ value, onChange, label }) => {
   };
 
   useEffect(() => {
-    scrollToValue(hourRef, hour);
+    if (!isOpen) return;
+    scrollToValue(periodRef, TIME_PERIOD_OPTIONS.indexOf(period));
+    scrollToValue(hourRef, hour12 - 1);
     scrollToValue(minuteRef, minute);
-  }, [hour, minute]);
+  }, [isOpen, period, hour12, minute]);
+
+  const emitTime = (nextPeriod, nextHour12, nextMinute) => {
+    const normalizedHour = nextHour12 % 12 + (nextPeriod === 'PM' ? 12 : 0);
+    const nextValue = `${String(normalizedHour).padStart(2, '0')}:${String(nextMinute).padStart(2, '0')}`;
+    if (nextValue !== timeValue) onChange(nextValue);
+  };
 
   const handleScroll = (type, event) => {
     const index = Math.round(event.currentTarget.scrollTop / ITEM_HEIGHT);
-    if (type === 'hour') {
-      emitTime(Math.min(Math.max(index, 0), 23), minute);
+    if (type === 'period') {
+      emitTime(TIME_PERIOD_OPTIONS[Math.min(Math.max(index, 0), TIME_PERIOD_OPTIONS.length - 1)], hour12, minute);
+    } else if (type === 'hour') {
+      emitTime(period, Math.min(Math.max(index + 1, 1), 12), minute);
     } else {
-      emitTime(hour, Math.min(Math.max(index, 0), 59));
+      emitTime(period, hour12, Math.min(Math.max(index, 0), 59));
     }
   };
 
   const setNow = () => {
     const now = new Date();
-    emitTime(now.getHours(), now.getMinutes());
+    onChange(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
   };
 
   const adjustMinutes = (amount) => {
-    const totalMinutes = (hour * 60 + minute + amount + 1440) % 1440;
-    emitTime(Math.floor(totalMinutes / 60), totalMinutes % 60);
+    const totalMinutes = (hour24 * 60 + minute + amount + 1440) % 1440;
+    onChange(`${String(Math.floor(totalMinutes / 60)).padStart(2, '0')}:${String(totalMinutes % 60).padStart(2, '0')}`);
   };
 
-  const renderScrollColumn = (items, selectedValue, ref, type) => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+  const renderScrollColumn = (items, selectedValue, ref, type, formatItem = (item) => String(item).padStart(2, '0')) => (
+    <div style={{ flex: 1, minWidth: 0 }}>
       <div
         ref={ref}
         onScroll={(event) => handleScroll(type, event)}
-        aria-label={type === 'hour' ? '시간 선택' : '분 선택'}
-        style={{ width: '58px', height: '108px', overflowY: 'auto', overscrollBehavior: 'contain', scrollSnapType: 'y mandatory', scrollbarWidth: 'thin', border: '1px solid #e2e8f0', borderRadius: '12px', backgroundColor: '#f8fafc', WebkitOverflowScrolling: 'touch' }}
+        role="listbox"
+        aria-label={type === 'period' ? '오전 또는 오후 선택' : type === 'hour' ? '시간 선택' : '분 선택'}
+        style={{ height: '132px', overflowY: 'auto', overscrollBehavior: 'contain', scrollSnapType: 'y mandatory', scrollbarWidth: 'none', borderRadius: '14px', backgroundColor: '#f8fafc', WebkitOverflowScrolling: 'touch' }}
       >
         <div style={{ padding: `${ITEM_HEIGHT}px 0` }}>
           {items.map(item => (
             <button
               key={`${type}-${item}`}
               type="button"
-              aria-label={`${type === 'hour' ? '시간' : '분'} ${String(item).padStart(2, '0')} 선택`}
-              onClick={() => emitTime(type === 'hour' ? item : hour, type === 'minute' ? item : minute)}
-              style={{ display: 'block', width: '100%', height: `${ITEM_HEIGHT}px`, padding: 0, border: 'none', backgroundColor: item === selectedValue ? '#dbeafe' : 'transparent', color: item === selectedValue ? '#1d4ed8' : '#94a3b8', fontSize: item === selectedValue ? '20px' : '14px', fontWeight: item === selectedValue ? '900' : '700', fontVariantNumeric: 'tabular-nums', scrollSnapAlign: 'center', cursor: 'pointer' }}
+              role="option"
+              aria-selected={item === selectedValue}
+              onClick={() => {
+                if (type === 'period') emitTime(item, hour12, minute);
+                if (type === 'hour') emitTime(period, item, minute);
+                if (type === 'minute') emitTime(period, hour12, item);
+              }}
+              style={{ display: 'block', width: '100%', height: `${ITEM_HEIGHT}px`, padding: 0, border: 'none', backgroundColor: item === selectedValue ? '#2563eb' : 'transparent', color: item === selectedValue ? 'white' : '#64748b', fontSize: item === selectedValue ? '18px' : '15px', fontWeight: item === selectedValue ? '900' : '700', fontVariantNumeric: 'tabular-nums', scrollSnapAlign: 'center', cursor: 'pointer' }}
             >
-              {String(item).padStart(2, '0')}
+              {formatItem(item)}
             </button>
           ))}
         </div>
       </div>
-      <span style={{ fontSize: '16px', fontWeight: '900', color: '#cbd5e1' }}>{type === 'hour' ? '시' : '분'}</span>
     </div>
   );
 
   return (
-    <div style={{ width: '100%', marginBottom: window.innerWidth < 768 ? '8px' : '20px' }}>
-      {label && <div style={{ fontSize: '9px', fontWeight: '900', color: '#9ca3af', textTransform: 'uppercase', marginBottom: window.innerWidth < 768 ? '4px' : '8px', letterSpacing: '0.05em' }}>{label}</div>}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', backgroundColor: 'white', padding: window.innerWidth < 768 ? '10px' : '14px', borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.04)', border: '1px solid #f1f5f9' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-          {renderScrollColumn(hours, hour, hourRef, 'hour')}
-          <span style={{ fontSize: '20px', fontWeight: '900', color: '#cbd5e1' }}>:</span>
-          {renderScrollColumn(minutes, minute, minuteRef, 'minute')}
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flexShrink: 0 }}>
-          <button type="button" onClick={setNow} style={{ padding: '5px 7px', backgroundColor: '#f8fafc', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: '7px', fontSize: '8px', fontWeight: '900', cursor: 'pointer', whiteSpace: 'nowrap' }}>현재 시간</button>
-          <div style={{ display: 'flex', gap: '3px' }}>
-            <button type="button" onClick={() => adjustMinutes(-30)} style={{ width: '30px', height: '25px', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '5px', fontSize: '8px', fontWeight: '900', color: '#94a3b8', cursor: 'pointer' }}>-30</button>
-            <button type="button" onClick={() => adjustMinutes(30)} style={{ width: '30px', height: '25px', backgroundColor: '#eff6ff', border: 'none', borderRadius: '5px', fontSize: '8px', fontWeight: '900', color: '#3b82f6', cursor: 'pointer' }}>+30</button>
+    <div ref={pickerRef} style={{ position: 'relative', width: '100%', marginBottom: compact ? 0 : (window.innerWidth < 768 ? '8px' : '20px') }}>
+      {label && <div className="expense-form-label" style={{ marginBottom: compact ? '6px' : '8px' }}>{label}</div>}
+      <button
+        type="button"
+        onClick={() => setIsOpen(open => !open)}
+        aria-label={`${label || '시간'} ${period === 'AM' ? '오전' : '오후'} ${String(hour12).padStart(2, '0')}:${String(minute).padStart(2, '0')}`}
+        aria-expanded={isOpen}
+        aria-haspopup="dialog"
+        style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', minHeight: compact ? '42px' : '50px', padding: compact ? '10px 12px' : '12px 14px', border: `1px solid ${isOpen ? '#2563eb' : '#e2e8f0'}`, borderRadius: '12px', backgroundColor: 'white', color: '#1f2937', fontFamily: 'inherit', fontSize: compact ? '12px' : '14px', fontWeight: '800', cursor: 'pointer', textAlign: 'left', boxShadow: isOpen ? '0 0 0 3px rgba(37, 99, 235, 0.12)' : 'none' }}
+      >
+        <Clock size={compact ? 14 : 17} color="#64748b" aria-hidden="true" />
+        <span style={{ flex: 1 }}>{period === 'AM' ? '오전' : '오후'} {String(hour12).padStart(2, '0')}:{String(minute).padStart(2, '0')}</span>
+        <ChevronDown size={16} color="#64748b" aria-hidden="true" />
+      </button>
+
+      {isOpen && (
+        <div role="dialog" aria-label="소비 시간 선택" style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, zIndex: 60, width: 'min(320px, calc(100vw - 48px))', padding: '12px', border: '1px solid #dbe3ef', borderRadius: '18px', backgroundColor: 'white', boxShadow: '0 18px 40px rgba(15, 23, 42, 0.2)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px', borderRadius: '15px', backgroundColor: '#eef4ff' }}>
+            {renderScrollColumn(TIME_PERIOD_OPTIONS, period, periodRef, 'period', item => item === 'AM' ? '오전' : '오후')}
+            <span style={{ color: '#94a3b8', fontSize: '18px', fontWeight: '900' }}>·</span>
+            {renderScrollColumn(hours, hour12, hourRef, 'hour')}
+            <span style={{ color: '#94a3b8', fontSize: '18px', fontWeight: '900' }}>:</span>
+            {renderScrollColumn(minutes, minute, minuteRef, 'minute')}
+          </div>
+          <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
+            <button type="button" onClick={setNow} style={{ flex: 1, padding: '8px', border: 'none', borderRadius: '9px', backgroundColor: '#f1f5f9', color: '#64748b', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}>현재 시간</button>
+            <button type="button" onClick={() => adjustMinutes(-30)} style={{ padding: '8px 10px', border: 'none', borderRadius: '9px', backgroundColor: '#f1f5f9', color: '#64748b', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}>-30</button>
+            <button type="button" onClick={() => adjustMinutes(30)} style={{ padding: '8px 10px', border: 'none', borderRadius: '9px', backgroundColor: '#eff6ff', color: '#2563eb', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}>+30</button>
+            <button type="button" onClick={() => setIsOpen(false)} style={{ flex: 1, padding: '8px', border: 'none', borderRadius: '9px', backgroundColor: '#2563eb', color: 'white', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}>완료</button>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
+
+const ITINERARY_EMOJI_OPTIONS = ['📍', '✈️', '🏨', '🍽️', '☕', '🏖️', '🛍️', '🚗', '🎫', '📸', '🌅', '🏛️', '🎉', '🧳'];
+
+const ItineraryEmojiPicker = ({ value, onChange }) => (
+  <div style={{ marginBottom: '12px' }}>
+    <div style={{ fontSize: '9px', fontWeight: '900', color: '#64748b', marginBottom: '6px' }}>
+      일정 아이콘
+    </div>
+    <div role="radiogroup" aria-label="일정 아이콘 선택" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+      {ITINERARY_EMOJI_OPTIONS.map((emoji) => (
+        <button
+          key={emoji}
+          type="button"
+          role="radio"
+          aria-label={`${emoji} 아이콘`}
+          aria-checked={value === emoji}
+          onClick={() => onChange(emoji)}
+          style={{ width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, border: `1px solid ${value === emoji ? '#2563eb' : '#e2e8f0'}`, borderRadius: '10px', backgroundColor: value === emoji ? '#eff6ff' : 'white', boxShadow: value === emoji ? '0 0 0 2px rgba(37, 99, 235, 0.12)' : 'none', fontSize: '18px', cursor: 'pointer', transition: 'all 0.15s' }}
+        >
+          {emoji}
+        </button>
+      ))}
+    </div>
+  </div>
+);
 
 
 const mapOptions = {
@@ -767,6 +834,7 @@ function App() {
   const [searchInput, setSearchInput] = useState('');
   const [searchResult, setSearchResult] = useState(null);
   const [activeDay, setActiveDay] = useState(null);
+  const [itineraryEmoji, setItineraryEmoji] = useState('📍');
   const [expandedCountries, setExpandedCountries] = useState({});
   const [expandedRegions, setExpandedRegions] = useState({});
   const [editingTripId, setEditingTripId] = useState(null);
@@ -1061,6 +1129,7 @@ function App() {
     // Keep the custom label in sync with the selected place.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setItineraryDisplayName(selectedPlace?.displayName || '');
+    setItineraryEmoji(selectedPlace?.emoji || '📍');
   }, [selectedPlace]);
 
   // Cloud Sync Initialization
@@ -2255,7 +2324,7 @@ function App() {
       const reserveItem = {
         ...place,
         id: makeEntityId(),
-        emoji: place.emoji || '📍',
+        emoji: itineraryEmoji || place.emoji || '📍',
         displayName,
         time: itineraryTime || ''
       };
@@ -2292,12 +2361,12 @@ function App() {
 
       newItinerary[dayIndex].items = [
         ...newItinerary[dayIndex].items,
-        { ...place, id: makeEntityId(), emoji: place.emoji || '📍', displayName, time: finalTime }
+        { ...place, id: makeEntityId(), emoji: itineraryEmoji || place.emoji || '📍', displayName, time: finalTime }
       ].sort((a, b) => (a.time || '00:00').localeCompare(b.time || '00:00'));
     } else {
       newItinerary.push({ 
         day: targetDay, 
-        items: [{ ...place, id: makeEntityId(), emoji: place.emoji || '📍', displayName, time: itineraryTime || '09:00' }]
+        items: [{ ...place, id: makeEntityId(), emoji: itineraryEmoji || place.emoji || '📍', displayName, time: itineraryTime || '09:00' }]
       });
     }
     saveItinerary(newItinerary);
@@ -3923,17 +3992,12 @@ function App() {
                       </select>
                     </div>
                     <div className="expense-form-field" style={{ flex: '1 1 0' }}>
-                      <label className="expense-form-label" htmlFor="expense-time-input">소비 시간</label>
-                      <div className="expense-form-time-control">
-                        <Clock size={14} color="#64748b" aria-hidden="true" />
-                        <input
-                          id="expense-time-input"
-                          type="time"
-                          value={expenseInput.time || ''}
-                          onChange={e => setExpenseInput({ ...expenseInput, time: e.target.value })}
-                          aria-label="소비 시간"
-                        />
-                      </div>
+                      <ScrollTimeInput
+                        value={expenseInput.time}
+                        onChange={(newTime) => setExpenseInput(current => ({ ...current, time: newTime }))}
+                        label="소비 시간"
+                        compact
+                      />
                     </div>
                   </div>
 
@@ -5167,6 +5231,8 @@ function App() {
                       </p>
                     </div>
 
+                    <ItineraryEmojiPicker value={itineraryEmoji} onChange={setItineraryEmoji} />
+
                     <PremiumTimeInput 
                       label="도착 시간"
                       value={itineraryTime || '09:00'} 
@@ -5312,6 +5378,8 @@ function App() {
                       입력하지 않으면 검색된 장소명이 일정에 표시됩니다.
                     </p>
                   </div>
+
+                  <ItineraryEmojiPicker value={itineraryEmoji} onChange={setItineraryEmoji} />
 
                   <PremiumTimeInput
                     label="도착 시간"
