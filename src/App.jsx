@@ -1,7 +1,7 @@
 // Build Version: v1.2.2-build-trigger-fix
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { GoogleMap, useJsApiLoader, OverlayView, InfoWindow, Polyline } from '@react-google-maps/api';
-import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronUp, ChevronDown, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Clock, Upload, Clipboard, LocateFixed, Download, Bell, FileText, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronUp, ChevronDown, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Clock, Upload, Clipboard, LocateFixed, Download, Bell, FileText, Mail, Lock, Eye, EyeOff, WifiOff, Link2, LockKeyhole } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import './index.css';
 
@@ -95,6 +95,19 @@ const getTripStatusMeta = (trip) => {
     backgroundColor: '#ecfdf5',
     color: '#059669'
   };
+};
+
+const getOpeningHours = (place) => {
+  const openingHours = place?.openingHours || place?.opening_hours || place?.regularOpeningHours;
+  if (Array.isArray(openingHours)) return openingHours;
+  return openingHours?.weekday_text || openingHours?.weekdayDescriptions || [];
+};
+
+const getBusinessStatusLabel = (status) => {
+  if (status === 'OPERATIONAL') return '영업 중';
+  if (status === 'CLOSED_TEMPORARILY') return '임시 휴업';
+  if (status === 'CLOSED_PERMANENTLY') return '영구 폐업';
+  return '';
 };
 
 const getEndDateForDayCount = (startDate, dayCount) => {
@@ -519,7 +532,7 @@ const PremiumTimeInput = ({ value, onChange, label }) => {
   return (
     <div style={{ width: '100%', marginBottom: window.innerWidth < 768 ? '8px' : '20px' }}>
       {label && <div style={{ fontSize: '9px', fontWeight: '900', color: '#9ca3af', textTransform: 'uppercase', marginBottom: window.innerWidth < 768 ? '4px' : '8px', letterSpacing: '0.05em' }}>{label}</div>}
-      <div style={{ 
+    <div style={{
         display: 'flex', 
         alignItems: 'center', 
         justifyContent: 'space-between',
@@ -914,6 +927,9 @@ function App() {
   ));
   const [showCashReconciliation, setShowCashReconciliation] = useState(false);
   const [showCurrencyManager, setShowCurrencyManager] = useState(false);
+  const [readOnlySharedTrip, setReadOnlySharedTrip] = useState(null);
+  const [sharedViewError, setSharedViewError] = useState('');
+  const [isOnline, setIsOnline] = useState(() => typeof navigator === 'undefined' ? true : navigator.onLine);
 
   const handleMyLocation = () => {
     if (!navigator.geolocation) {
@@ -1133,6 +1149,52 @@ function App() {
 
   // --- EFFECTS ---
 
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // A shared URL opens a non-editable itinerary without requiring the viewer
+  // to import it into their own account first.
+  useEffect(() => {
+    const sharedCode = new URLSearchParams(window.location.search).get('share');
+    if (!sharedCode) return undefined;
+
+    let cancelled = false;
+    supabase
+      .from('shared_trips')
+      .select('*')
+      .eq('id', sharedCode)
+      .single()
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error || !data?.trip_data) {
+          setSharedViewError('공유 일정을 불러오지 못했습니다. 링크가 만료되었거나 삭제되었을 수 있습니다.');
+          setSyncStatus('error');
+          return;
+        }
+        setReadOnlySharedTrip({ ...data.trip_data, sharedId: data.id });
+        setActiveTripId(`readonly-${data.id}`);
+        setViewMode('itinerary');
+        setShowOnboarding(false);
+        setSyncStatus('saved');
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSharedViewError('공유 일정을 불러오지 못했습니다. 네트워크 상태를 확인해주세요.');
+          setSyncStatus('error');
+        }
+      });
+
+    return () => { cancelled = true; };
+  }, []);
+
   // Also clear a test trip that may still be held by an already-open local page.
   useEffect(() => {
     const cleanedTrips = (trips || []).filter(trip => !trip.localOnly);
@@ -1291,7 +1353,10 @@ function App() {
   }, []);
 
   // --- DERIVED STATE ---
-  const activeTrip = (trips || []).find(t => String(t.id) === String(activeTripId));
+  const isReadOnlyTrip = Boolean(readOnlySharedTrip);
+  const activeTrip = isReadOnlyTrip
+    ? readOnlySharedTrip
+    : (trips || []).find(t => String(t.id) === String(activeTripId));
   const itinerary = useMemo(() => activeTrip?.itinerary || [], [activeTrip]);
   const reserveItems = useMemo(() => activeTrip?.reserveItems || [], [activeTrip]);
   const budgetSettings = activeTrip?.budgetSettings || { limitKRW: 1000000, travelCurrency: 'USD' };
@@ -1547,6 +1612,11 @@ function App() {
       setSyncStatus("error");
       return;
     }
+
+    if (!isOnline) {
+      setSyncStatus('offline');
+      return;
+    }
     
     if (session?.user?.id) {
       try {
@@ -1594,6 +1664,11 @@ function App() {
       setSyncStatus("error");
       return;
     }
+
+    if (!isOnline) {
+      setSyncStatus('offline');
+      return;
+    }
     
     const cloudTrips = (newTrips || []).filter(trip => !trip.localOnly);
 
@@ -1633,6 +1708,17 @@ function App() {
     setSyncStatus('saved');
   };
 
+  const getSharedTripLink = (sharedId) => (
+    typeof window === 'undefined'
+      ? String(sharedId || '')
+      : `${window.location.origin}${window.location.pathname}?share=${encodeURIComponent(sharedId)}`
+  );
+
+  const copySharedTripLink = (sharedId, tripId) => {
+    if (!sharedId) return;
+    copyToClipboard(getSharedTripLink(sharedId), tripId, '공유 링크');
+  };
+
   const shareTrip = async (tripId) => {
     const trip = (trips || []).find(t => t.id === tripId);
     if (!trip) return;
@@ -1642,7 +1728,7 @@ function App() {
       return;
     }
     if (trip.sharedId) {
-      copyToClipboard(trip.sharedId, tripId);
+      copySharedTripLink(trip.sharedId, tripId);
       return;
     }
 
@@ -1660,7 +1746,7 @@ function App() {
 
       const newTrips = trips.map(t => t.id === tripId ? { ...t, sharedId: data.id } : t);
       await syncTripsToCloud(newTrips);
-      copyToClipboard(data.id, tripId);
+      copySharedTripLink(data.id, tripId);
       
       setHasTriggeredToast(true);
       setShowShareToast(true);
@@ -1701,7 +1787,13 @@ function App() {
   };
 
   const joinSharedTrip = async () => {
-    const code = joinTripCode.trim();
+    const input = joinTripCode.trim();
+    let code = input;
+    try {
+      code = new URL(input, window.location.origin).searchParams.get('share') || input;
+    } catch {
+      code = input;
+    }
     if (!code) {
       setJoinTripError('친구에게 받은 공유 코드를 입력해주세요.');
       return;
@@ -1747,14 +1839,14 @@ function App() {
     }
   };
 
-  const copyToClipboard = (text, id) => {
+  const copyToClipboard = (text, id, copyLabel = '초대 코드') => {
     if (!text) return;
     
     const performCopy = async () => {
       try {
         if (navigator.clipboard && window.isSecureContext) {
           await navigator.clipboard.writeText(text);
-          setModalConfig({ type: 'success', title: '복사 완료', message: "초대 코드가 클립보드에 복사되었습니다." });
+          setModalConfig({ type: 'success', title: '복사 완료', message: `${copyLabel}가 클립보드에 복사되었습니다.` });
           setShowCustomModal(true);
         } else {
           // Fallback for non-secure contexts
@@ -1764,14 +1856,14 @@ function App() {
           textArea.select();
           document.execCommand("copy");
           document.body.removeChild(textArea);
-          setModalConfig({ type: 'success', title: '복사 완료', message: "초대 코드가 복사되었습니다." });
+          setModalConfig({ type: 'success', title: '복사 완료', message: `${copyLabel}가 복사되었습니다.` });
           setShowCustomModal(true);
         }
         
         setCopiedId(id);
       } catch (err) {
         console.error("Copy failed:", err);
-        setModalConfig({ type: 'error', title: '복사 실패', message: "초대 코드 복사에 실패했습니다. 수동으로 복사해주세요: " + text });
+        setModalConfig({ type: 'error', title: '복사 실패', message: `${copyLabel} 복사에 실패했습니다. 수동으로 복사해주세요: ${text}` });
         setShowCustomModal(true);
       }
     };
@@ -1841,7 +1933,7 @@ function App() {
 
   // --- TRIP DATA MUTATORS ---
   const updateActiveTrip = async (updates) => {
-    if (!activeTripId) return;
+    if (!activeTripId || isReadOnlyTrip) return;
     
     // Calculate new state array based on existing state
     const nextTrips = (trips || []).map(t => t.id === activeTripId ? { ...t, ...updates } : t);
@@ -2693,7 +2785,7 @@ function App() {
 
     try {
       const place = prediction.toPlace();
-      await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location', 'viewport', 'addressComponents'] });
+      await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location', 'viewport', 'addressComponents', 'regularOpeningHours', 'currentOpeningHours', 'businessStatus'] });
       const location = place.location;
       if (!location) return;
 
@@ -2708,6 +2800,8 @@ function App() {
         desc: address,
         country: addressGrouping.country,
         region: addressGrouping.region,
+        openingHours: getOpeningHours(place),
+        businessStatus: place.businessStatus || '',
         emoji: '📍',
         type: 'search'
       };
@@ -2780,7 +2874,7 @@ function App() {
     if (!map || !window.google) return;
     const service = new window.google.maps.places.PlacesService(map);
     service.getDetails(
-      { placeId, fields: ['name', 'geometry', 'formatted_address', 'address_components'] },
+      { placeId, fields: ['name', 'geometry', 'formatted_address', 'address_components', 'opening_hours', 'current_opening_hours', 'business_status'] },
       (place, status) => {
         if (status === window.google.maps.places.PlacesServiceStatus.OK && place.geometry && place.geometry.location) {
           const addressGrouping = getPlaceAddressGrouping(place.address_components);
@@ -2792,6 +2886,8 @@ function App() {
             desc: place.formatted_address || 'Selected from Map',
             country: addressGrouping.country,
             region: addressGrouping.region,
+            openingHours: getOpeningHours(place),
+            businessStatus: place.business_status || '',
             emoji: '📍',
             type: 'poi'
           };
@@ -2907,6 +3003,8 @@ function App() {
     'KRW'
   ].filter(Boolean)));
   const useFloatingPlacePanel = true;
+  const selectedPlaceOpeningHours = getOpeningHours(selectedPlace);
+  const selectedPlaceBusinessStatus = getBusinessStatusLabel(selectedPlace?.businessStatus);
 
   // Robust Error Boundaries
   if (loadError) {
@@ -2940,7 +3038,7 @@ function App() {
 
 
   return (
-    <div className={`app-container ${!sidebarOpen ? 'sidebar-closed' : ''}`}>
+    <div className={`app-container ${!sidebarOpen ? 'sidebar-closed' : ''} ${isReadOnlyTrip ? 'read-only-view' : ''}`}>
       
       {/* GLOBAL SEARCH BAR */}
       <div className="search-bar-container" style={{ 
@@ -3075,7 +3173,7 @@ function App() {
                 <h1 style={{ fontSize: '24px', fontWeight: '900', color: '#111827', margin: 0, letterSpacing: '-0.05em' }}>TravelPlaner</h1>
                 <p style={{ fontSize: '9px', fontWeight: '800', color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.15em', margin: '2px 0 0 0' }}>여행 일정 플래너</p>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 {session ? (
                   <button onClick={() => supabase.auth.signOut()} style={{ background: '#f3f4f6', border: 'none', color: '#6b7280', fontWeight: '800', fontSize: '10px', cursor: 'pointer', padding: '8px 12px', borderRadius: '10px' }}>로그아웃</button>
                 ) : (
@@ -3086,6 +3184,26 @@ function App() {
                 )}
               </div>
             </div>
+
+            {!isOnline && (
+              <div className="offline-banner" role="status">
+                <WifiOff size={14} aria-hidden="true" />
+                <span>오프라인 모드 · 변경사항은 이 기기에 먼저 저장됩니다.</span>
+              </div>
+            )}
+            {isReadOnlyTrip && (
+              <div className="shared-read-only-banner" role="status">
+                <LockKeyhole size={14} aria-hidden="true" />
+                <span>공유 일정 읽기 전용</span>
+                <button type="button" onClick={() => { setReadOnlySharedTrip(null); setActiveTripId(null); setViewMode('trips'); window.history.replaceState({}, '', window.location.pathname); }}>내 여행으로</button>
+              </div>
+            )}
+            {sharedViewError && !isReadOnlyTrip && (
+              <div className="shared-read-only-error" role="alert">
+                <Link2 size={14} aria-hidden="true" />
+                <span>{sharedViewError}</span>
+              </div>
+            )}
 
             {/* Row 2: Navigation Tabs & Share Actions */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -3126,9 +3244,9 @@ function App() {
                   {/* Unified Invite Action */}
                   <div style={{ marginLeft: 'auto' }}>
                     <button 
-                      onClick={() => activeTrip?.sharedId ? copyToClipboard(activeTrip.sharedId, activeTrip.id) : shareTrip(activeTrip.id)}
+                      onClick={() => activeTrip?.sharedId ? copySharedTripLink(activeTrip.sharedId, activeTrip.id) : shareTrip(activeTrip.id)}
                       style={{ height: '40px', padding: '0 12px', backgroundColor: activeTrip?.sharedId ? '#f3f4f6' : '#f5f3ff', borderRadius: '12px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: activeTrip?.sharedId ? '#6b7280' : '#8b5cf6', fontWeight: '900' }}
-                      title={activeTrip?.sharedId ? "초대 코드 복사" : "친구 초대하기"}
+                      title={activeTrip?.sharedId ? "공유 링크 복사" : "친구 초대하기"}
                     >
                       {copiedId === activeTrip?.id ? <Check size={14} color="#10b981" /> : (activeTrip?.sharedId ? <Users size={14} /> : <Share2 size={14} />)}
                       {copiedId === activeTrip?.id ? "복사됨" : (activeTrip?.sharedId ? "공유 중" : "초대")}
@@ -3302,10 +3420,10 @@ function App() {
                                 <div style={{ display: 'flex', gap: '4px' }}>
                                   <button 
                                     type="button"
-                                    aria-label={trip.sharedId ? `${trip.name} 초대 코드 복사` : `${trip.name} 친구 초대`}
-                                    onClick={(e) => { e.stopPropagation(); trip.sharedId ? copyToClipboard(trip.sharedId, trip.id) : shareTrip(trip.id); }}
+                                    aria-label={trip.sharedId ? `${trip.name} 공유 링크 복사` : `${trip.name} 친구 초대`}
+                                    onClick={(e) => { e.stopPropagation(); trip.sharedId ? copySharedTripLink(trip.sharedId, trip.id) : shareTrip(trip.id); }}
                                     style={{ width: '36px', height: '36px', borderRadius: '10px', border: 'none', backgroundColor: trip.sharedId ? '#f3f4f6' : '#f5f3ff', color: trip.sharedId ? '#6b7280' : '#8b5cf6', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s' }}
-                                    title={trip.sharedId ? "초대 코드 복사" : "친구 초대하기"}
+                                    title={trip.sharedId ? "공유 링크 복사" : "친구 초대하기"}
                                   >
                                     {copiedId === trip.id ? <Check size={16} color="#10b981" /> : <Share2 size={16} />}
                                   </button>
@@ -3454,7 +3572,7 @@ function App() {
                                             <p style={{ fontSize: '10px', fontWeight: '700', color: '#9ca3af', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{loc.loc}</p>
                                           </div>
                                           <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                                            {activeTripId && (
+                                            {activeTripId && !isReadOnlyTrip && (
                                               <button
                                                 onClick={(e) => {
                                                   e.stopPropagation();
@@ -3510,6 +3628,7 @@ function App() {
                       div::-webkit-scrollbar { display: none; }
                     `}</style>
                     <button
+                        className="read-only-hide"
                         onClick={toggleTripReminders}
                         type="button"
                         aria-label="일정 알림 설정"
@@ -3528,6 +3647,7 @@ function App() {
                       <Calendar size={14} /> 캘린더
                     </button>
                     <button
+                      className="read-only-hide"
                       onClick={addDay} 
                       style={{ 
                         display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: '800', 
@@ -3550,6 +3670,8 @@ function App() {
                     </button>
                 </div>
                 </div>
+
+                <p className="itinerary-read-only-note"><LockKeyhole size={13} style={{ verticalAlign: '-2px', marginRight: '4px' }} />읽기 전용 공유 일정입니다. 일정과 지출은 확인만 할 수 있습니다.</p>
 
                 {/* Reserve list: places saved before assigning them to a day. */}
                 <div
@@ -3607,7 +3729,7 @@ function App() {
                                 </h4>
                                 {item.loc && <p style={{ display: 'flex', alignItems: 'center', gap: '3px', margin: '4px 0 0', color: '#94a3b8', fontSize: '10px', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><MapPin size={10} />{item.loc}</p>}
                               </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: '1 1 230px', justifyContent: 'flex-end' }}>
+                              <div className="read-only-hide" style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: '1 1 230px', justifyContent: 'flex-end' }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', backgroundColor: '#eff6ff', border: '1px solid #dbeafe', borderRadius: '10px', overflow: 'hidden' }}>
                                   <button type="button" aria-label="예비 장소 위로 이동" onClick={() => moveReserveItem(item.id, 'up')} disabled={reserveIndex === 0} style={{ width: '28px', height: '20px', padding: 0, border: 'none', background: 'transparent', color: reserveIndex === 0 ? '#bfdbfe' : '#2563eb', cursor: reserveIndex === 0 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChevronUp size={14} /></button>
                                   <button type="button" aria-label="예비 장소 아래로 이동" onClick={() => moveReserveItem(item.id, 'down')} disabled={reserveIndex === reserveItems.length - 1} style={{ width: '28px', height: '20px', padding: 0, border: 'none', borderTop: '1px solid #dbeafe', background: 'transparent', color: reserveIndex === reserveItems.length - 1 ? '#bfdbfe' : '#2563eb', cursor: reserveIndex === reserveItems.length - 1 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChevronDown size={14} /></button>
@@ -3693,6 +3815,7 @@ function App() {
                           {(dayPlan?.items || []).length} 장소
                         </span>
                         <button
+                            className="read-only-hide"
                             type="button"
                             aria-label={`${dayPlan?.day}일차 삭제`}
                             title="이 일차 삭제"
@@ -3820,7 +3943,7 @@ function App() {
                                     alignItems: 'center'
                                   }}>
                                     {/* Order Group */}
-                                    <div style={{ 
+                                    <div className="itinerary-order-control" style={{
                                       display: 'flex', 
                                       flexDirection: 'column', 
                                       backgroundColor: '#f8fafc', 
@@ -3852,6 +3975,7 @@ function App() {
 
                                     {/* Edit Button */}
                                     <button
+                                      className="itinerary-edit-control"
                                       type="button"
                                       aria-label={`${item.displayName || item.name || '일정'} 편집`}
                                       title="일정 편집: 이름, 시간, 일정 위치 변경"
@@ -3868,7 +3992,8 @@ function App() {
                                     </button>
 
                                     {/* Navigation Button */}
-                                    <button 
+                                    <button
+                                      className="itinerary-navigation-control"
                                       type="button"
                                       aria-label={`${item.displayName || item.name || '일정'} 길찾기`}
                                       title="길찾기"
@@ -3908,7 +4033,7 @@ function App() {
                                     </button>
 
                                     {/* Delete Button */}
-                                    <div style={{ position: 'relative', width: '44px', height: '44px' }}>
+                                    <div className="itinerary-delete-control" style={{ position: 'relative', width: '44px', height: '44px' }}>
                                       <button 
                                         type="button"
                                         aria-label={`${item.displayName || item.name || '일정'} 일정 삭제`}
@@ -4398,7 +4523,7 @@ function App() {
           {/* Footer */}
         <div style={{ padding: '24px 32px', borderTop: '1px solid #f3f4f6', backgroundColor: '#f9fafb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: "11px", fontWeight: "900", color: "#111827", letterSpacing: "0.05em" }}>{(favorites || []).length} 저장 • {totalSpots} 일정</span>
-            <span style={{ fontSize: "10px", fontWeight: "800", color: syncStatus === "error" ? "#ef4444" : syncStatus === "saving" ? "#f59e0b" : "#10b981" }}>{isLoadingDB ? "동기화 중…" : syncStatus === "saving" ? "저장 중…" : syncStatus === "error" ? "로컬 저장됨" : "저장됨"}</span>
+            <span style={{ fontSize: "10px", fontWeight: "800", color: !isOnline || syncStatus === "offline" ? "#d97706" : syncStatus === "error" ? "#ef4444" : syncStatus === "saving" ? "#f59e0b" : "#10b981" }}>{!isOnline || syncStatus === "offline" ? "오프라인 저장" : isLoadingDB ? "동기화 중…" : syncStatus === "saving" ? "저장 중…" : syncStatus === "error" ? "로컬 저장됨" : "저장됨"}</span>
             <button onClick={() => setSidebarOpen(false)} style={{ fontSize: '11px', fontWeight: '900', color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer', letterSpacing: '0.05em' }}>닫기</button>
           </div>
         </aside>
@@ -4432,7 +4557,7 @@ function App() {
               <Users size={20} color="white" />
             </div>
             <div>
-              <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: '900', color: '#a78bfa' }}>초대 코드 복사됨</h4>
+              <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: '900', color: '#a78bfa' }}>공유 링크 복사됨</h4>
               <p style={{ margin: 0, fontSize: '12px', fontWeight: '700', color: '#d1d5db', lineHeight: 1.4 }}>이 코드를 친구에게 전달하면<br/>실시간으로 함께 일정을 짤 수 있습니다! 🤝</p>
             </div>
             <button 
@@ -5223,13 +5348,23 @@ function App() {
                       <MapPin size={9} color="#3b82f6" style={{ marginTop: '1px', flexShrink: 0 }} /> 
                       <span style={{ overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}>{selectedPlace.loc}</span>
                     </p>
+                    {(selectedPlaceBusinessStatus || selectedPlaceOpeningHours.length > 0) && (
+                      <details className="place-hours-summary">
+                        <summary><Clock size={11} aria-hidden="true" />영업시간{selectedPlaceBusinessStatus ? ` · ${selectedPlaceBusinessStatus}` : ''}</summary>
+                        {selectedPlaceOpeningHours.length > 0 && (
+                          <div className="place-hours-list">
+                            {selectedPlaceOpeningHours.map((hours, index) => <span key={`${hours}-${index}`}>{hours}</span>)}
+                          </div>
+                        )}
+                      </details>
+                    )}
                   </div>
                 </div>
 
                 <div style={{ height: '1px', backgroundColor: '#f1f5f9', margin: window.innerWidth < 768 ? '8px 0' : '16px 0' }} />
 
                 {/* BOTTOM SECTION: Add to Itinerary */}
-                {activeTripId && (
+                {activeTripId && !isReadOnlyTrip && (
                   <div style={{ backgroundColor: '#f8fafc', padding: window.innerWidth < 768 ? '10px' : '16px', borderRadius: '14px', border: '1px solid #f1f5f9' }}>
                     <div style={{ fontSize: '9px', fontWeight: '900', color: '#9ca3af', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.05em' }}>일차 선택</div>
                     <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', overflowX: 'auto', paddingBottom: '2px' }}>
@@ -5358,6 +5493,16 @@ function App() {
                     <MapPin size={10} color="#3b82f6" style={{ marginTop: '1px', flexShrink: 0 }} />
                     <span style={{ overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{selectedPlace.loc}</span>
                     </p>
+                    {(selectedPlaceBusinessStatus || selectedPlaceOpeningHours.length > 0) && (
+                      <details className="place-hours-summary">
+                        <summary><Clock size={11} aria-hidden="true" />영업시간{selectedPlaceBusinessStatus ? ` · ${selectedPlaceBusinessStatus}` : ''}</summary>
+                        {selectedPlaceOpeningHours.length > 0 && (
+                          <div className="place-hours-list">
+                            {selectedPlaceOpeningHours.map((hours, index) => <span key={`${hours}-${index}`}>{hours}</span>)}
+                          </div>
+                        )}
+                      </details>
+                    )}
                   </div>
                 </div>
                 <div className="mobile-place-add-header-actions">
@@ -5381,7 +5526,7 @@ function App() {
                 </div>
               </div>
 
-              {activeTripId && (
+              {activeTripId && !isReadOnlyTrip && (
                 <div style={{ backgroundColor: '#f8fafc', padding: '12px', borderRadius: '14px', border: '1px solid #f1f5f9' }}>
                   <div style={{ fontSize: '10px', fontWeight: '900', color: '#64748b', marginBottom: '8px' }}>일차 선택</div>
                   <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', overflowX: 'auto', paddingBottom: '2px' }}>
