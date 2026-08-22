@@ -81,6 +81,57 @@ const getFormattableText = (value) => {
   return value?.text || '';
 };
 
+const LLM_IMPORT_TEMPLATE = JSON.stringify({
+  name: '나트랑 4박 5일 여행',
+  country: '베트남',
+  startDate: '2026-09-01',
+  endDate: '2026-09-05',
+  itinerary: [
+    {
+      day: 1,
+      items: [
+        {
+          name: '깜라인 국제공항 도착',
+          displayName: '공항 도착',
+          time: '22:00',
+          loc: 'Cam Ranh International Airport'
+        }
+      ]
+    },
+    {
+      day: 2,
+      items: [
+        {
+          name: '포나가르 참탑',
+          displayName: '포나가르 참탑 방문',
+          time: '10:00',
+          loc: 'Po Nagar Cham Towers'
+        },
+        {
+          name: '나트랑 야시장',
+          displayName: '저녁 야시장',
+          time: '19:00',
+          loc: 'Nha Trang Night Market'
+        }
+      ]
+    }
+  ],
+  reserveItems: [
+    {
+      name: '아이리조트 온천',
+      displayName: '시간이 되면 방문할 장소',
+      time: '15:00',
+      loc: 'I-Resort Nha Trang'
+    }
+  ]
+}, null, 2);
+
+const parseImportedJsonText = (text) => {
+  const trimmed = String(text || '').trim();
+  const fencedJson = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  return JSON.parse(fencedJson ? fencedJson[1] : trimmed);
+};
+
 const CustomMapMarker = ({ position, onClick, icon, label, ariaLabel }) => {
   const width = Number(icon?.scaledSize?.width) || 40;
   const height = Number(icon?.scaledSize?.height) || width;
@@ -1185,6 +1236,30 @@ function App() {
     performCopy();
   };
 
+  const copyImportTemplate = async () => {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(LLM_IMPORT_TEMPLATE);
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = LLM_IMPORT_TEMPLATE;
+        textArea.setAttribute('readonly', '');
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
+      setModalConfig({ type: 'success', title: '예시 형식 복사 완료', message: '복사한 JSON 예시를 ChatGPT나 Gemini에 전달해 여행 일정으로 바꿔 달라고 요청해 보세요.' });
+      setShowCustomModal(true);
+    } catch (error) {
+      console.error('LLM template copy failed:', error);
+      setModalConfig({ type: 'error', title: '예시 복사 실패', message: '복사에 실패했습니다. 아래 예시를 직접 선택해 복사해 주세요.' });
+      setShowCustomModal(true);
+    }
+  };
+
   useEffect(() => {
     if (!map || !activeDay || (itinerary || []).length === 0) return;
     
@@ -1509,7 +1584,7 @@ function App() {
   const handlePasteImport = () => {
     if (!pasteText.trim()) return;
     try {
-      const data = JSON.parse(pasteText);
+      const data = parseImportedJsonText(pasteText);
       if (!data.name || !data.itinerary) {
         setModalConfig({ 
           type: 'error', 
@@ -2479,21 +2554,21 @@ function App() {
                   
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {/* Row 1: Import Options */}
-                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                        <button onClick={handleUploadJson} style={{ flex: '1 1 140px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '13px', fontWeight: '800', color: '#4f46e5', backgroundColor: '#f5f7ff', padding: '14px 10px', borderRadius: '20px', border: '1px solid #e0e7ff', cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap' }}>
-                          <Upload size={18} /> 일정 파일 가져오기
+                      <div className="trip-action-grid">
+                        <button onClick={() => setShowPasteModal(true)} className="trip-action-button" style={{ color: '#4f46e5', backgroundColor: '#f5f7ff', borderColor: '#e0e7ff' }}>
+                          <Clipboard size={18} /> AI 일정 만들기
                         </button>
-                        <button onClick={() => setShowPasteModal(true)} style={{ flex: '1 1 140px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '13px', fontWeight: '800', color: '#2563eb', backgroundColor: '#f0f7ff', padding: '14px 10px', borderRadius: '20px', border: '1px solid #dbeafe', cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap' }}>
+                        <button onClick={() => setShowPasteModal(true)} className="trip-action-button" style={{ color: '#2563eb', backgroundColor: '#f0f7ff', borderColor: '#dbeafe' }}>
                           <Clipboard size={18} /> 일정 텍스트 붙여넣기
                         </button>
                       </div>
 
                       {/* Row 2: Create & Join Options */}
-                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                        <button onClick={createNewTrip} style={{ flex: '1.5 1 180px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '14px', fontWeight: '800', color: 'white', backgroundColor: '#8b5cf6', padding: '14px 10px', borderRadius: '20px', border: 'none', cursor: 'pointer', boxShadow: '0 10px 15px -3px rgba(139, 92, 246, 0.3)', transition: 'all 0.2s', whiteSpace: 'nowrap' }}>
+                      <div className="trip-action-grid">
+                        <button onClick={createNewTrip} className="trip-action-button" style={{ fontSize: '14px', color: 'white', backgroundColor: '#8b5cf6', borderColor: '#8b5cf6', boxShadow: '0 10px 15px -3px rgba(139, 92, 246, 0.3)' }}>
                           <PlusCircle size={18} /> 새 여행 계획하기
                         </button>
-                        <button onClick={joinSharedTrip} style={{ flex: '1 1 100px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '13px', fontWeight: '800', color: '#059669', backgroundColor: '#f0fdf4', padding: '14px 10px', borderRadius: '20px', border: '1px solid #dcfce7', cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap' }}>
+                        <button onClick={joinSharedTrip} className="trip-action-button" style={{ color: '#059669', backgroundColor: '#f0fdf4', borderColor: '#dcfce7' }}>
                           <Users size={18} /> 참여하기
                         </button>
                       </div>
@@ -4609,15 +4684,48 @@ function App() {
           <div style={{
             backgroundColor: 'white', borderRadius: '32px', width: '100%', maxWidth: '480px',
             padding: '32px 24px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-            animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+            animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+            maxHeight: 'calc(100vh - 40px)',
+            overflowY: 'auto'
           }}>
-            <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#0f172a', margin: '0 0 8px 0' }}>JSON 붙여넣기</h3>
-            <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 20px 0' }}>다른 곳에서 복사한 일정 JSON 텍스트를 아래에 붙여넣어 주세요.</p>
+            <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#0f172a', margin: '0 0 8px 0' }}>일정 가져오기</h3>
+            <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 16px 0', lineHeight: 1.5 }}>LLM이 만들어 준 JSON 일정이나 직접 작성한 일정 JSON을 아래에 붙여넣어 주세요.</p>
+
+            <div style={{ padding: '16px', marginBottom: '16px', borderRadius: '18px', backgroundColor: '#eff6ff', border: '1px solid #dbeafe' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '10px' }}>
+                <div>
+                  <strong style={{ display: 'block', color: '#1e40af', fontSize: '13px', marginBottom: '4px' }}>LLM용 예시 형식</strong>
+                  <span style={{ display: 'block', color: '#64748b', fontSize: '11px', lineHeight: 1.5 }}>예시를 복사해 ChatGPT나 Gemini에 전달하면 같은 형식으로 일정을 만들 수 있어요.</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={copyImportTemplate}
+                  aria-label="LLM 일정 JSON 예시 복사"
+                  title="LLM 일정 JSON 예시 복사"
+                  style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '9px 10px', border: 'none', borderRadius: '10px', backgroundColor: '#2563eb', color: 'white', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}
+                >
+                  <Copy size={13} /> 예시 복사
+                </button>
+              </div>
+              <pre style={{ maxHeight: '120px', overflow: 'auto', margin: 0, padding: '10px', borderRadius: '10px', backgroundColor: 'rgba(255,255,255,0.8)', color: '#334155', fontSize: '10px', lineHeight: 1.45, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{LLM_IMPORT_TEMPLATE}</pre>
+            </div>
+
+            <div style={{ padding: '14px 16px', marginBottom: '18px', borderRadius: '16px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
+              <strong style={{ display: 'block', color: '#334155', fontSize: '12px', marginBottom: '8px' }}>사용 방법</strong>
+              <ol style={{ margin: 0, paddingLeft: '18px', color: '#64748b', fontSize: '11px', lineHeight: 1.65 }}>
+                <li>위의 <b>예시 복사</b>를 눌러 JSON 형식을 복사합니다.</li>
+                <li>LLM에 여행지, 날짜, 장소, 방문 시간을 알려주고 JSON 형식으로 작성해 달라고 요청합니다.</li>
+                <li>LLM의 답변에서 JSON 코드만 복사해 아래 입력창에 붙여넣습니다.</li>
+                <li>설명 문장이 아닌 <b>JSON만</b> 반환해 달라고 요청하면 가장 정확합니다.</li>
+              </ol>
+              <p style={{ margin: '9px 0 0', color: '#2563eb', fontSize: '11px', lineHeight: 1.5 }}>추천 문장: “아래 JSON 형식을 유지하고, 내 여행 일정에 맞는 값만 바꿔서 JSON 코드만 반환해줘.”</p>
+            </div>
             
             <textarea 
               value={pasteText}
               onChange={(e) => setPasteText(e.target.value)}
-              placeholder='{"name": "여행 제목", ...}'
+              aria-label="일정 JSON 붙여넣기"
+              placeholder='{"name": "여행 제목", "itinerary": [{"day": 1, "items": []}]}'
               style={{
                 width: '100%', height: '200px', padding: '16px', border: '1px solid #e2e8f0',
                 borderRadius: '16px', fontSize: '13px', fontFamily: 'monospace',
@@ -4625,6 +4733,14 @@ function App() {
                 backgroundColor: '#f8fafc'
               }}
             />
+
+            <button
+              type="button"
+              onClick={() => { setShowPasteModal(false); setPasteText(''); handleUploadJson(); }}
+              style={{ width: '100%', marginBottom: '12px', padding: '12px', border: '1px solid #e2e8f0', borderRadius: '12px', backgroundColor: 'white', color: '#64748b', fontSize: '12px', fontWeight: '800', cursor: 'pointer' }}
+            >
+              <Upload size={14} style={{ verticalAlign: 'middle', marginRight: '5px' }} /> JSON 파일로 가져오기
+            </button>
 
             <div style={{ display: 'flex', gap: '12px' }}>
               <button 
