@@ -491,6 +491,7 @@ const EXPENSE_CATEGORIES = [
   { value: 'flight', label: '항공', emoji: '✈️' },
   { value: 'sightseeing', label: '관광', emoji: '🎟️' },
   { value: 'shopping', label: '쇼핑', emoji: '🛍️' },
+  { value: 'communication', label: '통신', emoji: '📶' },
   { value: 'insurance', label: '보험', emoji: '🛡️' },
   { value: 'other', label: '기타', emoji: '🧾' }
 ];
@@ -3394,12 +3395,32 @@ function App() {
 
   const renderBudgetStatisticsPanel = () => {
     const paymentLabels = { cash: '현금', card: '카드', transfer: '계좌이체', unassigned: '미지정' };
-    const maxCategorySpent = Math.max(...categoryBudgetEntries.map(category => category.spent), 1);
+    const categoryColors = ['#8b5cf6', '#2563eb', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4', '#64748b'];
+    const categoryStats = categoryBudgetEntries.filter(category => category.spent > 0);
+    const categoryTotalKRW = categoryStats.reduce((sum, category) => sum + category.spent, 0);
+    let categoryCursor = 0;
+    const categoryGradient = categoryTotalKRW > 0
+      ? `conic-gradient(${categoryStats.map((category, index) => {
+        const start = categoryCursor;
+        categoryCursor += (category.spent / categoryTotalKRW) * 100;
+        return `${categoryColors[index % categoryColors.length]} ${start}% ${categoryCursor}%`;
+      }).join(', ')})`
+      : '#ede9fe';
     return <div className="budget-statistics-panel" style={{ padding: '16px', marginBottom: '18px', border: '1px solid #ddd6fe', borderRadius: '16px', background: '#faf5ff' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginBottom: '12px' }}><strong style={{ color: '#6d28d9', fontSize: '13px' }}>지출 통계</strong><span style={{ color: '#8b5cf6', fontSize: '10px', fontWeight: '800' }}>{expenses.length}건 · {itinerary.length}일</span></div>
       <div className="budget-spend-summary-grid"><div className="budget-spend-summary-item"><span>총 지출</span><strong>₩{totalSpentKRW.toLocaleString()}</strong></div><div className="budget-spend-summary-item"><span>일평균</span><strong>₩{averageDailySpendKRW.toLocaleString()}</strong></div></div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px', marginTop: '10px' }}>{Object.entries(paymentLabels).map(([method, label]) => <span key={`payment-stat-${method}`} style={{ padding: '6px 8px', borderRadius: '9px', background: 'white', color: '#475569', fontSize: '10px', fontWeight: '800' }}>{label} ₩{(paymentTotalsKRW[method] || 0).toLocaleString()}</span>)}</div>
-      <div style={{ marginTop: '14px' }}><strong style={{ color: '#7c3aed', fontSize: '11px' }}>카테고리별 지출</strong>{categoryBudgetEntries.filter(category => category.spent > 0).map(category => <div key={`category-stat-${category.value}`} style={{ marginTop: '8px' }}><div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569', fontSize: '10px', fontWeight: '800' }}><span>{category.emoji} {category.label}</span><span>₩{category.spent.toLocaleString()}</span></div><div style={{ height: '6px', marginTop: '4px', borderRadius: '99px', background: '#ede9fe', overflow: 'hidden' }}><div style={{ width: `${Math.min((category.spent / maxCategorySpent) * 100, 100)}%`, height: '100%', borderRadius: '99px', background: '#8b5cf6' }} /></div></div>)}{categoryBudgetEntries.every(category => category.spent === 0) && <p style={{ color: '#94a3b8', fontSize: '10px' }}>아직 기록된 지출이 없습니다.</p>}</div>
+      <div style={{ marginTop: '14px' }}>
+        <strong style={{ color: '#7c3aed', fontSize: '11px' }}>카테고리별 지출 비중</strong>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '18px', marginTop: '10px' }}>
+          <div role="img" aria-label={categoryTotalKRW > 0 ? `카테고리별 지출 비중, 총 ${categoryTotalKRW.toLocaleString()}원` : '기록된 카테고리별 지출 없음'} style={{ position: 'relative', width: '132px', height: '132px', flexShrink: 0, borderRadius: '50%', background: categoryGradient }}>
+            <div style={{ position: 'absolute', inset: '25px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', background: '#faf5ff' }}><strong style={{ color: '#6d28d9', fontSize: '17px', fontWeight: '900' }}>{categoryStats.length}</strong><span style={{ color: '#8b5cf6', fontSize: '9px', fontWeight: '800' }}>카테고리</span></div>
+          </div>
+          <div style={{ display: 'flex', flex: 1, minWidth: 0, flexDirection: 'column', gap: '7px' }}>
+            {categoryStats.length === 0 ? <p style={{ margin: 0, color: '#94a3b8', fontSize: '10px', fontWeight: '700' }}>아직 기록된 지출이 없습니다.</p> : categoryStats.map((category, index) => <div key={`category-stat-${category.value}`} style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, color: '#475569', fontSize: '10px', fontWeight: '800' }}><span style={{ width: '8px', height: '8px', flexShrink: 0, borderRadius: '50%', background: categoryColors[index % categoryColors.length] }} /><span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{category.emoji} {category.label}</span><span style={{ color: '#6d28d9', whiteSpace: 'nowrap' }}>{((category.spent / categoryTotalKRW) * 100).toFixed(1)}%</span></div>)}
+          </div>
+        </div>
+      </div>
       <div style={{ marginTop: '14px' }}><strong style={{ color: '#7c3aed', fontSize: '11px' }}>일차별 지출</strong><div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: '7px' }}>{Object.entries(dailyExpenseTotalsKRW).sort(([a], [b]) => Number(a) - Number(b)).map(([day, amount]) => <div key={`day-stat-${day}`} style={{ display: 'flex', justifyContent: 'space-between', color: '#475569', fontSize: '10px', fontWeight: '800' }}><span>{Number(day) === 0 ? '여행 전 준비' : `${day}일차`}</span><span>₩{amount.toLocaleString()}</span></div>)}</div></div>
     </div>;
   };
