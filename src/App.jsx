@@ -3771,9 +3771,6 @@ function App() {
                         <button onClick={openJoinTripModal} className="trip-action-button" style={{ color: '#059669', backgroundColor: '#f0fdf4', borderColor: '#dcfce7' }}>
                           <Users size={18} /> 참여하기
                         </button>
-                        <button onClick={handleUploadJson} className="trip-action-button" style={{ color: '#64748b', backgroundColor: '#f8fafc', borderColor: '#e2e8f0' }}>
-                          <Upload size={18} /> 백업 복원
-                        </button>
                         {deferredInstallPrompt && <button onClick={installPwa} className="trip-action-button" style={{ color: '#2563eb', backgroundColor: '#eff6ff', borderColor: '#dbeafe' }}>
                           <Download size={18} /> 앱으로 설치
                         </button>}
@@ -4150,6 +4147,16 @@ function App() {
                       style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: '800', color: '#64748b', backgroundColor: '#f8fafc', padding: '8px 12px', borderRadius: '14px', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}
                     >
                       <Download size={14} /> 데이터 백업
+                    </button>
+                    <button
+                      className="read-only-hide"
+                      onClick={handleUploadJson}
+                      type="button"
+                      aria-label="여행 데이터 백업 복원"
+                      title="백업 JSON 파일에서 여행 데이터 복원"
+                      style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: '800', color: '#64748b', backgroundColor: '#f8fafc', padding: '8px 12px', borderRadius: '14px', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                    >
+                      <Upload size={14} /> 백업 복원
                     </button>
                 </div>
                 </div>
