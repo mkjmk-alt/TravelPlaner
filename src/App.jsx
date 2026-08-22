@@ -484,6 +484,85 @@ const PAYMENT_METHODS = [
   { value: 'transfer', label: '계좌이체' }
 ];
 
+const EXPENSE_CATEGORIES = [
+  { value: 'food', label: '식비', emoji: '🍽️' },
+  { value: 'transport', label: '교통', emoji: '🚕' },
+  { value: 'lodging', label: '숙박', emoji: '🛏️' },
+  { value: 'flight', label: '항공', emoji: '✈️' },
+  { value: 'sightseeing', label: '관광', emoji: '🎟️' },
+  { value: 'shopping', label: '쇼핑', emoji: '🛍️' },
+  { value: 'insurance', label: '보험', emoji: '🛡️' },
+  { value: 'other', label: '기타', emoji: '🧾' }
+];
+
+const DEFAULT_CHECKLIST_ITEMS = [
+  { id: 'passport', label: '여권 및 신분증', checked: false },
+  { id: 'insurance', label: '여행자 보험', checked: false },
+  { id: 'charger', label: '충전기·보조배터리', checked: false },
+  { id: 'cash', label: '환전·현금 준비', checked: false },
+  { id: 'reservation', label: '예약·티켓 확인', checked: false }
+];
+
+const getDefaultChecklist = () => DEFAULT_CHECKLIST_ITEMS.map(item => ({ ...item }));
+
+const getExpenseCategoryLabel = (category) => (
+  EXPENSE_CATEGORIES.find(option => option.value === category)?.label || '기타'
+);
+
+const getExpenseCategoryEmoji = (category) => (
+  EXPENSE_CATEGORIES.find(option => option.value === category)?.emoji || '🧾'
+);
+
+const getEffectiveExchangeRate = (currency, rates = {}, budgetSettings = {}) => {
+  if (!currency || currency === 'KRW') return 1;
+  const manualRate = Number(budgetSettings.exchangeRates?.[currency]?.krwPerUnit ?? budgetSettings.manualRates?.[currency]);
+  if (Number.isFinite(manualRate) && manualRate > 0) return manualRate;
+  const liveRate = Number(rates[currency]);
+  return Number.isFinite(liveRate) && liveRate > 0 ? 1 / liveRate : 0;
+};
+
+const getCashWalletsFromSettings = (budgetSettings = {}) => {
+  const normalizeActual = value => value === '' || value === null || value === undefined ? '' : Number(value) || 0;
+  if (Array.isArray(budgetSettings.cashWallets)) {
+    return budgetSettings.cashWallets.map((wallet, index) => ({
+      id: wallet.id || `${wallet.currency || 'KRW'}-${index}`,
+      name: wallet.name || `${wallet.currency || 'KRW'} 현금`,
+      currency: wallet.currency || budgetSettings.travelCurrency || 'USD',
+      initial: Number(wallet.initial) || 0,
+      additional: Number(wallet.additional) || 0,
+      actualRemaining: normalizeActual(wallet.actualRemaining)
+    }));
+  }
+
+  return Object.entries(budgetSettings.cashLedgers || {}).map(([currency, ledger]) => ({
+    id: currency,
+    name: ledger?.name || `${currency} 현금`,
+    currency,
+    initial: Number(ledger?.initial) || 0,
+    additional: Number(ledger?.additional) || 0,
+    actualRemaining: normalizeActual(ledger?.actualRemaining)
+  }));
+};
+
+const getSafeExternalUrl = (value) => {
+  try {
+    const url = new URL(value);
+    return ['http:', 'https:'].includes(url.protocol) ? url.href : '';
+  } catch {
+    return '';
+  }
+};
+
+const getTripUpdatedAt = (trip) => Number(trip?.updatedAt || trip?.createdAt || 0);
+
+const areTripsEqual = (left, right) => {
+  try {
+    return JSON.stringify(left) === JSON.stringify(right);
+  } catch {
+    return false;
+  }
+};
+
 const getPaymentMethodLabel = (method) => (
   PAYMENT_METHODS.find(option => option.value === method)?.label || '결제수단 미지정'
 );
@@ -912,7 +991,7 @@ function App() {
   const [isJoiningTrip, setIsJoiningTrip] = useState(false);
   const [itineraryTime, setItineraryTime] = useState('');
   const [itineraryDisplayName, setItineraryDisplayName] = useState('');
-  const [editingTimeItem, setEditingTimeItem] = useState(null); // { day, id, time, displayName, originalName }
+  const [editingTimeItem, setEditingTimeItem] = useState(null); // { day, id, time, displayName, originalName, reservationNumber, reservationUrl, memo }
   const [showCustomModal, setShowCustomModal] = useState(false);
   const [modalConfig, setModalConfig] = useState({ type: 'success', title: '', message: '' });
   const [showPasteModal, setShowPasteModal] = useState(false);
@@ -922,11 +1001,22 @@ function App() {
   const [showOnboarding, setShowOnboarding] = useState(() => !readStoredJson(ONBOARDING_STORAGE_KEY, false));
   const [onboardingStep, setOnboardingStep] = useState(0);
   const [mergeNotice, setMergeNotice] = useState(null);
+  const [syncConflictNotice, setSyncConflictNotice] = useState(null);
   const [notificationPermission, setNotificationPermission] = useState(() => (
     typeof Notification === 'undefined' ? 'unsupported' : Notification.permission
   ));
   const [showCashReconciliation, setShowCashReconciliation] = useState(false);
   const [showCurrencyManager, setShowCurrencyManager] = useState(false);
+  const [showExchangeRateSettings, setShowExchangeRateSettings] = useState(false);
+  const [showCategoryBudgetSettings, setShowCategoryBudgetSettings] = useState(false);
+  const [showChecklist, setShowChecklist] = useState(false);
+  const [checklistDraft, setChecklistDraft] = useState('');
+  const [cashWalletId, setCashWalletId] = useState(null);
+  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState(null);
+  const [isBulkMoveMode, setIsBulkMoveMode] = useState(false);
+  const [selectedItineraryItems, setSelectedItineraryItems] = useState([]);
+  const [bulkMoveTargetDay, setBulkMoveTargetDay] = useState(1);
+  const [undoStack, setUndoStack] = useState([]);
   const [readOnlySharedTrip, setReadOnlySharedTrip] = useState(null);
   const [sharedViewError, setSharedViewError] = useState('');
   const [isOnline, setIsOnline] = useState(() => typeof navigator === 'undefined' ? true : navigator.onLine);
@@ -999,7 +1089,14 @@ function App() {
       }
       return cleanedTrips.map(trip => ({
         ...trip,
-        reserveItems: Array.isArray(trip.reserveItems) ? trip.reserveItems : []
+        updatedAt: getTripUpdatedAt(trip),
+        reserveItems: Array.isArray(trip.reserveItems) ? trip.reserveItems : [],
+        checklist: Array.isArray(trip.checklist) ? trip.checklist : getDefaultChecklist(),
+        expenses: Array.isArray(trip.expenses) ? trip.expenses.map(expense => ({
+          ...expense,
+          category: expense.category || 'other',
+          memo: expense.memo || ''
+        })) : []
       }));
     }
     
@@ -1015,7 +1112,9 @@ function App() {
         reserveItems: [],
         budgetSettings: oldBudget,
         expenses: oldExpenses,
-        createdAt: Date.now()
+        checklist: getDefaultChecklist(),
+        createdAt: Date.now(),
+        updatedAt: Date.now()
       };
       writeStoredJson("world_pro_trips_v1", [migratedTrip]);
       return [migratedTrip];
@@ -1026,7 +1125,8 @@ function App() {
   const [activeTripId, setActiveTripId] = useState(null);
 
   const [exchangeRates, setExchangeRates] = useState({});
-  const [expenseInput, setExpenseInput] = useState(() => ({ desc: '', amount: '', currency: '', paymentMethod: '', day: 1, time: getCurrentTimeInputValue() }));
+  const [exchangeRateInfo, setExchangeRateInfo] = useState({ date: '', source: '자동 환율' });
+  const [expenseInput, setExpenseInput] = useState(() => ({ desc: '', amount: '', currency: '', paymentMethod: '', category: 'other', memo: '', day: 1, time: getCurrentTimeInputValue() }));
   const [editingExpenseId, setEditingExpenseId] = useState(null);
   const [placeSuggestions, setPlaceSuggestions] = useState([]);
 
@@ -1152,13 +1252,26 @@ function App() {
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
+    const handleInstallPrompt = (event) => {
+      event.preventDefault();
+      setDeferredInstallPrompt(event);
+    };
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+    window.addEventListener('beforeinstallprompt', handleInstallPrompt);
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('beforeinstallprompt', handleInstallPrompt);
     };
   }, []);
+
+  const installPwa = async () => {
+    if (!deferredInstallPrompt) return;
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    setDeferredInstallPrompt(null);
+  };
 
   // A shared URL opens a non-editable itinerary without requiring the viewer
   // to import it into their own account first.
@@ -1242,6 +1355,7 @@ function App() {
         setSyncStatus("saved");
         return;
       }
+      setSyncConflictNotice(null);
       setSyncStatus("saving");
       try {
         const { data, error } = await supabase.from('user_state').select('*').eq('user_id', session.user.id);
@@ -1268,15 +1382,45 @@ function App() {
           if (localTripSyncError) throw localTripSyncError;
         } else if (cloudTrips) {
           const cloudTripList = (Array.isArray(cloudTrips) ? cloudTrips : []).filter(trip => !trip.localOnly);
-          const localOnlyTrips = localRegularTrips.filter(localTrip =>
-            !cloudTripList.some(cloudTrip => String(cloudTrip.id) === String(localTrip.id))
-          );
-          const mergedTrips = [...cloudTripList, ...localTestTrips, ...localOnlyTrips];
+          const cloudById = new Map(cloudTripList.map(trip => [String(trip.id), trip]));
+          const localById = new Map(localRegularTrips.map(trip => [String(trip.id), trip]));
+          const mergedTrips = [];
+          let localWins = 0;
+          let remoteWins = 0;
+          let conflictCount = 0;
+
+          cloudTripList.forEach(cloudTrip => {
+            const localTrip = localById.get(String(cloudTrip.id));
+            if (!localTrip) {
+              mergedTrips.push(cloudTrip);
+              return;
+            }
+            if (areTripsEqual(localTrip, cloudTrip)) {
+              mergedTrips.push(localTrip);
+              return;
+            }
+
+            conflictCount += 1;
+            if (getTripUpdatedAt(localTrip) > getTripUpdatedAt(cloudTrip)) {
+              mergedTrips.push(localTrip);
+              localWins += 1;
+            } else {
+              mergedTrips.push(cloudTrip);
+              remoteWins += 1;
+            }
+          });
+
+          const localOnlyTrips = localRegularTrips.filter(localTrip => !cloudById.has(String(localTrip.id)));
+          mergedTrips.push(...localOnlyTrips);
+          mergedTrips.push(...localTestTrips);
           setTrips(mergedTrips);
           writeStoredJson("world_pro_trips_v1", mergedTrips);
           mergedTripCount = localOnlyTrips.length;
-          if (localOnlyTrips.length > 0) {
-            const { error: mergeTripError } = await supabase.from("user_state").upsert({ user_id: session.user.id, key: "world_pro_trips_v1", value: [...cloudTripList, ...localOnlyTrips] }, { onConflict: "user_id,key" });
+          if (conflictCount > 0) {
+            setSyncConflictNotice({ conflicts: conflictCount, localWins, remoteWins });
+          }
+          if (localOnlyTrips.length > 0 || localWins > 0) {
+            const { error: mergeTripError } = await supabase.from("user_state").upsert({ user_id: session.user.id, key: "world_pro_trips_v1", value: mergedTrips.filter(trip => !trip.localOnly) }, { onConflict: "user_id,key" });
             if (mergeTripError) throw mergeTripError;
           }
         }
@@ -1347,6 +1491,10 @@ function App() {
       .then(data => {
         if (data && data.rates) {
           setExchangeRates(data.rates);
+          const updatedAt = data.time_last_update_unix
+            ? new Date(data.time_last_update_unix * 1000)
+            : new Date();
+          setExchangeRateInfo({ date: formatLocalDate(updatedAt), source: '자동 환율' });
         }
       })
       .catch(err => console.error("Exchange rate fetch failed", err));
@@ -1359,7 +1507,7 @@ function App() {
     : (trips || []).find(t => String(t.id) === String(activeTripId));
   const itinerary = useMemo(() => activeTrip?.itinerary || [], [activeTrip]);
   const reserveItems = useMemo(() => activeTrip?.reserveItems || [], [activeTrip]);
-  const budgetSettings = activeTrip?.budgetSettings || { limitKRW: 1000000, travelCurrency: 'USD' };
+  const budgetSettings = activeTrip?.budgetSettings || { limitKRW: 1000000, travelCurrency: 'USD', exchangeRates: {}, categoryBudgets: {} };
   const expenses = useMemo(() => activeTrip?.expenses || [], [activeTrip]);
   const createTripDayCount = useMemo(() => {
     if (!createTripData.startDate || !createTripData.endDate) return 0;
@@ -1376,11 +1524,12 @@ function App() {
     return Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
   }, [editTripData.startDate, editTripData.endDate]);
 
-  const getExpenseAmountKRW = (amount, currency) => {
+  const getExpenseAmountKRW = (amount, currency, settings = budgetSettings) => {
     const numericAmount = Number(amount);
     if (!Number.isFinite(numericAmount)) return 0;
-    if (currency !== 'KRW' && exchangeRates[currency]) {
-      return Math.round(numericAmount / exchangeRates[currency]);
+    if (currency !== 'KRW') {
+      const effectiveRate = getEffectiveExchangeRate(currency, exchangeRates, settings);
+      if (effectiveRate) return Math.round(numericAmount * effectiveRate);
     }
     return Math.round(numericAmount);
   };
@@ -1886,7 +2035,7 @@ function App() {
         document.execCommand('copy');
         document.body.removeChild(textArea);
       }
-      setModalConfig({ type: 'success', title: '예시 형식 복사 완료', message: '복사한 JSON 예시를 ChatGPT나 Gemini에 전달해 여행 일정으로 바꿔 달라고 요청해 보세요.' });
+      setModalConfig({ type: 'success', title: '예시 형식 복사 완료', message: '복사한 JSON 예시를 원하는 AI 도구에 전달해 여행 일정으로 바꿔 달라고 요청해 보세요.' });
       setShowCustomModal(true);
     } catch (error) {
       console.error('LLM template copy failed:', error);
@@ -1932,11 +2081,21 @@ function App() {
   }, [activeDay, itinerary, map]);
 
   // --- TRIP DATA MUTATORS ---
+  const rememberTripForUndo = (trip) => {
+    if (!trip || isReadOnlyTrip) return;
+    setUndoStack(previous => [
+      ...previous.slice(-9),
+      { tripId: trip.id, trip: JSON.parse(JSON.stringify(trip)), createdAt: Date.now() }
+    ]);
+  };
+
   const updateActiveTrip = async (updates) => {
     if (!activeTripId || isReadOnlyTrip) return;
-    
+
+    const currentTrip = (trips || []).find(trip => trip.id === activeTripId);
+    rememberTripForUndo(currentTrip);
     // Calculate new state array based on existing state
-    const nextTrips = (trips || []).map(t => t.id === activeTripId ? { ...t, ...updates } : t);
+    const nextTrips = (trips || []).map(t => t.id === activeTripId ? { ...t, ...updates, updatedAt: Date.now() } : t);
     
     // Sync to cloud and update local state
     await syncTripsToCloud(nextTrips);
@@ -1980,13 +2139,31 @@ function App() {
       ? getEndDateForDayCount(activeTrip.startDate, newItinerary.length)
       : activeTrip.endDate;
 
-    await updateActiveTrip({ itinerary: newItinerary, endDate: newEndDate });
+    const nextExpenses = expenses.map(expense => {
+      const expenseDay = parseDay(expense.day);
+      if (expenseDay === targetDay) return { ...expense, day: Math.max(0, targetDay - 1) };
+      if (expenseDay > targetDay) return { ...expense, day: expenseDay - 1 };
+      return expense;
+    });
+    await updateActiveTrip({ itinerary: newItinerary, endDate: newEndDate, expenses: nextExpenses });
     setActiveDay(Math.min(targetDay, newItinerary.length));
   };
 
   const saveItinerary = (newItinerary) => updateActiveTrip({ itinerary: newItinerary });
   const saveBudgetSettings = (newSettings) => updateActiveTrip({ budgetSettings: newSettings });
   const saveExpenses = (newExpenses) => updateActiveTrip({ expenses: newExpenses });
+
+  const undoLastChange = async () => {
+    const lastChange = undoStack[undoStack.length - 1];
+    if (!lastChange || isReadOnlyTrip) return;
+    const restoredTrips = (trips || []).map(trip => (
+      trip.id === lastChange.tripId ? lastChange.trip : trip
+    ));
+    setUndoStack(previous => previous.slice(0, -1));
+    await syncTripsToCloud(restoredTrips);
+    setModalConfig({ type: 'success', title: '변경을 실행 취소했습니다', message: '이전 상태로 복원했습니다.' });
+    setShowCustomModal(true);
+  };
 
   // --- TRIP CRUD ---
   const createNewTrip = (openAfterCreate = false) => {
@@ -2041,8 +2218,10 @@ function App() {
       reserveItems: [],
       budgetSettings: { limitKRW: 1000000, travelCurrency: countryToCurrency[country] || 'USD' },
       expenses: [],
+      checklist: getDefaultChecklist(),
       reminders: { enabled: false, minutesBefore: 30 },
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      updatedAt: Date.now()
     };
 
     const newTrips = [newTrip, ...(trips || [])];
@@ -2123,7 +2302,7 @@ function App() {
         `DTEND:${end}`,
         `SUMMARY:${escapeIcsText(item.displayName || item.name || '여행 일정')}`,
         `LOCATION:${escapeIcsText(item.loc || '')}`,
-        `DESCRIPTION:${escapeIcsText(item.desc || '')}`,
+        `DESCRIPTION:${escapeIcsText([item.desc, item.reservationNumber ? `예약번호: ${item.reservationNumber}` : '', item.memo ? `메모: ${item.memo}` : '', item.reservationUrl ? `예약 링크: ${item.reservationUrl}` : ''].filter(Boolean).join('\n'))}`,
         'END:VEVENT'
       ].join('\r\n');
     }));
@@ -2135,15 +2314,17 @@ function App() {
 
   const exportBudgetAsCsv = (trip = activeTrip) => {
     if (!trip) return;
-    const header = ['일차', '날짜', '지출 내용', '금액', '통화', '결제 수단', '원화 환산', '소비 시간'].join(',');
+    const header = ['일차', '날짜', '지출 내용', '카테고리', '메모', '금액', '통화', '결제 수단', '원화 환산', '소비 시간'].join(',');
     const rows = (trip.expenses || []).map(expense => [
       expense.day === 0 ? '여행 전 준비' : `${expense.day}일차`,
       expense.day === 0 ? '' : getActualDateForDay(trip.startDate, expense.day),
       expense.desc,
+      getExpenseCategoryLabel(expense.category),
+      expense.memo || '',
       expense.amount,
       expense.currency || 'KRW',
       getPaymentMethodLabel(expense.paymentMethod),
-      expense.amountKRW ?? expense.amount,
+      getExpenseAmountKRW(expense.amount, expense.currency, trip.budgetSettings),
       expense.time || ''
     ].map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(','));
     downloadTextFile(`${(trip.name || 'travel-plan').replace(/[^\w가-힣-]+/g, '_')}-budget.csv`, `\uFEFF${[header, ...rows].join('\r\n')}`, 'text/csv;charset=utf-8');
@@ -2161,6 +2342,7 @@ function App() {
       id: duplicateId,
       name: (trip.name || "여행") + " 복사본",
       createdAt: Date.now(),
+      updatedAt: Date.now(),
       itinerary: (trip.itinerary || []).map((day, dayIndex) => ({
         ...day,
         items: (day.items || []).map((item, itemIndex) => ({
@@ -2225,8 +2407,11 @@ function App() {
             expenses: (data.expenses || []).map(exp => ({
               ...exp,
               id: exp.id || Math.random().toString(36).substr(2, 9),
-              createdAt: exp.createdAt || Date.now()
+              createdAt: exp.createdAt || Date.now(),
+              category: exp.category || 'other',
+              memo: exp.memo || ''
             })),
+            checklist: Array.isArray(data.checklist) ? data.checklist : getDefaultChecklist(),
             reminders: data.reminders || { enabled: false, minutesBefore: 30 },
             createdAt: Date.now()
           };
@@ -2556,13 +2741,15 @@ function App() {
       amount: numericAmount,
       currency: currentCurrency,
       paymentMethod: expenseInput.paymentMethod,
+      category: expenseInput.category || 'other',
+      memo: expenseInput.memo?.trim() || '',
       amountKRW: getExpenseAmountKRW(expenseInput.amount, currentCurrency),
       day: parseInt(expenseInput.day, 10) || 0,
       time: expenseInput.time || ''
     };
 
     saveExpenses([...expenses, newExpense]);
-    setExpenseInput({ ...expenseInput, desc: '', amount: '', time: getCurrentTimeInputValue() });
+    setExpenseInput({ ...expenseInput, desc: '', amount: '', memo: '', time: getCurrentTimeInputValue() });
   };
 
   const startEditingExpense = (expense) => {
@@ -2572,6 +2759,8 @@ function App() {
       amount: String(expense.amount ?? ''),
       currency: expense.currency || budgetSettings.travelCurrency || 'USD',
       paymentMethod: expense.paymentMethod || '',
+      category: expense.category || 'other',
+      memo: expense.memo || '',
       day: expense.day ?? 1,
       time: expense.time || ''
     });
@@ -2579,7 +2768,7 @@ function App() {
 
   const cancelEditingExpense = () => {
     setEditingExpenseId(null);
-    setExpenseInput(current => ({ ...current, desc: '', amount: '', time: getCurrentTimeInputValue() }));
+    setExpenseInput(current => ({ ...current, desc: '', amount: '', memo: '', time: getCurrentTimeInputValue() }));
   };
 
   const saveExpenseEdit = () => {
@@ -2592,6 +2781,8 @@ function App() {
       amount: Number(expenseInput.amount),
       currency: currentCurrency,
       paymentMethod: expenseInput.paymentMethod,
+      category: expenseInput.category || 'other',
+      memo: expenseInput.memo?.trim() || '',
       amountKRW: getExpenseAmountKRW(expenseInput.amount, currentCurrency),
       day: parseInt(expenseInput.day, 10) || 0,
       time: expenseInput.time || ''
@@ -2655,6 +2846,9 @@ function App() {
       time: item.time || '09:00',
       displayName: item.displayName || item.name || '',
       originalName: item.name || '',
+      reservationNumber: item.reservationNumber || '',
+      reservationUrl: item.reservationUrl || '',
+      memo: item.memo || '',
     });
   };
 
@@ -2698,6 +2892,7 @@ function App() {
         ? { ...t, itinerary: newItin, reserveItems: [...(t.reserveItems || []), updatedItem] }
         : { ...t, itinerary: newItin };
     });
+    rememberTripForUndo((trips || []).find(trip => trip.id === activeTripId));
     syncTripsToCloud(nextTrips);
   };
 
@@ -2731,7 +2926,61 @@ function App() {
       }
       return t;
     });
+    rememberTripForUndo((trips || []).find(trip => trip.id === activeTripId));
     syncTripsToCloud(nextTrips);
+  };
+
+  const toggleItineraryItemSelection = (itemId) => {
+    setSelectedItineraryItems(previous => previous.includes(itemId)
+      ? previous.filter(id => id !== itemId)
+      : [...previous, itemId]);
+  };
+
+  const moveSelectedItineraryItems = () => {
+    const targetDay = parseDay(bulkMoveTargetDay);
+    if (!targetDay || selectedItineraryItems.length === 0) return;
+    const currentTrip = (trips || []).find(trip => trip.id === activeTripId);
+    if (!currentTrip) return;
+    const selected = new Set(selectedItineraryItems);
+    const movingItems = [];
+    const nextItinerary = (currentTrip.itinerary || []).map(dayPlan => {
+      const remaining = [];
+      (dayPlan.items || []).forEach(item => {
+        if (selected.has(item.id)) movingItems.push(item);
+        else remaining.push(item);
+      });
+      return { ...dayPlan, items: remaining };
+    }).map(dayPlan => parseDay(dayPlan.day) === targetDay
+      ? {
+        ...dayPlan,
+        items: [...dayPlan.items, ...movingItems].sort((a, b) => (a.time || '23:59').localeCompare(b.time || '23:59'))
+      }
+      : dayPlan);
+    if (movingItems.length === 0) return;
+    rememberTripForUndo(currentTrip);
+    syncTripsToCloud((trips || []).map(trip => trip.id === activeTripId
+      ? { ...trip, itinerary: nextItinerary }
+      : trip));
+    setSelectedItineraryItems([]);
+    setIsBulkMoveMode(false);
+    setActiveDay(targetDay);
+  };
+
+  const updateChecklist = (nextChecklist) => {
+    updateActiveTrip({ checklist: nextChecklist });
+  };
+
+  const toggleChecklistItem = (itemId) => {
+    const checklist = Array.isArray(activeTrip?.checklist) ? activeTrip.checklist : getDefaultChecklist();
+    updateChecklist(checklist.map(item => item.id === itemId ? { ...item, checked: !item.checked } : item));
+  };
+
+  const addChecklistItem = () => {
+    const label = checklistDraft.trim();
+    if (!label) return;
+    const checklist = Array.isArray(activeTrip?.checklist) ? activeTrip.checklist : getDefaultChecklist();
+    updateChecklist([...checklist, { id: makeEntityId(), label, checked: false }]);
+    setChecklistDraft('');
   };
 
   const removeFromItinerary = (dayNumber, itemId) => {
@@ -2910,23 +3159,23 @@ function App() {
   };
 
   const totalSpots = (itinerary || []).reduce((acc, day) => acc + (day.items || []).length, 0);
-  const totalSpentKRW = (expenses || []).reduce((acc, curr) => acc + (Number(curr.amountKRW) || 0), 0);
+  const totalSpentKRW = (expenses || []).reduce((acc, curr) => acc + getExpenseAmountKRW(curr.amount, curr.currency), 0);
   const expenseTotalsByCurrency = useMemo(() => (expenses || []).reduce((totals, expense) => {
     const currency = expense.currency || 'KRW';
     const amount = Number(expense.amount) || 0;
     totals[currency] = (totals[currency] || 0) + amount;
     return totals;
   }, {}), [expenses]);
+  // getExpenseAmountKRW is intentionally scoped to the active trip's settings.
+  /* eslint-disable react-hooks/exhaustive-deps */
   const expenseKRWTotalsByCurrency = useMemo(() => (expenses || []).reduce((totals, expense) => {
     const currency = expense.currency || 'KRW';
     const numericAmount = Number(expense.amount) || 0;
-    const convertedAmount = currency !== 'KRW' && exchangeRates[currency]
-      ? Math.round(numericAmount / exchangeRates[currency])
-      : Math.round(numericAmount);
-    const amountKRW = Number(expense.amountKRW ?? convertedAmount) || 0;
+    const amountKRW = getExpenseAmountKRW(numericAmount, currency);
     totals[currency] = (totals[currency] || 0) + amountKRW;
     return totals;
-  }, {}), [expenses, exchangeRates]);
+  }, {}), [expenses, exchangeRates, budgetSettings]);
+  /* eslint-enable react-hooks/exhaustive-deps */
   const cashSpentByCurrency = useMemo(() => (expenses || []).reduce((totals, expense) => {
     if (expense.paymentMethod !== 'cash') return totals;
     const currency = expense.currency || 'KRW';
@@ -2941,6 +3190,7 @@ function App() {
   const cashCurrencyChoices = Array.from(new Set([
     budgetSettings.cashLedgerCurrency,
     budgetSettings.travelCurrency,
+    ...getCashWalletsFromSettings(budgetSettings).map(wallet => wallet.currency),
     ...Object.keys(expenseTotalsByCurrency),
     ...(favoriteCurrencies || []),
     'USD',
@@ -2953,7 +3203,12 @@ function App() {
       || budgetSettings.travelCurrency
       || 'USD';
   const cashLedgers = budgetSettings.cashLedgers || {};
-  const cashLedger = cashLedgers[cashLedgerCurrency] || {};
+  const cashWallets = getCashWalletsFromSettings(budgetSettings);
+  const preferredCashWallet = cashWallets.find(wallet => wallet.id === cashWalletId)
+    || cashWallets.find(wallet => wallet.currency === cashLedgerCurrency)
+    || cashWallets[0];
+  const cashLedger = preferredCashWallet || cashLedgers[cashLedgerCurrency] || {};
+  const activeCashWalletId = preferredCashWallet?.id || null;
   const cashInitialAmount = Number(cashLedger.initial) || 0;
   const cashAdditionalAmount = Number(cashLedger.additional) || 0;
   const cashUsedAmount = cashSpentByCurrency[cashLedgerCurrency] || 0;
@@ -2966,6 +3221,13 @@ function App() {
     : actualCashBalance - expectedCashBalance;
   const unassignedPaymentCount = (expenses || []).filter(expense => !expense.paymentMethod).length;
   const updateCashLedger = (updates) => {
+    if (activeCashWalletId) {
+      const nextWallets = cashWallets.map(wallet => wallet.id === activeCashWalletId
+        ? { ...wallet, ...updates }
+        : wallet);
+      saveBudgetSettings({ ...budgetSettings, cashWallets: nextWallets, cashLedgerCurrency: cashLedger.currency });
+      return;
+    }
     const currentLedger = cashLedgers[cashLedgerCurrency] || {};
     saveBudgetSettings({
       ...budgetSettings,
@@ -2976,8 +3238,74 @@ function App() {
       }
     });
   };
+  const addCashWallet = () => {
+    const currency = cashCurrencyChoices.find(code => code !== 'KRW') || 'USD';
+    const newWallet = {
+      id: makeEntityId(),
+      name: `${currency} 현금 지갑`,
+      currency,
+      initial: 0,
+      additional: 0,
+      actualRemaining: ''
+    };
+    saveBudgetSettings({
+      ...budgetSettings,
+      cashWallets: [...cashWallets, newWallet],
+      cashLedgerCurrency: currency
+    });
+    setCashWalletId(newWallet.id);
+  };
   const editingExpense = (expenses || []).find(expense => expense.id === editingExpenseId);
   const budgetProgress = budgetSettings.limitKRW > 0 ? Math.min((totalSpentKRW / budgetSettings.limitKRW) * 100, 100) : 0;
+  // getExpenseAmountKRW is intentionally scoped to the active trip's settings.
+  /* eslint-disable react-hooks/exhaustive-deps */
+  const categoryTotalsKRW = useMemo(() => (expenses || []).reduce((totals, expense) => {
+    const category = expense.category || 'other';
+    totals[category] = (totals[category] || 0) + getExpenseAmountKRW(expense.amount, expense.currency);
+    return totals;
+  }, {}), [expenses, exchangeRates, budgetSettings]);
+  /* eslint-enable react-hooks/exhaustive-deps */
+  const categoryBudgetEntries = EXPENSE_CATEGORIES.map(category => ({
+    ...category,
+    spent: categoryTotalsKRW[category.value] || 0,
+    budget: Number(budgetSettings.categoryBudgets?.[category.value]) || 0
+  }));
+  const todayItinerarySummary = useMemo(() => {
+    if (!activeTrip || !activeTrip.startDate) return null;
+    const start = new Date(`${activeTrip.startDate}T00:00:00`);
+    if (Number.isNaN(start.getTime())) return null;
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tripDay = Math.round((today - start) / 86400000) + 1;
+    const dayPlan = itinerary.find(day => parseDay(day.day) === tripDay);
+    if (!dayPlan) return { status: tripDay < 1 ? 'upcoming' : 'past', day: tripDay };
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    const items = [...(dayPlan.items || [])].sort((a, b) => (a.time || '23:59').localeCompare(b.time || '23:59'));
+    const nextItem = items.find(item => {
+      const [hour, minute] = String(item.time || '23:59').split(':').map(Number);
+      return hour * 60 + minute >= nowMinutes;
+    });
+    const currentItem = [...items].reverse().find(item => {
+      const [hour, minute] = String(item.time || '00:00').split(':').map(Number);
+      return hour * 60 + minute <= nowMinutes;
+    });
+    return { status: 'ongoing', day: tripDay, dayPlan, nextItem, currentItem };
+  }, [activeTrip, itinerary]);
+  const getDayConflictWarnings = (dayPlan) => {
+    const items = [...(dayPlan?.items || [])].filter(item => item.time);
+    const warnings = [];
+    for (let index = 1; index < items.length; index += 1) {
+      const previous = items[index - 1];
+      const current = items[index];
+      const [prevHour, prevMinute] = previous.time.split(':').map(Number);
+      const [currentHour, currentMinute] = current.time.split(':').map(Number);
+      const gap = (currentHour * 60 + currentMinute) - (prevHour * 60 + prevMinute);
+      if (gap < 0) {
+        warnings.push(`${previous.displayName || previous.name} 이후 시간이 거꾸로 설정되어 있어요.`);
+      }
+    }
+    return warnings;
+  };
   const expenseCurrencyCode = expenseInput.currency || budgetSettings.travelCurrency || 'KRW';
   const expenseCurrencySymbol = getCurrencySymbol(expenseCurrencyCode);
   const expenseAmountValue = Number(expenseInput.amount);
@@ -3191,6 +3519,13 @@ function App() {
                 <span>오프라인 모드 · 변경사항은 이 기기에 먼저 저장됩니다.</span>
               </div>
             )}
+            {syncConflictNotice && (
+              <div role="status" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px', padding: '9px 11px', borderRadius: '10px', background: '#fff7ed', color: '#9a3412', fontSize: '10px', fontWeight: '800' }}>
+                <AlertCircle size={14} aria-hidden="true" />
+                <span style={{ flex: 1 }}>다른 기기에서 변경된 여행 {syncConflictNotice.conflicts}건을 확인해 최신 변경 기준으로 동기화했습니다.</span>
+                <button type="button" onClick={() => setSyncConflictNotice(null)} style={{ border: 'none', background: 'transparent', color: '#c2410c', fontSize: '10px', fontWeight: '900', cursor: 'pointer' }}>확인</button>
+              </div>
+            )}
             {isReadOnlyTrip && (
               <div className="shared-read-only-banner" role="status">
                 <LockKeyhole size={14} aria-hidden="true" />
@@ -3294,6 +3629,12 @@ function App() {
                         <button onClick={openJoinTripModal} className="trip-action-button" style={{ color: '#059669', backgroundColor: '#f0fdf4', borderColor: '#dcfce7' }}>
                           <Users size={18} /> 참여하기
                         </button>
+                        <button onClick={handleUploadJson} className="trip-action-button" style={{ color: '#64748b', backgroundColor: '#f8fafc', borderColor: '#e2e8f0' }}>
+                          <Upload size={18} /> 백업 복원
+                        </button>
+                        {deferredInstallPrompt && <button onClick={installPwa} className="trip-action-button" style={{ color: '#2563eb', backgroundColor: '#eff6ff', borderColor: '#dbeafe' }}>
+                          <Download size={18} /> 앱으로 설치
+                        </button>}
                       </div>
                     </div>
                 </div>
@@ -3482,7 +3823,7 @@ function App() {
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
                               <Wallet size={13} color="#9ca3af" /> 
-                              <span style={{ color: '#111827' }}>총 지출 ₩ {(trip.expenses || []).reduce((sum, e) => sum + (Number(e.amountKRW) || 0), 0).toLocaleString()}</span>
+                              <span style={{ color: '#111827' }}>총 지출 ₩ {(trip.expenses || []).reduce((sum, e) => sum + getExpenseAmountKRW(e.amount, e.currency, trip.budgetSettings), 0).toLocaleString()}</span>
                             </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginTop: '18px', paddingTop: '14px', borderTop: '1px solid #f1f5f9' }}>
@@ -3673,6 +4014,49 @@ function App() {
 
                 <p className="itinerary-read-only-note"><LockKeyhole size={13} style={{ verticalAlign: '-2px', marginRight: '4px' }} />읽기 전용 공유 일정입니다. 일정과 지출은 확인만 할 수 있습니다.</p>
 
+                {todayItinerarySummary && (
+                  <div className="today-next-card" style={{ marginBottom: '18px', padding: '16px 18px', borderRadius: '18px', background: 'linear-gradient(135deg, #eff6ff, #f8fafc)', border: '1px solid #dbeafe' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                      <strong style={{ color: '#1d4ed8', fontSize: '13px' }}>오늘의 일정</strong>
+                      {todayItinerarySummary.status === 'ongoing' && <span style={{ color: '#2563eb', fontSize: '11px', fontWeight: '900' }}>{todayItinerarySummary.day}일차</span>}
+                    </div>
+                    {todayItinerarySummary.status !== 'ongoing' ? (
+                      <p style={{ margin: '8px 0 0', color: '#64748b', fontSize: '12px', fontWeight: '700' }}>오늘 날짜에 해당하는 여행 일정이 없습니다.</p>
+                    ) : (
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '8px' }}>
+                        {todayItinerarySummary.currentItem && <span style={{ padding: '7px 9px', background: 'white', borderRadius: '10px', color: '#475569', fontSize: '11px', fontWeight: '800' }}>진행/지난 · {todayItinerarySummary.currentItem.displayName || todayItinerarySummary.currentItem.name}</span>}
+                        {todayItinerarySummary.nextItem ? <span style={{ padding: '7px 9px', background: '#2563eb', borderRadius: '10px', color: 'white', fontSize: '11px', fontWeight: '800' }}>다음 · {todayItinerarySummary.nextItem.time} {todayItinerarySummary.nextItem.displayName || todayItinerarySummary.nextItem.name}</span> : <span style={{ padding: '7px 9px', background: 'white', borderRadius: '10px', color: '#64748b', fontSize: '11px', fontWeight: '800' }}>오늘 일정이 끝났어요.</span>}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="itinerary-tools" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '18px' }}>
+                  <button type="button" className="read-only-hide" onClick={() => { setIsBulkMoveMode(mode => !mode); setSelectedItineraryItems([]); }} style={{ padding: '8px 11px', border: 'none', borderRadius: '12px', background: isBulkMoveMode ? '#dbeafe' : '#f8fafc', color: '#2563eb', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}>{isBulkMoveMode ? '일괄 이동 닫기' : '일정 일괄 이동'}</button>
+                  <button type="button" className="read-only-hide" onClick={() => setShowChecklist(show => !show)} style={{ padding: '8px 11px', border: 'none', borderRadius: '12px', background: showChecklist ? '#dcfce7' : '#f8fafc', color: '#15803d', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}>여행 준비 체크리스트</button>
+                  {undoStack.length > 0 && <button type="button" className="read-only-hide" onClick={undoLastChange} style={{ padding: '8px 11px', border: 'none', borderRadius: '12px', background: '#fff7ed', color: '#c2410c', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}>실행 취소</button>}
+                </div>
+
+                {isBulkMoveMode && (
+                  <div className="bulk-move-toolbar" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', padding: '12px', marginBottom: '18px', background: '#f8fbff', border: '1px solid #bfdbfe', borderRadius: '14px' }}>
+                    <span style={{ color: '#1d4ed8', fontSize: '11px', fontWeight: '900' }}>{selectedItineraryItems.length}개 선택</span>
+                    <select value={bulkMoveTargetDay} onChange={(event) => setBulkMoveTargetDay(Number(event.target.value))} aria-label="선택 일정 이동 일차" style={{ padding: '8px 10px', border: '1px solid #bfdbfe', borderRadius: '9px', background: 'white', color: '#1d4ed8', fontSize: '11px', fontWeight: '800' }}>
+                      {itinerary.map(dayPlan => <option key={`bulk-day-${dayPlan.day}`} value={parseDay(dayPlan.day)}>{parseDay(dayPlan.day)}일차로 이동</option>)}
+                    </select>
+                    <button type="button" onClick={moveSelectedItineraryItems} disabled={selectedItineraryItems.length === 0} style={{ padding: '8px 11px', border: 'none', borderRadius: '9px', background: selectedItineraryItems.length ? '#2563eb' : '#cbd5e1', color: 'white', fontSize: '11px', fontWeight: '900', cursor: selectedItineraryItems.length ? 'pointer' : 'default' }}>이동</button>
+                  </div>
+                )}
+
+                {showChecklist && (
+                  <div className="travel-checklist-card" style={{ padding: '16px', marginBottom: '22px', border: '1px solid #bbf7d0', borderRadius: '16px', background: '#f0fdf4' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'center', marginBottom: '10px' }}><strong style={{ color: '#166534', fontSize: '13px' }}>여행 준비 체크리스트</strong><span style={{ color: '#16a34a', fontSize: '11px', fontWeight: '800' }}>{(activeTrip?.checklist || []).filter(item => item.checked).length}/{(activeTrip?.checklist || []).length}</span></div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                      {(activeTrip?.checklist || getDefaultChecklist()).map(item => <label key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#334155', fontSize: '12px', fontWeight: '700' }}><input type="checkbox" checked={Boolean(item.checked)} onChange={() => toggleChecklistItem(item.id)} disabled={isReadOnlyTrip} /> <span style={{ textDecoration: item.checked ? 'line-through' : 'none' }}>{item.label}</span></label>)}
+                    </div>
+                    {!isReadOnlyTrip && <div style={{ display: 'flex', gap: '7px', marginTop: '11px' }}><input value={checklistDraft} onChange={(event) => setChecklistDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') addChecklistItem(); }} placeholder="준비물 추가" style={{ flex: 1, minWidth: 0, padding: '8px 10px', border: '1px solid #bbf7d0', borderRadius: '9px', background: 'white' }} /><button type="button" onClick={addChecklistItem} style={{ padding: '8px 11px', border: 'none', borderRadius: '9px', background: '#16a34a', color: 'white', fontWeight: '900', cursor: 'pointer' }}>추가</button></div>}
+                  </div>
+                )}
+
                 {/* Reserve list: places saved before assigning them to a day. */}
                 <div
                   className="itinerary-reserve-card"
@@ -3827,6 +4211,8 @@ function App() {
                       </div>
                     </div>
 
+                    {getDayConflictWarnings(dayPlan).length > 0 && <div className="itinerary-conflict-warning" role="status" style={{ margin: '12px 24px 0', padding: '10px 12px', borderRadius: '12px', background: '#fff7ed', color: '#c2410c', fontSize: '11px', fontWeight: '800' }}>시간·이동 확인: {getDayConflictWarnings(dayPlan)[0]}{getDayConflictWarnings(dayPlan).length > 1 ? ` 외 ${getDayConflictWarnings(dayPlan).length - 1}건` : ''}</div>}
+
                     {/* Day Items List */}
                     <div className="itinerary-day-items" style={{ padding: '24px' }}>
                       {(!dayPlan?.items || dayPlan.items.length === 0) ? (
@@ -3852,6 +4238,7 @@ function App() {
                                 }}
                               >
                                 <div className="itinerary-item-main" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                  {isBulkMoveMode && <input className="itinerary-bulk-checkbox" type="checkbox" checked={selectedItineraryItems.includes(item.id)} onChange={() => toggleItineraryItemSelection(item.id)} onClick={(event) => event.stopPropagation()} aria-label={`${item.displayName || item.name || '일정'} 선택`} style={{ width: '16px', height: '16px', flexShrink: 0 }} />}
                                   <div
                                     className="itinerary-item-number"
                                     aria-label={`${iIdx + 1}번째 일정`}
@@ -3933,6 +4320,11 @@ function App() {
                                       >
                                         {item.displayName || item.name || '장소 이름 정보 없음'}
                                       </h4>
+                                      {(item.reservationNumber || item.memo || item.reservationUrl) && <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginTop: '5px' }}>
+                                        {item.reservationNumber && <span style={{ padding: '3px 6px', borderRadius: '6px', background: '#fef3c7', color: '#92400e', fontSize: '9px', fontWeight: '800' }}>예약 {item.reservationNumber}</span>}
+                                        {item.memo && <span style={{ padding: '3px 6px', borderRadius: '6px', background: '#f1f5f9', color: '#64748b', fontSize: '9px', fontWeight: '800', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>메모 {item.memo}</span>}
+                                        {getSafeExternalUrl(item.reservationUrl) && <a href={getSafeExternalUrl(item.reservationUrl)} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()} style={{ padding: '3px 6px', borderRadius: '6px', background: '#eff6ff', color: '#2563eb', fontSize: '9px', fontWeight: '800' }}>예약 링크</a>}
+                                      </div>}
                                     </div>
                                   </div>
                                   <div className="itinerary-item-actions" style={{
@@ -4141,6 +4533,34 @@ function App() {
                   </p>
                 </div>
 
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '18px' }}>
+                  <button type="button" onClick={() => setShowExchangeRateSettings(show => !show)} style={{ padding: '8px 11px', border: 'none', borderRadius: '12px', background: showExchangeRateSettings ? '#dbeafe' : '#f8fafc', color: '#1d4ed8', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}>환율 기준 설정</button>
+                  <button type="button" onClick={() => setShowCategoryBudgetSettings(show => !show)} style={{ padding: '8px 11px', border: 'none', borderRadius: '12px', background: showCategoryBudgetSettings ? '#fef3c7' : '#f8fafc', color: '#92400e', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}>카테고리별 예산</button>
+                  {undoStack.length > 0 && <button type="button" className="read-only-hide" onClick={undoLastChange} style={{ padding: '8px 11px', border: 'none', borderRadius: '12px', background: '#fff7ed', color: '#c2410c', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}>실행 취소</button>}
+                </div>
+
+                {showExchangeRateSettings && (
+                  <div className="budget-settings-panel" style={{ padding: '14px 16px', marginBottom: '18px', border: '1px solid #bfdbfe', borderRadius: '16px', background: '#f8fbff' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'center', marginBottom: '10px' }}><strong style={{ color: '#1d4ed8', fontSize: '13px' }}>환율 기준일·수동 환율</strong><span style={{ color: '#64748b', fontSize: '10px', fontWeight: '700' }}>{budgetSettings.exchangeRateSource || exchangeRateInfo.source} · {budgetSettings.exchangeRateReferenceDate || exchangeRateInfo.date || '오늘'}</span></div>
+                    <p style={{ margin: '0 0 10px', color: '#64748b', fontSize: '10px', lineHeight: 1.5 }}>1 외화가 몇 원인지 입력하면 자동 환율보다 우선해 정산합니다. 실제 환전 영수증 기준으로 조정할 때 사용하세요.</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {expenseCurrencyChoices.filter(code => code !== 'KRW').map(code => {
+                        const manualValue = budgetSettings.exchangeRates?.[code]?.krwPerUnit ?? '';
+                        return <label key={`manual-rate-${code}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#334155', fontSize: '11px', fontWeight: '800' }}><span style={{ minWidth: '70px' }}>{getCurrencySymbol(code)} {code}</span><input type="number" min="0" step="any" value={manualValue} onChange={(event) => saveBudgetSettings({ ...budgetSettings, exchangeRates: { ...(budgetSettings.exchangeRates || {}), [code]: { krwPerUnit: event.target.value === '' ? '' : Number(event.target.value) } }, exchangeRateSource: '수동 환율', exchangeRateReferenceDate: formatLocalDate(new Date()) })} placeholder={getEffectiveExchangeRate(code, exchangeRates, {}) ? `자동 ${getEffectiveExchangeRate(code, exchangeRates, {}).toLocaleString()}원` : '예: 18.5'} style={{ flex: 1, minWidth: 0, padding: '8px 9px', border: '1px solid #dbeafe', borderRadius: '9px', background: 'white' }} /><span style={{ color: '#64748b', fontSize: '10px' }}>원/1단위</span></label>;
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {showCategoryBudgetSettings && (
+                  <div className="budget-settings-panel" style={{ padding: '14px 16px', marginBottom: '18px', border: '1px solid #fde68a', borderRadius: '16px', background: '#fffbeb' }}>
+                    <strong style={{ color: '#92400e', fontSize: '13px' }}>카테고리별 예산</strong>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
+                      {categoryBudgetEntries.map(category => <label key={`category-budget-${category.value}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#334155', fontSize: '11px', fontWeight: '800' }}><span style={{ flex: 1 }}>{category.emoji} {category.label} <small style={{ color: '#94a3b8' }}>사용 ₩{category.spent.toLocaleString()}</small></span><span>₩</span><input type="number" min="0" step="1000" value={category.budget || ''} onChange={(event) => saveBudgetSettings({ ...budgetSettings, categoryBudgets: { ...(budgetSettings.categoryBudgets || {}), [category.value]: event.target.value === '' ? 0 : Number(event.target.value) } })} placeholder="한도 없음" style={{ width: '104px', padding: '8px 9px', border: '1px solid #fde68a', borderRadius: '9px', background: 'white' }} /></label>)}
+                    </div>
+                  </div>
+                )}
+
                 {/* Add Expense Form */}
                 <div className="expense-form-card" style={{ padding: '16px', backgroundColor: '#f9fafb', border: '1px solid #f3f4f6', borderRadius: '16px', marginBottom: '24px' }}>
                   <div className="expense-form-heading" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '14px' }}>
@@ -4192,6 +4612,19 @@ function App() {
                         aria-label="지출 내용"
                         maxLength={120}
                       />
+                    </div>
+                  </div>
+
+                  <div className="expense-form-row">
+                    <div className="expense-form-field" style={{ flex: '1 1 0' }}>
+                      <label className="expense-form-label" htmlFor="expense-category-select">지출 카테고리</label>
+                      <select id="expense-category-select" className="expense-form-control" value={expenseInput.category || 'other'} onChange={e => setExpenseInput({ ...expenseInput, category: e.target.value })} aria-label="지출 카테고리">
+                        {EXPENSE_CATEGORIES.map(category => <option key={`expense-category-${category.value}`} value={category.value}>{category.emoji} {category.label}</option>)}
+                      </select>
+                    </div>
+                    <div className="expense-form-field" style={{ flex: '2 1 0' }}>
+                      <label className="expense-form-label" htmlFor="expense-memo-input">메모 (선택)</label>
+                      <input id="expense-memo-input" className="expense-form-control" type="text" value={expenseInput.memo || ''} onChange={e => setExpenseInput({ ...expenseInput, memo: e.target.value })} placeholder="영수증·정산 메모" maxLength={120} />
                     </div>
                   </div>
 
@@ -4266,7 +4699,7 @@ function App() {
                     [0, ...itinerary.map(d=>d.day)].map(dayNum => {
                       const dayExpenses = expenses.filter(e => e.day === dayNum);
                       if (dayExpenses.length === 0) return null;
-                      const daySubtotalKRW = dayExpenses.reduce((sum, expense) => sum + Number(expense.amountKRW ?? expense.amount ?? 0), 0);
+                      const daySubtotalKRW = dayExpenses.reduce((sum, expense) => sum + getExpenseAmountKRW(expense.amount, expense.currency), 0);
                       const dayCurrencyTotals = dayExpenses.reduce((totals, expense) => {
                         const currency = expense.currency || 'KRW';
                         const amount = Number(expense.amount) || 0;
@@ -4301,7 +4734,7 @@ function App() {
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             {dayExpenses.map((exp, expenseIndex) => {
                               const localAmount = Number(exp.amount) || 0;
-                              const amountKRW = Number(exp.amountKRW ?? exp.amount) || 0;
+                              const amountKRW = getExpenseAmountKRW(exp.amount, exp.currency);
                               const expenseCurrency = exp.currency || 'KRW';
 
                               return (
@@ -4315,6 +4748,7 @@ function App() {
                                   )}
                                   <h5 style={{ fontSize: '13px', fontWeight: '800', color: '#111827', margin: '0 0 4px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{exp.desc}</h5>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                    <span style={{ fontSize: '10px', fontWeight: '800', color: '#475569', whiteSpace: 'nowrap' }}>{getExpenseCategoryEmoji(exp.category)} {getExpenseCategoryLabel(exp.category)}</span>
                                     <span className={`expense-payment-badge${exp.paymentMethod ? ` is-${exp.paymentMethod}` : ' is-unassigned'}`}>
                                       {getPaymentMethodLabel(exp.paymentMethod)}
                                     </span>
@@ -4323,6 +4757,7 @@ function App() {
                                         현지 {getCurrencySymbol(expenseCurrency)}{localAmount.toLocaleString()} ({expenseCurrency})
                                       </span>
                                     )}
+                                    {exp.memo && <span style={{ fontSize: '10px', color: '#94a3b8', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>메모: {exp.memo}</span>}
                                   </div>
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '7px', flexShrink: 0 }}>
@@ -4408,7 +4843,7 @@ function App() {
                         <span>정산 통화</span>
                         <select
                           value={cashLedgerCurrency}
-                          onChange={(e) => saveBudgetSettings({ ...budgetSettings, cashLedgerCurrency: e.target.value })}
+                          onChange={(e) => { const wallet = cashWallets.find(candidate => candidate.currency === e.target.value); setCashWalletId(wallet?.id || null); saveBudgetSettings({ ...budgetSettings, cashLedgerCurrency: e.target.value }); }}
                           aria-label="현금 정산 통화"
                         >
                           {cashCurrencyChoices.map(code => (
@@ -4418,6 +4853,16 @@ function App() {
                           ))}
                         </select>
                       </div>
+
+                      <div style={{ display: 'flex', gap: '7px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '12px' }}>
+                        <span style={{ color: '#92400e', fontSize: '10px', fontWeight: '900' }}>통화별 현금 지갑</span>
+                        {cashWallets.map(wallet => <button key={`cash-wallet-${wallet.id}`} type="button" onClick={() => { setCashWalletId(wallet.id); saveBudgetSettings({ ...budgetSettings, cashLedgerCurrency: wallet.currency }); }} style={{ padding: '6px 8px', border: `1px solid ${activeCashWalletId === wallet.id ? '#f59e0b' : '#fde68a'}`, borderRadius: '8px', background: activeCashWalletId === wallet.id ? '#fef3c7' : 'white', color: '#92400e', fontSize: '10px', fontWeight: '800', cursor: 'pointer' }}>{wallet.name} · {wallet.currency}</button>)}
+                        {!isReadOnlyTrip && <button type="button" onClick={addCashWallet} style={{ padding: '6px 8px', border: '1px dashed #f59e0b', borderRadius: '8px', background: 'transparent', color: '#b45309', fontSize: '10px', fontWeight: '900', cursor: 'pointer' }}>+ 지갑 추가</button>}
+                      </div>
+
+                      {activeCashWalletId && <label style={{ display: 'block', marginBottom: '12px', color: '#92400e', fontSize: '10px', fontWeight: '900' }}>지갑 이름
+                        <input type="text" value={cashLedger.name || ''} onChange={(event) => updateCashLedger({ name: event.target.value })} placeholder="예: 지갑 1" style={{ width: '100%', boxSizing: 'border-box', marginTop: '6px', padding: '9px 10px', border: '1px solid #fde68a', borderRadius: '9px', background: 'white' }} />
+                      </label>}
 
                       <div className="cash-reconciliation-fields">
                         <div className="expense-form-field">
@@ -5696,6 +6141,18 @@ function App() {
               />
             </div>
 
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
+              <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b' }}>예약번호
+                <input type="text" value={editingTimeItem.reservationNumber || ''} onChange={(e) => setEditingTimeItem({ ...editingTimeItem, reservationNumber: e.target.value })} placeholder="선택" style={{ width: '100%', boxSizing: 'border-box', marginTop: '7px', padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '12px' }} />
+              </label>
+              <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b' }}>예약 링크
+                <input type="url" value={editingTimeItem.reservationUrl || ''} onChange={(e) => setEditingTimeItem({ ...editingTimeItem, reservationUrl: e.target.value })} placeholder="https://" style={{ width: '100%', boxSizing: 'border-box', marginTop: '7px', padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '12px' }} />
+              </label>
+            </div>
+            <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b', marginBottom: '14px' }}>메모
+              <textarea value={editingTimeItem.memo || ''} onChange={(e) => setEditingTimeItem({ ...editingTimeItem, memo: e.target.value })} placeholder="체크인 방법, 준비물 등을 적어두세요." rows={3} style={{ width: '100%', boxSizing: 'border-box', marginTop: '7px', padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '12px', resize: 'vertical' }} />
+            </label>
+
             <ScrollTimeInput
               value={editingTimeItem.time}
               onChange={(newTime) => setEditingTimeItem({ ...editingTimeItem, time: newTime })}
@@ -5714,7 +6171,10 @@ function App() {
                   updateItineraryItem(editingTimeItem.sourceDay, editingTimeItem.id, {
                     day: editingTimeItem.day,
                     time: editingTimeItem.time,
-                    displayName: editingTimeItem.displayName.trim() || editingTimeItem.originalName
+                    displayName: editingTimeItem.displayName.trim() || editingTimeItem.originalName,
+                    reservationNumber: editingTimeItem.reservationNumber?.trim() || '',
+                    reservationUrl: editingTimeItem.reservationUrl?.trim() || '',
+                    memo: editingTimeItem.memo?.trim() || ''
                   });
                   if (editingTimeItem.day === 'reserve') setActiveDay('reserve');
                   setEditingTimeItem(null);
@@ -5770,6 +6230,15 @@ function App() {
                 placeholder="지출 내용"
                 style={{ width: '100%', boxSizing: 'border-box', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '14px', fontWeight: '700', outline: 'none' }}
               />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '10px', marginBottom: '14px' }}>
+              <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b' }}>카테고리
+                <select value={expenseInput.category || 'other'} onChange={(e) => setExpenseInput(current => ({ ...current, category: e.target.value }))} style={{ width: '100%', boxSizing: 'border-box', marginTop: '8px', padding: '12px 8px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '12px', fontWeight: '700' }}>{EXPENSE_CATEGORIES.map(category => <option key={`expense-edit-category-${category.value}`} value={category.value}>{category.emoji} {category.label}</option>)}</select>
+              </label>
+              <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b' }}>메모
+                <input type="text" value={expenseInput.memo || ''} onChange={(e) => setExpenseInput(current => ({ ...current, memo: e.target.value }))} placeholder="영수증·정산 메모" style={{ width: '100%', boxSizing: 'border-box', marginTop: '8px', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }} />
+              </label>
             </div>
 
             <div className="expense-edit-currency-payment-amount" style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.9fr 0.9fr', gap: '10px', marginBottom: '14px' }}>
@@ -5921,7 +6390,7 @@ function App() {
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '10px' }}>
                 <div>
                   <strong style={{ display: 'block', color: '#1e40af', fontSize: '13px', marginBottom: '4px' }}>LLM용 예시 형식</strong>
-                  <span style={{ display: 'block', color: '#64748b', fontSize: '11px', lineHeight: 1.5 }}>예시를 복사해 ChatGPT나 Gemini에 전달하면 같은 형식으로 일정을 만들 수 있어요.</span>
+                  <span style={{ display: 'block', color: '#64748b', fontSize: '11px', lineHeight: 1.5 }}>예시를 복사해 AI 도구에 전달하면 같은 형식으로 일정을 만들 수 있어요.</span>
                 </div>
                 <button
                   type="button"
