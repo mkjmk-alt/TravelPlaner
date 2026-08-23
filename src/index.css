@@ -1443,15 +1443,17 @@ body {
   }
 
   .expense-currency-choice-row .expense-choice-button {
-    flex: 0 0 72px;
-    min-width: 72px;
+    box-sizing: border-box;
+    flex: 0 0 70px;
+    min-width: 70px;
     padding-inline: 6px;
   }
 
   .expense-currency-choice-row .expense-currency-more-select {
-    flex: 0 0 88px;
-    width: 88px;
-    min-width: 88px;
+    flex: 0 0 86px;
+    width: 86px;
+    min-width: 86px;
+    box-sizing: border-box;
     padding-inline: 6px;
   }
 
