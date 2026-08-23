@@ -1272,11 +1272,7 @@ body {
 }
 
 .expense-currency-choice-row .expense-currency-choice-group {
-  display: flex;
-  flex: 0 0 auto;
-  flex-wrap: nowrap;
-  width: auto;
-  min-width: max-content;
+  display: contents;
 }
 
 .expense-currency-choice-row .expense-choice-button {
@@ -1444,17 +1440,18 @@ body {
 
   .expense-currency-choice-row .expense-choice-button {
     box-sizing: border-box;
-    flex: 0 0 70px;
-    min-width: 70px;
+    flex: 0 0 72px;
+    width: 72px;
+    min-width: 72px;
     padding-inline: 6px;
   }
 
   .expense-currency-choice-row .expense-currency-more-select {
-    flex: 0 0 86px;
-    width: 86px;
-    min-width: 86px;
     box-sizing: border-box;
-    padding-inline: 6px;
+    flex: 0 0 72px;
+    width: 72px;
+    min-width: 72px;
+    padding-inline: 4px;
   }
 
   .expense-form-currency-payment-amount .expense-form-amount-field,
