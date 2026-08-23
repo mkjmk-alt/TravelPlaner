@@ -1424,34 +1424,46 @@ body {
     flex: 1 1 0;
   }
 
-  /* Keep the currency shortcuts and the additional-currency picker on one
-     compact row. The row can scroll horizontally when a narrow phone cannot
-     display every option at once, so no choice is clipped or pushed below. */
+  /* Keep the description and time controls together as two equal columns on
+     mobile, while the day selector stays in the row above. */
+  .expense-form-description-time {
+    flex-direction: row;
+    align-items: flex-end;
+  }
+
+  .expense-form-description-time .expense-form-field {
+    width: calc(50% - 4px) !important;
+    flex: 1 1 0 !important;
+  }
+
+  /* Keep VND, USD, and the additional-currency picker visible together on
+     mobile. The grid gives all three controls a predictable equal column,
+     so the select never gets pushed outside the form or into a scroll area. */
   .expense-currency-choice-row {
-    overflow-x: auto;
-    padding-bottom: 2px;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    overflow: visible;
+    padding-bottom: 0;
   }
 
-  .expense-currency-choice-row::-webkit-scrollbar {
-    display: none;
+  .expense-currency-choice-row.has-additional {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .expense-currency-choice-row .expense-choice-button {
+  .expense-currency-choice-row .expense-choice-button,
+  .expense-currency-choice-row .expense-currency-more-select {
     box-sizing: border-box;
-    flex: 0 0 72px;
-    width: 72px;
-    min-width: 72px;
-    padding-inline: 6px;
+    width: 100%;
+    min-width: 0;
+    flex: 1 1 auto;
   }
 
   .expense-currency-choice-row .expense-currency-more-select {
-    box-sizing: border-box;
-    flex: 0 0 72px;
-    width: 72px;
-    min-width: 72px;
+    overflow: hidden;
     padding-inline: 4px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .expense-form-currency-payment-amount .expense-form-amount-field,

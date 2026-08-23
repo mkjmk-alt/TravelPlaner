@@ -5015,18 +5015,10 @@ function App() {
                         </select>
                       )}
                     </div>
-                    <div className="expense-form-field" style={{ flex: '1 1 0' }}>
-                      <ScrollTimeInput
-                        value={expenseInput.time}
-                        onChange={(newTime) => setExpenseInput(current => ({ ...current, time: newTime }))}
-                        label="소비 시간"
-                        compact
-                      />
-                    </div>
                   </div>
 
-                  <div className="expense-form-row">
-                    <div className="expense-form-field" style={{ flex: '1 1 100%' }}>
+                  <div className="expense-form-row expense-form-description-time">
+                    <div className="expense-form-field expense-form-description-field" style={{ flex: '1 1 0' }}>
                       <label className="expense-form-label" htmlFor="expense-description-input">지출 내용</label>
                       <input
                         id="expense-description-input"
@@ -5037,6 +5029,14 @@ function App() {
                         onChange={e => setExpenseInput({ ...expenseInput, desc: e.target.value })}
                         aria-label="지출 내용"
                         maxLength={120}
+                      />
+                    </div>
+                    <div className="expense-form-field expense-form-time-field" style={{ flex: '1 1 0' }}>
+                      <ScrollTimeInput
+                        value={expenseInput.time}
+                        onChange={(newTime) => setExpenseInput(current => ({ ...current, time: newTime }))}
+                        label="소비 시간"
+                        compact
                       />
                     </div>
                   </div>
@@ -5057,7 +5057,7 @@ function App() {
                   <div className="expense-form-row expense-form-currency-payment-amount">
                     <div className="expense-form-field" style={{ flex: '1.2 1 0' }}>
                       <label className="expense-form-label">사용 통화</label>
-                      <div className="expense-currency-choice-row">
+                      <div className={`expense-currency-choice-row${expenseCurrencyAdditionalChoices.length > 0 ? ' has-additional' : ''}`}>
                         <ExpenseChoiceGroup
                           options={expenseCurrencyQuickOptions}
                           value={expenseCurrencyQuickValue}
