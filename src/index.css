@@ -1314,6 +1314,23 @@ body {
   color: #059669;
 }
 
+/* Keep the expense description and currency controls in the same visual scale
+   as the surrounding compact choices. */
+#expense-description-input,
+#expense-currency-select {
+  font-size: 12px !important;
+}
+
+.expense-time-picker-trigger {
+  color: #475569 !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+}
+
+.expense-time-picker-trigger > span {
+  color: inherit;
+}
+
 @media (max-width: 390px) {
   .expense-form-card {
     padding: 14px !important;
