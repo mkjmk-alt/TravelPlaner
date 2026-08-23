@@ -1157,6 +1157,104 @@ body {
   outline: none;
 }
 
+.expense-choice-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+}
+
+.expense-choice-group.is-scrollable {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.expense-choice-group.is-scrollable::-webkit-scrollbar {
+  display: none;
+}
+
+.expense-choice-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  color: #475569;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color .18s ease, background-color .18s ease, color .18s ease, box-shadow .18s ease;
+}
+
+.expense-choice-button:hover {
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+
+.expense-choice-button.is-selected {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, .08);
+}
+
+.expense-choice-button.is-selected.is-cash {
+  border-color: #10b981;
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.expense-choice-button.is-selected.is-card {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.expense-choice-button.is-selected.is-transfer {
+  border-color: #8b5cf6;
+  background: #f5f3ff;
+  color: #6d28d9;
+}
+
+.expense-day-choice-group .expense-choice-button {
+  flex: 0 0 auto;
+}
+
+.expense-category-choice-group .expense-choice-button {
+  flex: 1 1 calc(50% - 3px);
+}
+
+.expense-payment-choice-group {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.expense-payment-choice-group .expense-choice-button {
+  flex: 1 1 46px;
+  min-width: 46px;
+  padding-inline: 6px;
+}
+
+.expense-currency-choice-group .expense-choice-button {
+  flex: 1 1 auto;
+}
+
+.expense-currency-more-select {
+  margin-top: 6px;
+}
+
 .expense-form-time-control,
 .expense-form-amount-control {
   display: flex;
@@ -1259,6 +1357,14 @@ body {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .expense-payment-choice-group {
+    flex-direction: row;
+  }
+
+  .expense-payment-choice-group .expense-choice-button {
+    flex: 1 1 0;
+  }
+
   .expense-form-currency-payment-amount .expense-form-amount-field,
   .expense-edit-currency-payment-amount .expense-edit-amount-field {
     grid-column: 1 / -1;
@@ -1286,6 +1392,12 @@ body {
   .expense-form-currency-payment-amount .expense-form-amount-field,
   .expense-edit-currency-payment-amount .expense-edit-amount-field {
     grid-column: auto !important;
+  }
+
+  .expense-choice-button {
+    min-height: 40px;
+    padding-inline: 8px;
+    font-size: 10px;
   }
 
   .cash-reconciliation-summary {

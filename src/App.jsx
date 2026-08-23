@@ -835,6 +835,31 @@ const ScrollTimeInput = ({ value, onChange, label, compact = false }) => {
   );
 };
 
+const ExpenseChoiceGroup = ({ options, value, onChange, ariaLabel, className = '', scrollable = false }) => (
+  <div
+    className={`expense-choice-group${scrollable ? ' is-scrollable' : ''}${className ? ` ${className}` : ''}`}
+    role="group"
+    aria-label={ariaLabel}
+  >
+    {options.map((option) => {
+      const isSelected = String(value) === String(option.value);
+      return (
+        <button
+          key={String(option.value)}
+          type="button"
+          className={`expense-choice-button${isSelected ? ' is-selected' : ''}${option.value ? ` is-${option.value}` : ''}`}
+          aria-pressed={isSelected}
+          title={option.title || option.label}
+          onClick={() => onChange(option.value)}
+        >
+          {option.emoji && <span aria-hidden="true">{option.emoji}</span>}
+          <span>{option.label}</span>
+        </button>
+      );
+    })}
+  </div>
+);
+
 const ITINERARY_EMOJI_OPTIONS = ['📍', '✈️', '🏨', '🍽️', '☕', '🏖️', '🛍️', '🚗', '🎫', '📸', '🌅', '🏛️', '🎉', '🧳'];
 
 const ItineraryEmojiPicker = ({ value, onChange }) => (
@@ -3252,23 +3277,20 @@ function App() {
   const localCurrencyTotals = Object.entries(expenseTotalsByCurrency)
     .filter(([currency]) => currency !== 'KRW')
     .sort(([first], [second]) => first.localeCompare(second));
+  const defaultCashCurrency = SUPPORTED_CURRENCY_CODES.includes(budgetSettings.travelCurrency)
+    ? budgetSettings.travelCurrency
+    : 'KRW';
   const cashCurrencyChoices = Array.from(new Set([
-    budgetSettings.cashLedgerCurrency,
-    budgetSettings.travelCurrency,
-    ...getCashWalletsFromSettings(budgetSettings).map(wallet => wallet.currency),
-    ...Object.keys(expenseTotalsByCurrency),
-    ...(favoriteCurrencies || []),
-    'USD',
-    'VND',
-    'KRW'
+    defaultCashCurrency,
+    ...(favoriteCurrencies || [])
   ].filter(currency => SUPPORTED_CURRENCY_CODES.includes(currency))));
   const cashLedgerCurrency = cashCurrencyChoices.includes(budgetSettings.cashLedgerCurrency)
     ? budgetSettings.cashLedgerCurrency
-    : cashCurrencyChoices.find(currency => currency !== 'KRW' && (cashSpentByCurrency[currency] || expenseTotalsByCurrency[currency]))
-      || budgetSettings.travelCurrency
-      || 'USD';
+    : defaultCashCurrency;
   const cashLedgers = budgetSettings.cashLedgers || {};
-  const cashWallets = getCashWalletsFromSettings(budgetSettings);
+  const allCashWallets = getCashWalletsFromSettings(budgetSettings);
+  const cashWallets = allCashWallets
+    .filter(wallet => cashCurrencyChoices.includes(wallet.currency));
   const preferredCashWallet = cashWallets.find(wallet => wallet.id === cashWalletId)
     || cashWallets.find(wallet => wallet.currency === cashLedgerCurrency)
     || cashWallets[0];
@@ -3287,7 +3309,7 @@ function App() {
   const unassignedPaymentCount = (expenses || []).filter(expense => !expense.paymentMethod).length;
   const updateCashLedger = (updates) => {
     if (activeCashWalletId) {
-      const nextWallets = cashWallets.map(wallet => wallet.id === activeCashWalletId
+      const nextWallets = allCashWallets.map(wallet => wallet.id === activeCashWalletId
         ? { ...wallet, ...updates }
         : wallet);
       saveBudgetSettings({ ...budgetSettings, cashWallets: nextWallets, cashLedgerCurrency: cashLedger.currency });
@@ -3304,7 +3326,7 @@ function App() {
     });
   };
   const addCashWallet = () => {
-    const currency = cashCurrencyChoices.find(code => code !== 'KRW') || 'USD';
+    const currency = cashCurrencyChoices.find(code => code !== defaultCashCurrency) || defaultCashCurrency;
     const newWallet = {
       id: makeEntityId(),
       name: `${currency} 현금 지갑`,
@@ -3315,7 +3337,7 @@ function App() {
     };
     saveBudgetSettings({
       ...budgetSettings,
-      cashWallets: [...cashWallets, newWallet],
+      cashWallets: [...allCashWallets, newWallet],
       cashLedgerCurrency: currency
     });
     setCashWalletId(newWallet.id);
@@ -3414,6 +3436,28 @@ function App() {
     'USD',
     'KRW'
   ].filter(Boolean)));
+  const expenseDayChoices = [
+    { value: 0, label: '여행 전 준비' },
+    ...itinerary.map(dayPlan => {
+      const dayNumber = parseInt(dayPlan.day, 10);
+      const actualDate = activeTrip?.startDate ? getActualDateForDay(activeTrip.startDate, dayNumber) : '';
+      return { value: dayNumber, label: `${dayNumber}일차${actualDate ? ` · ${actualDate}` : ''}` };
+    })
+  ];
+  const useExpenseDayChoices = expenseDayChoices.length <= 8;
+  const expenseQuickCurrencyCodes = Array.from(new Set([
+    budgetSettings.travelCurrency,
+    ...(favoriteCurrencies || [])
+  ].filter(code => code && expenseCurrencyChoices.includes(code))));
+  const expenseCurrencyQuickOptions = expenseQuickCurrencyCodes.map(code => ({
+    value: code,
+    label: `${getCurrencySymbol(code)} ${code}`,
+    title: `${getCurrencyNameKO(code)} (${code})`
+  }));
+  const expenseCurrencyAdditionalChoices = expenseCurrencyChoices.filter(code => !expenseQuickCurrencyCodes.includes(code));
+  const selectedExpenseCurrency = expenseInput.currency || budgetSettings.travelCurrency || expenseCurrencyChoices[0] || 'KRW';
+  const expenseCurrencyQuickValue = expenseQuickCurrencyCodes.includes(selectedExpenseCurrency) ? selectedExpenseCurrency : '';
+  const expenseCurrencyAdditionalValue = expenseCurrencyAdditionalChoices.includes(selectedExpenseCurrency) ? selectedExpenseCurrency : '';
   const useFloatingPlacePanel = true;
   const selectedPlaceOpeningHours = getOpeningHours(selectedPlace);
   const selectedPlaceBusinessStatus = getBusinessStatusLabel(selectedPlace?.businessStatus);
@@ -3426,7 +3470,7 @@ function App() {
       </div>
       <div className="cash-reconciliation-panel">
         <div className="cash-reconciliation-panel-heading">
-          <span>정산 통화</span>
+        <span style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}><strong>정산 통화</strong><small style={{ color: '#a16207', fontSize: '9px', fontWeight: '700' }}>기본 여행 통화와 즐겨찾기 통화만 표시</small></span>
           <select value={cashLedgerCurrency} onChange={(e) => { const wallet = cashWallets.find(candidate => candidate.currency === e.target.value); setCashWalletId(wallet?.id || null); saveBudgetSettings({ ...budgetSettings, cashLedgerCurrency: e.target.value }); }} aria-label="현금 정산 통화">
             {cashCurrencyChoices.map(code => <option key={`cash-ledger-currency-${code}`} value={code}>{getCurrencySymbol(code)} {getCurrencyNameKO(code)} ({code})</option>)}
           </select>
@@ -4945,21 +4989,27 @@ function App() {
 
                   <div className="expense-form-row expense-form-day-time">
                     <div className="expense-form-field" style={{ flex: '1 1 0' }}>
-                      <label className="expense-form-label" htmlFor="expense-day-select">사용 일차</label>
-                      <select
-                        id="expense-day-select"
-                        className="expense-form-control"
-                        value={expenseInput.day}
-                        onChange={e => setExpenseInput({ ...expenseInput, day: e.target.value })}
-                        aria-label="지출 사용 일차"
-                      >
-                        <option value={0}>여행 전 준비</option>
-                        {itinerary.map(dayPlan => {
-                          const dayNumber = parseInt(dayPlan.day, 10);
-                          const actualDate = activeTrip?.startDate ? getActualDateForDay(activeTrip.startDate, dayNumber) : '';
-                          return <option key={`opt-day-${dayNumber}`} value={dayNumber}>{dayNumber}일차{actualDate ? ` · ${actualDate}` : ''}</option>;
-                        })}
-                      </select>
+                      <label className="expense-form-label">사용 일차</label>
+                      {useExpenseDayChoices ? (
+                        <ExpenseChoiceGroup
+                          options={expenseDayChoices}
+                          value={expenseInput.day}
+                          onChange={(day) => setExpenseInput(current => ({ ...current, day }))}
+                          ariaLabel="지출 사용 일차"
+                          className="expense-day-choice-group"
+                          scrollable
+                        />
+                      ) : (
+                        <select
+                          id="expense-day-select"
+                          className="expense-form-control"
+                          value={expenseInput.day}
+                          onChange={e => setExpenseInput({ ...expenseInput, day: e.target.value })}
+                          aria-label="지출 사용 일차"
+                        >
+                          {expenseDayChoices.map(day => <option key={`opt-day-${day.value}`} value={day.value}>{day.label}</option>)}
+                        </select>
+                      )}
                     </div>
                     <div className="expense-form-field" style={{ flex: '1 1 0' }}>
                       <ScrollTimeInput
@@ -4989,10 +5039,14 @@ function App() {
 
                   <div className="expense-form-row">
                     <div className="expense-form-field" style={{ flex: '1 1 0' }}>
-                      <label className="expense-form-label" htmlFor="expense-category-select">지출 카테고리</label>
-                      <select id="expense-category-select" className="expense-form-control" value={expenseInput.category || 'other'} onChange={e => setExpenseInput({ ...expenseInput, category: e.target.value })} aria-label="지출 카테고리">
-                        {EXPENSE_CATEGORIES.map(category => <option key={`expense-category-${category.value}`} value={category.value}>{category.emoji} {category.label}</option>)}
-                      </select>
+                      <label className="expense-form-label">지출 카테고리</label>
+                      <ExpenseChoiceGroup
+                        options={EXPENSE_CATEGORIES}
+                        value={expenseInput.category || 'other'}
+                        onChange={(category) => setExpenseInput(current => ({ ...current, category }))}
+                        ariaLabel="지출 카테고리"
+                        className="expense-category-choice-group"
+                      />
                     </div>
                     <div className="expense-form-field" style={{ flex: '2 1 0' }}>
                       <label className="expense-form-label" htmlFor="expense-memo-input">메모 (선택)</label>
@@ -5002,33 +5056,40 @@ function App() {
 
                   <div className="expense-form-row expense-form-currency-payment-amount">
                     <div className="expense-form-field" style={{ flex: '1.2 1 0' }}>
-                      <label className="expense-form-label" htmlFor="expense-currency-select">사용 통화</label>
-                      <select
-                        id="expense-currency-select"
-                        className="expense-form-control"
-                        value={expenseInput.currency || budgetSettings.travelCurrency}
-                        onChange={e => setExpenseInput({ ...expenseInput, currency: e.target.value })}
-                        aria-label="지출 입력 통화"
-                      >
-                        {expenseCurrencyChoices.map(code => (
-                          <option key={`expense-currency-${code}`} value={code}>
-                            {code === budgetSettings.travelCurrency ? '기본 · ' : ''}{getCurrencySymbol(code)} {getCurrencyNameKO(code)} ({code})
-                          </option>
-                        ))}
-                      </select>
+                      <label className="expense-form-label">사용 통화</label>
+                      <ExpenseChoiceGroup
+                        options={expenseCurrencyQuickOptions}
+                        value={expenseCurrencyQuickValue}
+                        onChange={(currency) => setExpenseInput(current => ({ ...current, currency }))}
+                        ariaLabel="빠른 지출 입력 통화"
+                        className="expense-currency-choice-group"
+                      />
+                      {expenseCurrencyAdditionalChoices.length > 0 && (
+                        <select
+                          id="expense-currency-select"
+                          className="expense-form-control expense-currency-more-select"
+                          value={expenseCurrencyAdditionalValue}
+                          onChange={e => e.target.value && setExpenseInput(current => ({ ...current, currency: e.target.value }))}
+                          aria-label="전체 통화에서 지출 입력 통화 선택"
+                        >
+                          <option value="">전체 통화</option>
+                          {expenseCurrencyAdditionalChoices.map(code => (
+                            <option key={`expense-currency-${code}`} value={code}>
+                              {getCurrencySymbol(code)} {getCurrencyNameKO(code)} ({code})
+                            </option>
+                          ))}
+                        </select>
+                      )}
                     </div>
                     <div className="expense-form-field">
-                      <label className="expense-form-label" htmlFor="expense-payment-method-select">결제 수단</label>
-                      <select
-                        id="expense-payment-method-select"
-                        className="expense-form-control"
+                      <label className="expense-form-label">결제 수단</label>
+                      <ExpenseChoiceGroup
+                        options={PAYMENT_METHODS}
                         value={expenseInput.paymentMethod}
-                        onChange={e => setExpenseInput({ ...expenseInput, paymentMethod: e.target.value })}
-                        aria-label="지출 결제 수단"
-                      >
-                        <option value="">결제 수단 선택</option>
-                        {PAYMENT_METHODS.map(method => <option key={`expense-payment-${method.value}`} value={method.value}>{method.label}</option>)}
-                      </select>
+                        onChange={(paymentMethod) => setExpenseInput(current => ({ ...current, paymentMethod }))}
+                        ariaLabel="지출 결제 수단"
+                        className="expense-payment-choice-group"
+                      />
                     </div>
                     <div className="expense-form-field expense-form-amount-field">
                       <label className="expense-form-label" htmlFor="expense-amount-input">금액 · {expenseCurrencySymbol} {expenseCurrencyCode}</label>
@@ -6593,18 +6654,24 @@ function App() {
 
             <div style={{ marginBottom: '14px' }}>
               <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b', marginBottom: '8px' }}>소비 일자</label>
-              <select
-                value={expenseInput.day}
-                onChange={(e) => setExpenseInput(current => ({ ...current, day: e.target.value }))}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', backgroundColor: 'white', fontSize: '14px', fontWeight: '700', outline: 'none' }}
-              >
-                <option value={0}>여행 전 준비</option>
-                {itinerary.map(dayPlan => {
-                  const dayNumber = parseInt(dayPlan.day, 10);
-                  const actualDate = activeTrip?.startDate ? getActualDateForDay(activeTrip.startDate, dayNumber) : '';
-                  return <option key={`expense-edit-day-${dayNumber}`} value={dayNumber}>{dayNumber}일차{actualDate ? ` · ${actualDate}` : ''}</option>;
-                })}
-              </select>
+              {useExpenseDayChoices ? (
+                <ExpenseChoiceGroup
+                  options={expenseDayChoices}
+                  value={expenseInput.day}
+                  onChange={(day) => setExpenseInput(current => ({ ...current, day }))}
+                  ariaLabel="지출 수정 소비 일자"
+                  className="expense-day-choice-group"
+                  scrollable
+                />
+              ) : (
+                <select
+                  value={expenseInput.day}
+                  onChange={(e) => setExpenseInput(current => ({ ...current, day: e.target.value }))}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', backgroundColor: 'white', fontSize: '14px', fontWeight: '700', outline: 'none' }}
+                >
+                  {expenseDayChoices.map(day => <option key={`expense-edit-day-${day.value}`} value={day.value}>{day.label}</option>)}
+                </select>
+              )}
             </div>
 
             <div style={{ marginBottom: '14px' }}>
@@ -6619,9 +6686,16 @@ function App() {
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '10px', marginBottom: '14px' }}>
-              <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b' }}>카테고리
-                <select value={expenseInput.category || 'other'} onChange={(e) => setExpenseInput(current => ({ ...current, category: e.target.value }))} style={{ width: '100%', boxSizing: 'border-box', marginTop: '8px', padding: '12px 8px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '12px', fontWeight: '700' }}>{EXPENSE_CATEGORIES.map(category => <option key={`expense-edit-category-${category.value}`} value={category.value}>{category.emoji} {category.label}</option>)}</select>
-              </label>
+              <div style={{ minWidth: 0 }}>
+                <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b', marginBottom: '8px' }}>카테고리</label>
+                <ExpenseChoiceGroup
+                  options={EXPENSE_CATEGORIES}
+                  value={expenseInput.category || 'other'}
+                  onChange={(category) => setExpenseInput(current => ({ ...current, category }))}
+                  ariaLabel="지출 수정 카테고리"
+                  className="expense-category-choice-group"
+                />
+              </div>
               <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b' }}>메모
                 <input type="text" value={expenseInput.memo || ''} onChange={(e) => setExpenseInput(current => ({ ...current, memo: e.target.value }))} placeholder="영수증·정산 메모" style={{ width: '100%', boxSizing: 'border-box', marginTop: '8px', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }} />
               </label>
@@ -6630,30 +6704,34 @@ function App() {
             <div className="expense-edit-currency-payment-amount" style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.9fr 0.9fr', gap: '10px', marginBottom: '14px' }}>
               <div style={{ minWidth: 0 }}>
                 <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b', marginBottom: '8px' }}>사용 통화</label>
-                <select
-                  value={expenseInput.currency || budgetSettings.travelCurrency}
-                  onChange={(e) => setExpenseInput(current => ({ ...current, currency: e.target.value }))}
-                  aria-label="지출 수정 통화"
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', backgroundColor: 'white', fontSize: '13px', fontWeight: '700', outline: 'none' }}
-                >
-                  {expenseCurrencyChoices.map(code => (
-                    <option key={`expense-edit-currency-${code}`} value={code}>
-                      {code === budgetSettings.travelCurrency ? '기본 · ' : ''}{getCurrencySymbol(code)} {getCurrencyNameKO(code)} ({code})
-                    </option>
-                  ))}
-                </select>
+                <ExpenseChoiceGroup
+                  options={expenseCurrencyQuickOptions}
+                  value={expenseCurrencyQuickValue}
+                  onChange={(currency) => setExpenseInput(current => ({ ...current, currency }))}
+                  ariaLabel="빠른 지출 수정 통화"
+                  className="expense-currency-choice-group"
+                />
+                {expenseCurrencyAdditionalChoices.length > 0 && (
+                  <select
+                    value={expenseCurrencyAdditionalValue}
+                    onChange={(e) => e.target.value && setExpenseInput(current => ({ ...current, currency: e.target.value }))}
+                    aria-label="전체 통화에서 지출 수정 통화 선택"
+                    className="expense-form-control expense-currency-more-select"
+                  >
+                    <option value="">전체 통화</option>
+                    {expenseCurrencyAdditionalChoices.map(code => <option key={`expense-edit-currency-${code}`} value={code}>{getCurrencySymbol(code)} {getCurrencyNameKO(code)} ({code})</option>)}
+                  </select>
+                )}
               </div>
               <div style={{ minWidth: 0 }}>
                 <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b', marginBottom: '8px' }}>결제 수단</label>
-                <select
+                <ExpenseChoiceGroup
+                  options={PAYMENT_METHODS}
                   value={expenseInput.paymentMethod}
-                  onChange={(e) => setExpenseInput(current => ({ ...current, paymentMethod: e.target.value }))}
+                  onChange={(paymentMethod) => setExpenseInput(current => ({ ...current, paymentMethod }))}
                   aria-label="지출 수정 결제 수단"
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', backgroundColor: 'white', fontSize: '13px', fontWeight: '700', outline: 'none' }}
-                >
-                  <option value="">결제 수단 선택</option>
-                  {PAYMENT_METHODS.map(method => <option key={`expense-edit-payment-${method.value}`} value={method.value}>{method.label}</option>)}
-                </select>
+                  className="expense-payment-choice-group"
+                />
               </div>
               <div className="expense-edit-amount-field" style={{ minWidth: 0 }}>
                 <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b', marginBottom: '8px' }}>금액 · {expenseCurrencySymbol} {expenseCurrencyCode}</label>
