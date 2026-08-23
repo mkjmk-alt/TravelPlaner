@@ -5057,29 +5057,31 @@ function App() {
                   <div className="expense-form-row expense-form-currency-payment-amount">
                     <div className="expense-form-field" style={{ flex: '1.2 1 0' }}>
                       <label className="expense-form-label">사용 통화</label>
-                      <ExpenseChoiceGroup
-                        options={expenseCurrencyQuickOptions}
-                        value={expenseCurrencyQuickValue}
-                        onChange={(currency) => setExpenseInput(current => ({ ...current, currency }))}
-                        ariaLabel="빠른 지출 입력 통화"
-                        className="expense-currency-choice-group"
-                      />
-                      {expenseCurrencyAdditionalChoices.length > 0 && (
-                        <select
-                          id="expense-currency-select"
-                          className="expense-form-control expense-currency-more-select"
-                          value={expenseCurrencyAdditionalValue}
-                          onChange={e => e.target.value && setExpenseInput(current => ({ ...current, currency: e.target.value }))}
-                          aria-label="전체 통화에서 지출 입력 통화 선택"
-                        >
-                          <option value="">전체 통화</option>
-                          {expenseCurrencyAdditionalChoices.map(code => (
-                            <option key={`expense-currency-${code}`} value={code}>
-                              {getCurrencySymbol(code)} {getCurrencyNameKO(code)} ({code})
-                            </option>
-                          ))}
-                        </select>
-                      )}
+                      <div className="expense-currency-choice-row">
+                        <ExpenseChoiceGroup
+                          options={expenseCurrencyQuickOptions}
+                          value={expenseCurrencyQuickValue}
+                          onChange={(currency) => setExpenseInput(current => ({ ...current, currency }))}
+                          ariaLabel="빠른 지출 입력 통화"
+                          className="expense-currency-choice-group"
+                        />
+                        {expenseCurrencyAdditionalChoices.length > 0 && (
+                          <select
+                            id="expense-currency-select"
+                            className="expense-form-control expense-currency-more-select"
+                            value={expenseCurrencyAdditionalValue}
+                            onChange={e => e.target.value && setExpenseInput(current => ({ ...current, currency: e.target.value }))}
+                            aria-label="추가 통화에서 지출 입력 통화 선택"
+                          >
+                            <option value="">추가 선택</option>
+                            {expenseCurrencyAdditionalChoices.map(code => (
+                              <option key={`expense-currency-${code}`} value={code}>
+                                {getCurrencySymbol(code)} {getCurrencyNameKO(code)} ({code})
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
                     </div>
                     <div className="expense-form-field">
                       <label className="expense-form-label">결제 수단</label>

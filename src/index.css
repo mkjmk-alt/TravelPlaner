@@ -1263,6 +1263,33 @@ body {
   flex: 1 1 auto;
 }
 
+.expense-currency-choice-row {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+}
+
+.expense-currency-choice-row .expense-currency-choice-group {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  width: auto;
+  min-width: max-content;
+}
+
+.expense-currency-choice-row .expense-choice-button {
+  flex: 0 0 auto;
+}
+
+.expense-currency-choice-row .expense-currency-more-select {
+  flex: 0 0 auto;
+  width: auto;
+  margin-top: 0;
+  white-space: nowrap;
+}
+
 .expense-currency-more-select {
   margin-top: 6px;
 }
@@ -1399,6 +1426,33 @@ body {
 
   .expense-payment-choice-group .expense-choice-button {
     flex: 1 1 0;
+  }
+
+  /* Keep the currency shortcuts and the additional-currency picker on one
+     compact row. The row can scroll horizontally when a narrow phone cannot
+     display every option at once, so no choice is clipped or pushed below. */
+  .expense-currency-choice-row {
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .expense-currency-choice-row::-webkit-scrollbar {
+    display: none;
+  }
+
+  .expense-currency-choice-row .expense-choice-button {
+    flex: 0 0 72px;
+    min-width: 72px;
+    padding-inline: 6px;
+  }
+
+  .expense-currency-choice-row .expense-currency-more-select {
+    flex: 0 0 88px;
+    width: 88px;
+    min-width: 88px;
+    padding-inline: 6px;
   }
 
   .expense-form-currency-payment-amount .expense-form-amount-field,
