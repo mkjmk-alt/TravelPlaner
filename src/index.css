@@ -1233,7 +1233,19 @@ body {
 }
 
 .expense-category-choice-group .expense-choice-button {
-  flex: 1 1 calc(50% - 3px);
+  flex: 0 0 auto;
+}
+
+.expense-category-choice-group {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.expense-category-choice-group::-webkit-scrollbar {
+  display: none;
 }
 
 .expense-payment-choice-group {

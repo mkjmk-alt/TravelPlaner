@@ -5038,7 +5038,7 @@ function App() {
                   </div>
 
                   <div className="expense-form-row">
-                    <div className="expense-form-field" style={{ flex: '1 1 0' }}>
+                    <div className="expense-form-field" style={{ flex: '1 1 100%' }}>
                       <label className="expense-form-label">지출 카테고리</label>
                       <ExpenseChoiceGroup
                         options={EXPENSE_CATEGORIES}
@@ -5047,10 +5047,6 @@ function App() {
                         ariaLabel="지출 카테고리"
                         className="expense-category-choice-group"
                       />
-                    </div>
-                    <div className="expense-form-field" style={{ flex: '2 1 0' }}>
-                      <label className="expense-form-label" htmlFor="expense-memo-input">메모 (선택)</label>
-                      <input id="expense-memo-input" className="expense-form-control" type="text" value={expenseInput.memo || ''} onChange={e => setExpenseInput({ ...expenseInput, memo: e.target.value })} placeholder="영수증·정산 메모" maxLength={120} />
                     </div>
                   </div>
 
@@ -6685,7 +6681,7 @@ function App() {
               />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '10px', marginBottom: '14px' }}>
+            <div style={{ marginBottom: '14px' }}>
               <div style={{ minWidth: 0 }}>
                 <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b', marginBottom: '8px' }}>카테고리</label>
                 <ExpenseChoiceGroup
@@ -6696,9 +6692,6 @@ function App() {
                   className="expense-category-choice-group"
                 />
               </div>
-              <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b' }}>메모
-                <input type="text" value={expenseInput.memo || ''} onChange={(e) => setExpenseInput(current => ({ ...current, memo: e.target.value }))} placeholder="영수증·정산 메모" style={{ width: '100%', boxSizing: 'border-box', marginTop: '8px', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }} />
-              </label>
             </div>
 
             <div className="expense-edit-currency-payment-amount" style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.9fr 0.9fr', gap: '10px', marginBottom: '14px' }}>
