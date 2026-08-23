@@ -3514,9 +3514,16 @@ function App() {
     const categoryTotalKRW = categoryStats.reduce((sum, category) => sum + category.spent, 0);
     const paymentStats = Object.entries(paymentLabels).map(([key, label]) => ({ key, label, amount: paymentTotalsKRW[key] || 0 }));
     const dailyStats = Object.entries(dailyExpenseTotalsKRW).sort(([first], [second]) => Number(first) - Number(second));
+    const exportTextScale = 1.28;
+    const categoryRowHeight = 44;
+    const analysisPanelHeight = Math.max(500, 150 + Math.max(categoryStats.length, 1) * categoryRowHeight);
+    const dailyRowHeight = 46;
+    const dailyPanelY = 520 + analysisPanelHeight + 30;
+    const dailyPanelHeight = Math.max(210, 105 + Math.max(dailyStats.length, 1) * dailyRowHeight);
+    const footerY = dailyPanelY + dailyPanelHeight + 45;
     const canvas = document.createElement('canvas');
     canvas.width = 1200;
-    canvas.height = Math.max(1420, 1110 + Math.max(0, dailyStats.length - 1) * 38);
+    canvas.height = footerY + 40;
     const context = canvas.getContext('2d');
     if (!context) return;
     const ctx = context;
@@ -3530,7 +3537,7 @@ function App() {
       ctx.closePath();
     };
     const drawText = (value, x, y, size, color, weight = 600, align = 'left') => {
-      ctx.font = `${weight} ${size}px Arial, "Apple SD Gothic Neo", sans-serif`;
+      ctx.font = `${weight} ${Math.round(size * exportTextScale)}px Arial, "Apple SD Gothic Neo", sans-serif`;
       ctx.fillStyle = color;
       ctx.textAlign = align;
       ctx.textBaseline = 'alphabetic';
@@ -3590,7 +3597,7 @@ function App() {
       drawText(value, x + 18, 472, 19, '#4c1d95', 900);
     });
 
-    drawCard(40, 520, 680, 430, '#ffffff', '#e9d5ff');
+    drawCard(40, 520, 680, analysisPanelHeight, '#ffffff', '#e9d5ff');
     drawText('카테고리별 지출 비중', 68, 562, 16, '#5b21b6', 900);
     drawText('원화 환산 기준', 692, 562, 11, '#a78bfa', 800, 'right');
     const donutX = 220;
@@ -3619,7 +3626,7 @@ function App() {
     drawText('카테고리', donutX, donutY + 24, 11, '#8b7bb5', 800, 'center');
     if (categoryStats.length === 0) drawText('기록 없음', 220, 875, 12, '#94a3b8', 800, 'center');
     categoryStats.forEach((category, index) => {
-      const y = 602 + index * 35;
+      const y = 602 + index * categoryRowHeight;
       const percentage = categoryTotalKRW ? (category.spent / categoryTotalKRW) * 100 : 0;
       ctx.fillStyle = categoryColors[index % categoryColors.length];
       ctx.beginPath();
@@ -3630,7 +3637,7 @@ function App() {
       drawText(formatKRW(category.spent), 682, y + 17, 10, '#94a3b8', 700, 'right');
     });
 
-    drawCard(740, 520, 420, 430, '#ffffff', '#e9d5ff');
+    drawCard(740, 520, 420, analysisPanelHeight, '#ffffff', '#e9d5ff');
     drawText('결제 수단별 지출', 768, 562, 16, '#5b21b6', 900);
     drawText('총액 비교', 1132, 562, 11, '#a78bfa', 800, 'right');
     const paymentTotal = paymentStats.reduce((sum, payment) => sum + payment.amount, 0) || 1;
@@ -3648,12 +3655,12 @@ function App() {
       drawText(`${percentage.toFixed(1)}%`, 768, y + 45, 10, paymentColors[payment.key], 800);
     });
 
-    drawCard(40, 980, 1120, Math.max(170, 80 + dailyStats.length * 38), '#ffffff', '#e9d5ff');
-    drawText('일차별 지출', 68, 1022, 16, '#5b21b6', 900);
-    drawText('여행 흐름을 한눈에 확인', 1132, 1022, 11, '#a78bfa', 800, 'right');
+    drawCard(40, dailyPanelY, 1120, dailyPanelHeight, '#ffffff', '#e9d5ff');
+    drawText('일차별 지출', 68, dailyPanelY + 42, 16, '#5b21b6', 900);
+    drawText('여행 흐름을 한눈에 확인', 1132, dailyPanelY + 42, 11, '#a78bfa', 800, 'right');
     const maxDailyAmount = Math.max(...dailyStats.map(([, amount]) => amount), 1);
     dailyStats.forEach(([day, amount], index) => {
-      const y = 1062 + index * 38;
+      const y = dailyPanelY + 82 + index * dailyRowHeight;
       const label = Number(day) === 0 ? '여행 전 준비' : `${day}일차`;
       drawText(label, 68, y, 11, '#64748b', 800);
       roundedRect(180, y - 10, 730, 10, 5);
@@ -3664,8 +3671,8 @@ function App() {
       ctx.fill();
       drawText(formatKRW(amount), 1132, y, 11, '#6d28d9', 900, 'right');
     });
-    if (dailyStats.length === 0) drawText('아직 기록된 지출이 없습니다.', 600, 1065, 12, '#94a3b8', 800, 'center');
-    drawText('TravelPlaner · 모든 금액은 저장된 환율 기준으로 원화 환산되었습니다.', 600, canvas.height - 32, 11, '#94a3b8', 700, 'center');
+    if (dailyStats.length === 0) drawText('아직 기록된 지출이 없습니다.', 600, dailyPanelY + 85, 12, '#94a3b8', 800, 'center');
+    drawText('TravelPlaner · 모든 금액은 저장된 환율 기준으로 원화 환산되었습니다.', 600, footerY, 11, '#94a3b8', 700, 'center');
 
     const saveImage = (blob) => {
       if (!blob) return;
