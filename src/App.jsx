@@ -5171,7 +5171,7 @@ function App() {
                               const expenseCurrency = exp.currency || 'KRW';
 
                               return (
-                              <div key={exp.id} className="expense-item-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '12px 16px', backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+                              <div key={exp.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '12px 16px', backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
                                 <div style={{ minWidth: 0, flex: 1 }}>
                                   {exp.time && (
                                     <div className="expense-item-time">
