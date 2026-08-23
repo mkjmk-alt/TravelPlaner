@@ -1002,6 +1002,18 @@ body {
   color: #334155;
 }
 
+/* Keep settings controls in the same compact scale as their labels. The
+   important flag also prevents the mobile no-zoom rule from enlarging these
+   controls independently of the surrounding panel typography. */
+.budget-settings-panel input,
+.budget-settings-panel select,
+.cash-reconciliation-panel input,
+.cash-reconciliation-panel select,
+.currency-manager-panel > select {
+  font-size: 12px !important;
+  line-height: 1.35;
+}
+
 .currency-manager-chips {
   display: flex;
   flex-wrap: wrap;
@@ -1436,34 +1448,36 @@ body {
     flex: 1 1 0 !important;
   }
 
-  /* Keep VND, USD, and the additional-currency picker visible together on
-     mobile. The grid gives all three controls a predictable equal column,
-     so the select never gets pushed outside the form or into a scroll area. */
+  /* Keep the first currency choices and the additional-currency picker in
+     one row. Extra favorite currencies remain available by horizontal scroll. */
   .expense-currency-choice-row {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    display: flex;
+    flex-wrap: nowrap;
     gap: 6px;
-    overflow: visible;
-    padding-bottom: 0;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
   }
 
-  .expense-currency-choice-row.has-additional {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .expense-currency-choice-row::-webkit-scrollbar {
+    display: none;
   }
 
   .expense-currency-choice-row .expense-choice-button,
   .expense-currency-choice-row .expense-currency-more-select {
     box-sizing: border-box;
-    width: 100%;
-    min-width: 0;
-    flex: 1 1 auto;
+    flex: 0 0 72px;
+    width: 72px;
+    min-width: 72px;
   }
 
   .expense-currency-choice-row .expense-currency-more-select {
     overflow: hidden;
-    padding-inline: 4px;
+    padding-inline: 3px;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-size: 11px !important;
   }
 
   .expense-form-currency-payment-amount .expense-form-amount-field,
