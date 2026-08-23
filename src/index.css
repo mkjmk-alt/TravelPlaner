@@ -241,6 +241,92 @@ body {
   border: 1px solid #fecaca;
 }
 
+.sync-conflict-banner {
+  position: fixed;
+  top: calc(96px + env(safe-area-inset-top));
+  left: 50%;
+  z-index: 3100;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: min(92vw, 520px);
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #fed7aa;
+  border-radius: 14px;
+  background: rgba(255, 247, 237, 0.98);
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.14);
+  color: #9a3412;
+  transform: translateX(-50%);
+  animation: syncConflictBannerIn 0.24s ease-out;
+}
+
+.sync-conflict-banner-icon {
+  display: flex;
+  flex: 0 0 30px;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  color: #ea580c;
+  background: #ffedd5;
+}
+
+.sync-conflict-banner-content {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sync-conflict-banner-content strong {
+  color: #9a3412;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.sync-conflict-banner-content span {
+  overflow: hidden;
+  color: #c2410c;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sync-conflict-banner button {
+  flex-shrink: 0;
+  padding: 7px 9px;
+  border: 1px solid #fdba74;
+  border-radius: 9px;
+  color: #c2410c;
+  background: #fff;
+  font-size: 10px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.sync-conflict-banner button:hover,
+.sync-conflict-banner button:focus-visible {
+  background: #ffedd5;
+  outline: none;
+}
+
+@keyframes syncConflictBannerIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
 .read-only-view .read-only-hide,
 .read-only-view .expense-form-card,
 .read-only-view .cash-reconciliation-card,
@@ -1669,6 +1755,23 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     bottom: 0;
     z-index: 1;
     box-shadow: 0 -8px 16px rgba(248, 250, 252, 0.95);
+  }
+}
+
+@media (max-width: 768px) {
+  .sync-conflict-banner {
+    top: calc(94px + env(safe-area-inset-top));
+    width: calc(100vw - 24px);
+    padding: 9px 10px;
+    border-radius: 13px;
+  }
+
+  .sync-conflict-banner-content span {
+    white-space: normal;
+  }
+
+  .sync-conflict-banner button {
+    padding: 6px 8px;
   }
 }
 

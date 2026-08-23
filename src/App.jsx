@@ -3884,15 +3884,6 @@ function App() {
                 <span>오프라인 모드 · 변경사항은 이 기기에 먼저 저장됩니다.</span>
               </div>
             )}
-            {syncConflictNotice && (
-              <div role="status" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px', padding: '9px 11px', borderRadius: '10px', background: '#fff7ed', color: '#9a3412', fontSize: '10px', fontWeight: '800' }}>
-                <AlertCircle size={14} aria-hidden="true" />
-                <span style={{ flex: 1 }}>
-                  여행 데이터 {syncConflictNotice.conflicts}건이 기기와 클라우드에서 달라 최신 변경 기준으로 정리되었습니다.
-                </span>
-                <button type="button" onClick={dismissSyncConflictNotice} style={{ border: 'none', background: 'transparent', color: '#c2410c', fontSize: '10px', fontWeight: '900', cursor: 'pointer' }}>확인</button>
-              </div>
-            )}
             {isReadOnlyTrip && (
               <div className="shared-read-only-banner" role="status">
                 <LockKeyhole size={14} aria-hidden="true" />
@@ -5356,6 +5347,17 @@ function App() {
             <button onClick={() => setSidebarOpen(false)} style={{ fontSize: '11px', fontWeight: '900', color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer', letterSpacing: '0.05em' }}>닫기</button>
           </div>
         </aside>
+
+        {syncConflictNotice && (
+          <div className="sync-conflict-banner" role="status" aria-live="polite">
+            <span className="sync-conflict-banner-icon" aria-hidden="true"><AlertCircle size={16} /></span>
+            <span className="sync-conflict-banner-content">
+              <strong>기기 간 변경사항 동기화</strong>
+              <span>여행 데이터 {syncConflictNotice.conflicts}건을 최신 변경 기준으로 정리했습니다.</span>
+            </span>
+            <button type="button" onClick={dismissSyncConflictNotice}>확인</button>
+          </div>
+        )}
 
       {/* Share Toast Notification */}
       {hasTriggeredToast && (
