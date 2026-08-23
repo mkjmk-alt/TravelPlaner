@@ -949,6 +949,8 @@ function App() {
   const setSidebarOpen = (open) => {
     setSheetMode(open ? 'half' : 'collapsed');
   };
+  // Keep the expanded mobile sheet below the fixed search field.
+  const mobileSheetTop = Math.min(112, Math.max(0, windowSize.height - 60));
 
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
@@ -979,14 +981,14 @@ function App() {
     if (windowSize.width < 768) {
       const H = windowSize.height;
       const snapPoints = {
-        full: 0,
+        full: mobileSheetTop,
         half: H * 0.45,
         collapsed: H - 60
       };
       
       let baseTranslatePx = snapPoints[sheetMode];
       let finalTranslatePx = baseTranslatePx + dragOffset;
-      finalTranslatePx = Math.max(0, Math.min(H - 60, finalTranslatePx));
+      finalTranslatePx = Math.max(mobileSheetTop, Math.min(H - 60, finalTranslatePx));
       
       let closestMode = sheetMode;
       let minDiff = Infinity;
@@ -3874,9 +3876,11 @@ function App() {
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
         style={{
-          height: windowSize.width < 768 ? `${windowSize.height}px` : undefined,
+          height: windowSize.width < 768
+            ? `${windowSize.height - (sheetMode === 'full' ? mobileSheetTop : 0)}px`
+            : undefined,
           transform: windowSize.width < 768
-            ? `translateY(${Math.max(0, Math.min(windowSize.height - 60, (sheetMode === 'full' ? 0 : sheetMode === 'half' ? windowSize.height * 0.45 : windowSize.height - 60) + dragOffset))}px)`
+            ? `translateY(${Math.max(mobileSheetTop, Math.min(windowSize.height - 60, (sheetMode === 'full' ? mobileSheetTop : sheetMode === 'half' ? windowSize.height * 0.45 : windowSize.height - 60) + dragOffset))}px)`
             : (sidebarOpen ? `translateY(${dragOffset}px)` : `translateY(calc(100% - 60px + ${dragOffset}px))`)
         }}
       >
@@ -5167,7 +5171,7 @@ function App() {
                               const expenseCurrency = exp.currency || 'KRW';
 
                               return (
-                              <div key={exp.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '12px 16px', backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+                              <div key={exp.id} className="expense-item-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '12px 16px', backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
                                 <div style={{ minWidth: 0, flex: 1 }}>
                                   {exp.time && (
                                     <div className="expense-item-time">
