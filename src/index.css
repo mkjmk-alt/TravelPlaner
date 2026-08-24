@@ -1321,6 +1321,13 @@ body {
   white-space: nowrap;
 }
 
+/* When the additional-currency picker is present, let all visible choices
+   share the full currency column evenly instead of reserving a fixed minimum. */
+.expense-currency-choice-row.has-additional .expense-choice-button,
+.expense-currency-choice-row.has-additional .expense-currency-more-select {
+  min-width: 0;
+}
+
 .expense-currency-more-select {
   margin-top: 6px;
 }
