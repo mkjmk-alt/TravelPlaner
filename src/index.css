@@ -1330,6 +1330,28 @@ body {
 
 .expense-currency-more-select {
   margin-top: 6px;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  background-color: #eff6ff;
+  color: #1d4ed8;
+  font-size: 11px !important;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+  text-align-last: center;
+  cursor: pointer;
+  color-scheme: light;
+}
+
+.expense-currency-more-select:hover,
+.expense-currency-more-select:focus {
+  border-color: #2563eb;
+  background-color: #dbeafe;
+  color: #1d4ed8;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, .1);
 }
 
 .expense-form-time-control,

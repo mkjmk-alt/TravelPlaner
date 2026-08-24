@@ -5083,7 +5083,7 @@ function App() {
                             <option value="">추가 선택</option>
                             {expenseCurrencyAdditionalChoices.map(code => (
                               <option key={`expense-currency-${code}`} value={code}>
-                                {getCurrencySymbol(code)} {getCurrencyNameKO(code)} ({code})
+                                {getCurrencySymbol(code)} {code}
                               </option>
                             ))}
                           </select>
@@ -6725,7 +6725,7 @@ function App() {
                     className="expense-form-control expense-currency-more-select"
                   >
                     <option value="">전체 통화</option>
-                    {expenseCurrencyAdditionalChoices.map(code => <option key={`expense-edit-currency-${code}`} value={code}>{getCurrencySymbol(code)} {getCurrencyNameKO(code)} ({code})</option>)}
+                    {expenseCurrencyAdditionalChoices.map(code => <option key={`expense-edit-currency-${code}`} value={code}>{getCurrencySymbol(code)} {code}</option>)}
                   </select>
                 )}
               </div>
