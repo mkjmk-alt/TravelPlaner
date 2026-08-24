@@ -413,6 +413,11 @@ body {
   grid-template-columns: 1.2fr 0.9fr 0.9fr;
 }
 
+.expense-form-currency-payment-amount .expense-form-amount-field,
+.expense-edit-currency-payment-amount .expense-edit-amount-field {
+  grid-column: 1 / -1;
+}
+
 .expense-edit-currency-payment-amount {
   width: 100%;
 }
@@ -1262,13 +1267,15 @@ body {
 
 .expense-payment-choice-group {
   flex-direction: row;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  gap: 4px;
 }
 
 .expense-payment-choice-group .expense-choice-button {
-  flex: 1 1 46px;
-  min-width: 46px;
-  padding-inline: 6px;
+  flex: 1 1 0;
+  min-width: 0;
+  padding-inline: 4px;
+  white-space: nowrap;
 }
 
 .expense-currency-choice-group .expense-choice-button {
@@ -1425,7 +1432,7 @@ body {
 
   .expense-form-currency-payment-amount,
   .expense-edit-currency-payment-amount {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
   }
 
   .expense-payment-choice-group {
