@@ -5150,7 +5150,7 @@ function App() {
                   </div>
 
                   <div className="expense-form-row expense-form-currency-payment-amount">
-                    <div className="expense-form-field" style={{ flex: '1.2 1 0' }}>
+                    <div className="expense-form-field expense-form-currency-field">
                       <label className="expense-form-label">사용 통화</label>
                       <div className={`expense-currency-choice-row${expenseCurrencyAdditionalChoices.length > 0 ? ' has-additional' : ''}`}>
                         <ExpenseChoiceGroup
