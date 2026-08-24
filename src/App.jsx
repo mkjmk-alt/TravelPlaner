@@ -3537,7 +3537,7 @@ function App() {
   const useExpenseDayChoices = expenseDayChoices.length <= 8;
   const expenseQuickCurrencyCodes = Array.from(new Set([
     budgetSettings.travelCurrency,
-    ...(favoriteCurrencies || [])
+    'KRW'
   ].filter(code => code && expenseCurrencyChoices.includes(code))));
   const expenseCurrencyQuickOptions = expenseQuickCurrencyCodes.map(code => ({
     value: code,

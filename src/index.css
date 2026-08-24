@@ -1321,19 +1321,21 @@ body {
    present. Divide the available row width evenly, excluding the gaps, so
    labels cannot change the width of an individual currency box. */
 .expense-currency-choice-row.has-additional {
-  gap: 4px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
   overflow-x: visible;
 }
 
 .expense-currency-choice-row.has-additional .expense-currency-choice-group .expense-choice-button {
-  flex: 1 1 0;
-  width: 0;
+  flex: 0 0 auto;
+  width: 100%;
   min-width: 0;
 }
 
 .expense-currency-choice-row.has-additional .expense-currency-more-picker {
-  flex: 1 1 0;
-  width: 0;
+  flex: 0 0 auto;
+  width: 100%;
   min-width: 0;
 }
 
@@ -1583,21 +1585,21 @@ body {
   }
 
   .expense-currency-choice-row.has-additional {
-    gap: 4px;
+    gap: 6px;
     overflow-x: visible;
   }
 
   .expense-currency-choice-row.has-additional .expense-currency-choice-group .expense-choice-button {
     box-sizing: border-box;
-    flex: 1 1 0;
-    width: 0;
+    flex: 0 0 auto;
+    width: 100%;
     min-width: 0;
   }
 
   .expense-currency-choice-row.has-additional .expense-currency-more-picker {
     box-sizing: border-box;
-    flex: 1 1 0;
-    width: 0;
+    flex: 0 0 auto;
+    width: 100%;
     min-width: 0;
   }
 
