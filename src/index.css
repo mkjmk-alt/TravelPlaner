@@ -410,7 +410,7 @@ body {
 
 .expense-form-currency-payment-amount {
   display: grid !important;
-  grid-template-columns: 1.2fr 0.9fr 0.9fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .expense-form-currency-payment-amount .expense-form-amount-field,
