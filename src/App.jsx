@@ -1,5 +1,6 @@
 // Build Version: v1.2.2-build-trigger-fix
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { GoogleMap, useJsApiLoader, OverlayView, InfoWindow, Polyline } from '@react-google-maps/api';
 import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronUp, ChevronDown, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Clock, Upload, Clipboard, LocateFixed, Download, Bell, FileText, Mail, Lock, Eye, EyeOff, WifiOff, Link2, LockKeyhole } from 'lucide-react';
 import { supabase } from './supabaseClient';
@@ -859,6 +860,93 @@ const ExpenseChoiceGroup = ({ options, value, onChange, ariaLabel, className = '
     })}
   </div>
 );
+
+const ExpenseCurrencyPicker = ({ value, options, onChange, placeholder = '추가 선택', ariaLabel, className = '' }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState(null);
+  const triggerRef = useRef(null);
+  const menuRef = useRef(null);
+  const selectedCode = options.includes(value) ? value : '';
+
+  const updateMenuPosition = () => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom - 16;
+    const openAbove = spaceBelow < 180 && rect.top > 220;
+    setMenuPosition({
+      left: rect.left,
+      width: rect.width,
+      top: openAbove ? undefined : rect.bottom + 8,
+      bottom: openAbove ? window.innerHeight - rect.top + 8 : undefined,
+      maxHeight: Math.max(160, openAbove ? rect.top - 16 : spaceBelow)
+    });
+  };
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    updateMenuPosition();
+    const handleOutsidePointer = (event) => {
+      if (!triggerRef.current?.contains(event.target) && !menuRef.current?.contains(event.target)) setIsOpen(false);
+    };
+    const handleViewportChange = () => updateMenuPosition();
+    document.addEventListener('pointerdown', handleOutsidePointer);
+    window.addEventListener('resize', handleViewportChange);
+    window.addEventListener('scroll', handleViewportChange, true);
+    return () => {
+      document.removeEventListener('pointerdown', handleOutsidePointer);
+      window.removeEventListener('resize', handleViewportChange);
+      window.removeEventListener('scroll', handleViewportChange, true);
+    };
+  }, [isOpen]);
+
+  const selectedLabel = selectedCode ? `${getCurrencySymbol(selectedCode)} ${selectedCode}` : placeholder;
+
+  return (
+    <>
+      <div className={`expense-currency-picker${className ? ` ${className}` : ''}${isOpen ? ' is-open' : ''}`}>
+        <button
+          ref={triggerRef}
+          type="button"
+          className="expense-currency-picker-trigger"
+          onClick={() => setIsOpen(open => !open)}
+          aria-label={ariaLabel}
+          aria-expanded={isOpen}
+          aria-haspopup="listbox"
+        >
+          <span>{selectedLabel}</span>
+          <ChevronDown size={15} aria-hidden="true" />
+        </button>
+      </div>
+      {isOpen && menuPosition && createPortal(
+        <div
+          ref={menuRef}
+          className="expense-currency-picker-popover"
+          role="listbox"
+          aria-label={ariaLabel}
+          style={{ left: menuPosition.left, width: menuPosition.width, top: menuPosition.top, bottom: menuPosition.bottom, maxHeight: menuPosition.maxHeight }}
+        >
+          {options.map(code => (
+            <button
+              key={`expense-currency-picker-${code}`}
+              type="button"
+              className={`expense-currency-picker-option${code === selectedCode ? ' is-selected' : ''}`}
+              role="option"
+              aria-selected={code === selectedCode}
+              onClick={() => {
+                onChange(code);
+                setIsOpen(false);
+              }}
+            >
+              {getCurrencySymbol(code)} {code}
+            </button>
+          ))}
+        </div>,
+        document.body
+      )}
+    </>
+  );
+};
 
 const ITINERARY_EMOJI_OPTIONS = ['📍', '✈️', '🏨', '🍽️', '☕', '🏖️', '🛍️', '🚗', '🎫', '📸', '🌅', '🏛️', '🎉', '🧳'];
 
@@ -5073,20 +5161,14 @@ function App() {
                           className="expense-currency-choice-group"
                         />
                         {expenseCurrencyAdditionalChoices.length > 0 && (
-                          <select
-                            id="expense-currency-select"
-                            className="expense-form-control expense-currency-more-select"
+                          <ExpenseCurrencyPicker
                             value={expenseCurrencyAdditionalValue}
-                            onChange={e => e.target.value && setExpenseInput(current => ({ ...current, currency: e.target.value }))}
-                            aria-label="추가 통화에서 지출 입력 통화 선택"
-                          >
-                            <option value="">추가 선택</option>
-                            {expenseCurrencyAdditionalChoices.map(code => (
-                              <option key={`expense-currency-${code}`} value={code}>
-                                {getCurrencySymbol(code)} {code}
-                              </option>
-                            ))}
-                          </select>
+                            options={expenseCurrencyAdditionalChoices}
+                            onChange={currency => setExpenseInput(current => ({ ...current, currency }))}
+                            placeholder="추가 선택"
+                            ariaLabel="추가 통화에서 지출 입력 통화 선택"
+                            className="expense-currency-more-picker"
+                          />
                         )}
                       </div>
                     </div>
@@ -6718,15 +6800,14 @@ function App() {
                   className="expense-currency-choice-group"
                 />
                 {expenseCurrencyAdditionalChoices.length > 0 && (
-                  <select
+                  <ExpenseCurrencyPicker
                     value={expenseCurrencyAdditionalValue}
-                    onChange={(e) => e.target.value && setExpenseInput(current => ({ ...current, currency: e.target.value }))}
-                    aria-label="전체 통화에서 지출 수정 통화 선택"
-                    className="expense-form-control expense-currency-more-select"
-                  >
-                    <option value="">전체 통화</option>
-                    {expenseCurrencyAdditionalChoices.map(code => <option key={`expense-edit-currency-${code}`} value={code}>{getCurrencySymbol(code)} {code}</option>)}
-                  </select>
+                    options={expenseCurrencyAdditionalChoices}
+                    onChange={currency => setExpenseInput(current => ({ ...current, currency }))}
+                    placeholder="전체 통화"
+                    ariaLabel="전체 통화에서 지출 수정 통화 선택"
+                    className="expense-currency-more-picker"
+                  />
                 )}
               </div>
               <div style={{ minWidth: 0 }}>
