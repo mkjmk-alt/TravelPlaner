@@ -1332,10 +1332,10 @@ body {
   margin-top: 6px;
   min-height: 38px;
   padding: 8px 10px;
-  border: 1px solid #bfdbfe;
-  border-radius: 10px;
-  background-color: #eff6ff;
-  color: #1d4ed8;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background-color: #fff;
+  color: #475569;
   font-size: 11px !important;
   font-weight: 800;
   line-height: 1.2;
@@ -1348,7 +1348,7 @@ body {
 .expense-currency-more-select:hover,
 .expense-currency-more-select:focus {
   border-color: #2563eb;
-  background-color: #dbeafe;
+  background-color: #fff;
   color: #1d4ed8;
   outline: none;
   box-shadow: 0 0 0 2px rgba(37, 99, 235, .1);
