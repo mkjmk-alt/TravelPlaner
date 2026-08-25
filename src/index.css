@@ -1704,14 +1704,14 @@ body {
 
 @media (max-width: 768px) {
   .map-controls-group {
-    top: 116px; /* Keep map controls close to, but below, the floating search field. */
+    top: 104px; /* Place map controls between the search field and sidebar. */
     right: 16px;
     gap: 8px;
     z-index: 900;
   }
 
   .sidebar-toggle-btn {
-    top: 116px; /* Align the menu button with the map controls. */
+    top: 104px; /* Align the menu button with the map controls. */
     left: 16px;
   }
 
@@ -1810,12 +1810,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   }
 
   .map-controls-group {
-    top: calc(116px + env(safe-area-inset-top));
+    top: calc(104px + env(safe-area-inset-top));
     z-index: 900;
   }
 
   .sidebar-toggle-btn {
-    top: calc(116px + env(safe-area-inset-top));
+    top: calc(104px + env(safe-area-inset-top));
   }
 }
 
