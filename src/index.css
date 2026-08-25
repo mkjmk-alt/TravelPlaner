@@ -1354,11 +1354,11 @@ body {
   min-height: 42px;
   padding: 10px 12px;
   border: 1px solid #e2e8f0;
-  border-radius: 12px;
+  border-radius: 10px;
   background-color: #fff;
   color: #475569;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
   line-height: 1.2;
   cursor: pointer;
@@ -1473,7 +1473,7 @@ body {
    as the surrounding compact choices. */
 #expense-description-input,
 .expense-currency-picker-trigger {
-  font-size: 12px !important;
+  font-size: 11px !important;
 }
 
 .expense-time-picker-trigger {
@@ -1704,14 +1704,14 @@ body {
 
 @media (max-width: 768px) {
   .map-controls-group {
-    top: 156px; /* Keep controls below the search bar and the mobile header */
+    top: 132px; /* Keep map controls below the floating search field. */
     right: 16px;
     gap: 8px;
     z-index: 900;
   }
 
   .sidebar-toggle-btn {
-    top: 100px; /* Offset to clear the search bar on mobile */
+    top: 132px; /* Align the menu button with the map controls. */
     left: 16px;
   }
 
@@ -1810,8 +1810,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   }
 
   .map-controls-group {
-    top: calc(156px + env(safe-area-inset-top));
+    top: calc(132px + env(safe-area-inset-top));
     z-index: 900;
+  }
+
+  .sidebar-toggle-btn {
+    top: calc(132px + env(safe-area-inset-top));
   }
 }
 
