@@ -5529,8 +5529,15 @@ function App() {
           </div>
 
           {/* Footer */}
-        <div style={{ padding: '24px 32px', borderTop: '1px solid #f3f4f6', backgroundColor: '#f9fafb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: "11px", fontWeight: "900", color: "#111827", letterSpacing: "0.05em" }}>{(favorites || []).length} 저장 • {totalSpots} 일정</span>
+        <div style={{ padding: '18px 32px', borderTop: '1px solid #f3f4f6', backgroundColor: '#f9fafb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
+              <span style={{ fontSize: "11px", fontWeight: "900", color: "#111827", letterSpacing: "0.05em" }}>{(favorites || []).length} 저장 • {totalSpots} 일정</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '9px', fontWeight: '800' }}>
+                <a href="/privacy.html" style={{ color: '#64748b', textDecoration: 'none' }}>개인정보처리방침</a>
+                <span aria-hidden="true" style={{ color: '#cbd5e1' }}>·</span>
+                <a href="/support.html" style={{ color: '#64748b', textDecoration: 'none' }}>지원</a>
+              </span>
+            </div>
             <span style={{ fontSize: "10px", fontWeight: "800", color: !isOnline || syncStatus === "offline" ? "#d97706" : syncStatus === "error" ? "#ef4444" : syncStatus === "saving" ? "#f59e0b" : "#10b981" }}>{!isOnline || syncStatus === "offline" ? "오프라인 저장" : isLoadingDB ? "동기화 중…" : syncStatus === "saving" ? "저장 중…" : syncStatus === "error" ? "로컬 저장됨" : "저장됨"}</span>
             <button onClick={() => setSidebarOpen(false)} style={{ fontSize: '11px', fontWeight: '900', color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer', letterSpacing: '0.05em' }}>닫기</button>
           </div>
@@ -5698,6 +5705,11 @@ function App() {
             )}
             {authMode === 'signup' && <button type="button" onClick={() => openAuthModal('login')} style={{ width: '100%', marginTop: '16px', padding: 0, border: 'none', background: 'none', color: '#2563eb', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}>이미 계정이 있나요? 로그인</button>}
             {authMode === 'reset' && <button type="button" onClick={() => openAuthModal('login')} style={{ width: '100%', marginTop: '16px', padding: 0, border: 'none', background: 'none', color: '#2563eb', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}>로그인으로 돌아가기</button>}
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '20px', color: '#94a3b8', fontSize: '10px', fontWeight: '800' }}>
+              <a href="/privacy.html" style={{ color: 'inherit', textDecoration: 'none' }}>개인정보처리방침</a>
+              <span aria-hidden="true">·</span>
+              <a href="/support.html" style={{ color: 'inherit', textDecoration: 'none' }}>지원</a>
+            </div>
           </form>
         </div>
       )}
