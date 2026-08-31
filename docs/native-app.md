@@ -47,6 +47,23 @@ travelplaner://auth/callback
 
 iOS는 `ASWebAuthenticationSession`, Android는 기본 브라우저를 사용합니다. 콜백이 앱에 도착하면 같은 WebView 원본 주소로 변환해 Supabase 세션 교환을 완료합니다. 운영 웹의 기존 로그인 리디렉션은 변경되지 않습니다.
 
+## 계정 삭제 활성화
+
+로그인한 사용자는 앱 헤더의 **계정 삭제**에서 `삭제`를 직접 입력한 뒤 인증 계정과 클라우드 데이터를 영구 삭제할 수 있습니다. Google Play의 외부 삭제 URL은 다음과 같습니다.
+
+```text
+https://travelplaner-545.pages.dev/delete-account.html
+```
+
+운영 활성화에는 다음 두 가지가 모두 필요합니다.
+
+1. Supabase SQL Editor에서 `supabase/migrations/202609010001_account_deletion.sql`을 실행합니다. 이 마이그레이션은 공유 일정에 `owner_id`를 추가하고 다른 사용자의 공유 데이터를 삭제하지 못하도록 소유권을 고정합니다.
+2. Cloudflare Pages의 Settings → Variables and Secrets에 `SUPABASE_SERVICE_ROLE_KEY`를 **Secret**으로 추가하고 Production을 다시 배포합니다.
+
+서비스 역할 키는 계정 삭제 서버 함수에서만 사용하며 `VITE_` 접두사를 붙이거나 Git, 브라우저 코드, 로그에 기록하면 안 됩니다. 로컬 Pages Functions 테스트가 필요하면 `.dev.vars.example`을 `.dev.vars`로 복사하고 실제 값은 커밋하지 않습니다.
+
+삭제 API는 Supabase access token으로 본인을 확인한 뒤 `shared_trips.owner_id`, `user_state.user_id`, Auth 사용자 순서로 삭제합니다. 기기의 로그인 없는 로컬 일정은 계정과 분리해 유지됩니다.
+
 ## Android 설정
 
 1. Android Studio에서 `android/` 폴더를 엽니다.
@@ -65,6 +82,7 @@ iOS는 `ASWebAuthenticationSession`, Android는 기본 브라우저를 사용합
 - [ ] 앱 업데이트 설치 후 로컬 일정 유지
 - [ ] 이메일 로그인과 Google OAuth
 - [ ] 로그인 후 로컬/클라우드 일정 병합
+- [ ] 계정 삭제 → 재로그인 불가 및 클라우드 데이터 제거 확인
 - [ ] 현재 위치 권한 허용/거절/설정에서 재허용
 - [ ] Google 지도 경로 링크가 외부 지도 앱에서 열림
 - [ ] 예약 링크와 새 창 링크
@@ -83,9 +101,10 @@ iOS는 `ASWebAuthenticationSession`, Android는 기본 브라우저를 사용합
 - iPhone/iPad/Android 스토어 스크린샷
 - 개인정보처리방침: `https://travelplaner-545.pages.dev/privacy.html`
 - 지원 페이지: `https://travelplaner-545.pages.dev/support.html`
+- 계정 삭제: `https://travelplaner-545.pages.dev/delete-account.html`
 
 스토어 소개 문구, 심사 메모, 개인정보 설문 초안, 스크린샷 목록과 업로드 절차는 [`docs/store-submission.md`](store-submission.md)에 정리했습니다.
 
-선택적 회원가입을 유지하면 Apple과 Google 정책에 따라 앱 안에서 계정 삭제를 시작할 수 있어야 하며 Google Play용 공개 삭제 URL도 필요합니다. 네이티브 앱에서 회원가입과 로그인을 제공하지 않는 경우에는 이 요구가 앱에 적용되지 않지만, 기기 간 동기화 기능도 함께 제외됩니다.
+선택적 회원가입과 계정 삭제 UI·서버 함수·공개 삭제 페이지는 구현되어 있습니다. 실제 운영에서는 위 Supabase 마이그레이션과 Cloudflare Secret 설정을 완료해야 합니다.
 
 계정과 서명 키가 없는 상태에서도 소스 코드, 시뮬레이터 빌드, 디버그 APK와 내부 테스트 직전 단계까지는 완료할 수 있습니다. 실제 TestFlight/Play 업로드는 계정 소유자의 서명 승인이 필요합니다.

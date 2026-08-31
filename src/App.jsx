@@ -87,6 +87,7 @@ const openNativeAuthSession = (url) => {
 
 const ONBOARDING_STORAGE_KEY = 'travelplaner_onboarding_seen_v1';
 const SYNC_CONFLICT_DISMISSED_STORAGE_PREFIX = 'travelplaner_sync_conflict_dismissed_v1';
+const ACCOUNT_DELETE_PENDING_STORAGE_KEY = 'travelplaner_account_delete_pending_v1';
 
 const escapeIcsText = (value) => String(value || '')
   .replace(/\\/g, '\\\\')
@@ -1050,6 +1051,7 @@ function App() {
 
   // --- GLOBAL UI & AUTH STATE ---
   const [session, setSession] = useState(null);
+  const [authResolved, setAuthResolved] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState('login');
   const [authEmail, setAuthEmail] = useState('');
@@ -1059,6 +1061,10 @@ function App() {
   const [authMessage, setAuthMessage] = useState('');
   const [authSubmitting, setAuthSubmitting] = useState(false);
   const [showAuthPassword, setShowAuthPassword] = useState(false);
+  const [showAccountDeleteModal, setShowAccountDeleteModal] = useState(false);
+  const [accountDeleteConfirmation, setAccountDeleteConfirmation] = useState('');
+  const [accountDeleteError, setAccountDeleteError] = useState('');
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   
   const [windowSize, setWindowSize] = useState({
     width: window.innerWidth,
@@ -1341,6 +1347,13 @@ function App() {
       : undefined
   );
 
+  const clearAccountDeletionIntent = () => {
+    localStorage.removeItem(ACCOUNT_DELETE_PENDING_STORAGE_KEY);
+    const currentUrl = new URL(window.location.href);
+    currentUrl.searchParams.delete('account');
+    window.history.replaceState({}, '', `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`);
+  };
+
   const resetAuthForm = () => {
     setAuthEmail('');
     setAuthPassword('');
@@ -1358,8 +1371,69 @@ function App() {
 
   const closeAuthModal = () => {
     if (authSubmitting) return;
+    if (readStoredJson(ACCOUNT_DELETE_PENDING_STORAGE_KEY, false)) clearAccountDeletionIntent();
     setShowAuthModal(false);
     resetAuthForm();
+  };
+
+  const requestAccountDeletion = () => {
+    writeStoredJson(ACCOUNT_DELETE_PENDING_STORAGE_KEY, true);
+    setAccountDeleteConfirmation('');
+    setAccountDeleteError('');
+    if (session) {
+      setShowAccountDeleteModal(true);
+    } else {
+      openAuthModal('login');
+    }
+  };
+
+  const closeAccountDeleteModal = () => {
+    if (isDeletingAccount) return;
+    clearAccountDeletionIntent();
+    setShowAccountDeleteModal(false);
+    setAccountDeleteConfirmation('');
+    setAccountDeleteError('');
+  };
+
+  const handleDeleteAccount = async (event) => {
+    event.preventDefault();
+    if (accountDeleteConfirmation !== '삭제' || isDeletingAccount) return;
+
+    setIsDeletingAccount(true);
+    setAccountDeleteError('');
+    try {
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (!currentSession?.access_token) throw new Error('로그인 세션이 만료되었습니다. 다시 로그인해주세요.');
+
+      const response = await fetch('/api/account', {
+        method: 'DELETE',
+        headers: {
+          authorization: `Bearer ${currentSession.access_token}`,
+          'content-type': 'application/json'
+        },
+        credentials: 'same-origin'
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.deleted) {
+        throw new Error(payload?.error?.message || '계정을 삭제하지 못했습니다.');
+      }
+
+      clearAccountDeletionIntent();
+      setShowAccountDeleteModal(false);
+      setAccountDeleteConfirmation('');
+      await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
+      setSession(null);
+      setModalConfig({
+        type: 'success',
+        title: '계정 삭제 완료',
+        message: '계정과 클라우드 동기화 데이터를 삭제했습니다. 이 기기의 로그인 없는 로컬 일정은 그대로 유지됩니다.'
+      });
+      setShowCustomModal(true);
+    } catch (error) {
+      setAccountDeleteError(error.message || '계정을 삭제하지 못했습니다. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setIsDeletingAccount(false);
+    }
   };
 
   const handleGoogleLogin = async () => {
@@ -1531,9 +1605,12 @@ function App() {
   
   // Auth listener
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => setSession(session))
+      .finally(() => setAuthResolved(true));
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession);
+      setAuthResolved(true);
       if (event === 'PASSWORD_RECOVERY') {
         setAuthMode('new-password');
         setAuthError('');
@@ -1543,6 +1620,26 @@ function App() {
     });
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('account') === 'delete') {
+      writeStoredJson(ACCOUNT_DELETE_PENDING_STORAGE_KEY, true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!authResolved || !readStoredJson(ACCOUNT_DELETE_PENDING_STORAGE_KEY, false)) return;
+    if (session) {
+      // Open the destructive confirmation only after the requested account is authenticated.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setShowAuthModal(false);
+      setShowAccountDeleteModal(true);
+    } else if (!showAuthModal) {
+      openAuthModal('login');
+    }
+  // Re-run only when the resolved authentication or modal state changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authResolved, session, showAuthModal]);
 
   // Reset activeDay when trip changes
   useEffect(() => {
@@ -2112,7 +2209,7 @@ function App() {
     try {
       const { data, error } = await supabase
         .from('shared_trips')
-        .insert({ trip_data: trip })
+        .insert({ trip_data: trip, owner_id: session?.user?.id || null })
         .select()
         .single();
 
@@ -4047,7 +4144,10 @@ function App() {
               </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 {session ? (
-                  <button onClick={() => supabase.auth.signOut()} style={{ background: '#f3f4f6', border: 'none', color: '#6b7280', fontWeight: '800', fontSize: '10px', cursor: 'pointer', padding: '8px 12px', borderRadius: '10px' }}>로그아웃</button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <button onClick={() => supabase.auth.signOut()} style={{ background: '#f3f4f6', border: 'none', color: '#6b7280', fontWeight: '800', fontSize: '10px', cursor: 'pointer', padding: '8px 10px', borderRadius: '10px' }}>로그아웃</button>
+                    <button type="button" onClick={requestAccountDeletion} style={{ background: '#fff1f2', border: '1px solid #fecdd3', color: '#be123c', fontWeight: '900', fontSize: '9px', cursor: 'pointer', padding: '7px 9px', borderRadius: '10px' }}>계정 삭제</button>
+                  </div>
                 ) : (
                   <button onClick={() => openAuthModal('login')} style={{ background: 'white', border: '1px solid #e5e7eb', color: '#4b5563', padding: '8px 12px', borderRadius: '10px', fontWeight: '800', fontSize: '10px', cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <Lock size={12} />
@@ -5606,6 +5706,64 @@ function App() {
             <span style={{ color: '#047857', fontSize: '12px', lineHeight: 1.5 }}>로그인 전 저장된 여행 {mergeNotice.trips}개{mergeNotice.favorites > 0 ? `와 장소 ${mergeNotice.favorites}개` : ''}를 계정에 병합했습니다.</span>
           </div>
           <button type="button" aria-label="동기화 안내 닫기" onClick={() => setMergeNotice(null)} style={{ border: 'none', background: 'none', color: '#059669', cursor: 'pointer', padding: '2px' }}><X size={16} /></button>
+        </div>
+      )}
+
+      {showAccountDeleteModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="account-delete-modal-title"
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') closeAccountDeleteModal();
+          }}
+          style={{ position: 'fixed', inset: 0, zIndex: 14500, backgroundColor: 'rgba(15, 23, 42, 0.58)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
+        >
+          <form
+            onSubmit={handleDeleteAccount}
+            style={{ width: '100%', maxWidth: '430px', maxHeight: 'calc(100vh - 40px)', overflowY: 'auto', position: 'relative', padding: '28px 24px', borderRadius: '26px', backgroundColor: 'white', boxShadow: '0 25px 60px rgba(15, 23, 42, 0.3)' }}
+          >
+            <button
+              type="button"
+              aria-label="계정 삭제 창 닫기"
+              onClick={closeAccountDeleteModal}
+              disabled={isDeletingAccount}
+              style={{ position: 'absolute', top: '18px', right: '18px', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', borderRadius: '50%', backgroundColor: '#f1f5f9', color: '#64748b', cursor: isDeletingAccount ? 'not-allowed' : 'pointer' }}
+            >
+              <X size={18} />
+            </button>
+            <div style={{ width: '46px', height: '46px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px', borderRadius: '15px', backgroundColor: '#fff1f2', color: '#e11d48' }}>
+              <Trash2 size={22} />
+            </div>
+            <h2 id="account-delete-modal-title" style={{ margin: 0, color: '#0f172a', fontSize: '22px', fontWeight: '900', letterSpacing: '-0.04em' }}>계정을 영구 삭제할까요?</h2>
+            <p style={{ margin: '10px 0 0', color: '#475569', fontSize: '12px', fontWeight: '700', lineHeight: 1.65 }}>
+              <strong>{session?.user?.email || '현재 로그인 계정'}</strong>의 인증 계정, 클라우드에 동기화된 여행 데이터와 이 계정에서 만든 공유 일정이 삭제됩니다.
+            </p>
+            <div style={{ margin: '16px 0', padding: '13px 14px', borderRadius: '14px', backgroundColor: '#fff7ed', color: '#9a3412', fontSize: '11px', fontWeight: '800', lineHeight: 1.55 }}>
+              삭제한 클라우드 데이터는 복구할 수 없습니다. 이 기기의 로그인 없는 로컬 일정은 유지됩니다.
+            </div>
+            <label htmlFor="account-delete-confirmation" style={{ display: 'flex', flexDirection: 'column', gap: '7px', color: '#475569', fontSize: '11px', fontWeight: '900' }}>
+              계속하려면 아래에 <strong style={{ color: '#be123c' }}>삭제</strong>를 입력하세요.
+              <input
+                id="account-delete-confirmation"
+                autoFocus
+                type="text"
+                autoComplete="off"
+                value={accountDeleteConfirmation}
+                onChange={(event) => { setAccountDeleteConfirmation(event.target.value); setAccountDeleteError(''); }}
+                disabled={isDeletingAccount}
+                placeholder="삭제"
+                style={{ width: '100%', boxSizing: 'border-box', padding: '13px 14px', border: `1px solid ${accountDeleteError ? '#fca5a5' : '#e2e8f0'}`, borderRadius: '13px', backgroundColor: '#f8fafc', color: '#0f172a', fontSize: '14px', fontWeight: '800', outline: 'none' }}
+              />
+            </label>
+            {accountDeleteError && <p role="alert" style={{ margin: '10px 0 0', padding: '10px 12px', borderRadius: '11px', backgroundColor: '#fef2f2', color: '#dc2626', fontSize: '12px', fontWeight: '800', lineHeight: 1.45 }}>{accountDeleteError}</p>}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.25fr', gap: '9px', marginTop: '20px' }}>
+              <button type="button" onClick={closeAccountDeleteModal} disabled={isDeletingAccount} style={{ padding: '13px', border: '1px solid #e2e8f0', borderRadius: '13px', backgroundColor: 'white', color: '#475569', fontSize: '12px', fontWeight: '900', cursor: isDeletingAccount ? 'not-allowed' : 'pointer' }}>취소</button>
+              <button type="submit" disabled={accountDeleteConfirmation !== '삭제' || isDeletingAccount} style={{ padding: '13px', border: 'none', borderRadius: '13px', backgroundColor: '#e11d48', color: 'white', fontSize: '12px', fontWeight: '900', cursor: accountDeleteConfirmation !== '삭제' || isDeletingAccount ? 'not-allowed' : 'pointer', opacity: accountDeleteConfirmation !== '삭제' || isDeletingAccount ? 0.5 : 1 }}>
+                {isDeletingAccount ? '삭제 중…' : '계정 영구 삭제'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 

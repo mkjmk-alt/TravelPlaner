@@ -15,6 +15,7 @@
 | 앱 아이콘 | iOS/Android 적용 완료 |
 | 개인정보처리방침 | <https://travelplaner-545.pages.dev/privacy.html> |
 | 지원 URL | <https://travelplaner-545.pages.dev/support.html> |
+| 계정 삭제 URL | <https://travelplaner-545.pages.dev/delete-account.html> |
 | 운영 웹앱 | <https://travelplaner-545.pages.dev/> |
 | iOS 시뮬레이터 Release 빌드 | 통과 |
 | Android Release AAB 빌드·Lint | 통과 |
@@ -100,7 +101,7 @@ WebView를 사용하지만 다음 네이티브 기능을 제공합니다.
 - 광고 및 광고 추적: 없음
 - 위치: 백그라운드 접근 없음
 - Android 자동 백업: 비활성화
-- 계정 생성 기능을 제공할 경우 앱 내부 삭제 경로와 공개 삭제 URL이 모두 필요
+- 계정 삭제 UI·서버 함수·공개 삭제 페이지 구현 완료. Supabase 마이그레이션과 Cloudflare Secret 활성화 후 실계정 검증 필요
 - App Store Connect와 Play Console의 답변에는 앱 자체뿐 아니라 Google Maps 및 Supabase 처리도 포함
 
 ## 스크린샷 촬영 목록
@@ -145,13 +146,16 @@ xcodebuild -project ios/TravelPlaner.xcodeproj \
 
 ## 계정 소유자가 완료해야 하는 항목
 
-- [ ] Apple Developer Team 선택 및 Bundle ID 등록
+- [x] Xcode 프로젝트 Apple Developer Team 선택
+- [ ] Bundle ID 등록과 App Store 배포 프로파일 확인
 - [ ] App Store Connect 앱 레코드 생성
 - [ ] Android 업로드 키 생성 및 Play App Signing 활성화
 - [ ] Google Play 앱 레코드 생성
 - [ ] Supabase Redirect URLs에 `travelplaner://auth/callback` 추가
-- [ ] 선택적 로그인을 유지할지, 네이티브 앱에서는 제외할지 확정
-- [ ] 로그인을 유지하면 실제 계정 삭제 기능과 공개 삭제 페이지 활성화
+- [x] 선택적 로그인 유지 확정
+- [x] 계정 삭제 UI·서버 함수·공개 삭제 페이지 소스 구현
+- [ ] Supabase 계정 삭제 마이그레이션 적용
+- [ ] Cloudflare `SUPABASE_SERVICE_ROLE_KEY` Secret 설정
 - [ ] App Privacy 및 Data safety 설문 최종 제출
 - [ ] 실기기 테스트와 스토어 스크린샷 촬영
 - [ ] TestFlight 및 Play 내부 테스트 배포
