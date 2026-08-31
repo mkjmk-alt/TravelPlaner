@@ -84,4 +84,8 @@ iOS는 `ASWebAuthenticationSession`, Android는 기본 브라우저를 사용합
 - 개인정보처리방침: `https://travelplaner-545.pages.dev/privacy.html`
 - 지원 페이지: `https://travelplaner-545.pages.dev/support.html`
 
+스토어 소개 문구, 심사 메모, 개인정보 설문 초안, 스크린샷 목록과 업로드 절차는 [`docs/store-submission.md`](store-submission.md)에 정리했습니다.
+
+선택적 회원가입을 유지하면 Apple과 Google 정책에 따라 앱 안에서 계정 삭제를 시작할 수 있어야 하며 Google Play용 공개 삭제 URL도 필요합니다. 네이티브 앱에서 회원가입과 로그인을 제공하지 않는 경우에는 이 요구가 앱에 적용되지 않지만, 기기 간 동기화 기능도 함께 제외됩니다.
+
 계정과 서명 키가 없는 상태에서도 소스 코드, 시뮬레이터 빌드, 디버그 APK와 내부 테스트 직전 단계까지는 완료할 수 있습니다. 실제 TestFlight/Play 업로드는 계정 소유자의 서명 승인이 필요합니다.

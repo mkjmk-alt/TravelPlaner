@@ -68,4 +68,4 @@ cd android
 - 오프라인 안내와 재시도
 - `travelplaner://` 딥 링크
 
-세부 설정과 출시 절차는 [네이티브 앱 개발 및 출시 가이드](docs/native-app.md)를 참고하세요.
+세부 설정은 [네이티브 앱 개발 및 출시 가이드](docs/native-app.md), 스토어 입력 자료와 업로드 절차는 [스토어 제출 준비서](docs/store-submission.md)를 참고하세요.
