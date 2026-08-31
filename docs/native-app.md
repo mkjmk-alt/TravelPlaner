@@ -37,6 +37,16 @@
 
 `ios/project.yml`을 수정했다면 `xcodegen generate`를 다시 실행합니다.
 
+## Supabase 인증 리디렉션
+
+Google OAuth, 이메일 확인과 비밀번호 재설정이 네이티브 앱으로 돌아오려면 Supabase Dashboard의 Authentication → URL Configuration → Redirect URLs에 다음 주소를 추가해야 합니다.
+
+```text
+travelplaner://auth/callback
+```
+
+iOS는 `ASWebAuthenticationSession`, Android는 기본 브라우저를 사용합니다. 콜백이 앱에 도착하면 같은 WebView 원본 주소로 변환해 Supabase 세션 교환을 완료합니다. 운영 웹의 기존 로그인 리디렉션은 변경되지 않습니다.
+
 ## Android 설정
 
 1. Android Studio에서 `android/` 폴더를 엽니다.

@@ -148,6 +148,18 @@ class MainActivity : ComponentActivity() {
 
     private inner class NativeDownloadBridge {
         @JavascriptInterface
+        fun openAuth(url: String) {
+            runOnUiThread {
+                val currentHost = webView.url?.let { Uri.parse(it).host }
+                val productionHost = Uri.parse(AppConfig.PRODUCTION_URL).host
+                val authUri = runCatching { Uri.parse(url) }.getOrNull()
+                if (currentHost == productionHost && authUri?.scheme == "https") {
+                    openExternal(authUri)
+                }
+            }
+        }
+
+        @JavascriptInterface
         fun saveBase64File(fileName: String, dataUrl: String) {
             runOnUiThread {
                 val currentHost = webView.url?.let { Uri.parse(it).host }

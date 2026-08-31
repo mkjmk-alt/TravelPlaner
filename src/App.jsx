@@ -68,6 +68,23 @@ const saveBlobAsFile = (blob, fileName) => {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 
+const isNativeShell = () => Boolean(
+  window.webkit?.messageHandlers?.travelPlanerAuth || window.TravelPlanerAndroid?.openAuth
+);
+
+const openNativeAuthSession = (url) => {
+  const iosBridge = window.webkit?.messageHandlers?.travelPlanerAuth;
+  if (iosBridge) {
+    iosBridge.postMessage(url);
+    return true;
+  }
+  if (window.TravelPlanerAndroid?.openAuth) {
+    window.TravelPlanerAndroid.openAuth(url);
+    return true;
+  }
+  return false;
+};
+
 const ONBOARDING_STORAGE_KEY = 'travelplaner_onboarding_seen_v1';
 const SYNC_CONFLICT_DISMISSED_STORAGE_PREFIX = 'travelplaner_sync_conflict_dismissed_v1';
 
@@ -1319,7 +1336,9 @@ function App() {
   const makeEntityId = () => crypto.randomUUID();
 
   const getAuthRedirectUrl = () => (
-    typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}` : undefined
+    typeof window !== 'undefined'
+      ? (isNativeShell() ? 'travelplaner://auth/callback' : `${window.location.origin}${window.location.pathname}`)
+      : undefined
   );
 
   const resetAuthForm = () => {
@@ -1345,11 +1364,21 @@ function App() {
 
   const handleGoogleLogin = async () => {
     setAuthError('');
-    const { error } = await supabase.auth.signInWithOAuth({
+    const nativeShell = isNativeShell();
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: getAuthRedirectUrl() }
+      options: {
+        redirectTo: getAuthRedirectUrl(),
+        skipBrowserRedirect: nativeShell
+      }
     });
-    if (error) setAuthError(error.message || 'Google 로그인에 실패했습니다.');
+    if (error) {
+      setAuthError(error.message || 'Google 로그인에 실패했습니다.');
+      return;
+    }
+    if (nativeShell && data?.url && !openNativeAuthSession(data.url)) {
+      setAuthError('네이티브 로그인 창을 열지 못했습니다.');
+    }
   };
 
   const handleEmailAuthSubmit = async (event) => {

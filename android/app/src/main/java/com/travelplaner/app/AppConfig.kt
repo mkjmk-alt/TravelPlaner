@@ -22,6 +22,7 @@ object AppConfig {
     fun deepLinkToWebUrl(uri: Uri): String {
         val path = uri.path?.ifBlank { "/" } ?: "/"
         val query = uri.encodedQuery?.let { "?$it" }.orEmpty()
-        return PRODUCTION_URL.trimEnd('/') + path + query
+        val fragment = uri.encodedFragment?.let { "#$it" }.orEmpty()
+        return PRODUCTION_URL.trimEnd('/') + path + query + fragment
     }
 }

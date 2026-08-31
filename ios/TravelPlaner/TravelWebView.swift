@@ -16,6 +16,7 @@ struct TravelWebView: UIViewRepresentable {
         configuration.allowsInlineMediaPlayback = true
         configuration.mediaTypesRequiringUserActionForPlayback = []
         configuration.userContentController.add(context.coordinator, name: "travelPlanerDownload")
+        configuration.userContentController.add(context.coordinator, name: "travelPlanerAuth")
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
@@ -40,6 +41,7 @@ struct TravelWebView: UIViewRepresentable {
 
     static func dismantleUIView(_ webView: WKWebView, coordinator: Coordinator) {
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "travelPlanerDownload")
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "travelPlanerAuth")
     }
 
     @MainActor
@@ -61,8 +63,16 @@ struct TravelWebView: UIViewRepresentable {
         }
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            guard message.frameInfo.securityOrigin.host == AppConfiguration.productionURL.host else { return }
+
+            if message.name == "travelPlanerAuth",
+               let urlString = message.body as? String,
+               let url = URL(string: urlString) {
+                browser.beginAuthentication(at: url)
+                return
+            }
+
             guard message.name == "travelPlanerDownload",
-                  message.frameInfo.securityOrigin.host == AppConfiguration.productionURL.host,
                   let payload = message.body as? [String: Any],
                   let fileName = payload["fileName"] as? String,
                   let dataURL = payload["dataUrl"] as? String,
