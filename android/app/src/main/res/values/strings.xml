@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">TravelPlaner</string>
+    <string name="offline_title">인터넷 연결을 확인해주세요</string>
+    <string name="offline_message">기기에 저장된 일정은 삭제되지 않습니다.</string>
+    <string name="retry">다시 시도</string>
+    <string name="download_description">TravelPlaner 파일을 저장하고 있습니다.</string>
+    <string name="download_started">다운로드를 시작했습니다.</string>
+    <string name="download_saved">파일을 저장했습니다.</string>
+    <string name="download_failed">파일을 다운로드하지 못했습니다.</string>
+    <string name="no_file_picker">파일을 선택할 수 있는 앱이 없습니다.</string>
+    <string name="no_matching_app">이 링크를 열 수 있는 앱이 없습니다.</string>
+</resources>

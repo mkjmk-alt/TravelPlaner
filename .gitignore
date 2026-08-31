@@ -29,3 +29,15 @@ dist-ssr
 # Scratch and test files
 scratch/
 
+# Native iOS
+ios/DerivedData/
+ios/**/xcuserdata/
+*.xcuserstate
+
+# Native Android
+android/.gradle/
+android/local.properties
+android/keystore.properties
+android/*.jks
+android/*.keystore
+android/**/build/

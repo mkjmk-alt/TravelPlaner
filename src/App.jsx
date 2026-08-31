@@ -41,6 +41,33 @@ const dataUrlToBlob = (dataUrl) => {
   return new Blob([bytes], { type: mimeMatch?.[1] || 'image/png' });
 };
 
+const saveBlobWithNativeBridge = (blob, fileName) => {
+  const iosBridge = window.webkit?.messageHandlers?.travelPlanerDownload;
+  const androidBridge = window.TravelPlanerAndroid;
+  if (!iosBridge && !androidBridge?.saveBase64File) return false;
+
+  const reader = new FileReader();
+  reader.onloadend = () => {
+    const payload = { fileName, dataUrl: String(reader.result || '') };
+    if (iosBridge) iosBridge.postMessage(payload);
+    else androidBridge.saveBase64File(payload.fileName, payload.dataUrl);
+  };
+  reader.readAsDataURL(blob);
+  return true;
+};
+
+const saveBlobAsFile = (blob, fileName) => {
+  if (saveBlobWithNativeBridge(blob, fileName)) return;
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
 const ONBOARDING_STORAGE_KEY = 'travelplaner_onboarding_seen_v1';
 const SYNC_CONFLICT_DISMISSED_STORAGE_PREFIX = 'travelplaner_sync_conflict_dismissed_v1';
 
@@ -2436,29 +2463,15 @@ function App() {
     const exportData = { ...trip };
     delete exportData.sharedId;
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
     const safeName = (trip.name || "travel-plan").replace(/[^\w가-힣-]+/g, "_");
-    link.href = url;
-    link.download = safeName + "-backup.json";
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    saveBlobAsFile(blob, safeName + "-backup.json");
     setModalConfig({ type: "success", title: "여행 데이터 백업 완료", message: "일정·지출·예산이 포함된 여행 데이터 백업 파일을 저장했습니다." });
     setShowCustomModal(true);
   };
 
   const downloadTextFile = (fileName, content, type) => {
     const blob = new Blob([content], { type });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    saveBlobAsFile(blob, fileName);
   };
 
   const exportTripAsIcal = (trip = activeTrip) => {
@@ -3764,14 +3777,8 @@ function App() {
 
     const saveImage = (blob) => {
       if (!blob) return;
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${(activeTrip.name || 'travel-plan').replace(/[^\w가-힣-]+/g, '_')}-expense-statistics.png`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      const fileName = `${(activeTrip.name || 'travel-plan').replace(/[^\w가-힣-]+/g, '_')}-expense-statistics.png`;
+      saveBlobAsFile(blob, fileName);
       setModalConfig({ type: 'success', title: '통계 이미지 저장 완료', message: '현재 지출 통계를 PNG 이미지로 저장했습니다.' });
       setShowCustomModal(true);
     };

@@ -1,0 +1,59 @@
+name: TravelPlaner
+options:
+  bundleIdPrefix: com.travelplaner
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: 1.0.0
+    DEVELOPMENT_TEAM: ""
+targets:
+  TravelPlaner:
+    type: application
+    platform: iOS
+    sources:
+      - path: TravelPlaner
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.travelplaner.app
+        PRODUCT_NAME: TravelPlaner
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        INFOPLIST_KEY_CFBundleDisplayName: TravelPlaner
+    info:
+      path: TravelPlaner/Info.plist
+      properties:
+        CFBundleDisplayName: TravelPlaner
+        CFBundleURLTypes:
+          - CFBundleTypeRole: Editor
+            CFBundleURLName: com.travelplaner.app
+            CFBundleURLSchemes:
+              - travelplaner
+        NSLocationWhenInUseUsageDescription: 현재 위치를 지도에 표시하고 주변 여행지를 찾기 위해 위치 권한이 필요합니다.
+        NSCameraUsageDescription: 예약 자료와 여행 사진을 첨부하기 위해 카메라 권한이 필요합니다.
+        NSPhotoLibraryUsageDescription: 예약 자료와 여행 사진을 첨부하기 위해 사진 접근 권한이 필요합니다.
+        NSMicrophoneUsageDescription: 웹 콘텐츠에서 음성 기능을 사용할 때 마이크 권한이 필요합니다.
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIViewControllerBasedStatusBarAppearance: true
+schemes:
+  TravelPlaner:
+    build:
+      targets:
+        TravelPlaner: all
+    run:
+      config: Debug
+    archive:
+      config: Release
