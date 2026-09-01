@@ -47,6 +47,8 @@ travelplaner://auth/callback
 
 iOS는 `ASWebAuthenticationSession`, Android는 기본 브라우저를 사용합니다. 콜백이 앱에 도착하면 같은 WebView 원본 주소로 변환해 Supabase 세션 교환을 완료합니다. 운영 웹의 기존 로그인 리디렉션은 변경되지 않습니다.
 
+네이티브 인증 브리지는 운영 Supabase 프로젝트의 HTTPS 호스트(`eiktqxrgsjrtmoyzuupn.supabase.co`)와 정확한 콜백(`travelplaner://auth/callback`)만 허용합니다. 다른 HTTPS 주소나 같은 스킴의 임의 경로는 인증 세션 또는 WebView 콜백으로 처리하지 않습니다.
+
 2026년 9월 2일 기준 Supabase 운영 프로젝트의 Redirect URLs에 `travelplaner://auth/callback` 등록을 완료했고, 기존 웹 리디렉션과 함께 총 2개가 유지되는 것을 확인했습니다.
 
 ## 계정 삭제 활성화
@@ -98,6 +100,8 @@ RLS를 먼저 적용하면 구버전 브라우저의 직접 Supabase 요청이 �
 6. `bundleRelease`로 AAB를 만들고 내부 테스트 트랙에 업로드합니다.
 
 현재 저장소에는 공개 저장소에 올려도 안전한 디버그 서명 설정만 포함합니다. 출시 서명 키는 개발자 계정 소유자가 생성해야 합니다.
+
+웹 다운로드는 Android 10 이상에서 추가 저장 공간 권한 없이 시스템 다운로드 관리자로 저장합니다. 공개 다운로드 폴더 쓰기 권한이 필요한 Android 8~9에서만 `WRITE_EXTERNAL_STORAGE`를 실행 중 요청하며, Manifest 권한도 API 28까지만 적용합니다. Android 12 이상은 `dataExtractionRules`로 클라우드 백업과 기기 간 자동 이전에서 앱 데이터를 제외합니다.
 
 ## 필수 실기기 확인표
 

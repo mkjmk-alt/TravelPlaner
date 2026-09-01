@@ -32,7 +32,7 @@ final class BrowserModel: NSObject, ObservableObject, ASWebAuthenticationPresent
     }
 
     func open(_ url: URL) {
-        if url.scheme?.lowercased() == "travelplaner" {
+        if AppConfiguration.isAuthenticationCallback(url) {
             var components = URLComponents(url: AppConfiguration.productionURL, resolvingAgainstBaseURL: false)
             components?.path = url.path.isEmpty ? "/" : url.path
             components?.query = url.query
@@ -48,7 +48,7 @@ final class BrowserModel: NSObject, ObservableObject, ASWebAuthenticationPresent
     }
 
     func beginAuthentication(at url: URL) {
-        guard url.scheme?.lowercased() == "https" else { return }
+        guard AppConfiguration.isAllowedAuthenticationURL(url) else { return }
         authenticationSession?.cancel()
 
         let session = ASWebAuthenticationSession(

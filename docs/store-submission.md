@@ -18,6 +18,7 @@
 | 계정 삭제 URL | <https://travelplaner-545.pages.dev/delete-account.html> |
 | 운영 웹앱 | <https://travelplaner-545.pages.dev/> |
 | iOS 시뮬레이터 Release 빌드 | 통과 |
+| iOS 실기기용 Release Archive | 개발 서명으로 통과 |
 | Android Release AAB 빌드·Lint | 통과 |
 | 로그인 없는 로컬 데이터 보존 | 강제 종료 및 앱 업데이트 후 유지 확인 |
 
@@ -82,6 +83,7 @@ WebView를 사용하지만 다음 네이티브 기능을 제공합니다.
 - 플랫폼 위치 권한 처리
 - 네이티브 파일 선택, 다운로드와 공유 시트
 - iOS 인증 세션 및 Android 외부 브라우저 인증 복귀
+- 운영 Supabase 호스트와 정확한 딥 링크 콜백만 허용하는 인증 브리지
 - 딥 링크, 시스템 뒤로가기, 오프라인 복구 UI와 안전 영역 처리
 
 심사 계정은 선택적 로그인 기능을 유지하는 경우에만 별도로 준비합니다. 핵심 기능 검토에는 로그인이 필요하지 않습니다.
@@ -100,8 +102,8 @@ WebView를 사용하지만 다음 네이티브 기능을 제공합니다.
 - 전송 구간: HTTPS 사용
 - 광고 및 광고 추적: 없음
 - 위치: 백그라운드 접근 없음
-- Android 자동 백업: 비활성화
-- 계정 삭제 UI·서버 함수·공개 삭제 페이지 구현 완료. Supabase 마이그레이션과 Cloudflare Secret 활성화 후 실계정 검증 필요
+- Android 자동 백업과 기기 간 자동 이전: 비활성화
+- 계정 삭제 UI·서버 함수·공개 삭제 페이지 구현, Supabase 마이그레이션과 Cloudflare Secret 운영 적용 완료. 스토어 제출 전 실계정 삭제 흐름 최종 확인 필요
 - App Store Connect와 Play Console의 답변에는 앱 자체뿐 아니라 Google Maps 및 Supabase 처리도 포함
 
 ## 스크린샷 촬영 목록

@@ -7,6 +7,7 @@
     <string name="download_started">다운로드를 시작했습니다.</string>
     <string name="download_saved">파일을 저장했습니다.</string>
     <string name="download_failed">파일을 다운로드하지 못했습니다.</string>
+    <string name="download_permission_denied">다운로드를 저장하려면 저장 공간 권한이 필요합니다.</string>
     <string name="no_file_picker">파일을 선택할 수 있는 앱이 없습니다.</string>
     <string name="no_matching_app">이 링크를 열 수 있는 앱이 없습니다.</string>
 </resources>

@@ -10,6 +10,7 @@ import android.graphics.Color
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.util.Base64
@@ -51,6 +52,7 @@ class MainActivity : ComponentActivity() {
     private var geolocationCallback: GeolocationPermissions.Callback? = null
     private var geolocationOrigin: String? = null
     private var pendingDownloadData: ByteArray? = null
+    private var pendingWebDownload: WebDownload? = null
     private val fileChooserLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         fileChooserCallback?.onReceiveValue(
             WebChromeClient.FileChooserParams.parseResult(result.resultCode, result.data)
@@ -65,6 +67,17 @@ class MainActivity : ComponentActivity() {
         geolocationCallback?.invoke(geolocationOrigin, granted, false)
         geolocationCallback = null
         geolocationOrigin = null
+    }
+    private val storagePermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        val download = pendingWebDownload
+        pendingWebDownload = null
+        if (granted && download != null) {
+            enqueueWebDownload(download)
+        } else if (!granted) {
+            Toast.makeText(this, R.string.download_permission_denied, Toast.LENGTH_SHORT).show()
+        }
     }
     private val createDocumentLauncher = registerForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream")
@@ -106,7 +119,10 @@ class MainActivity : ComponentActivity() {
         root.addView(offlineView, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         setContentView(root)
 
-        val initialUrl = intent?.data?.let { AppConfig.deepLinkToWebUrl(it) } ?: AppConfig.PRODUCTION_URL
+        val initialUrl = intent?.data
+            ?.takeIf(AppConfig::isAuthenticationCallback)
+            ?.let(AppConfig::deepLinkToWebUrl)
+            ?: AppConfig.PRODUCTION_URL
         if (savedInstanceState == null) webView.loadUrl(initialUrl) else webView.restoreState(savedInstanceState)
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -153,7 +169,7 @@ class MainActivity : ComponentActivity() {
                 val currentHost = webView.url?.let { Uri.parse(it).host }
                 val productionHost = Uri.parse(AppConfig.PRODUCTION_URL).host
                 val authUri = runCatching { Uri.parse(url) }.getOrNull()
-                if (currentHost == productionHost && authUri?.scheme == "https") {
+                if (currentHost == productionHost && authUri != null && AppConfig.isAllowedAuthenticationUrl(authUri)) {
                     openExternal(authUri)
                 }
             }
@@ -256,20 +272,36 @@ class MainActivity : ComponentActivity() {
                 val resolvedMimeType = mimeType.ifBlank {
                     MimeTypeMap.getSingleton().getMimeTypeFromExtension(fileName.substringAfterLast('.')).orEmpty()
                 }
-                val request = DownloadManager.Request(Uri.parse(url)).apply {
-                    if (resolvedMimeType.isNotBlank()) setMimeType(resolvedMimeType)
-                    addRequestHeader("Cookie", CookieManager.getInstance().getCookie(url).orEmpty())
-                    addRequestHeader("User-Agent", userAgent)
-                    setTitle(fileName)
-                    setDescription(getString(R.string.download_description))
-                    setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                    setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+                val download = WebDownload(url, userAgent, fileName, resolvedMimeType)
+                if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P &&
+                    checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+                ) {
+                    pendingWebDownload = download
+                    storagePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                } else {
+                    enqueueWebDownload(download)
                 }
-                (getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(request)
-                Toast.makeText(this@MainActivity, R.string.download_started, Toast.LENGTH_SHORT).show()
             } catch (_: Exception) {
                 Toast.makeText(this@MainActivity, R.string.download_failed, Toast.LENGTH_SHORT).show()
             }
+        }
+    }
+
+    private fun enqueueWebDownload(download: WebDownload) {
+        try {
+            val request = DownloadManager.Request(Uri.parse(download.url)).apply {
+                if (download.mimeType.isNotBlank()) setMimeType(download.mimeType)
+                addRequestHeader("Cookie", CookieManager.getInstance().getCookie(download.url).orEmpty())
+                addRequestHeader("User-Agent", download.userAgent)
+                setTitle(download.fileName)
+                setDescription(getString(R.string.download_description))
+                setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, download.fileName)
+            }
+            (getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(request)
+            Toast.makeText(this, R.string.download_started, Toast.LENGTH_SHORT).show()
+        } catch (_: Exception) {
+            Toast.makeText(this, R.string.download_failed, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -327,7 +359,9 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        intent.data?.let { webView.loadUrl(AppConfig.deepLinkToWebUrl(it)) }
+        intent.data
+            ?.takeIf(AppConfig::isAuthenticationCallback)
+            ?.let { webView.loadUrl(AppConfig.deepLinkToWebUrl(it)) }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -352,4 +386,11 @@ class MainActivity : ComponentActivity() {
     companion object {
         private const val MAX_BASE64_LENGTH = 34 * 1024 * 1024
     }
+
+    private data class WebDownload(
+        val url: String,
+        val userAgent: String,
+        val fileName: String,
+        val mimeType: String
+    )
 }
