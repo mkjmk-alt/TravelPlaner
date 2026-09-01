@@ -47,6 +47,8 @@ travelplaner://auth/callback
 
 iOS는 `ASWebAuthenticationSession`, Android는 기본 브라우저를 사용합니다. 콜백이 앱에 도착하면 같은 WebView 원본 주소로 변환해 Supabase 세션 교환을 완료합니다. 운영 웹의 기존 로그인 리디렉션은 변경되지 않습니다.
 
+2026년 9월 2일 기준 Supabase 운영 프로젝트의 Redirect URLs에 `travelplaner://auth/callback` 등록을 완료했고, 기존 웹 리디렉션과 함께 총 2개가 유지되는 것을 확인했습니다.
+
 ## 계정 삭제 활성화
 
 로그인한 사용자는 앱 헤더의 **계정 삭제**에서 `삭제`를 직접 입력한 뒤 인증 계정과 클라우드 데이터를 영구 삭제할 수 있습니다. Google Play의 외부 삭제 URL은 다음과 같습니다.

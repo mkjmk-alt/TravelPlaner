@@ -151,7 +151,7 @@ xcodebuild -project ios/TravelPlaner.xcodeproj \
 - [ ] App Store Connect 앱 레코드 생성
 - [ ] Android 업로드 키 생성 및 Play App Signing 활성화
 - [ ] Google Play 앱 레코드 생성
-- [ ] Supabase Redirect URLs에 `travelplaner://auth/callback` 추가
+- [x] Supabase Redirect URLs에 `travelplaner://auth/callback` 추가
 - [x] 선택적 로그인 유지 확정
 - [x] 계정 삭제 UI·서버 함수·공개 삭제 페이지 소스 구현
 - [x] Supabase 계정 삭제·공유 일정 RLS 마이그레이션 적용
