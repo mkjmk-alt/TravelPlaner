@@ -36,9 +36,6 @@ targets:
             CFBundleURLSchemes:
               - travelplaner
         NSLocationWhenInUseUsageDescription: 현재 위치를 지도에 표시하고 주변 여행지를 찾기 위해 위치 권한이 필요합니다.
-        NSCameraUsageDescription: 예약 자료와 여행 사진을 첨부하기 위해 카메라 권한이 필요합니다.
-        NSPhotoLibraryUsageDescription: 예약 자료와 여행 사진을 첨부하기 위해 사진 접근 권한이 필요합니다.
-        NSMicrophoneUsageDescription: 웹 콘텐츠에서 음성 기능을 사용할 때 마이크 권한이 필요합니다.
         UILaunchScreen:
           UIColorName: LaunchBackground
         UISupportedInterfaceOrientations:

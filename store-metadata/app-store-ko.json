@@ -1,0 +1,15 @@
+{
+  "name": "TravelPlaner",
+  "subtitle": "지도와 예산까지 한 번에",
+  "promotionalText": "여행 일정, 장소, 예약, 체크리스트와 지출을 한 화면에서 관리하고 JSON·iCalendar·CSV로 간편하게 백업하세요.",
+  "keywords": "여행,일정,플래너,지도,예약,예산,지출,체크리스트,환율",
+  "description": "TravelPlaner는 여행 계획부터 현지 지출 정리까지 한곳에서 관리하는 여행 일정 플래너입니다.\n\n여행별 날짜와 목적지를 정하고 일차별 방문 장소와 시간을 지도에서 확인하세요. 항공권·숙소 등 예약 정보와 준비 체크리스트를 함께 관리할 수 있습니다. 현지 통화와 원화 환산, 카테고리 예산, 결제 수단별 지출, 현금 정산 기능으로 여행 경비도 한눈에 파악할 수 있습니다.\n\n주요 기능\n• 여행별 일차 일정과 지도 동선 관리\n• 현재 위치 확인과 외부 지도 경로 연결\n• 항공·숙소 등 예약 정보 정리\n• 여행 준비 체크리스트\n• 다중 통화, 환율, 카테고리 예산과 지출 통계\n• JSON 백업, iCalendar, CSV와 통계 이미지 저장\n• 로그인 없이 기기에 저장하여 바로 사용\n• 선택적 계정 동기화와 공유 일정\n• 오프라인 상태 안내와 네트워크 복구 후 재시도\n\n로그인하지 않은 여행 정보는 사용 중인 기기의 앱 저장소에 보관됩니다. 앱을 삭제하거나 운영체제에서 앱 데이터를 지우면 로컬 데이터도 삭제되므로 중요한 일정은 JSON 백업으로 보관하세요.",
+  "releaseNotes": "TravelPlaner 1.0을 출시합니다. 여행 일정, 지도, 예약 메모, 체크리스트, 다중 통화 예산·지출, 현금 정산, 백업과 선택적 공유 기능을 제공합니다.",
+  "supportUrl": "https://travelplaner-545.pages.dev/support.html",
+  "marketingUrl": "https://travelplaner-545.pages.dev/",
+  "privacyPolicyUrl": "https://travelplaner-545.pages.dev/privacy.html",
+  "privacyChoicesUrl": "https://travelplaner-545.pages.dev/delete-account.html",
+  "termsUrl": "https://travelplaner-545.pages.dev/terms.html",
+  "primaryCategory": "Travel",
+  "reviewNotes": "로그인 없이 모든 핵심 여행 계획 기능을 검토할 수 있습니다. 첫 화면에서 새 여행을 만든 뒤 일정, 예약, 체크리스트와 예산·지출 화면을 확인해주세요. 위치 권한은 지도 오른쪽의 현재 위치 버튼을 누를 때만 요청합니다. 공유 링크를 가진 사용자는 해당 공유 사본을 보고 수정할 수 있으며, 생성자는 공유 해제로 서버 사본을 삭제할 수 있습니다. 계정 로그인은 선택 사항이므로 별도 심사 계정이 필요하지 않습니다."
+}

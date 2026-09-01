@@ -1,0 +1,46 @@
+{
+  "tracking": false,
+  "advertising": false,
+  "dataSale": false,
+  "encryptedInTransit": true,
+  "accountRequired": false,
+  "accountDeletionUrl": "https://travelplaner-545.pages.dev/delete-account.html",
+  "dataTypes": [
+    {
+      "type": "Email address",
+      "optional": true,
+      "linkedToUser": true,
+      "purposes": ["App functionality", "Account management"]
+    },
+    {
+      "type": "User ID",
+      "optional": true,
+      "linkedToUser": true,
+      "purposes": ["App functionality", "Account management"]
+    },
+    {
+      "type": "Other user-generated content",
+      "optional": true,
+      "linkedToUser": true,
+      "purposes": ["App functionality"]
+    },
+    {
+      "type": "Other financial info",
+      "optional": true,
+      "linkedToUser": true,
+      "purposes": ["App functionality"]
+    },
+    {
+      "type": "Precise location",
+      "optional": true,
+      "linkedToUser": false,
+      "purposes": ["App functionality"]
+    },
+    {
+      "type": "In-app search history",
+      "optional": true,
+      "linkedToUser": false,
+      "purposes": ["App functionality"]
+    }
+  ]
+}

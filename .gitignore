@@ -43,3 +43,6 @@ android/keystore.properties
 android/*.jks
 android/*.keystore
 android/**/build/
+
+# Supabase CLI cache
+supabase/.temp/

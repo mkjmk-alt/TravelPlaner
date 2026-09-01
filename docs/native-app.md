@@ -31,7 +31,7 @@
 1. `ios/TravelPlaner.xcodeproj`를 Xcode에서 엽니다.
 2. TravelPlaner 타깃의 Signing & Capabilities에서 Apple Developer Team을 선택합니다.
 3. 실제 Bundle ID를 확인합니다.
-4. 위치, 사진, 카메라 권한 문구를 검토합니다.
+4. 현재 위치 버튼을 위한 위치 권한 문구를 검토합니다.
 5. 실기기에서 위치, Google 로그인, JSON/ICS/PNG 저장을 점검합니다.
 6. Archive 후 TestFlight 내부 테스트에 업로드합니다.
 
@@ -70,25 +70,27 @@ https://travelplaner-545.pages.dev/delete-account.html
 
 ## 공유 일정 API와 RLS
 
-공유 일정의 생성·조회·수정은 Cloudflare Pages Function인 `/api/shared-trips`를 거칩니다. Supabase 관리자 비밀키는 서버 런타임에서만 사용하고 브라우저 번들에는 포함하지 않습니다.
+공유 일정의 생성·조회·수정·해제는 Cloudflare Pages Function인 `/api/shared-trips`를 거칩니다. Supabase 관리자 비밀키는 서버 런타임에서만 사용하고 브라우저 번들에는 포함하지 않습니다.
 
 - `GET`: 정확한 UUID 공유 코드 한 건만 조회
-- `POST`: 공유 일정 생성. 로그인 토큰이 있으면 검증 후 `owner_id` 기록
+- `POST`: 공유 일정 생성. 로그인 토큰이 있으면 검증 후 `owner_id`를 기록하고, 생성 기기에만 공유 해제용 관리 토큰을 한 번 반환
 - `PATCH`: 정확한 UUID 공유 일정의 `trip_data`만 수정
+- `DELETE`: 로그인한 소유자 또는 생성 기기의 관리 토큰을 확인한 뒤 공유 사본 삭제
 - 공유 링크는 추측하기 어려운 UUID 자체가 접근 권한인 capability link입니다.
+- 관리 토큰은 서버에 원문을 저장하지 않고 SHA-256 해시만 저장합니다.
 - 공동 편집은 직접 Realtime 구독 대신 15초 간격 API 동기화를 사용합니다.
 - `shared_trips`는 `anon`, `authenticated`의 직접 권한을 회수하고 서버 함수만 접근합니다.
 - `user_state`는 RLS로 로그인한 본인의 `user_id` 행만 조회·저장할 수 있습니다.
 
-운영 중단을 피하려면 아래 순서를 지켜야 합니다.
+`202609010001_account_deletion.sql` 마이그레이션은 운영에 적용 완료되었습니다. 공유 해제를 추가할 때는 새 컬럼을 먼저 준비해야 하므로 아래 순서를 지킵니다.
 
-1. Pages Function과 새 프런트 버전을 배포합니다.
-2. Cloudflare Production에 `SUPABASE_SECRET_KEY`가 연결됐는지 확인합니다.
-3. 기존 공유 UUID로 `/api/shared-trips` 조회를 확인합니다.
-4. `supabase/migrations/202609010001_account_deletion.sql`을 실행해 RLS와 권한 회수를 적용합니다.
+1. `supabase/migrations/202609020001_shared_trip_management.sql`을 실행해 nullable 관리 토큰 해시 컬럼을 추가합니다.
+2. Pages Function과 새 프런트 버전을 배포합니다.
+3. Cloudflare Production에 `SUPABASE_SECRET_KEY`가 연결됐는지 확인합니다.
+4. 기존 공유 UUID의 조회·수정과 새 공유 UUID의 생성·해제를 확인합니다.
 5. 같은 공유 링크와 로그인 동기화를 다시 확인합니다.
 
-RLS를 먼저 적용하면 구버전 브라우저의 직접 Supabase 요청이 실패하므로 반드시 서버 API 배포와 검증을 먼저 완료합니다.
+새 컬럼은 nullable이므로 마이그레이션을 먼저 적용해도 기존 공유 링크가 중단되지 않습니다. 기존 익명 공유에는 관리 토큰이 없으므로 생성 기기 토큰으로 해제할 수 없지만, 로그인 소유자가 기록된 공유는 소유자 인증으로 해제할 수 있습니다.
 
 ## Android 설정
 
@@ -113,6 +115,7 @@ Android 런처 아이콘은 적응형 아이콘과 원형 아이콘을 함께 �
 - [ ] 이메일 로그인과 Google OAuth
 - [ ] 로그인 후 로컬/클라우드 일정 병합
 - [ ] 계정 삭제 → 재로그인 불가 및 클라우드 데이터 제거 확인
+- [ ] 새 공유 생성 → 다른 브라우저에서 조회·수정 → 생성 기기에서 공유 해제 → 기존 링크 404 확인
 - [ ] 현재 위치 권한 허용/거절/설정에서 재허용
 - [ ] Google 지도 경로 링크가 외부 지도 앱에서 열림
 - [ ] 예약 링크와 새 창 링크

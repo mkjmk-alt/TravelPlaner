@@ -2,6 +2,8 @@
 
 이 문서는 소스와 빌드가 끝난 뒤 Apple Developer 및 Google Play Console 계정 소유자가 입력할 내용을 정리한 제출용 원본입니다. 비밀번호, 인증서, 업로드 키는 이 문서나 Git에 기록하지 않습니다.
 
+콘솔에 복사할 한국어 메타데이터와 개인정보 설문 원본은 [`store-metadata/`](../store-metadata/)에 있으며 `npm run store:validate`로 현재 글자 수 제한과 HTTPS URL을 검증합니다.
+
 ## 현재 제출 준비 상태
 
 | 항목 | 상태 |
@@ -14,6 +16,7 @@
 | Android Target SDK | API 36 |
 | 앱 아이콘 | iOS 및 Android 적응형·원형·단색 아이콘 적용 완료 |
 | 개인정보처리방침 | <https://travelplaner-545.pages.dev/privacy.html> |
+| 이용약관 | <https://travelplaner-545.pages.dev/terms.html> |
 | 지원 URL | <https://travelplaner-545.pages.dev/support.html> |
 | 계정 삭제 URL | <https://travelplaner-545.pages.dev/delete-account.html> |
 | 운영 웹앱 | <https://travelplaner-545.pages.dev/> |
@@ -26,6 +29,7 @@
 | Google Play 앱 아이콘 | 512×512 준비 완료 |
 | Google Play 기능 그래픽 | 1024×500 준비 완료 |
 | 로그인 없는 로컬 데이터 보존 | 강제 종료 및 앱 업데이트 후 유지 확인 |
+| iOS Privacy Manifest | 계정·사용자 콘텐츠·지출·위치·검색 처리 선언 완료 |
 
 2026년 8월 31일부터 Google Play의 신규 앱과 업데이트는 Android 16(API 36) 이상을 대상으로 해야 하며, 현재 설정은 이 기준을 충족합니다.
 
@@ -50,6 +54,7 @@
 - 지원 URL: <https://travelplaner-545.pages.dev/support.html>
 - 마케팅 URL: <https://travelplaner-545.pages.dev/>
 - 개인정보처리방침 URL: <https://travelplaner-545.pages.dev/privacy.html>
+- 이용약관 URL: <https://travelplaner-545.pages.dev/terms.html>
 
 ### Google Play
 
@@ -57,6 +62,7 @@
 - 앱 카테고리: 여행 및 지역정보
 - 개발자 연락처: Play Console 계정 소유자의 공개 지원 이메일을 입력
 - 개인정보처리방침: <https://travelplaner-545.pages.dev/privacy.html>
+- 이용약관: <https://travelplaner-545.pages.dev/terms.html>
 
 ## 전체 설명 초안
 

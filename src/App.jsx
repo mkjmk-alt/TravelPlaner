@@ -625,6 +625,8 @@ const getComparableTrip = (trip) => {
   const comparableTrip = { ...(trip || {}) };
   // This is local bookkeeping and changes during every save. It is not trip content.
   delete comparableTrip.updatedAt;
+  delete comparableTrip.sharedId;
+  delete comparableTrip.sharedManagementToken;
   comparableTrip.reserveItems = Array.isArray(comparableTrip.reserveItems) ? comparableTrip.reserveItems : [];
   comparableTrip.checklist = Array.isArray(comparableTrip.checklist) ? comparableTrip.checklist : getDefaultChecklist();
   comparableTrip.expenses = Array.isArray(comparableTrip.expenses)
@@ -637,6 +639,36 @@ const getComparableTrip = (trip) => {
   return sortSyncValue(comparableTrip);
 };
 
+const getShareableTrip = (trip) => {
+  const shareableTrip = { ...(trip || {}) };
+  delete shareableTrip.sharedId;
+  delete shareableTrip.sharedManagementToken;
+  return shareableTrip;
+};
+
+const removeShareMetadata = (trip) => {
+  const localTrip = { ...(trip || {}) };
+  delete localTrip.sharedId;
+  delete localTrip.sharedManagementToken;
+  return localTrip;
+};
+
+const getPrivateCloudTrip = (trip) => {
+  const cloudTrip = { ...(trip || {}) };
+  // The creator-only revocation secret must remain in this device's local storage.
+  delete cloudTrip.sharedManagementToken;
+  return cloudTrip;
+};
+
+const preserveLocalShareMetadata = (trip, localTrip) => {
+  const nextTrip = { ...(trip || {}) };
+  if (!nextTrip.sharedId && localTrip?.sharedId) nextTrip.sharedId = localTrip.sharedId;
+  if (localTrip?.sharedManagementToken) {
+    nextTrip.sharedManagementToken = localTrip.sharedManagementToken;
+  }
+  return nextTrip;
+};
+
 const areTripsEqual = (left, right) => {
   try {
     return JSON.stringify(getComparableTrip(left)) === JSON.stringify(getComparableTrip(right));
@@ -645,13 +677,20 @@ const areTripsEqual = (left, right) => {
   }
 };
 
-const requestSharedTripApi = async ({ method = 'GET', id = '', tripData, accessToken = '' }) => {
+const requestSharedTripApi = async ({
+  method = 'GET',
+  id = '',
+  tripData,
+  accessToken = '',
+  managementToken = ''
+}) => {
   const url = new URL('/api/shared-trips', window.location.origin);
   if (id) url.searchParams.set('id', id);
 
   const headers = {};
   if (tripData !== undefined) headers['content-type'] = 'application/json';
   if (accessToken) headers.authorization = `Bearer ${accessToken}`;
+  if (managementToken) headers['x-travelplaner-management-token'] = managementToken;
 
   const response = await fetch(url, {
     method,
@@ -663,10 +702,17 @@ const requestSharedTripApi = async ({ method = 'GET', id = '', tripData, accessT
   if (!response.ok) {
     throw new Error(payload?.error?.message || '공유 일정 요청에 실패했습니다.');
   }
+  if (method === 'DELETE') {
+    if (!payload?.deleted || payload.id !== id) throw new Error('공유 해제 응답을 확인하지 못했습니다.');
+    return payload;
+  }
   if (!payload?.trip?.id || !payload.trip.trip_data) {
     throw new Error('공유 일정 응답을 확인하지 못했습니다.');
   }
-  return payload.trip;
+  return {
+    ...payload.trip,
+    management_token: payload.management_token || ''
+  };
 };
 
 const getPaymentMethodLabel = (method) => (
@@ -1704,7 +1750,7 @@ function App() {
         const localRegularTrips = (trips || []).filter(trip => !trip.localOnly);
 
         if (!cloudTrips && localRegularTrips.length > 0) {
-          const { error: localTripSyncError } = await supabase.from("user_state").upsert({ user_id: session.user.id, key: "world_pro_trips_v1", value: localRegularTrips }, { onConflict: "user_id,key" });
+          const { error: localTripSyncError } = await supabase.from("user_state").upsert({ user_id: session.user.id, key: "world_pro_trips_v1", value: localRegularTrips.map(getPrivateCloudTrip) }, { onConflict: "user_id,key" });
           if (localTripSyncError) throw localTripSyncError;
         } else if (cloudTrips) {
           const cloudTripList = (Array.isArray(cloudTrips) ? cloudTrips : []).filter(trip => !trip.localOnly);
@@ -1737,7 +1783,7 @@ function App() {
               mergedTrips.push(localTrip);
               localWins += 1;
             } else {
-              mergedTrips.push(cloudTrip);
+              mergedTrips.push(preserveLocalShareMetadata(cloudTrip, localTrip));
               remoteWins += 1;
             }
           });
@@ -1762,7 +1808,7 @@ function App() {
             }
           }
           if (localOnlyTrips.length > 0 || localWins > 0) {
-            const { error: mergeTripError } = await supabase.from("user_state").upsert({ user_id: session.user.id, key: "world_pro_trips_v1", value: mergedTrips.filter(trip => !trip.localOnly) }, { onConflict: "user_id,key" });
+            const { error: mergeTripError } = await supabase.from("user_state").upsert({ user_id: session.user.id, key: "world_pro_trips_v1", value: mergedTrips.filter(trip => !trip.localOnly).map(getPrivateCloudTrip) }, { onConflict: "user_id,key" });
             if (mergeTripError) throw mergeTripError;
           }
         }
@@ -1834,7 +1880,7 @@ function App() {
             const remoteTrip = remoteTrips.get(String(trip.sharedId || ''));
             if (!remoteTrip || areTripsEqual(trip, remoteTrip)) return trip;
             changed = true;
-            return remoteTrip;
+            return preserveLocalShareMetadata(remoteTrip, trip);
           });
           if (changed) writeStoredJson('world_pro_trips_v1', nextTrips);
           return changed ? nextTrips : previousTrips;
@@ -2196,7 +2242,7 @@ function App() {
         const { error } = await supabase
           .from('user_state')
           .upsert(
-            { user_id: session.user.id, key: 'world_pro_trips_v1', value: cloudTrips },
+            { user_id: session.user.id, key: 'world_pro_trips_v1', value: cloudTrips.map(getPrivateCloudTrip) },
             { onConflict: 'user_id,key' }
           );
         if (error) throw error;
@@ -2211,7 +2257,11 @@ function App() {
     for (const trip of cloudTrips) {
       if (trip.sharedId) {
         try {
-          await requestSharedTripApi({ method: 'PATCH', id: trip.sharedId, tripData: trip });
+          await requestSharedTripApi({
+            method: 'PATCH',
+            id: trip.sharedId,
+            tripData: getShareableTrip(trip)
+          });
         } catch (err) {
           console.error("Shared trip update failed:", err);
           setSyncStatus('error');
@@ -2249,11 +2299,15 @@ function App() {
     try {
       const data = await requestSharedTripApi({
         method: 'POST',
-        tripData: trip,
+        tripData: getShareableTrip(trip),
         accessToken: session?.access_token || ''
       });
 
-      const newTrips = trips.map(t => t.id === tripId ? { ...t, sharedId: data.id } : t);
+      const newTrips = trips.map(t => t.id === tripId ? {
+        ...t,
+        sharedId: data.id,
+        sharedManagementToken: data.management_token
+      } : t);
       await syncTripsToCloud(newTrips);
       copySharedTripLink(data.id, tripId);
       
@@ -2263,6 +2317,46 @@ function App() {
     } catch (err) {
       console.error("Sharing failed detail:", err);
       setModalConfig({ type: 'error', title: '공유 실패', message: `공유에 실패했습니다: ${err.message || "네트워크나 데이터베이스 설정을 확인해주세요."}` });
+      setShowCustomModal(true);
+    }
+  };
+
+  const stopSharingTrip = async (tripId) => {
+    const trip = (trips || []).find(item => item.id === tripId);
+    if (!trip?.sharedId) return;
+    if (!trip.sharedManagementToken && !session?.access_token) {
+      setModalConfig({
+        type: 'error',
+        title: '공유 해제 불가',
+        message: '이 기기에는 공유 생성자용 관리 정보가 없습니다. 공유를 만든 기기에서 해제하거나 생성에 사용한 계정으로 로그인해주세요.'
+      });
+      setShowCustomModal(true);
+      return;
+    }
+
+    try {
+      await requestSharedTripApi({
+        method: 'DELETE',
+        id: trip.sharedId,
+        accessToken: session?.access_token || '',
+        managementToken: trip.sharedManagementToken
+      });
+      const nextTrips = (trips || []).map(item => (
+        item.id === tripId ? removeShareMetadata(item) : item
+      ));
+      await syncTripsToCloud(nextTrips);
+      setModalConfig({
+        type: 'success',
+        title: '공유 해제 완료',
+        message: '공유 링크와 서버에 저장된 공유 사본을 삭제했습니다. 이 기기의 원본 여행은 그대로 유지됩니다.'
+      });
+      setShowCustomModal(true);
+    } catch (error) {
+      setModalConfig({
+        type: 'error',
+        title: '공유 해제 실패',
+        message: error.message || '네트워크 상태를 확인한 뒤 다시 시도해주세요.'
+      });
       setShowCustomModal(true);
     }
   };
@@ -2614,6 +2708,7 @@ function App() {
 
     const exportData = { ...trip };
     delete exportData.sharedId;
+    delete exportData.sharedManagementToken;
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
     const safeName = (trip.name || "travel-plan").replace(/[^\w가-힣-]+/g, "_");
     saveBlobAsFile(blob, safeName + "-backup.json");
@@ -2674,6 +2769,7 @@ function App() {
     const duplicateId = Date.now().toString();
     const tripWithoutShare = { ...trip };
     delete tripWithoutShare.sharedId;
+    delete tripWithoutShare.sharedManagementToken;
     const duplicate = {
       ...tripWithoutShare,
       id: duplicateId,
@@ -2945,6 +3041,26 @@ function App() {
   };
 
   const deleteTrip = async (id) => {
+    const tripToDelete = (trips || []).find(trip => trip.id === id);
+    if (tripToDelete?.sharedId && tripToDelete.sharedManagementToken) {
+      try {
+        await requestSharedTripApi({
+          method: 'DELETE',
+          id: tripToDelete.sharedId,
+          accessToken: session?.access_token || '',
+          managementToken: tripToDelete.sharedManagementToken
+        });
+      } catch (error) {
+        setModalConfig({
+          type: 'error',
+          title: '공유 데이터 삭제 실패',
+          message: `${error.message || '공유를 해제하지 못했습니다.'} 공유 사본이 남지 않도록 다시 시도한 뒤 여행을 삭제해주세요.`
+        });
+        setShowCustomModal(true);
+        return;
+      }
+    }
+
     const newTrips = (trips || []).filter(t => t.id !== id);
     // Wait for cloud sync to finish before any UI navigation
     await syncTripsToCloud(newTrips);
@@ -4240,7 +4356,7 @@ function App() {
                   </button>
                   
                   {/* Unified Invite Action */}
-                  <div style={{ marginLeft: 'auto' }}>
+                  <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <button 
                       onClick={() => activeTrip?.sharedId ? copySharedTripLink(activeTrip.sharedId, activeTrip.id) : shareTrip(activeTrip.id)}
                       style={{ height: '40px', padding: '0 12px', backgroundColor: activeTrip?.sharedId ? '#f3f4f6' : '#f5f3ff', borderRadius: '12px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: activeTrip?.sharedId ? '#6b7280' : '#8b5cf6', fontWeight: '900' }}
@@ -4249,6 +4365,35 @@ function App() {
                       {copiedId === activeTrip?.id ? <Check size={14} color="#10b981" /> : (activeTrip?.sharedId ? <Users size={14} /> : <Share2 size={14} />)}
                       {copiedId === activeTrip?.id ? "복사됨" : (activeTrip?.sharedId ? "공유 중" : "초대")}
                     </button>
+                    {activeTrip?.sharedId && (activeTrip?.sharedManagementToken || session?.user?.id) && (
+                      <button
+                        type="button"
+                        onClick={(event) => handleInlineDelete(
+                          event,
+                          `unshare-${activeTrip.id}`,
+                          () => stopSharingTrip(activeTrip.id)
+                        )}
+                        style={{
+                          height: '40px',
+                          minWidth: confirmDeleteId === `unshare-${activeTrip.id}` ? '66px' : '40px',
+                          padding: confirmDeleteId === `unshare-${activeTrip.id}` ? '0 10px' : 0,
+                          backgroundColor: confirmDeleteId === `unshare-${activeTrip.id}` ? '#ef4444' : '#fff1f2',
+                          borderRadius: '12px',
+                          border: '1px solid #fecdd3',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: confirmDeleteId === `unshare-${activeTrip.id}` ? 'white' : '#be123c',
+                          fontSize: '10px',
+                          fontWeight: '900'
+                        }}
+                        title={confirmDeleteId === `unshare-${activeTrip.id}` ? '공유 해제 확인' : '공유 링크와 서버 사본 삭제'}
+                        aria-label={`${activeTrip.name} 공유 해제`}
+                      >
+                        {confirmDeleteId === `unshare-${activeTrip.id}` ? '해제 확인' : <X size={15} />}
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -5661,6 +5806,8 @@ function App() {
               <span style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '9px', fontWeight: '800' }}>
                 <a href="/privacy.html" style={{ color: '#64748b', textDecoration: 'none' }}>개인정보처리방침</a>
                 <span aria-hidden="true" style={{ color: '#cbd5e1' }}>·</span>
+                <a href="/terms.html" style={{ color: '#64748b', textDecoration: 'none' }}>이용약관</a>
+                <span aria-hidden="true" style={{ color: '#cbd5e1' }}>·</span>
                 <a href="/support.html" style={{ color: '#64748b', textDecoration: 'none' }}>지원</a>
               </span>
             </div>
@@ -5710,7 +5857,7 @@ function App() {
             </div>
             <div>
               <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: '900', color: '#a78bfa' }}>공유 링크 복사됨</h4>
-              <p style={{ margin: 0, fontSize: '12px', fontWeight: '700', color: '#d1d5db', lineHeight: 1.4 }}>이 코드를 친구에게 전달하면<br/>실시간으로 함께 일정을 짤 수 있습니다! 🤝</p>
+              <p style={{ margin: 0, fontSize: '12px', fontWeight: '700', color: '#d1d5db', lineHeight: 1.4 }}>링크를 받은 사람은 일정을 보고 수정할 수 있습니다.<br/>공유 중 화면의 해제 버튼으로 링크를 폐기할 수 있어요.</p>
             </div>
             <button 
               aria-label="알림 닫기"
@@ -5891,6 +6038,8 @@ function App() {
             {authMode === 'reset' && <button type="button" onClick={() => openAuthModal('login')} style={{ width: '100%', marginTop: '16px', padding: 0, border: 'none', background: 'none', color: '#2563eb', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}>로그인으로 돌아가기</button>}
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '20px', color: '#94a3b8', fontSize: '10px', fontWeight: '800' }}>
               <a href="/privacy.html" style={{ color: 'inherit', textDecoration: 'none' }}>개인정보처리방침</a>
+              <span aria-hidden="true">·</span>
+              <a href="/terms.html" style={{ color: 'inherit', textDecoration: 'none' }}>이용약관</a>
               <span aria-hidden="true">·</span>
               <a href="/support.html" style={{ color: 'inherit', textDecoration: 'none' }}>지원</a>
             </div>

@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   onRequest,
+  onRequestDelete,
   onRequestGet,
   onRequestPatch,
   onRequestPost
@@ -21,18 +22,24 @@ const jsonResponse = (body, status = 200) => new Response(JSON.stringify(body), 
   headers: { 'content-type': 'application/json' }
 });
 
-const makeRequest = (method, { id = '', body, token = '', origin = '' } = {}) => {
+const makeRequest = (method, { id = '', body, token = '', managementToken = '', origin = '' } = {}) => {
   const url = new URL('https://travelplaner.example/api/shared-trips');
   if (id) url.searchParams.set('id', id);
   const headers = {};
   if (body !== undefined) headers['content-type'] = 'application/json';
   if (token) headers.authorization = `Bearer ${token}`;
+  if (managementToken) headers['x-travelplaner-management-token'] = managementToken;
   if (origin) headers.origin = origin;
   return new Request(url, {
     method,
     headers,
     body: body === undefined ? undefined : (typeof body === 'string' ? body : JSON.stringify(body))
   });
+};
+
+const hashToken = async (token) => {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
 };
 
 test('rejects a malformed shared id before querying Supabase', async () => {
@@ -86,7 +93,14 @@ test('creates an anonymous shared trip with a null owner', async () => {
     assert.equal(response.status, 201);
     assert.equal(calls.length, 1);
     assert.equal(calls[0].options.method, 'POST');
-    assert.deepEqual(JSON.parse(calls[0].options.body), { trip_data: tripData, owner_id: null });
+    const payload = await response.json();
+    const requestBody = JSON.parse(calls[0].options.body);
+    assert.equal(typeof payload.management_token, 'string');
+    assert.equal(payload.management_token.length >= 40, true);
+    assert.deepEqual(requestBody.trip_data, tripData);
+    assert.equal(requestBody.owner_id, null);
+    assert.match(requestBody.management_token_hash, /^[0-9a-f]{64}$/);
+    assert.equal(requestBody.management_token_hash, await hashToken(payload.management_token));
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -108,7 +122,10 @@ test('verifies a supplied session and assigns the authenticated owner', async ()
     });
     assert.equal(response.status, 201);
     assert.equal(calls[0].options.headers.authorization, 'Bearer valid-token');
-    assert.deepEqual(JSON.parse(calls[1].options.body), { trip_data: tripData, owner_id: 'user-123' });
+    const requestBody = JSON.parse(calls[1].options.body);
+    assert.deepEqual(requestBody.trip_data, tripData);
+    assert.equal(requestBody.owner_id, 'user-123');
+    assert.match(requestBody.management_token_hash, /^[0-9a-f]{64}$/);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -175,6 +192,79 @@ test('rejects cross-origin writes', async () => {
   assert.equal(response.status, 403);
 });
 
+test('deletes a shared trip with its creator management token', async () => {
+  const originalFetch = globalThis.fetch;
+  const managementToken = 'creator-only-token';
+  const calls = [];
+  globalThis.fetch = async (input, options = {}) => {
+    const url = new URL(String(input));
+    calls.push({ url, options });
+    if (options.method === 'DELETE') return jsonResponse([{ id: tripId }]);
+    return jsonResponse([{
+      id: tripId,
+      owner_id: null,
+      management_token_hash: await hashToken(managementToken)
+    }]);
+  };
+  try {
+    const response = await onRequestDelete({
+      request: makeRequest('DELETE', {
+        id: tripId,
+        managementToken,
+        origin: 'https://travelplaner.example'
+      }),
+      env
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { deleted: true, id: tripId });
+    assert.equal(calls.length, 2);
+    assert.equal(calls[1].options.method, 'DELETE');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('allows the authenticated owner to delete a legacy shared trip', async () => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (input, options = {}) => {
+    const url = new URL(String(input));
+    calls.push({ url, options });
+    if (url.pathname === '/auth/v1/user') return jsonResponse({ id: 'user-123' });
+    if (options.method === 'DELETE') return jsonResponse([{ id: tripId }]);
+    return jsonResponse([{ id: tripId, owner_id: 'user-123', management_token_hash: null }]);
+  };
+  try {
+    const response = await onRequestDelete({
+      request: makeRequest('DELETE', { id: tripId, token: 'valid-token' }),
+      env
+    });
+    assert.equal(response.status, 200);
+    assert.equal(calls.length, 3);
+    assert.equal(calls[2].options.method, 'DELETE');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('rejects shared trip deletion without owner credentials', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => jsonResponse([{
+    id: tripId,
+    owner_id: null,
+    management_token_hash: await hashToken('correct-token')
+  }]);
+  try {
+    const response = await onRequestDelete({
+      request: makeRequest('DELETE', { id: tripId, managementToken: 'wrong-token' }),
+      env
+    });
+    assert.equal(response.status, 403);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('returns 404 when the exact shared trip does not exist', async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () => jsonResponse([]);
@@ -186,7 +276,7 @@ test('returns 404 when the exact shared trip does not exist', async () => {
   }
 });
 
-test('allows only GET, POST, and PATCH on the endpoint', async () => {
-  const response = await onRequest({ request: makeRequest('DELETE') });
+test('allows only GET, POST, PATCH, and DELETE on the endpoint', async () => {
+  const response = await onRequest({ request: makeRequest('PUT') });
   assert.equal(response.status, 405);
 });
