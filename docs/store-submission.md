@@ -12,7 +12,7 @@
 | iOS 최소 버전 | iOS 16 |
 | Android 최소 버전 | Android 8.0, API 26 |
 | Android Target SDK | API 36 |
-| 앱 아이콘 | iOS/Android 적용 완료 |
+| 앱 아이콘 | iOS 및 Android 적응형·원형·단색 아이콘 적용 완료 |
 | 개인정보처리방침 | <https://travelplaner-545.pages.dev/privacy.html> |
 | 지원 URL | <https://travelplaner-545.pages.dev/support.html> |
 | 계정 삭제 URL | <https://travelplaner-545.pages.dev/delete-account.html> |
