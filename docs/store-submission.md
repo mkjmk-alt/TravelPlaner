@@ -20,6 +20,11 @@
 | iOS 시뮬레이터 Release 빌드 | 통과 |
 | iOS 실기기용 Release Archive | 개발 서명으로 통과 |
 | Android Release AAB 빌드·Lint | 통과 |
+| iPhone 17 Pro Max 스크린샷 원본 | 3장, 1320×2868 |
+| iPad Pro 13-inch 스크린샷 원본 | 1장, 2064×2752 |
+| Android 스크린샷 원본 | 3장, 1344×2992 |
+| Google Play 앱 아이콘 | 512×512 준비 완료 |
+| Google Play 기능 그래픽 | 1024×500 준비 완료 |
 | 로그인 없는 로컬 데이터 보존 | 강제 종료 및 앱 업데이트 후 유지 확인 |
 
 2026년 8월 31일부터 Google Play의 신규 앱과 업데이트는 Android 16(API 36) 이상을 대상으로 해야 하며, 현재 설정은 이 기준을 충족합니다.
@@ -118,6 +123,8 @@ WebView를 사용하지만 다음 네이티브 기능을 제공합니다.
 6. 지출 통계 및 이미지 저장
 
 Apple은 기기 종류별로 최소 1장, 최대 10장을 허용합니다. iPad 지원을 유지하므로 iPad 스크린샷도 준비합니다. Google Play에는 휴대전화 스크린샷과 512×512 앱 아이콘, 1024×500 그래픽 이미지를 계정에서 등록합니다.
+
+현재 촬영한 iOS 원본과 크기 정보는 [`store-assets/README.md`](../store-assets/README.md)에 정리했습니다. 스토어 레코드의 실제 업로드 화면에서 요구 크기를 다시 확인한 뒤 사용합니다.
 
 ## iOS Archive와 업로드
 

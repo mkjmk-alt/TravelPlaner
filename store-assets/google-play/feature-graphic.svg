@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1024" height="500" viewBox="0 0 1024 500">
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#10233f" />
+      <stop offset="0.48" stop-color="#314fda" />
+      <stop offset="1" stop-color="#8655f7" />
+    </linearGradient>
+    <linearGradient id="pill" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.18" />
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.08" />
+    </linearGradient>
+    <radialGradient id="glow">
+      <stop offset="0" stop-color="#6df2c2" stop-opacity="0.52" />
+      <stop offset="1" stop-color="#6df2c2" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="iconBackground" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#26a8ff" />
+      <stop offset="0.58" stop-color="#1764f2" />
+      <stop offset="1" stop-color="#0a42d9" />
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="22" stdDeviation="24" flood-color="#09162c" flood-opacity="0.45" />
+    </filter>
+  </defs>
+
+  <rect width="1024" height="500" fill="url(#background)" />
+  <circle cx="834" cy="88" r="236" fill="url(#glow)" />
+  <circle cx="42" cy="502" r="190" fill="#8f6cff" opacity="0.16" />
+  <path d="M-42 92 C 150 18, 302 138, 466 72 S 768 2, 1062 88" fill="none" stroke="#ffffff" stroke-opacity="0.09" stroke-width="3" />
+  <path d="M-10 438 C 120 350, 242 456, 364 384 S 570 298, 700 362" fill="none" stroke="#77f4c6" stroke-opacity="0.62" stroke-width="5" stroke-linecap="round" stroke-dasharray="4 18" />
+  <circle cx="35" cy="412" r="10" fill="#77f4c6" />
+  <circle cx="696" cy="362" r="10" fill="#ffffff" />
+
+  <g font-family="Pretendard, Apple SD Gothic Neo, Noto Sans KR, sans-serif" fill="#ffffff">
+    <text x="66" y="154" font-size="70" font-weight="800" letter-spacing="-2">TravelPlaner</text>
+    <text x="68" y="205" font-size="28" font-weight="600" opacity="0.92">여행 계획부터 현지 지출까지 한 번에</text>
+    <text x="68" y="249" font-size="19" font-weight="500" opacity="0.70">지도 · 일정 · 예약 · 체크리스트 · 다중 통화 예산</text>
+  </g>
+
+  <g transform="translate(66 292)" font-family="Pretendard, Apple SD Gothic Neo, Noto Sans KR, sans-serif" font-size="19" font-weight="700" fill="#ffffff">
+    <rect width="142" height="54" rx="27" fill="url(#pill)" stroke="#ffffff" stroke-opacity="0.16" />
+    <text x="71" y="34" text-anchor="middle">일정 관리</text>
+    <rect x="156" width="142" height="54" rx="27" fill="url(#pill)" stroke="#ffffff" stroke-opacity="0.16" />
+    <text x="227" y="34" text-anchor="middle">지도 동선</text>
+    <rect x="312" width="142" height="54" rx="27" fill="url(#pill)" stroke="#ffffff" stroke-opacity="0.16" />
+    <text x="383" y="34" text-anchor="middle">예산 통계</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="652" y="50" width="392" height="392" rx="94" fill="#ffffff" fill-opacity="0.14" stroke="#ffffff" stroke-opacity="0.32" />
+    <rect x="674" y="72" width="348" height="348" rx="76" fill="url(#iconBackground)" />
+    <path d="M716 344 C 756 294, 816 358, 854 308 S 921 238, 972 255" fill="none" stroke="#ffffff" stroke-width="18" stroke-linecap="round" />
+    <path d="M784 124 C 741 124, 712 154, 712 194 C 712 247, 784 304, 784 304 C 784 304, 856 247, 856 194 C 856 154, 827 124, 784 124 Z" fill="#2ee887" />
+    <circle cx="784" cy="194" r="30" fill="#ffffff" />
+    <path d="M925 250 L 986 228 L 957 296 L 943 269 L 925 250 Z" fill="#ffffff" />
+    <path d="M943 269 L 986 228 L 954 281 Z" fill="#cfe1ff" />
+  </g>
+</svg>
