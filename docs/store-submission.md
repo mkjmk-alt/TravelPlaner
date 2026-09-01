@@ -154,8 +154,8 @@ xcodebuild -project ios/TravelPlaner.xcodeproj \
 - [ ] Supabase Redirect URLs에 `travelplaner://auth/callback` 추가
 - [x] 선택적 로그인 유지 확정
 - [x] 계정 삭제 UI·서버 함수·공개 삭제 페이지 소스 구현
-- [ ] Supabase 계정 삭제 마이그레이션 적용
-- [ ] Cloudflare `SUPABASE_SECRET_KEY` Secret 설정
+- [x] Supabase 계정 삭제·공유 일정 RLS 마이그레이션 적용
+- [x] Cloudflare `SUPABASE_SECRET_KEY` Production Secret 설정
 - [ ] App Privacy 및 Data safety 설문 최종 제출
 - [ ] 실기기 테스트와 스토어 스크린샷 촬영
 - [ ] TestFlight 및 Play 내부 테스트 배포

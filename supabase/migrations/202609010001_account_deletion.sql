@@ -1,3 +1,5 @@
+begin;
+
 alter table public.shared_trips
   add column if not exists owner_id uuid references auth.users(id) on delete cascade;
 
@@ -47,3 +49,5 @@ with check (user_id = auth.uid());
 
 comment on column public.shared_trips.owner_id is
   'Authenticated owner of a shared trip. Null means it was shared anonymously.';
+
+commit;
