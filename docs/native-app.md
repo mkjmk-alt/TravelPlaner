@@ -58,9 +58,9 @@ https://travelplaner-545.pages.dev/delete-account.html
 운영 활성화에는 다음 두 가지가 모두 필요합니다.
 
 1. Supabase SQL Editor에서 `supabase/migrations/202609010001_account_deletion.sql`을 실행합니다. 이 마이그레이션은 공유 일정에 `owner_id`를 추가하고 다른 사용자의 공유 데이터를 삭제하지 못하도록 소유권을 고정합니다.
-2. Cloudflare Pages의 Settings → Variables and Secrets에 `SUPABASE_SERVICE_ROLE_KEY`를 **Secret**으로 추가하고 Production을 다시 배포합니다.
+2. Cloudflare Pages의 Settings → Variables and Secrets에 `SUPABASE_SECRET_KEY`를 **Secret**으로 추가하고 Production을 다시 배포합니다. 새 `sb_secret_...` 키를 권장하며 기존 `SUPABASE_SERVICE_ROLE_KEY`도 서버 전용 하위 호환됩니다.
 
-서비스 역할 키는 계정 삭제 서버 함수에서만 사용하며 `VITE_` 접두사를 붙이거나 Git, 브라우저 코드, 로그에 기록하면 안 됩니다. 로컬 Pages Functions 테스트가 필요하면 `.dev.vars.example`을 `.dev.vars`로 복사하고 실제 값은 커밋하지 않습니다.
+비밀키는 계정 삭제 서버 함수에서만 사용하며 `VITE_` 접두사를 붙이거나 Git, 브라우저 코드, 로그에 기록하면 안 됩니다. 로컬 Pages Functions 테스트가 필요하면 `.dev.vars.example`을 `.dev.vars`로 복사하고 실제 값은 커밋하지 않습니다.
 
 삭제 API는 Supabase access token으로 본인을 확인한 뒤 `shared_trips.owner_id`, `user_state.user_id`, Auth 사용자 순서로 삭제합니다. 기기의 로그인 없는 로컬 일정은 계정과 분리해 유지됩니다.
 

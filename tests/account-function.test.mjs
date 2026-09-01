@@ -6,7 +6,7 @@ import { onRequest, onRequestDelete } from '../functions/api/account.js';
 const env = {
   VITE_SUPABASE_URL: 'https://project.supabase.co',
   VITE_SUPABASE_ANON_KEY: 'anon-key',
-  SUPABASE_SERVICE_ROLE_KEY: 'service-role-key'
+  SUPABASE_SECRET_KEY: 'sb_secret_test-key'
 };
 
 const makeRequest = (token = 'valid-token') => new Request('https://travelplaner.example/api/account', {
@@ -71,7 +71,8 @@ test('deletes only rows owned by the authenticated user before deleting auth', a
     assert.equal(calls[1].options.method, 'DELETE');
     assert.equal(calls[2].url.searchParams.get('user_id'), 'eq.user-123');
     assert.equal(calls[3].url.pathname, '/auth/v1/admin/users/user-123');
-    assert.equal(calls[3].options.headers.authorization, 'Bearer service-role-key');
+    assert.equal(calls[3].options.headers.apikey, 'sb_secret_test-key');
+    assert.equal(calls[3].options.headers.authorization, undefined);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -103,4 +104,31 @@ test('does not delete the auth account after a database deletion failure', async
 test('allows only DELETE on the account endpoint', async () => {
   const response = await onRequest({ request: new Request('https://travelplaner.example/api/account') });
   assert.equal(response.status, 405);
+});
+
+test('keeps legacy service_role bearer compatibility', async () => {
+  const originalFetch = globalThis.fetch;
+  const adminCalls = [];
+  globalThis.fetch = async (input, options = {}) => {
+    const url = new URL(String(input));
+    if (url.pathname === '/auth/v1/user') return jsonResponse({ id: 'user-123' });
+    if (url.pathname.startsWith('/rest/v1/')) return new Response(null, { status: 204 });
+    adminCalls.push(options.headers);
+    return jsonResponse({});
+  };
+
+  try {
+    const response = await onRequestDelete({
+      request: makeRequest(),
+      env: {
+        VITE_SUPABASE_URL: env.VITE_SUPABASE_URL,
+        VITE_SUPABASE_ANON_KEY: env.VITE_SUPABASE_ANON_KEY,
+        SUPABASE_SERVICE_ROLE_KEY: 'legacy-service-role-jwt'
+      }
+    });
+    assert.equal(response.status, 200);
+    assert.equal(adminCalls[0].authorization, 'Bearer legacy-service-role-jwt');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
