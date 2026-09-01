@@ -96,10 +96,10 @@ RLS를 먼저 적용하면 구버전 브라우저의 직접 Supabase 요청이 �
 2. JDK 17과 Android SDK 36을 선택합니다.
 3. `./gradlew assembleDebug lint`로 검증합니다.
 4. Play Console에서 앱을 만든 뒤 업로드 키를 생성합니다.
-5. 비밀 키는 Git에 추가하지 말고 로컬 `keystore.properties` 또는 CI Secret으로 관리합니다.
-6. `bundleRelease`로 AAB를 만들고 내부 테스트 트랙에 업로드합니다.
+5. 비밀 키는 Git에 추가하지 말고 로컬 `keystore.properties` 또는 `TRAVELPLANER_ANDROID_*` CI Secret으로 관리합니다.
+6. `./gradlew bundleStoreRelease lintRelease`로 서명 설정을 검증하면서 AAB를 만들고 내부 테스트 트랙에 업로드합니다.
 
-현재 저장소에는 공개 저장소에 올려도 안전한 디버그 서명 설정만 포함합니다. 출시 서명 키는 개발자 계정 소유자가 생성해야 합니다.
+현재 저장소에는 공개 저장소에 올려도 안전한 디버그 서명 설정만 포함합니다. 출시 서명 키는 개발자 계정 소유자가 생성해야 합니다. 키 없이 실행한 일반 `bundleRelease` 결과는 구조 검증용 미서명 AAB이므로 Play Console에 업로드하지 않습니다.
 
 Android 런처 아이콘은 적응형 아이콘과 원형 아이콘을 함께 제공하며 Android 13 이상의 테마 아이콘을 위한 단색 레이어도 포함합니다. API 36 Pixel 가상기기에서 원형 마스크 표시와 잘림 여부를 확인했습니다.
 

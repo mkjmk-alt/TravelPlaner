@@ -19,7 +19,7 @@
 | 운영 웹앱 | <https://travelplaner-545.pages.dev/> |
 | iOS 시뮬레이터 Release 빌드 | 통과 |
 | iOS 실기기용 Release Archive | 개발 서명으로 통과 |
-| Android Release AAB 빌드·Lint | 통과 |
+| Android Release AAB 구조 빌드·Lint | 통과, Google Play 업로드용 서명 대기 |
 | iPhone 17 Pro Max 스크린샷 원본 | 3장, 1320×2868 |
 | iPad Pro 13-inch 스크린샷 원본 | 1장, 2064×2752 |
 | Android 스크린샷 원본 | 3장, 1344×2992 |
@@ -149,8 +149,8 @@ xcodebuild -project ios/TravelPlaner.xcodeproj \
 
 1. Play Console에서 `com.travelplaner.app` 앱을 생성합니다.
 2. Play App Signing을 활성화하고 업로드 키를 생성합니다.
-3. `android/keystore.properties.example`을 `android/keystore.properties`로 복사해 로컬 값만 입력합니다.
-4. `cd android && ./gradlew bundleRelease lintRelease`를 실행합니다.
+3. `android/keystore.properties.example`을 `android/keystore.properties`로 복사해 로컬 값만 입력하거나 문서에 적힌 `TRAVELPLANER_ANDROID_*` CI Secret 네 개를 설정합니다.
+4. `cd android && ./gradlew bundleStoreRelease lintRelease`를 실행합니다. 이 명령은 키 파일과 네 개의 서명 값을 먼저 검증하므로 미서명 AAB의 실수 업로드를 막습니다.
 5. `android/app/build/outputs/bundle/release/app-release.aab`를 내부 테스트 트랙에 업로드합니다.
 
 ## 계정 소유자가 완료해야 하는 항목
