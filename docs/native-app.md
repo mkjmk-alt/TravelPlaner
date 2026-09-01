@@ -57,12 +57,34 @@ https://travelplaner-545.pages.dev/delete-account.html
 
 운영 활성화에는 다음 두 가지가 모두 필요합니다.
 
-1. Supabase SQL Editor에서 `supabase/migrations/202609010001_account_deletion.sql`을 실행합니다. 이 마이그레이션은 공유 일정에 `owner_id`를 추가하고 다른 사용자의 공유 데이터를 삭제하지 못하도록 소유권을 고정합니다.
-2. Cloudflare Pages의 Settings → Variables and Secrets에 `SUPABASE_SECRET_KEY`를 **Secret**으로 추가하고 Production을 다시 배포합니다. 새 `sb_secret_...` 키를 권장하며 기존 `SUPABASE_SERVICE_ROLE_KEY`도 서버 전용 하위 호환됩니다.
+1. Cloudflare Pages의 Settings → Variables and Secrets에 `SUPABASE_SECRET_KEY`를 **Secret**으로 추가하고 Production을 다시 배포합니다. 새 `sb_secret_...` 키를 권장하며 기존 `SUPABASE_SERVICE_ROLE_KEY`도 서버 전용 하위 호환됩니다.
+2. `/api/shared-trips`가 운영 배포에서 정상 동작하는지 확인한 다음 Supabase SQL Editor에서 `supabase/migrations/202609010001_account_deletion.sql`을 실행합니다. 이 마이그레이션은 공유 일정에 `owner_id`를 추가하고, 공유 테이블의 직접 접근을 차단하며, 사용자 상태를 본인 계정에만 허용합니다.
 
 비밀키는 계정 삭제 서버 함수에서만 사용하며 `VITE_` 접두사를 붙이거나 Git, 브라우저 코드, 로그에 기록하면 안 됩니다. 로컬 Pages Functions 테스트가 필요하면 `.dev.vars.example`을 `.dev.vars`로 복사하고 실제 값은 커밋하지 않습니다.
 
 삭제 API는 Supabase access token으로 본인을 확인한 뒤 `shared_trips.owner_id`, `user_state.user_id`, Auth 사용자 순서로 삭제합니다. 기기의 로그인 없는 로컬 일정은 계정과 분리해 유지됩니다.
+
+## 공유 일정 API와 RLS
+
+공유 일정의 생성·조회·수정은 Cloudflare Pages Function인 `/api/shared-trips`를 거칩니다. Supabase 관리자 비밀키는 서버 런타임에서만 사용하고 브라우저 번들에는 포함하지 않습니다.
+
+- `GET`: 정확한 UUID 공유 코드 한 건만 조회
+- `POST`: 공유 일정 생성. 로그인 토큰이 있으면 검증 후 `owner_id` 기록
+- `PATCH`: 정확한 UUID 공유 일정의 `trip_data`만 수정
+- 공유 링크는 추측하기 어려운 UUID 자체가 접근 권한인 capability link입니다.
+- 공동 편집은 직접 Realtime 구독 대신 15초 간격 API 동기화를 사용합니다.
+- `shared_trips`는 `anon`, `authenticated`의 직접 권한을 회수하고 서버 함수만 접근합니다.
+- `user_state`는 RLS로 로그인한 본인의 `user_id` 행만 조회·저장할 수 있습니다.
+
+운영 중단을 피하려면 아래 순서를 지켜야 합니다.
+
+1. Pages Function과 새 프런트 버전을 배포합니다.
+2. Cloudflare Production에 `SUPABASE_SECRET_KEY`가 연결됐는지 확인합니다.
+3. 기존 공유 UUID로 `/api/shared-trips` 조회를 확인합니다.
+4. `supabase/migrations/202609010001_account_deletion.sql`을 실행해 RLS와 권한 회수를 적용합니다.
+5. 같은 공유 링크와 로그인 동기화를 다시 확인합니다.
+
+RLS를 먼저 적용하면 구버전 브라우저의 직접 Supabase 요청이 실패하므로 반드시 서버 API 배포와 검증을 먼저 완료합니다.
 
 ## Android 설정
 

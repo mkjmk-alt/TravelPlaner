@@ -645,6 +645,30 @@ const areTripsEqual = (left, right) => {
   }
 };
 
+const requestSharedTripApi = async ({ method = 'GET', id = '', tripData, accessToken = '' }) => {
+  const url = new URL('/api/shared-trips', window.location.origin);
+  if (id) url.searchParams.set('id', id);
+
+  const headers = {};
+  if (tripData !== undefined) headers['content-type'] = 'application/json';
+  if (accessToken) headers.authorization = `Bearer ${accessToken}`;
+
+  const response = await fetch(url, {
+    method,
+    headers,
+    body: tripData === undefined ? undefined : JSON.stringify({ trip_data: tripData }),
+    credentials: 'same-origin'
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload?.error?.message || '공유 일정 요청에 실패했습니다.');
+  }
+  if (!payload?.trip?.id || !payload.trip.trip_data) {
+    throw new Error('공유 일정 응답을 확인하지 못했습니다.');
+  }
+  return payload.trip;
+};
+
 const getPaymentMethodLabel = (method) => (
   PAYMENT_METHODS.find(option => option.value === method)?.label || '결제수단 미지정'
 );
@@ -1336,7 +1360,9 @@ function App() {
   const [editingExpenseId, setEditingExpenseId] = useState(null);
   const [placeSuggestions, setPlaceSuggestions] = useState([]);
 
-  const sharedTripCount = (trips || []).filter(t => t.sharedId).length;
+  const sharedTripIdsKey = Array.from(new Set(
+    (trips || []).filter(trip => trip.sharedId).map(trip => String(trip.sharedId))
+  )).sort().join(',');
   const suggestionRequestRef = useRef(0);
   const autocompleteSessionTokenRef = useRef(null);
   const makeEntityId = () => crypto.randomUUID();
@@ -1566,18 +1592,9 @@ function App() {
     if (!sharedCode) return undefined;
 
     let cancelled = false;
-    supabase
-      .from('shared_trips')
-      .select('*')
-      .eq('id', sharedCode)
-      .single()
-      .then(({ data, error }) => {
+    requestSharedTripApi({ id: sharedCode })
+      .then((data) => {
         if (cancelled) return;
-        if (error || !data?.trip_data) {
-          setSharedViewError('공유 일정을 불러오지 못했습니다. 링크가 만료되었거나 삭제되었을 수 있습니다.');
-          setSyncStatus('error');
-          return;
-        }
         setReadOnlySharedTrip({ ...data.trip_data, sharedId: data.id });
         setActiveTripId(`readonly-${data.id}`);
         setViewMode('itinerary');
@@ -1783,31 +1800,58 @@ function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
-  // --- REALTIME SYNC FOR SHARED TRIPS ---
+  // Shared trips use the same-origin Pages Function so the database table can
+  // stay private. Polling preserves collaboration without exposing Realtime.
   useEffect(() => {
-    const safeTrips = trips || [];
-    const sharedIds = safeTrips.filter(t => t.sharedId).map(t => t.sharedId);
+    const sharedIds = sharedTripIdsKey.split(',').filter(Boolean);
     if (sharedIds.length === 0) return;
 
-    // Listen for any changes in the shared_trips table
-    const channel = supabase
-      .channel('shared-trips-sync')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'shared_trips' }, payload => {
-        const sharedId = payload.new.id;
-        const updatedData = payload.new.trip_data;
-        
-        setTrips(prev => (prev || []).map(t => 
-          t.sharedId === sharedId ? { ...updatedData, sharedId } : t
-        ));
-      })
-      .subscribe();
+    let cancelled = false;
+    let polling = false;
+    const pollSharedTrips = async () => {
+      if (cancelled || polling || !navigator.onLine) return;
+      polling = true;
+      try {
+        const results = await Promise.allSettled(
+          sharedIds.map(sharedId => requestSharedTripApi({ id: sharedId }))
+        );
+        if (cancelled) return;
+
+        const remoteTrips = new Map();
+        results.forEach(result => {
+          if (result.status === 'fulfilled') {
+            remoteTrips.set(String(result.value.id), {
+              ...result.value.trip_data,
+              sharedId: result.value.id
+            });
+          }
+        });
+        if (remoteTrips.size === 0) return;
+
+        setTrips(previousTrips => {
+          let changed = false;
+          const nextTrips = (previousTrips || []).map(trip => {
+            const remoteTrip = remoteTrips.get(String(trip.sharedId || ''));
+            if (!remoteTrip || areTripsEqual(trip, remoteTrip)) return trip;
+            changed = true;
+            return remoteTrip;
+          });
+          if (changed) writeStoredJson('world_pro_trips_v1', nextTrips);
+          return changed ? nextTrips : previousTrips;
+        });
+      } finally {
+        polling = false;
+      }
+    };
+
+    pollSharedTrips();
+    const intervalId = window.setInterval(pollSharedTrips, 15000);
 
     return () => {
-      supabase.removeChannel(channel);
+      cancelled = true;
+      window.clearInterval(intervalId);
     };
-  // Realtime subscription only needs to change when the number of shared trips changes.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sharedTripCount]);
+  }, [sharedTripIdsKey]);
 
   // Exchange Rates
   useEffect(() => {
@@ -2163,15 +2207,11 @@ function App() {
       }
     }
 
-    // 2. Sync individual shared trips to shared_trips table
+    // 2. Sync individual shared trips through the server-only sharing API.
     for (const trip of cloudTrips) {
       if (trip.sharedId) {
         try {
-          const { error } = await supabase
-            .from('shared_trips')
-            .update({ trip_data: trip })
-            .eq('id', trip.sharedId);
-          if (error) throw error;
+          await requestSharedTripApi({ method: 'PATCH', id: trip.sharedId, tripData: trip });
         } catch (err) {
           console.error("Shared trip update failed:", err);
           setSyncStatus('error');
@@ -2207,16 +2247,11 @@ function App() {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('shared_trips')
-        .insert({ trip_data: trip, owner_id: session?.user?.id || null })
-        .select()
-        .single();
-
-      if (error) {
-        console.error("Supabase insert error:", error);
-        throw new Error(error.message || "Database insert failed");
-      }
+      const data = await requestSharedTripApi({
+        method: 'POST',
+        tripData: trip,
+        accessToken: session?.access_token || ''
+      });
 
       const newTrips = trips.map(t => t.id === tripId ? { ...t, sharedId: data.id } : t);
       await syncTripsToCloud(newTrips);
@@ -2281,16 +2316,7 @@ function App() {
     setJoinTripError('');
 
     try {
-      const { data, error } = await supabase
-        .from('shared_trips')
-        .select('*')
-        .eq('id', code.trim())
-        .single();
-
-      if (error || !data) {
-        setJoinTripError('올바른 공유 코드를 찾을 수 없습니다. 코드를 다시 확인해주세요.');
-        return;
-      }
+      const data = await requestSharedTripApi({ id: code.trim() });
 
       if ((trips || []).some(t => t.sharedId === data.id)) {
         setJoinTripError('이미 참여 중인 여행입니다.');

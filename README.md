@@ -12,6 +12,8 @@
 
 운영 웹 주소는 <https://travelplaner-545.pages.dev/>입니다. 네이티브 앱은 동일한 주소를 영구 WebView 저장소로 열기 때문에 로그인하지 않은 일정도 앱 종료 후 유지됩니다.
 
+공유 일정은 브라우저에서 Supabase 테이블에 직접 접근하지 않고 같은 원본의 `/api/shared-trips` Pages Function을 사용합니다. 공유 URL의 UUID가 접근 권한 역할을 하며, 공동 편집 내용은 15초 간격으로 동기화됩니다. 서버 함수와 RLS 배포 순서는 [네이티브 앱 개발 및 출시 가이드](docs/native-app.md#공유-일정-api와-rls)에 정리되어 있습니다.
+
 ## 웹앱 실행
 
 ```bash

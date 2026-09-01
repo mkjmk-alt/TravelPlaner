@@ -33,13 +33,17 @@ before insert or update of owner_id on public.shared_trips
 for each row execute function public.assign_shared_trip_owner();
 
 alter table public.shared_trips enable row level security;
+revoke all on table public.shared_trips from anon, authenticated;
 
-drop policy if exists "owners can delete shared trips" on public.shared_trips;
-create policy "owners can delete shared trips"
-on public.shared_trips
-for delete
+alter table public.user_state enable row level security;
+
+drop policy if exists "users manage own state" on public.user_state;
+create policy "users manage own state"
+on public.user_state
+for all
 to authenticated
-using (owner_id = auth.uid());
+using (user_id = auth.uid())
+with check (user_id = auth.uid());
 
 comment on column public.shared_trips.owner_id is
   'Authenticated owner of a shared trip. Null means it was shared anonymously.';
