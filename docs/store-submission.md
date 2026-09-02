@@ -22,7 +22,7 @@
 | 운영 웹앱 | <https://travelplaner-545.pages.dev/> |
 | iOS 시뮬레이터 Release 빌드 | 통과 |
 | iOS 실기기용 Release Archive | 개발 서명으로 통과 |
-| Android Release AAB 구조 빌드·Lint | 통과, Google Play 업로드용 서명 대기 |
+| Android Store Release AAB | 업로드 키 서명, Release Lint·JAR 서명·bundletool 검증 통과 |
 | iPhone 17 Pro Max 스크린샷 원본 | 3장, 1320×2868 |
 | iPad Pro 13-inch 스크린샷 원본 | 1장, 2064×2752 |
 | Android 스크린샷 원본 | 3장, 1344×2992 |
@@ -30,6 +30,7 @@
 | Google Play 기능 그래픽 | 1024×500 준비 완료 |
 | 로그인 없는 로컬 데이터 보존 | 강제 종료 및 앱 업데이트 후 유지 확인 |
 | iOS Privacy Manifest | 계정·사용자 콘텐츠·지출·위치·검색 처리 선언 완료 |
+| iOS Required Reason API | 앱 소스 직접 사용 없음 확인, `NSPrivacyAccessedAPITypes` 빈 배열 유지 |
 
 2026년 8월 31일부터 Google Play의 신규 앱과 업데이트는 Android 16(API 36) 이상을 대상으로 해야 하며, 현재 설정은 이 기준을 충족합니다.
 
@@ -159,13 +160,17 @@ xcodebuild -project ios/TravelPlaner.xcodeproj \
 4. `cd android && ./gradlew bundleStoreRelease lintRelease`를 실행합니다. 이 명령은 키 파일과 네 개의 서명 값을 먼저 검증하므로 미서명 AAB의 실수 업로드를 막습니다.
 5. `android/app/build/outputs/bundle/release/app-release.aab`를 내부 테스트 트랙에 업로드합니다.
 
+2023년 11월 13일 이후 생성된 개인 Play 개발자 계정은 프로덕션 접근 신청 전에 최소 12명의 테스터가 14일 연속 참여한 비공개 테스트를 완료해야 합니다. 내부 테스트로 설치·업데이트를 먼저 확인한 뒤 [`google-play-testing-plan.md`](google-play-testing-plan.md)의 명단과 시나리오를 사용해 비공개 테스트를 시작합니다.
+
 ## 계정 소유자가 완료해야 하는 항목
 
 - [x] Xcode 프로젝트 Apple Developer Team 선택
 - [ ] Bundle ID 등록과 App Store 배포 프로파일 확인
 - [ ] App Store Connect 앱 레코드 생성
-- [ ] Android 업로드 키 생성 및 Play App Signing 활성화
+- [x] Android 업로드 키 생성과 서명된 AAB 검증
+- [ ] Play App Signing 활성화와 업로드 인증서 등록
 - [ ] Google Play 앱 레코드 생성
+- [ ] Google 결제 프로필 연결, 개인 신원 인증과 개발자 등록비 결제
 - [x] Supabase Redirect URLs에 `travelplaner://auth/callback` 추가
 - [x] 선택적 로그인 유지 확정
 - [x] 계정 삭제 UI·서버 함수·공개 삭제 페이지 소스 구현
@@ -174,12 +179,16 @@ xcodebuild -project ios/TravelPlaner.xcodeproj \
 - [ ] App Privacy 및 Data safety 설문 최종 제출
 - [ ] 실기기 테스트와 스토어 스크린샷 촬영
 - [ ] TestFlight 및 Play 내부 테스트 배포
+- [ ] Play 비공개 테스트 12명 이상·14일 연속 참여 및 프로덕션 접근 신청
 
 ## 공식 기준 참고
 
 - Apple App Review Guidelines: <https://developer.apple.com/app-store/review/guidelines/>
 - Apple App Privacy: <https://developer.apple.com/help/app-store-connect/manage-app-information/manage-app-privacy>
+- Apple Required Reason API: <https://developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api>
 - Apple 스크린샷: <https://developer.apple.com/help/app-store-connect/manage-app-information/upload-app-previews-and-screenshots>
 - Google Play Target API: <https://developer.android.com/google/play/requirements/target-sdk>
 - Google Play Data safety: <https://support.google.com/googleplay/android-developer/answer/10787469>
 - Google Play 계정 삭제: <https://support.google.com/googleplay/android-developer/answer/13327111>
+- Google Play 개인 계정 테스트 요구사항: <https://support.google.com/googleplay/android-developer/answer/14151465>
+- Google Play 개발자 신원 인증: <https://support.google.com/android-developer-console/answer/16641416>

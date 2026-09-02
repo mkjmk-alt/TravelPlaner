@@ -97,11 +97,11 @@ https://travelplaner-545.pages.dev/delete-account.html
 1. Android Studio에서 `android/` 폴더를 엽니다.
 2. JDK 17과 Android SDK 36을 선택합니다.
 3. `./gradlew assembleDebug lint`로 검증합니다.
-4. Play Console에서 앱을 만든 뒤 업로드 키를 생성합니다.
+4. 로컬에서 준비된 업로드 키와 인증서 지문을 `android/UPLOAD_KEY.md`에서 확인합니다.
 5. 비밀 키는 Git에 추가하지 말고 로컬 `keystore.properties` 또는 `TRAVELPLANER_ANDROID_*` CI Secret으로 관리합니다.
 6. `./gradlew bundleStoreRelease lintRelease`로 서명 설정을 검증하면서 AAB를 만들고 내부 테스트 트랙에 업로드합니다.
 
-현재 저장소에는 공개 저장소에 올려도 안전한 디버그 서명 설정만 포함합니다. 출시 서명 키는 개발자 계정 소유자가 생성해야 합니다. 키 없이 실행한 일반 `bundleRelease` 결과는 구조 검증용 미서명 AAB이므로 Play Console에 업로드하지 않습니다.
+업로드 키는 `android/travelplaner-upload.jks`에 로컬로 생성했고 비밀번호는 macOS 로그인 키체인의 `TravelPlaner Android Upload Key` 항목에만 저장했습니다. JKS와 비밀번호는 Git에 포함되지 않습니다. 현재 서명된 AAB는 `android/app/build/outputs/bundle/release/app-release.aab`이며 Gradle Release Lint, JAR 서명과 bundletool 구조 검증을 통과했습니다. 키 없이 실행한 일반 `bundleRelease` 결과는 구조 검증용 미서명 AAB일 수 있으므로 Play Console에는 반드시 `bundleStoreRelease` 결과만 업로드합니다.
 
 Android 런처 아이콘은 적응형 아이콘과 원형 아이콘을 함께 제공하며 Android 13 이상의 테마 아이콘을 위한 단색 레이어도 포함합니다. API 36 Pixel 가상기기에서 원형 마스크 표시와 잘림 여부를 확인했습니다.
 
@@ -129,7 +129,7 @@ Android 런처 아이콘은 적응형 아이콘과 원형 아이콘을 함께 �
 
 - Apple Developer Program 및 Google Play Console 계정
 - 최종 Bundle/Application ID 승인
-- 배포 인증서, 프로비저닝 프로파일, Android 업로드 키
+- 배포 인증서, 프로비저닝 프로파일, Android 업로드 키의 외부 보안 백업과 Play App Signing 등록
 - 앱 소개 문구, 카테고리, 연령 등급
 - iPhone/iPad/Android 스토어 스크린샷
 - 개인정보처리방침: `https://travelplaner-545.pages.dev/privacy.html`
@@ -140,4 +140,4 @@ Android 런처 아이콘은 적응형 아이콘과 원형 아이콘을 함께 �
 
 선택적 회원가입, 계정 삭제 UI·서버 함수·공개 삭제 페이지, 공유 일정 API가 구현되어 있습니다. 2026년 9월 1일 기준 Cloudflare Production Secret과 Supabase RLS 마이그레이션을 운영에 적용했고, 기존 공유 링크의 API 조회와 화면 로드를 재검증했습니다.
 
-계정과 서명 키가 없는 상태에서도 소스 코드, 시뮬레이터 빌드, 디버그 APK와 내부 테스트 직전 단계까지는 완료할 수 있습니다. 실제 TestFlight/Play 업로드는 계정 소유자의 서명 승인이 필요합니다.
+Android 업로드 키와 서명된 AAB까지 로컬 준비가 완료됐습니다. 실제 TestFlight/Play 업로드는 계정 소유자의 개발자 등록, 신원·결제 확인과 스토어 콘솔 접근이 필요합니다.
