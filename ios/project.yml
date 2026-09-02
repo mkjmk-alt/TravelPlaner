@@ -32,6 +32,7 @@ targets:
         CFBundleDisplayName: TravelPlaner
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSApplicationCategoryType: public.app-category.travel
         CFBundleURLTypes:
           - CFBundleTypeRole: Editor
             CFBundleURLName: com.travelplaner.app

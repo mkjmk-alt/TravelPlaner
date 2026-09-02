@@ -33,6 +33,8 @@
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.travel</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>현재 위치를 지도에 표시하고 주변 여행지를 찾기 위해 위치 권한이 필요합니다.</string>
 	<key>UILaunchScreen</key>
