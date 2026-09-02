@@ -23,6 +23,7 @@
 | iOS 시뮬레이터 Release 빌드 | 통과 |
 | iOS 실기기용 Release Archive | 개발 서명으로 통과 |
 | Android Store Release AAB | 업로드 키 서명, Release Lint·JAR 서명·bundletool 검증 통과 |
+| Android API 36 Release 실행 | 서명 APK 설치·콜드 스타트·운영 WebView 렌더링·크래시 부재 확인 |
 | iPhone 17 Pro Max 스크린샷 원본 | 3장, 1320×2868 |
 | iPad Pro 13-inch 스크린샷 원본 | 1장, 2064×2752 |
 | Android 스크린샷 원본 | 3장, 1344×2992 |

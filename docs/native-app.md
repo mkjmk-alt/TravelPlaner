@@ -105,6 +105,8 @@ https://travelplaner-545.pages.dev/delete-account.html
 
 Android 런처 아이콘은 적응형 아이콘과 원형 아이콘을 함께 제공하며 Android 13 이상의 테마 아이콘을 위한 단색 레이어도 포함합니다. API 36 Pixel 가상기기에서 원형 마스크 표시와 잘림 여부를 확인했습니다.
 
+서명된 `1.0.0 (1)` Release APK도 API 36 가상기기에 새로 설치해 콜드 스타트, 운영 WebView 온보딩 렌더링과 크래시 로그 부재를 확인했습니다. 완성 Manifest에는 카메라·마이크·사진 권한이 없고 위치, 네트워크 및 Android 8~9 다운로드용 저장 권한만 있습니다.
+
 웹 다운로드는 Android 10 이상에서 추가 저장 공간 권한 없이 시스템 다운로드 관리자로 저장합니다. 공개 다운로드 폴더 쓰기 권한이 필요한 Android 8~9에서만 `WRITE_EXTERNAL_STORAGE`를 실행 중 요청하며, Manifest 권한도 API 28까지만 적용합니다. Android 12 이상은 `dataExtractionRules`로 클라우드 백업과 기기 간 자동 이전에서 앱 데이터를 제외합니다.
 
 ## 필수 실기기 확인표
