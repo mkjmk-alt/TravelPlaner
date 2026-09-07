@@ -17,8 +17,7 @@ final class PersistenceUITests: XCTestCase {
         XCTAssertTrue(createButton.waitForExistence(timeout: 15), "새 여행 버튼이 나타나지 않았습니다.")
         createButton.tap()
 
-        let labeledNameField = app.textFields["여행 이름"]
-        let nameField = labeledNameField.exists ? labeledNameField : app.textFields.firstMatch
+        let nameField = app.textFields["여행 이름"]
         XCTAssertTrue(nameField.waitForExistence(timeout: 5), "여행 이름 입력란이 나타나지 않았습니다.")
         nameField.tap()
         nameField.typeText(tripName)
