@@ -49,6 +49,17 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         UIViewControllerBasedStatusBarAppearance: true
+  TravelPlanerUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: TravelPlanerUITests
+    dependencies:
+      - target: TravelPlaner
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.travelplaner.app.uitests
+        GENERATE_INFOPLIST_FILE: YES
 schemes:
   TravelPlaner:
     build:
@@ -56,5 +67,9 @@ schemes:
         TravelPlaner: all
     run:
       config: Debug
+    test:
+      config: Debug
+      targets:
+        - TravelPlanerUITests
     archive:
       config: Release

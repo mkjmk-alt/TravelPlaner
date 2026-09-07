@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0631862A7F2B44BEC15FF837 /* PersistenceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18736DBDD0AD2C09C8AE6A06 /* PersistenceUITests.swift */; };
 		0BD46AE957D5E73664CB9364 /* TravelWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDD5C341624831DF3F2E2CCA /* TravelWebView.swift */; };
 		2DB00C6EA62176E7AC744DA6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 322CCCFB6536D4D44DEEC671 /* Assets.xcassets */; };
 		59873E6A59C052B5DF132D57 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF04ADB524AC74B46EF167B1 /* ContentView.swift */; };
@@ -16,11 +17,23 @@
 		C54649CEBE1CF9DFA6B76C60 /* AppConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FCB8F17ED7014A268A98298 /* AppConfiguration.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		45F730574CAAA98EEFA6CDDF /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 23276F15B77F16B4BF4A227D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D2C37761098216D472FAE15E;
+			remoteInfo = TravelPlaner;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		0FCB8F17ED7014A268A98298 /* AppConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfiguration.swift; sourceTree = "<group>"; };
+		18736DBDD0AD2C09C8AE6A06 /* PersistenceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceUITests.swift; sourceTree = "<group>"; };
 		322CCCFB6536D4D44DEEC671 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		7D8EF23A7C2017FBA00D22BB /* BrowserModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserModel.swift; sourceTree = "<group>"; };
 		A3A22732A2DE379FAFC15878 /* TravelPlaner.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = TravelPlaner.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA3DE89BDF2FD26F6EBD7FE3 /* TravelPlanerUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = TravelPlanerUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BDD5C341624831DF3F2E2CCA /* TravelWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TravelWebView.swift; sourceTree = "<group>"; };
 		D9DE951BCF0113523667075A /* TravelPlanerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TravelPlanerApp.swift; sourceTree = "<group>"; };
 		EDD7EA4149F3B6BF52C259F9 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -29,10 +42,19 @@
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
+		1D8D6732E585B9ECD653B3FC /* TravelPlanerUITests */ = {
+			isa = PBXGroup;
+			children = (
+				18736DBDD0AD2C09C8AE6A06 /* PersistenceUITests.swift */,
+			);
+			path = TravelPlanerUITests;
+			sourceTree = "<group>";
+		};
 		3CD6EE0943E71D60697D2AB6 /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				A3A22732A2DE379FAFC15878 /* TravelPlaner.app */,
+				AA3DE89BDF2FD26F6EBD7FE3 /* TravelPlanerUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -56,6 +78,7 @@
 			isa = PBXGroup;
 			children = (
 				7CAC77B52729137E546B56FB /* TravelPlaner */,
+				1D8D6732E585B9ECD653B3FC /* TravelPlanerUITests */,
 				3CD6EE0943E71D60697D2AB6 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -63,6 +86,24 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		307ABC8F2D9062D0994E3E60 /* TravelPlanerUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2636A85CFD654B97C0917252 /* Build configuration list for PBXNativeTarget "TravelPlanerUITests" */;
+			buildPhases = (
+				341103509F6EDC6B4CDE2F3E /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				0AF76F1C6335060306DFF80B /* PBXTargetDependency */,
+			);
+			name = TravelPlanerUITests;
+			packageProductDependencies = (
+			);
+			productName = TravelPlanerUITests;
+			productReference = AA3DE89BDF2FD26F6EBD7FE3 /* TravelPlanerUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		D2C37761098216D472FAE15E /* TravelPlaner */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = DF3652C47A699876D99A254C /* Build configuration list for PBXNativeTarget "TravelPlaner" */;
@@ -90,6 +131,10 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					307ABC8F2D9062D0994E3E60 = {
+						DevelopmentTeam = BTT4JXSL86;
+						TestTargetID = D2C37761098216D472FAE15E;
+					};
 					D2C37761098216D472FAE15E = {
 						DevelopmentTeam = BTT4JXSL86;
 						ProvisioningStyle = Automatic;
@@ -111,6 +156,7 @@
 			projectRoot = "";
 			targets = (
 				D2C37761098216D472FAE15E /* TravelPlaner */,
+				307ABC8F2D9062D0994E3E60 /* TravelPlanerUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -128,6 +174,14 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		341103509F6EDC6B4CDE2F3E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0631862A7F2B44BEC15FF837 /* PersistenceUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		CBEA7165EE678F27848FC5D5 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -141,6 +195,14 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		0AF76F1C6335060306DFF80B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D2C37761098216D472FAE15E /* TravelPlaner */;
+			targetProxy = 45F730574CAAA98EEFA6CDDF /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		16F1A13BB369D133EE08CB51 /* Debug */ = {
@@ -310,9 +372,52 @@
 			};
 			name = Debug;
 		};
+		B9E4A584AF170D8494E388A0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.travelplaner.app.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = TravelPlaner;
+			};
+			name = Release;
+		};
+		BEEAEB1279470C4EC832A2D7 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.travelplaner.app.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = TravelPlaner;
+			};
+			name = Debug;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		2636A85CFD654B97C0917252 /* Build configuration list for PBXNativeTarget "TravelPlanerUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BEEAEB1279470C4EC832A2D7 /* Debug */,
+				B9E4A584AF170D8494E388A0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		8951BA71D3E171F97055B93F /* Build configuration list for PBXProject "TravelPlaner" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

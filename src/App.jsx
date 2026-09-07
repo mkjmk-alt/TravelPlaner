@@ -6095,6 +6095,7 @@ function App() {
                 <input
                   autoFocus
                   type="text"
+                  aria-label="여행 이름"
                   value={createTripData.name}
                   onChange={(event) => { setCreateTripData({ ...createTripData, name: event.target.value }); setCreateTripError(''); }}
                   placeholder="예: 나트랑 4박 5일 여행"

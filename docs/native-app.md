@@ -26,6 +26,15 @@
 
 사용자는 JSON 백업 내보내기로 로그인 없이도 복구 파일을 만들 수 있습니다. 민감한 여행 데이터가 사용자 동의 없이 OS 클라우드 백업에 포함되지 않도록 Android 자동 백업은 비활성화했습니다.
 
+iOS Simulator 자동 검증은 `TravelPlanerUITests/PersistenceUITests.swift`에 있습니다. 이 테스트는 온보딩을 닫고 로그인 없이 테스트 일정을 만든 다음 앱을 종료·재실행해 일정 이름이 복원되는지 확인합니다.
+
+```bash
+xcodebuild test -project ios/TravelPlaner.xcodeproj \
+  -scheme TravelPlaner \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+  CODE_SIGNING_ALLOWED=NO
+```
+
 ## iOS 설정
 
 1. `ios/TravelPlaner.xcodeproj`를 Xcode에서 엽니다.
@@ -130,6 +139,8 @@ Android 런처 아이콘은 적응형 아이콘과 원형 아이콘을 함께 �
 네트워크를 끈 상태로 Release 앱을 콜드 스타트하면 저장된 일정과 함께 오프라인 안내가 표시됐습니다. 네트워크를 복구하자 앱을 다시 시작하지 않아도 안내가 사라졌고 기존 일정은 계속 유지되어, 오프라인 진입과 온라인 복구 흐름을 확인했습니다.
 
 2026년 9월 7일 보안 검증에서는 운영 호스트 내부 이동이 WebView에 유지되고 외부 HTTPS 주소는 Chrome으로 전달되며 WebView URL은 운영 주소에 남는 것을 API 36 가상기기에서 확인했습니다. iOS 최신 개발 서명 아카이브는 `ios/DerivedData/TravelPlaner-1.0.0-build1-security-v2.xcarchive`이며 코드 서명, `com.travelplaner.app`, 버전 `1.0.0 (1)`을 재검증했습니다.
+
+같은 날 iPhone 17 Pro iOS 26.5 Simulator에서 `PersistenceUITests.testAnonymousTripSurvivesColdRelaunch`를 실행해 `iOS저장0907` 일정 생성, 앱 종료, 콜드 재실행 후 일정 복원을 실제 WKWebView UI로 확인했습니다.
 
 웹 다운로드는 Android 10 이상에서 추가 저장 공간 권한 없이 시스템 다운로드 관리자로 저장합니다. 공개 다운로드 폴더 쓰기 권한이 필요한 Android 8~9에서만 `WRITE_EXTERNAL_STORAGE`를 실행 중 요청하며, Manifest 권한도 API 28까지만 적용합니다. Android 12 이상은 `dataExtractionRules`로 클라우드 백업과 기기 간 자동 이전에서 앱 데이터를 제외합니다.
 
