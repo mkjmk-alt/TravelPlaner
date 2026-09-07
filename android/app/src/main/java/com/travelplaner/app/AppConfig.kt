@@ -4,6 +4,7 @@ import android.net.Uri
 
 object AppConfig {
     const val PRODUCTION_URL = "https://travelplaner-545.pages.dev/"
+    const val PRODUCTION_ORIGIN = "https://travelplaner-545.pages.dev"
     private const val AUTHENTICATION_HOST = "eiktqxrgsjrtmoyzuupn.supabase.co"
     private const val AUTH_CALLBACK_SCHEME = "travelplaner"
     private const val AUTH_CALLBACK_HOST = "auth"
@@ -12,7 +13,15 @@ object AppConfig {
     private val webSchemes = setOf("http", "https")
     private val externalSchemes = setOf("tel", "mailto", "sms", "geo", "market")
 
-    fun isWebUrl(uri: Uri): Boolean = uri.scheme?.lowercase() in webSchemes
+    fun isInternalWebUrl(uri: Uri): Boolean =
+        uri.scheme?.lowercase() == "https" &&
+            uri.host?.lowercase() == Uri.parse(PRODUCTION_URL).host?.lowercase() &&
+            uri.port in setOf(-1, 443)
+
+    fun canOpenExternally(uri: Uri): Boolean {
+        val scheme = uri.scheme?.lowercase() ?: return false
+        return scheme in externalSchemes || (scheme in webSchemes && !isInternalWebUrl(uri))
+    }
 
     fun isAllowedAuthenticationUrl(uri: Uri): Boolean =
         uri.scheme?.lowercase() == "https" && uri.host?.lowercase() == AUTHENTICATION_HOST
@@ -25,10 +34,7 @@ object AppConfig {
     fun shouldOpenExternally(uri: Uri): Boolean {
         val scheme = uri.scheme?.lowercase() ?: return false
         if (scheme in externalSchemes) return true
-        if (scheme !in webSchemes) return true
-        val host = uri.host?.lowercase().orEmpty()
-        val path = uri.path?.lowercase().orEmpty()
-        return host == "maps.apple.com" || (host.endsWith("google.com") && path.startsWith("/maps"))
+        return scheme in webSchemes && !isInternalWebUrl(uri)
     }
 
     fun deepLinkToWebUrl(uri: Uri): String {

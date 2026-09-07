@@ -43,7 +43,7 @@ final class BrowserModel: NSObject, ObservableObject, ASWebAuthenticationPresent
             return
         }
 
-        guard AppConfiguration.allowedWebSchemes.contains(url.scheme?.lowercased() ?? "") else { return }
+        guard AppConfiguration.isInternalWebURL(url) else { return }
         webView?.load(URLRequest(url: url))
     }
 

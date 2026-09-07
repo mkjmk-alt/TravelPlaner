@@ -76,6 +76,7 @@ kotlin {
 
 dependencies {
     implementation("androidx.activity:activity-ktx:1.11.0")
+    implementation("androidx.webkit:webkit:1.17.0")
 }
 
 val verifyReleaseSigning by tasks.registering {

@@ -63,7 +63,10 @@ struct TravelWebView: UIViewRepresentable {
         }
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-            guard message.frameInfo.securityOrigin.host == AppConfiguration.productionURL.host else { return }
+            let origin = message.frameInfo.securityOrigin
+            guard origin.protocol.lowercased() == "https",
+                  origin.host.lowercased() == AppConfiguration.productionURL.host?.lowercased(),
+                  origin.port == 0 || origin.port == 443 else { return }
 
             if message.name == "travelPlanerAuth",
                let urlString = message.body as? String,
@@ -80,11 +83,9 @@ struct TravelWebView: UIViewRepresentable {
                   let data = Data(base64Encoded: String(dataURL[dataURL.index(after: separator)...])),
                   data.count <= 25 * 1024 * 1024 else { return }
 
-            let safeName = fileName
-                .replacingOccurrences(of: "/", with: "-")
-                .replacingOccurrences(of: "\\", with: "-")
+            let safeName = sanitizedFileName(fileName)
             let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-            let destination = directory.appendingPathComponent(safeName.isEmpty ? "TravelPlaner-file" : safeName)
+            let destination = directory.appendingPathComponent(safeName)
             do {
                 try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
                 try data.write(to: destination, options: .atomic)
@@ -138,13 +139,12 @@ struct TravelWebView: UIViewRepresentable {
             }
 
             if AppConfiguration.shouldOpenExternally(url) {
-                UIApplication.shared.open(url)
+                openExternal(url)
                 decisionHandler(.cancel)
                 return
             }
 
-            guard AppConfiguration.allowedWebSchemes.contains(url.scheme?.lowercased() ?? "") else {
-                if UIApplication.shared.canOpenURL(url) { UIApplication.shared.open(url) }
+            guard AppConfiguration.isInternalWebURL(url) else {
                 decisionHandler(.cancel)
                 return
             }
@@ -178,8 +178,8 @@ struct TravelWebView: UIViewRepresentable {
         ) -> WKWebView? {
             guard navigationAction.targetFrame == nil, let url = navigationAction.request.url else { return nil }
             if AppConfiguration.shouldOpenExternally(url) {
-                UIApplication.shared.open(url)
-            } else {
+                openExternal(url)
+            } else if AppConfiguration.isInternalWebURL(url) {
                 webView.load(navigationAction.request)
             }
             return nil
@@ -229,7 +229,7 @@ struct TravelWebView: UIViewRepresentable {
             suggestedFilename: String,
             completionHandler: @escaping (URL?) -> Void
         ) {
-            let safeName = suggestedFilename.replacingOccurrences(of: "/", with: "-")
+            let safeName = sanitizedFileName(suggestedFilename)
             let destination = FileManager.default.temporaryDirectory
                 .appendingPathComponent(UUID().uuidString)
                 .appendingPathComponent(safeName)
@@ -259,6 +259,22 @@ struct TravelWebView: UIViewRepresentable {
         private func release(_ download: WKDownload) {
             downloadDestinations.removeValue(forKey: ObjectIdentifier(download))
             activeDownloads.removeAll { $0 === download }
+        }
+
+        private func openExternal(_ url: URL) {
+            UIApplication.shared.open(url, options: [:])
+        }
+
+        private func sanitizedFileName(_ fileName: String) -> String {
+            let invalidCharacters = CharacterSet(charactersIn: "/\\:")
+                .union(.controlCharacters)
+            let sanitized = fileName
+                .components(separatedBy: invalidCharacters)
+                .joined(separator: "-")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return sanitized.isEmpty || sanitized == "." || sanitized == ".."
+                ? "TravelPlaner-file"
+                : sanitized
         }
 
         private func presentAlert(title: String?, message: String, actions: [(String, () -> Void)]) {

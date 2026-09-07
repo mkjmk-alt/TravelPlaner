@@ -51,6 +51,22 @@ iOS는 `ASWebAuthenticationSession`, Android는 기본 브라우저를 사용합
 
 2026년 9월 2일 기준 Supabase 운영 프로젝트의 Redirect URLs에 `travelplaner://auth/callback` 등록을 완료했고, 기존 웹 리디렉션과 함께 총 2개가 유지되는 것을 확인했습니다.
 
+## 네이티브 WebView 보안 경계
+
+iOS와 Android WebView 안에는 HTTPS 운영 호스트(`travelplaner-545.pages.dev`)만 표시합니다. 다른 웹 주소는 시스템 브라우저나 해당 앱으로 넘기며, 알 수 없는 커스텀 스킴은 차단합니다.
+
+- Android 네이티브 브리지는 모든 iframe에 노출되는 레거시 `addJavascriptInterface` 대신, 운영 origin과 메인 프레임만 허용하는 AndroidX WebKit 메시지 채널을 사용합니다.
+- 인증 브리지는 운영 페이지에서 요청한 정확한 Supabase 인증 호스트만 엽니다.
+- 위치 권한, 파일 선택, 네이티브 파일 저장은 운영 페이지에서 시작한 요청만 처리합니다.
+- Android는 파일 URL 접근과 혼합 HTTP 콘텐츠를 차단하고 Safe Browsing을 활성화합니다.
+- Android WebView 원격 디버깅은 디버그 빌드에서만 활성화됩니다.
+- iOS 스크립트 메시지는 HTTPS, 운영 호스트, 기본 HTTPS 포트를 모두 확인합니다.
+- 다운로드 파일명에서 경로 구분자와 제어 문자를 제거해 앱 임시 폴더 또는 사용자가 선택한 위치에만 저장합니다.
+
+`npm run native:security`는 Manifest, Info.plist와 양쪽 WebView 소스의 필수 보안 불변 조건을 검사합니다. 네이티브 릴리스 빌드 전에 반드시 실행합니다.
+
+API 36 가상기기의 `userdebug` 시스템 이미지는 앱의 비활성화 호출과 무관하게 WebView 개발자 도구를 강제로 제공할 수 있습니다. 따라서 가상기기의 디버그 소켓 존재만으로 출시 앱 설정을 판정하지 않습니다. Release APK의 `android:debuggable=false`와 빌드된 코드의 `FLAG_DEBUGGABLE` 조건을 함께 확인하고, 최종 제출 전 일반 사용자 빌드의 실기기에서도 다시 확인합니다.
+
 ## 계정 삭제 활성화
 
 로그인한 사용자는 앱 헤더의 **계정 삭제**에서 `삭제`를 직접 입력한 뒤 인증 계정과 클라우드 데이터를 영구 삭제할 수 있습니다. Google Play의 외부 삭제 URL은 다음과 같습니다.
@@ -101,11 +117,13 @@ https://travelplaner-545.pages.dev/delete-account.html
 5. 비밀 키는 Git에 추가하지 말고 로컬 `keystore.properties` 또는 `TRAVELPLANER_ANDROID_*` CI Secret으로 관리합니다.
 6. `./gradlew bundleStoreRelease lintRelease`로 서명 설정을 검증하면서 AAB를 만들고 내부 테스트 트랙에 업로드합니다.
 
-업로드 키는 `android/travelplaner-upload.jks`에 로컬로 생성했고 비밀번호는 macOS 로그인 키체인의 `TravelPlaner Android Upload Key` 항목에만 저장했습니다. JKS와 비밀번호는 Git에 포함되지 않습니다. 현재 서명된 AAB는 `android/app/build/outputs/bundle/release/app-release.aab`이며 Gradle Release Lint, JAR 서명과 bundletool 구조 검증을 통과했습니다. 키 없이 실행한 일반 `bundleRelease` 결과는 구조 검증용 미서명 AAB일 수 있으므로 Play Console에는 반드시 `bundleStoreRelease` 결과만 업로드합니다.
+업로드 키는 `android/travelplaner-upload.jks`에 로컬로 생성했고 비밀번호는 macOS 로그인 키체인의 `TravelPlaner Android Upload Key` 항목에만 저장했습니다. JKS와 비밀번호는 Git에 포함되지 않습니다. 현재 서명된 AAB는 `android/app/build/outputs/bundle/release/app-release.aab`이며 Gradle Release Lint, JAR 서명과 bundletool 구조 검증을 통과했습니다. 2026년 9월 7일 보안 검증 빌드의 SHA-256은 `eb4a2d3738e89ac0588ce64c74826acb49069d47cc357e0e5b41f3ae6ddb0886`입니다. 키 없이 실행한 일반 `bundleRelease` 결과는 구조 검증용 미서명 AAB일 수 있으므로 Play Console에는 반드시 `bundleStoreRelease` 결과만 업로드합니다.
 
 Android 런처 아이콘은 적응형 아이콘과 원형 아이콘을 함께 제공하며 Android 13 이상의 테마 아이콘을 위한 단색 레이어도 포함합니다. API 36 Pixel 가상기기에서 원형 마스크 표시와 잘림 여부를 확인했습니다.
 
 서명된 `1.0.0 (1)` Release APK도 API 36 가상기기에 새로 설치해 콜드 스타트, 운영 WebView 온보딩 렌더링과 크래시 로그 부재를 확인했습니다. 완성 Manifest에는 카메라·마이크·사진 권한이 없고 위치, 네트워크 및 Android 8~9 다운로드용 저장 권한만 있습니다.
+
+2026년 9월 7일 보안 검증에서는 운영 호스트 내부 이동이 WebView에 유지되고 외부 HTTPS 주소는 Chrome으로 전달되며 WebView URL은 운영 주소에 남는 것을 API 36 가상기기에서 확인했습니다. iOS 최신 개발 서명 아카이브는 `ios/DerivedData/TravelPlaner-1.0.0-build1-security-v2.xcarchive`이며 코드 서명, `com.travelplaner.app`, 버전 `1.0.0 (1)`을 재검증했습니다.
 
 웹 다운로드는 Android 10 이상에서 추가 저장 공간 권한 없이 시스템 다운로드 관리자로 저장합니다. 공개 다운로드 폴더 쓰기 권한이 필요한 Android 8~9에서만 `WRITE_EXTERNAL_STORAGE`를 실행 중 요청하며, Manifest 권한도 API 28까지만 적용합니다. Android 12 이상은 `dataExtractionRules`로 클라우드 백업과 기기 간 자동 이전에서 앱 데이터를 제외합니다.
 

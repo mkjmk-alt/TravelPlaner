@@ -5,6 +5,7 @@ import android.app.DownloadManager
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.net.ConnectivityManager
@@ -20,7 +21,6 @@ import android.view.ViewGroup
 import android.webkit.CookieManager
 import android.webkit.DownloadListener
 import android.webkit.GeolocationPermissions
-import android.webkit.JavascriptInterface
 import android.webkit.MimeTypeMap
 import android.webkit.PermissionRequest
 import android.webkit.URLUtil
@@ -43,6 +43,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.webkit.WebMessageCompat
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
+import org.json.JSONObject
 
 class MainActivity : ComponentActivity() {
     private lateinit var webView: WebView
@@ -109,6 +113,9 @@ class MainActivity : ComponentActivity() {
             insets
         }
         webView = createWebView()
+        WebView.setWebContentsDebuggingEnabled(
+            applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+        )
         progressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
             isIndeterminate = false
             max = 100
@@ -149,6 +156,7 @@ class MainActivity : ComponentActivity() {
                 allowFileAccess = false
                 allowContentAccess = true
                 mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                safeBrowsingEnabled = true
                 mediaPlaybackRequiresUserGesture = false
                 setGeolocationEnabled(true)
                 builtInZoomControls = false
@@ -158,38 +166,44 @@ class MainActivity : ComponentActivity() {
             webViewClient = TravelWebViewClient()
             webChromeClient = TravelChromeClient()
             setDownloadListener(TravelDownloadListener())
-            addJavascriptInterface(NativeDownloadBridge(), "TravelPlanerAndroid")
+            configureNativeBridge(this)
         }
     }
 
-    private inner class NativeDownloadBridge {
-        @JavascriptInterface
-        fun openAuth(url: String) {
-            runOnUiThread {
-                val currentHost = webView.url?.let { Uri.parse(it).host }
-                val productionHost = Uri.parse(AppConfig.PRODUCTION_URL).host
-                val authUri = runCatching { Uri.parse(url) }.getOrNull()
-                if (currentHost == productionHost && authUri != null && AppConfig.isAllowedAuthenticationUrl(authUri)) {
+    private fun configureNativeBridge(target: WebView) {
+        if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) return
+
+        WebViewCompat.addWebMessageListener(
+            target,
+            "TravelPlanerAndroid",
+            setOf(AppConfig.PRODUCTION_ORIGIN)
+        ) { _, message, sourceOrigin, isMainFrame, _ ->
+            if (!isMainFrame || !AppConfig.isInternalWebUrl(sourceOrigin)) return@addWebMessageListener
+            val payload = message.data?.let { runCatching { JSONObject(it) }.getOrNull() } ?: return@addWebMessageListener
+            runOnUiThread { handleNativeMessage(payload) }
+        }
+    }
+
+    private fun handleNativeMessage(payload: JSONObject) {
+        when (payload.optString("type")) {
+            "openAuth" -> {
+                val authUri = payload.optString("url")
+                    .takeIf(String::isNotBlank)
+                    ?.let { runCatching { Uri.parse(it) }.getOrNull() }
+                if (authUri != null && AppConfig.isAllowedAuthenticationUrl(authUri)) {
                     openExternal(authUri)
                 }
             }
-        }
 
-        @JavascriptInterface
-        fun saveBase64File(fileName: String, dataUrl: String) {
-            runOnUiThread {
-                val currentHost = webView.url?.let { Uri.parse(it).host }
-                val productionHost = Uri.parse(AppConfig.PRODUCTION_URL).host
-                val encoded = dataUrl.substringAfter(',', "")
-                if (currentHost != productionHost || encoded.isEmpty() || encoded.length > MAX_BASE64_LENGTH) return@runOnUiThread
-
+            "saveBase64File" -> {
+                val encoded = payload.optString("dataUrl").substringAfter(',', "")
+                if (encoded.isEmpty() || encoded.length > MAX_BASE64_LENGTH) return
                 try {
                     pendingDownloadData = Base64.decode(encoded, Base64.DEFAULT)
-                    val safeName = fileName.replace(Regex("[/\\\\]"), "-").ifBlank { "TravelPlaner-file" }
-                    createDocumentLauncher.launch(safeName)
+                    createDocumentLauncher.launch(sanitizeFileName(payload.optString("fileName")))
                 } catch (_: IllegalArgumentException) {
                     pendingDownloadData = null
-                    Toast.makeText(this@MainActivity, R.string.download_failed, Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, R.string.download_failed, Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -224,6 +238,11 @@ class MainActivity : ComponentActivity() {
         }
 
         override fun onGeolocationPermissionsShowPrompt(origin: String, callback: GeolocationPermissions.Callback) {
+            val originUri = runCatching { Uri.parse(origin) }.getOrNull()
+            if (originUri == null || !AppConfig.isInternalWebUrl(originUri)) {
+                callback.invoke(origin, false, false)
+                return
+            }
             if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
                 callback.invoke(origin, true, false)
             } else {
@@ -246,6 +265,11 @@ class MainActivity : ComponentActivity() {
             filePathCallback: ValueCallback<Array<Uri>>,
             fileChooserParams: FileChooserParams
         ): Boolean {
+            val currentUri = webView.url?.let(Uri::parse)
+            if (currentUri == null || !AppConfig.isInternalWebUrl(currentUri)) {
+                filePathCallback.onReceiveValue(null)
+                return false
+            }
             fileChooserCallback?.onReceiveValue(null)
             fileChooserCallback = filePathCallback
             return try {
@@ -268,7 +292,12 @@ class MainActivity : ComponentActivity() {
             contentLength: Long
         ) {
             try {
-                val fileName = URLUtil.guessFileName(url, contentDisposition, mimeType)
+                val downloadUri = Uri.parse(url)
+                if (!AppConfig.isInternalWebUrl(downloadUri)) {
+                    openExternal(downloadUri)
+                    return
+                }
+                val fileName = sanitizeFileName(URLUtil.guessFileName(url, contentDisposition, mimeType))
                 val resolvedMimeType = mimeType.ifBlank {
                     MimeTypeMap.getSingleton().getMimeTypeFromExtension(fileName.substringAfterLast('.')).orEmpty()
                 }
@@ -306,8 +335,9 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleNavigation(uri: Uri): Boolean {
-        if (AppConfig.shouldOpenExternally(uri)) return openExternal(uri)
-        return !AppConfig.isWebUrl(uri)
+        if (AppConfig.isInternalWebUrl(uri)) return false
+        if (AppConfig.shouldOpenExternally(uri) && AppConfig.canOpenExternally(uri)) return openExternal(uri)
+        return true
     }
 
     private fun openExternal(uri: Uri): Boolean = try {
@@ -354,6 +384,14 @@ class MainActivity : ComponentActivity() {
         val network = manager.activeNetwork ?: return false
         val capabilities = manager.getNetworkCapabilities(network) ?: return false
         return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
+
+    private fun sanitizeFileName(fileName: String): String {
+        val sanitized = fileName
+            .replace(Regex("[/\\\\:\\p{Cntrl}]"), "-")
+            .trim()
+        return sanitized.takeUnless { it.isBlank() || it == "." || it == ".." }
+            ?: "TravelPlaner-file"
     }
 
     override fun onNewIntent(intent: Intent) {

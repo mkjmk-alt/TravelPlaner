@@ -44,13 +44,13 @@ const dataUrlToBlob = (dataUrl) => {
 const saveBlobWithNativeBridge = (blob, fileName) => {
   const iosBridge = window.webkit?.messageHandlers?.travelPlanerDownload;
   const androidBridge = window.TravelPlanerAndroid;
-  if (!iosBridge && !androidBridge?.saveBase64File) return false;
+  if (!iosBridge && !androidBridge?.postMessage) return false;
 
   const reader = new FileReader();
   reader.onloadend = () => {
     const payload = { fileName, dataUrl: String(reader.result || '') };
     if (iosBridge) iosBridge.postMessage(payload);
-    else androidBridge.saveBase64File(payload.fileName, payload.dataUrl);
+    else androidBridge.postMessage(JSON.stringify({ type: 'saveBase64File', ...payload }));
   };
   reader.readAsDataURL(blob);
   return true;
@@ -69,7 +69,7 @@ const saveBlobAsFile = (blob, fileName) => {
 };
 
 const isNativeShell = () => Boolean(
-  window.webkit?.messageHandlers?.travelPlanerAuth || window.TravelPlanerAndroid?.openAuth
+  window.webkit?.messageHandlers?.travelPlanerAuth || window.TravelPlanerAndroid?.postMessage
 );
 
 const openNativeAuthSession = (url) => {
@@ -78,8 +78,8 @@ const openNativeAuthSession = (url) => {
     iosBridge.postMessage(url);
     return true;
   }
-  if (window.TravelPlanerAndroid?.openAuth) {
-    window.TravelPlanerAndroid.openAuth(url);
+  if (window.TravelPlanerAndroid?.postMessage) {
+    window.TravelPlanerAndroid.postMessage(JSON.stringify({ type: 'openAuth', url }));
     return true;
   }
   return false;
