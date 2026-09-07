@@ -147,6 +147,8 @@ Android 런처 아이콘은 적응형 아이콘과 원형 아이콘을 함께 �
 
 ## 스토어 제출 전 필요한 외부 정보
 
+> 현재 보류: Apple Developer Program과 Google Play Console의 가입·결제·신원 확인, TestFlight/Play Console 업로드는 계정 결제를 진행할 때까지 수행하지 않습니다. 로컬 빌드, 서명 산출물 검증, 시뮬레이터·에뮬레이터 테스트 등 결제 없이 가능한 개발 작업만 계속합니다.
+
 - Apple Developer Program 및 Google Play Console 계정
 - 최종 Bundle/Application ID 승인
 - 배포 인증서, 프로비저닝 프로파일, Android 업로드 키의 외부 보안 백업과 Play App Signing 등록
