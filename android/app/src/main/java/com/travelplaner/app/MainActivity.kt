@@ -134,11 +134,28 @@ class MainActivity : ComponentActivity() {
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (webView.canGoBack()) {
-                    webView.goBack()
-                } else {
-                    isEnabled = false
-                    onBackPressedDispatcher.onBackPressed()
+                webView.evaluateJavascript(
+                    """
+                    (() => {
+                      const dialogs = Array.from(document.querySelectorAll('[role="dialog"]'));
+                      const dialog = dialogs.reverse().find((element) => {
+                        const style = window.getComputedStyle(element);
+                        return style.display !== 'none' && style.visibility !== 'hidden';
+                      });
+                      const closeButton = dialog?.querySelector('button[aria-label*="닫기"]');
+                      if (!closeButton) return false;
+                      closeButton.click();
+                      return true;
+                    })()
+                    """.trimIndent()
+                ) { handled ->
+                    if (handled == "true") return@evaluateJavascript
+                    if (webView.canGoBack()) {
+                        webView.goBack()
+                    } else {
+                        isEnabled = false
+                        onBackPressedDispatcher.onBackPressed()
+                    }
                 }
             }
         })

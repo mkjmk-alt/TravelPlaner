@@ -7261,7 +7261,7 @@ function App() {
       `}</style>
       {/* Custom Modal (Success/Error) */}
       {showCustomModal && (
-        <div style={{
+        <div role="dialog" aria-modal="true" aria-label={modalConfig.title || '알림'} style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
           backgroundColor: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(8px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -7287,6 +7287,8 @@ function App() {
               {modalConfig.message}
             </p>
             <button 
+              type="button"
+              aria-label="알림 닫기"
               onClick={() => setShowCustomModal(false)}
               style={{
                 width: '100%', backgroundColor: modalConfig.type === 'success' ? '#0f172a' : '#ef4444', 
@@ -7303,7 +7305,7 @@ function App() {
 
       {/* JSON Paste Modal */}
       {showPasteModal && (
-        <div style={{
+        <div role="dialog" aria-modal="true" aria-label="AI 일정 가져오기" style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
           backgroundColor: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(8px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -7372,6 +7374,8 @@ function App() {
 
             <div style={{ display: 'flex', gap: '12px' }}>
               <button 
+                type="button"
+                aria-label="AI 일정 가져오기 창 닫기"
                 onClick={() => { setShowPasteModal(false); setPasteText(''); }}
                 style={{
                   flex: 1, backgroundColor: '#f1f5f9', color: '#64748b', border: 'none',

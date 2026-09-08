@@ -138,6 +138,8 @@ Android 런처 아이콘은 적응형 아이콘과 원형 아이콘을 함께 �
 
 네트워크를 끈 상태로 Release 앱을 콜드 스타트하면 저장된 일정과 함께 오프라인 안내가 표시됐습니다. 네트워크를 복구하자 앱을 다시 시작하지 않아도 안내가 사라졌고 기존 일정은 계속 유지되어, 오프라인 진입과 온라인 복구 흐름을 확인했습니다.
 
+Android 뒤로가기는 열린 웹 대화상자의 접근성 `닫기` 버튼을 먼저 실행하도록 처리했습니다. API 36 Debug 시뮬레이터에서 여행 생성 창을 연 뒤 키보드 닫기와 모달 닫기를 순서대로 수행해도 `MainActivity`가 유지되는 것을 확인했습니다. 열린 대화상자가 없을 때만 WebView 기록 이동 또는 앱 종료로 이어집니다.
+
 2026년 9월 7일 보안 검증에서는 운영 호스트 내부 이동이 WebView에 유지되고 외부 HTTPS 주소는 Chrome으로 전달되며 WebView URL은 운영 주소에 남는 것을 API 36 가상기기에서 확인했습니다. iOS 최신 개발 서명 아카이브는 `ios/DerivedData/TravelPlaner-1.0.0-build1-security-v2.xcarchive`이며 코드 서명, `com.travelplaner.app`, 버전 `1.0.0 (1)`을 재검증했습니다.
 
 같은 날 iPhone 17 Pro iOS 26.5 Simulator에서 `PersistenceUITests.testAnonymousTripSurvivesColdRelaunch`를 실행해 `iOS저장0907` 일정 생성, 앱 종료, 콜드 재실행 후 일정 복원을 실제 WKWebView UI로 확인했습니다.
