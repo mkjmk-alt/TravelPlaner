@@ -1,7 +1,7 @@
 // Build Version: v1.2.2-build-trigger-fix
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { GoogleMap, useJsApiLoader, OverlayView, InfoWindow, Polyline } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, MarkerF, InfoWindow, Polyline } from '@react-google-maps/api';
 import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronUp, ChevronDown, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Clock, Upload, Clipboard, LocateFixed, Download, Bell, FileText, Mail, Lock, Eye, EyeOff, WifiOff, Link2, LockKeyhole } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import './index.css';
@@ -270,56 +270,14 @@ const parseImportedJsonText = (text) => {
 };
 
 const CustomMapMarker = ({ position, onClick, icon, label, ariaLabel }) => {
-  const width = Number(icon?.scaledSize?.width) || 40;
-  const height = Number(icon?.scaledSize?.height) || width;
-  const anchorX = Number(icon?.anchor?.x);
-  const anchorY = Number(icon?.anchor?.y);
-  const offsetX = Number.isFinite(anchorX) ? -anchorX : -width / 2;
-  const offsetY = Number.isFinite(anchorY) ? -anchorY : -height / 2;
-
   return (
-    <OverlayView
+    <MarkerF
       position={position}
-      mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-      getPixelPositionOffset={() => ({ x: offsetX, y: offsetY })}
-    >
-      <button
-        type="button"
-        aria-label={ariaLabel || (label?.text ? `지도 ${label.text}` : '지도 장소')}
-        onClick={onClick}
-        style={{
-          position: 'relative',
-          display: 'block',
-          width: `${width}px`,
-          height: `${height}px`,
-          padding: 0,
-          border: 0,
-          background: 'transparent',
-          cursor: onClick ? 'pointer' : 'default'
-        }}
-      >
-        {icon?.url && <img src={icon.url} alt="" width={width} height={height} draggable="false" style={{ display: 'block' }} />}
-        {label?.text && (
-          <span
-            aria-hidden="true"
-            style={{
-              position: 'absolute',
-              inset: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: label.color || 'white',
-              fontSize: label.fontSize || '14px',
-              fontWeight: label.fontWeight || '700',
-              pointerEvents: 'none',
-              lineHeight: 1
-            }}
-          >
-            {label.text}
-          </span>
-        )}
-      </button>
-    </OverlayView>
+      icon={icon}
+      label={label}
+      title={ariaLabel || (label?.text ? `지도 ${label.text}` : '지도 장소')}
+      onClick={onClick}
+    />
   );
 };
 
@@ -6455,8 +6413,8 @@ function App() {
 
         <GoogleMap
           mapContainerStyle={{ width: '100%', height: '100%' }}
-          center={HK_CENTER}
-          zoom={3}
+          defaultCenter={HK_CENTER}
+          defaultZoom={3}
           onLoad={(m) => setMap(m)}
           options={mapOptions}
           onClick={onMapClick}
