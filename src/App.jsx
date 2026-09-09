@@ -6952,30 +6952,32 @@ function App() {
                     onChange={(val) => setItineraryTime(val)}
                   />
 
-                  <button
-                    type="button"
-                    className="mobile-place-add-button"
-                    onClick={() => {
-                      if (!activeDay) {
-                        setModalConfig({
-                          type: 'error',
-                          title: '추가 위치 미선택',
-                          message: '일차 또는 예비 목록을 먼저 선택해주세요.'
-                        });
-                        setShowCustomModal(true);
-                        return;
-                      }
-                      addToItinerary(selectedPlace);
-                      setSelectedPlace(null);
-                    }}
-                    style={{ width: '100%', minHeight: '44px', marginTop: '10px', padding: '10px', backgroundColor: activeDay ? '#2563eb' : '#94a3b8', color: 'white', borderRadius: '10px', fontSize: '12px', fontWeight: '900', border: 'none', cursor: activeDay ? 'pointer' : 'not-allowed', boxShadow: activeDay ? '0 4px 12px rgba(37, 99, 235, 0.2)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', opacity: activeDay ? 1 : 0.7 }}
-                  >
-                    <PlusCircle size={16} />
-                    {activeDay === 'reserve' ? '예비 목록에 추가' : activeDay ? activeDay + '일차 일정에 추가' : '일차 또는 예비 목록을 선택해주세요'}
-                  </button>
                 </div>
               )}
             </div>
+            {activeTripId && !isReadOnlyTrip && (
+              <button
+                type="button"
+                className="mobile-place-add-button"
+                onClick={() => {
+                  if (!activeDay) {
+                    setModalConfig({
+                      type: 'error',
+                      title: '추가 위치 미선택',
+                      message: '일차 또는 예비 목록을 먼저 선택해주세요.'
+                    });
+                    setShowCustomModal(true);
+                    return;
+                  }
+                  addToItinerary(selectedPlace);
+                  setSelectedPlace(null);
+                }}
+                style={{ minHeight: '44px', padding: '10px', backgroundColor: activeDay ? '#2563eb' : '#94a3b8', color: 'white', borderRadius: '10px', fontSize: '12px', fontWeight: '900', border: 'none', cursor: activeDay ? 'pointer' : 'not-allowed', boxShadow: activeDay ? '0 4px 12px rgba(37, 99, 235, 0.2)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', opacity: activeDay ? 1 : 0.7 }}
+              >
+                <PlusCircle size={16} />
+                {activeDay === 'reserve' ? '예비 목록에 추가' : activeDay ? activeDay + '일차 일정에 추가' : '일차 또는 예비 목록을 선택해주세요'}
+              </button>
+            )}
           </div>
         </div>
       )}

@@ -2062,8 +2062,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     top: calc(190px + env(safe-area-inset-top));
     left: 12px;
     right: 12px;
-    max-height: calc(100dvh - 220px - env(safe-area-inset-top));
-    overflow-y: auto;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
     pointer-events: auto;
@@ -2101,14 +2103,16 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   }
 
   .mobile-place-add-content {
-    padding: 12px 14px max(16px, env(safe-area-inset-bottom));
+    min-height: 0;
+    overflow-y: auto;
+    padding: 12px 14px 4px;
+    flex: 1 1 auto;
   }
 
   .mobile-place-add-button {
-    position: sticky;
-    bottom: 0;
-    z-index: 1;
-    box-shadow: 0 -8px 16px rgba(248, 250, 252, 0.95);
+    flex: 0 0 auto;
+    width: calc(100% - 28px) !important;
+    margin: 10px 14px calc(14px + env(safe-area-inset-bottom)) !important;
   }
 }
 
@@ -2312,7 +2316,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     width: min(360px, calc(100vw - 48px));
     max-height: calc(100vh - 48px);
     transform: translateY(-50%);
-    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
     pointer-events: auto;
@@ -2346,13 +2352,15 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   }
 
   .mobile-place-add-content {
-    padding: 20px 16px;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 20px 16px 4px;
+    flex: 1 1 auto;
   }
 
   .mobile-place-add-button {
-    position: sticky;
-    bottom: 0;
-    z-index: 1;
-    box-shadow: 0 -8px 16px rgba(248, 250, 252, 0.95);
+    flex: 0 0 auto;
+    width: calc(100% - 32px) !important;
+    margin: 10px 16px 16px !important;
   }
 }
