@@ -1090,6 +1090,10 @@ const ItineraryEmojiPicker = ({ value, onChange }) => (
 
 
 const mapOptions = {
+  // GoogleMap accepts initial camera values through options, not default* props.
+  // Keep this object stable so React updates do not reset a user's pan/zoom.
+  center: HK_CENTER,
+  zoom: 3,
   disableDefaultUI: true,
   zoomControl: false,
   gestureHandling: 'greedy',
@@ -6455,8 +6459,6 @@ function App() {
 
         <GoogleMap
           mapContainerStyle={{ width: '100%', height: '100%' }}
-          defaultCenter={HK_CENTER}
-          defaultZoom={3}
           onLoad={(m) => setMap(m)}
           options={mapOptions}
           onClick={onMapClick}
