@@ -1,7 +1,7 @@
 // Build Version: v1.2.2-build-trigger-fix
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { GoogleMap, useJsApiLoader, OverlayView, InfoWindow, Polyline } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, OverlayViewF, InfoWindow, Polyline } from '@react-google-maps/api';
 import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronUp, ChevronDown, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Clock, Upload, Clipboard, LocateFixed, Download, Bell, FileText, Mail, Lock, Eye, EyeOff, WifiOff, Link2, LockKeyhole } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import './index.css';
@@ -270,6 +270,12 @@ const parseImportedJsonText = (text) => {
 };
 
 const CustomMapMarker = ({ position, onClick, icon, label, ariaLabel }) => {
+  // Keep the literal stable when a parent re-renders for an unrelated reason.
+  // OverlayViewF can then update the same map overlay instead of recreating it.
+  const markerPosition = useMemo(
+    () => ({ lat: Number(position.lat), lng: Number(position.lng) }),
+    [position.lat, position.lng]
+  );
   const width = Number(icon?.scaledSize?.width) || 40;
   const height = Number(icon?.scaledSize?.height) || width;
   const anchorX = Number(icon?.anchor?.x);
@@ -278,9 +284,9 @@ const CustomMapMarker = ({ position, onClick, icon, label, ariaLabel }) => {
   const offsetY = Number.isFinite(anchorY) ? -anchorY : -height / 2;
 
   return (
-    <OverlayView
-      position={position}
-      mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+    <OverlayViewF
+      position={markerPosition}
+      mapPaneName="overlayMouseTarget"
       getPixelPositionOffset={() => ({ x: offsetX, y: offsetY })}
     >
       <button
@@ -319,7 +325,7 @@ const CustomMapMarker = ({ position, onClick, icon, label, ariaLabel }) => {
           </span>
         )}
       </button>
-    </OverlayView>
+    </OverlayViewF>
   );
 };
 
