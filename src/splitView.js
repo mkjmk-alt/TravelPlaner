@@ -9,6 +9,22 @@ export const normalizeDisplayMode = (mode) => (
   mode === DISPLAY_MODES.SPLIT ? DISPLAY_MODES.SPLIT : DISPLAY_MODES.CLASSIC
 );
 
+export const getResponsiveDisplayMode = ({ width, height, isCoarsePointer = false }) => {
+  const viewportWidth = Math.max(0, Number(width) || 0);
+  const viewportHeight = Math.max(0, Number(height) || 0);
+  const isPortrait = viewportHeight > viewportWidth;
+  const isMobileViewport = viewportWidth <= 768 || (isCoarsePointer && viewportWidth <= 900);
+  const isPortraitTablet = isPortrait && viewportWidth <= 1024;
+
+  return isMobileViewport || isPortraitTablet
+    ? DISPLAY_MODES.SPLIT
+    : DISPLAY_MODES.CLASSIC;
+};
+
+export const getSidebarFooterVariant = (mode) => (
+  normalizeDisplayMode(mode) === DISPLAY_MODES.SPLIT ? 'compact' : 'full'
+);
+
 export const getSplitViewScrollContainer = (mode) => (
   normalizeDisplayMode(mode) === DISPLAY_MODES.SPLIT ? 'sidebar' : 'list'
 );
