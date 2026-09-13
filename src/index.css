@@ -115,12 +115,68 @@ body {
   transition: none !important;
 }
 
+/* Allow the flex child to shrink to the sheet viewport and keep vertical
+   touch scrolling inside the itinerary panel on mobile WebKit. */
+.sidebar-list-content {
+  min-height: 0;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+
 .map-wrapper {
   width: 100%;
   height: 100%;
   position: absolute;
   top: 0;
   left: 0;
+}
+
+.map-wrapper.is-dragging {
+  transition: none !important;
+}
+
+.map-unavailable-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 32px;
+  box-sizing: border-box;
+  background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 52%, #ecfdf5 100%);
+  color: #64748b;
+  text-align: center;
+}
+
+.map-unavailable-state svg {
+  color: #94a3b8;
+}
+
+.map-unavailable-state strong {
+  color: #334155;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.map-unavailable-state p {
+  max-width: 340px;
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.map-unavailable-spinner {
+  width: 42px;
+  height: 42px;
+  border: 4px solid #bfdbfe;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
 }
 
 @media (max-width: 768px) {

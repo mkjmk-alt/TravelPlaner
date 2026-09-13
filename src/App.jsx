@@ -4,6 +4,8 @@ import { createPortal } from 'react-dom';
 import { GoogleMap, useJsApiLoader, OverlayViewF, InfoWindow, Polyline } from '@react-google-maps/api';
 import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronUp, ChevronDown, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Clock, Upload, Clipboard, LocateFixed, Download, Bell, FileText, Mail, Lock, Eye, EyeOff, WifiOff, Link2, LockKeyhole } from 'lucide-react';
 import { supabase } from './supabaseClient';
+import { getMapAvailability } from './mapAvailability';
+import { getClosestMobileSheetMode, getMobileSheetPosition, getMobileSheetSnapPoints } from './mobileSheet';
 import './index.css';
 
 // --- CONFIGURATION ---
@@ -1128,6 +1130,11 @@ function App() {
     language: 'ko',
     region: 'KR'
   });
+  const mapAvailability = getMapAvailability({
+    apiKey: GOOGLE_MAPS_API_KEY,
+    isLoaded,
+    loadError
+  });
 
   // --- GLOBAL UI & AUTH STATE ---
   const [session, setSession] = useState(null);
@@ -1173,6 +1180,11 @@ function App() {
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
   const [touchStartY, setTouchStartY] = useState(0);
+  const mobileSheetPosition = getMobileSheetPosition({
+    height: windowSize.height,
+    mode: sheetMode,
+    dragOffset
+  });
 
   const onTouchStart = (e) => {
     const target = e.target;
@@ -1198,28 +1210,9 @@ function App() {
     
     if (windowSize.width < 768) {
       const H = windowSize.height;
-      const snapPoints = {
-        full: mobileSheetTop,
-        half: H * 0.45,
-        collapsed: H - 60
-      };
-      
-      let baseTranslatePx = snapPoints[sheetMode];
-      let finalTranslatePx = baseTranslatePx + dragOffset;
-      finalTranslatePx = Math.max(mobileSheetTop, Math.min(H - 60, finalTranslatePx));
-      
-      let closestMode = sheetMode;
-      let minDiff = Infinity;
-      
-      Object.entries(snapPoints).forEach(([mode, value]) => {
-        const diff = Math.abs(finalTranslatePx - value);
-        if (diff < minDiff) {
-          minDiff = diff;
-          closestMode = mode;
-        }
-      });
-      
-      setSheetMode(closestMode);
+      const snapPoints = getMobileSheetSnapPoints(H);
+      const finalTranslatePx = getMobileSheetPosition({ height: H, mode: sheetMode, dragOffset });
+      setSheetMode(getClosestMobileSheetMode(finalTranslatePx, snapPoints));
     } else {
       if (sidebarOpen) {
         if (dragOffset > 100) setSidebarOpen(false);
@@ -4125,37 +4118,6 @@ function App() {
     </div>;
   };
 
-  // Robust Error Boundaries
-  if (loadError) {
-    return (
-      <div className="h-screen flex flex-col items-center justify-center bg-red-50 text-red-500 font-sans p-10 text-center" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: '#fef2f2', color: '#ef4444' }}>
-        <AlertCircle size={48} className="mb-4" />
-        <h1 style={{ fontSize: '24px', fontWeight: '900', margin: '16px 0 8px 0' }}>지도를 불러오지 못했습니다</h1>
-        <p style={{ fontWeight: 'bold' }}>{loadError.message}</p>
-      </div>
-    );
-  }
-
-  if (!GOOGLE_MAPS_API_KEY) {
-    return (
-      <div className="h-screen flex flex-col items-center justify-center bg-orange-50 text-orange-500 font-sans p-10 text-center" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: '#fff7ed', color: '#f97316' }}>
-        <AlertCircle size={48} className="mb-4" />
-        <h1 style={{ fontSize: '24px', fontWeight: '900', margin: '16px 0 8px 0' }}>지도 API 키가 없습니다</h1>
-        <p style={{ fontWeight: 'bold' }}>환경 설정을 확인해주세요.</p>
-      </div>
-    );
-  }
-
-  if (!isLoaded) {
-    return (
-      <div className="h-screen flex flex-col items-center justify-center font-sans bg-white text-gray-400" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: 'white', color: '#9ca3af' }}>
-        <div style={{ width: '48px', height: '48px', border: '4px solid #3b82f6', borderTopColor: 'transparent', borderRadius: '50%', marginBottom: '16px', animation: 'spin 1s linear infinite' }}></div>
-        <div style={{ fontWeight: '900', letterSpacing: '0.1em' }}>여행 지도를 불러오는 중…</div>
-      </div>
-    );
-  }
-
-
   return (
     <div className={`app-container ${!sidebarOpen ? 'sidebar-closed' : ''} ${isReadOnlyTrip ? 'read-only-view' : ''}`}>
       
@@ -4260,7 +4222,7 @@ function App() {
             ? `${windowSize.height - (sheetMode === 'full' ? mobileSheetTop : 0)}px`
             : undefined,
           transform: windowSize.width < 768
-            ? `translateY(${Math.max(mobileSheetTop, Math.min(windowSize.height - 60, (sheetMode === 'full' ? mobileSheetTop : sheetMode === 'half' ? windowSize.height * 0.45 : windowSize.height - 60) + dragOffset))}px)`
+            ? `translateY(${mobileSheetPosition}px)`
             : (sidebarOpen ? `translateY(${dragOffset}px)` : `translateY(calc(100% - 60px + ${dragOffset}px))`)
         }}
       >
@@ -6418,7 +6380,16 @@ function App() {
       )}
 
       {/* MAP VIEWPORT */}
-      <div className="map-wrapper">
+      <div
+        className={`map-wrapper ${isDragging ? 'is-dragging' : ''}`}
+        style={{
+          height: windowSize.width < 768 && sheetMode !== 'collapsed'
+            ? `${mobileSheetPosition}px`
+            : windowSize.width < 768 ? '100%' : undefined
+        }}
+      >
+        {mapAvailability.mapAvailable ? (
+          <>
         {/* MAP CONTROLS (TOP-RIGHT) */}
         <div className="map-controls-group">
           {/* Full Route Toggle */}
@@ -6842,6 +6813,26 @@ function App() {
             </InfoWindow>
           )}
         </GoogleMap>
+          </>
+        ) : (
+          <div
+            className={`map-unavailable-state ${mapAvailability.reason === 'loading' ? 'is-loading' : ''}`}
+            role={mapAvailability.reason === 'loading' ? 'status' : 'alert'}
+            aria-live="polite"
+          >
+            {mapAvailability.reason === 'loading' ? (
+              <div className="map-unavailable-spinner" aria-hidden="true" />
+            ) : (
+              <AlertCircle size={42} aria-hidden="true" />
+            )}
+            <strong>{mapAvailability.title}</strong>
+            <p>
+              {mapAvailability.reason === 'missing-key'
+                ? '지도 없이도 일정, 즐겨찾기, 예산 기능은 사용할 수 있습니다.'
+                : mapAvailability.detail}
+            </p>
+          </div>
+        )}
       </div>
 
       {selectedPlace && (
