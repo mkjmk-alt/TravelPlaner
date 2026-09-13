@@ -211,3 +211,11 @@
 - 수정 내용: 최종 리뷰 지적사항을 반영한 웹 구현 커밋을 `main`에 통합함. 데스크톱·태블릿 가로는 1번 classic, 모바일·태블릿 세로는 2번 split으로 자동 적용하고, split 저장 상태 고정·스크롤 끝 메타데이터·분할선 최소 높이·가로 태블릿 경계를 유지함. 기존 iOS 변경사항은 보존하고 커밋하지 않음.
 - 검증: `npm test` 38개 통과, `npm run lint` 통과, `npm run build` 통과, `git diff --check` 통과. Vite의 기존 500kB 초과 청크 경고만 남음. 실제 터치·픽셀 브라우저 검증은 자동화 도구 제한으로 수행하지 못함.
 - 답변: 구현을 현재 `main`에 통합하고 최종 검증을 완료함. GitHub 푸시·배포는 요청하지 않아 진행하지 않음.
+
+## 2026-09-14
+
+- ID: `P6vN2rK8Lm`
+- 요청: 반응형 화면 모드 구현사항을 GitHub에 푸시하고 Cloudflare Pages에 배포.
+- 수정 내용: 검증된 `main` 커밋 `00522473665038ca84aaaa2bd3c3ff1aa2bbd0d4`를 `origin/main`에 푸시함. 기존 iOS 미커밋 변경은 제외함.
+- 배포: Cloudflare Pages 프로젝트 `travelplaner` 배포 완료. 배포 URL `https://3eec6bd9.travelplaner-545.pages.dev`, 운영 URL `https://travelplaner-545.pages.dev` 모두 HTTP 200 응답 확인.
+- 답변: GitHub 푸시 및 Cloudflare Pages 배포 완료.
