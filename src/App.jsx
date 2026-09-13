@@ -5,7 +5,9 @@ import { GoogleMap, useJsApiLoader, OverlayViewF, InfoWindow, Polyline } from '@
 import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronUp, ChevronDown, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Clock, Upload, Clipboard, LocateFixed, Download, Bell, FileText, Mail, Lock, Eye, EyeOff, WifiOff, Link2, LockKeyhole } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { getMapAvailability } from './mapAvailability';
+import { getMobileViewModeSheetMode } from './mobileSidebar';
 import { getClosestMobileSheetMode, getMobileSheetPosition, getMobileSheetSnapPoints } from './mobileSheet';
+import { DISPLAY_MODES, getFreeSplitPanePosition, getSplitViewGridRows, normalizeDisplayMode } from './splitView';
 import './index.css';
 
 // --- CONFIGURATION ---
@@ -1170,6 +1172,8 @@ function App() {
   }, []);
 
   const [sheetMode, setSheetMode] = useState('half'); // 'collapsed' | 'half' | 'full'
+  const [displayMode, setDisplayMode] = useState(DISPLAY_MODES.CLASSIC);
+  const [splitPanePosition, setSplitPanePosition] = useState(null);
   const sidebarOpen = sheetMode !== 'collapsed';
   const setSidebarOpen = (open) => {
     setSheetMode(open ? 'half' : 'collapsed');
@@ -1179,36 +1183,49 @@ function App() {
 
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
-  const [touchStartY, setTouchStartY] = useState(0);
+  const [dragStartY, setDragStartY] = useState(0);
   const mobileSheetPosition = getMobileSheetPosition({
     height: windowSize.height,
     mode: sheetMode,
     dragOffset
   });
+  const isSplitView = displayMode === DISPLAY_MODES.SPLIT;
+  const splitPanePositionForRender = isSplitView
+    ? getFreeSplitPanePosition({
+      height: windowSize.height,
+      position: splitPanePosition,
+      dragOffset
+    })
+    : null;
 
-  const onTouchStart = (e) => {
+  const onPointerDown = (e) => {
     const target = e.target;
     if (
       target.closest('.drag-handle') || 
       (target.closest('.sidebar-header') && !target.closest('button') && !target.closest('a') && !target.closest('input'))
     ) {
+      e.currentTarget.setPointerCapture?.(e.pointerId);
       setIsDragging(true);
-      setTouchStartY(e.touches[0].clientY);
+      setDragStartY(e.clientY);
     }
   };
 
-  const onTouchMove = (e) => {
+  const onPointerMove = (e) => {
     if (!isDragging) return;
-    const currentY = e.touches[0].clientY;
-    const diff = currentY - touchStartY;
+    const diff = e.clientY - dragStartY;
     setDragOffset(diff);
   };
 
-  const onTouchEnd = () => {
+  const onPointerEnd = (e) => {
     if (!isDragging) return;
+    if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+      e.currentTarget.releasePointerCapture?.(e.pointerId);
+    }
     setIsDragging(false);
     
-    if (windowSize.width < 768) {
+    if (isSplitView) {
+      setSplitPanePosition(splitPanePositionForRender);
+    } else if (windowSize.width < 768) {
       const H = windowSize.height;
       const snapPoints = getMobileSheetSnapPoints(H);
       const finalTranslatePx = getMobileSheetPosition({ height: H, mode: sheetMode, dragOffset });
@@ -1224,10 +1241,30 @@ function App() {
   };
   const [viewMode, setViewMode] = useState('trips');
   const [isMobileHeaderHidden, setIsMobileHeaderHidden] = useState(false);
+  const changeDisplayMode = (mode) => {
+    const nextMode = normalizeDisplayMode(mode);
+    setDisplayMode(nextMode);
+    setDragOffset(0);
+    if (nextMode === DISPLAY_MODES.SPLIT) {
+      setSheetMode('half');
+      setSplitPanePosition(getFreeSplitPanePosition({ height: windowSize.height, position: windowSize.height * 0.5 }));
+    } else {
+      setSplitPanePosition(null);
+    }
+  };
   const openItinerary = () => {
     setIsMobileHeaderHidden(false);
     setViewMode('itinerary');
     if (windowSize.width < 768) setSheetMode('full');
+  };
+  const openFavorites = () => {
+    setIsMobileHeaderHidden(false);
+    setViewMode('favorites');
+    setSheetMode(currentMode => getMobileViewModeSheetMode({
+      viewMode: 'favorites',
+      viewportWidth: windowSize.width,
+      currentMode
+    }));
   };
 
   const handleSidebarScroll = (e) => {
@@ -4119,7 +4156,10 @@ function App() {
   };
 
   return (
-    <div className={`app-container ${!sidebarOpen ? 'sidebar-closed' : ''} ${isReadOnlyTrip ? 'read-only-view' : ''}`}>
+    <div
+      className={`app-container ${!sidebarOpen ? 'sidebar-closed' : ''} ${isReadOnlyTrip ? 'read-only-view' : ''} ${isSplitView ? 'split-view-mode' : ''}`}
+      style={isSplitView ? { gridTemplateRows: getSplitViewGridRows({ height: windowSize.height, position: splitPanePosition, dragOffset }) } : undefined}
+    >
       
       {/* GLOBAL SEARCH BAR */}
       <div className="search-bar-container" style={{ 
@@ -4214,14 +4254,19 @@ function App() {
       {/* SIDEBAR UI */}
       <aside 
         className={`sidebar-container ${!sidebarOpen ? 'closed' : ''} ${isDragging ? 'dragging' : ''}`}
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerEnd}
+        onPointerCancel={onPointerEnd}
         style={{
-          height: windowSize.width < 768
+          height: isSplitView
+            ? '100%'
+            : windowSize.width < 768
             ? `${windowSize.height - (sheetMode === 'full' ? mobileSheetTop : 0)}px`
             : undefined,
-          transform: windowSize.width < 768
+          transform: isSplitView
+            ? 'none'
+            : windowSize.width < 768
             ? `translateY(${mobileSheetPosition}px)`
             : (sidebarOpen ? `translateY(${dragOffset}px)` : `translateY(calc(100% - 60px + ${dragOffset}px))`)
         }}
@@ -4229,10 +4274,11 @@ function App() {
         <div 
         role="button"
         tabIndex={0}
-        aria-label={sheetMode === 'full' ? '일정 패널 줄이기' : '일정 패널 크게 보기'}
+        aria-label={isSplitView ? '지도와 일정 경계 드래그' : sheetMode === 'full' ? '일정 패널 줄이기' : '일정 패널 크게 보기'}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } }}
           className="drag-handle" 
           onClick={() => {
+            if (isSplitView) return;
             if (windowSize.width < 768) {
               if (sheetMode === 'collapsed') {
                 setSheetMode('half');
@@ -4245,16 +4291,36 @@ function App() {
               setSidebarOpen(!sidebarOpen);
             }
           }}
-          style={{ cursor: 'pointer' }}
+          style={{ cursor: isSplitView ? 'ns-resize' : 'pointer' }}
         ></div>
 
           {/* Header */}
           <div className={"sidebar-header " + (isMobileHeaderHidden ? "mobile-header-hidden" : "")} style={{ padding: '24px 32px', borderBottom: '1px solid #f3f4f6', backgroundColor: 'white', userSelect: 'none' }}>
             {/* Row 1: Logo & Auth */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <div>
+            <div className="sidebar-brand-auth-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <div className="sidebar-brand-mode-row" style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                <div className="sidebar-brand-copy">
                 <h1 style={{ fontSize: '24px', fontWeight: '900', color: '#111827', margin: 0, letterSpacing: '-0.05em' }}>TravelPlaner</h1>
                 <p style={{ fontSize: '9px', fontWeight: '800', color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.15em', margin: '2px 0 0 0' }}>여행 일정 플래너</p>
+                </div>
+                <div className="sidebar-display-mode-switch" role="group" aria-label="화면 모드 선택">
+                  <button
+                    type="button"
+                    className={displayMode === DISPLAY_MODES.CLASSIC ? 'is-selected' : ''}
+                    aria-label="기본 화면 모드"
+                    aria-pressed={displayMode === DISPLAY_MODES.CLASSIC}
+                    title="1번: 현재 화면"
+                    onClick={() => changeDisplayMode(DISPLAY_MODES.CLASSIC)}
+                  >1</button>
+                  <button
+                    type="button"
+                    className={displayMode === DISPLAY_MODES.SPLIT ? 'is-selected' : ''}
+                    aria-label="스플릿 뷰 모드"
+                    aria-pressed={displayMode === DISPLAY_MODES.SPLIT}
+                    title="2번: 지도·일정 스플릿 뷰"
+                    onClick={() => changeDisplayMode(DISPLAY_MODES.SPLIT)}
+                  >2</button>
+                </div>
               </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 {session ? (
@@ -4302,7 +4368,7 @@ function App() {
                   <Plane size={18} />
                 </button>
                 <button 
-                  onClick={() => { setIsMobileHeaderHidden(false); setViewMode('favorites'); }}
+                  onClick={openFavorites}
                   style={{ width: '40px', height: '40px', borderRadius: '12px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.2s', backgroundColor: viewMode === 'favorites' ? '#ef4444' : '#f3f4f6', color: viewMode === 'favorites' ? 'white' : '#9ca3af' }}
                   aria-label="저장한 장소" title="저장한 장소"
                 >
@@ -6383,7 +6449,9 @@ function App() {
       <div
         className={`map-wrapper ${isDragging ? 'is-dragging' : ''}`}
         style={{
-          height: windowSize.width < 768 && sheetMode !== 'collapsed'
+          height: isSplitView
+            ? '100%'
+            : windowSize.width < 768 && sheetMode !== 'collapsed'
             ? `${mobileSheetPosition}px`
             : windowSize.width < 768 ? '100%' : undefined
         }}
