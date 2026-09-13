@@ -150,5 +150,5 @@
 - ID: `B7xQ2mL9Kr`
 - 요청: 자유롭게 크기를 조절할 수 있도록 수정한 내용을 GitHub에 푸시하고 배포.
 - 수정 내용: 검증된 웹 변경사항을 `main` 브랜치에 커밋하고 GitHub 원격 저장소에 푸시함. 기존 iOS 프로젝트의 별도 변경사항은 커밋·수정하지 않음.
-- 배포: Cloudflare Pages 프로젝트 `travelplaner`에 배포 완료. 배포 주소 `https://dfaa2fb6.travelplaner-545.pages.dev`, 운영 주소 `https://travelplaner-545.pages.dev` 모두 HTTP 200 응답 확인.
+- 배포: Cloudflare Pages 프로젝트 `travelplaner`에 배포 완료. 최종 배포 주소 `https://7120ae58.travelplaner-545.pages.dev`, 운영 주소 `https://travelplaner-545.pages.dev` 모두 HTTP 200 응답 확인.
 - 답변: GitHub 푸시 및 배포 완료.
