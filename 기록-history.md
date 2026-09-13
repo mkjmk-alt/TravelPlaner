@@ -90,7 +90,7 @@
 - 요청: 현재 지도·일정 분할 화면 구현사항을 GitHub에 푸시하고 Cloudflare Pages에 배포.
 - 수정 내용: 검증된 웹 소스·스타일·상태 계산 모듈·회귀 테스트·작업 기록만 커밋 대상으로 지정함. 기존 `ios/TravelPlaner.xcodeproj/project.pbxproj` 변경사항은 제외함.
 - 검증: 푸시 전 `npm test -- --runInBand` 26개 통과, `npm run lint`, `npm run build`, `git diff --check` 통과. `origin/main`과 로컬 `main`의 선행 커밋 차이는 0/0으로 확인함.
-- 답변: 관련 파일을 `a666f2d`로 커밋해 `origin/main`에 푸시하고 Cloudflare Pages에 배포함. 처음 지정한 Pages 프로젝트명 `travelplaner-545`는 존재하지 않아 실제 프로젝트명 `travelplaner`로 재시도함. 배포 URL은 `https://b77c3ac9.travelplaner-545.pages.dev`, 운영 주소와 배포 URL 모두 HTTP 200이며, Cloudflare 배포 목록에서 Production/main 및 소스 `a666f2d`로 확인함.
+- 답변: 관련 파일을 `a666f2d`로 커밋해 `origin/main`에 푸시하고 Cloudflare Pages에 배포함. 처음 지정한 Pages 프로젝트명 `travelplaner-545`는 존재하지 않아 실제 프로젝트명 `travelplaner`로 재시도함. 기록 반영 커밋 `a44c323`도 푸시한 뒤 최종 배포 URL `https://b539670e.travelplaner-545.pages.dev`를 생성함. 최종 운영 주소와 배포 URL 모두 HTTP 200이며, Cloudflare 배포 목록에서 Production/main 및 소스 `a44c323`로 확인함.
 
 ## 2026-09-13
 
