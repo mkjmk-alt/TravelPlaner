@@ -4,11 +4,28 @@ import test from 'node:test';
 import {
   DISPLAY_MODES,
   getFreeSplitPanePosition,
+  getResponsiveDisplayMode,
+  getSidebarFooterVariant,
   getSplitPaneLayout,
   getSplitViewScrollContainer,
   getSplitViewGridRows,
   normalizeDisplayMode
 } from '../src/splitView.js';
+
+test('selects classic on desktop and tablet landscape, split on mobile and tablet portrait', () => {
+  assert.equal(getResponsiveDisplayMode({ width: 1440, height: 900 }), DISPLAY_MODES.CLASSIC);
+  assert.equal(getResponsiveDisplayMode({ width: 1024, height: 768 }), DISPLAY_MODES.CLASSIC);
+  assert.equal(getResponsiveDisplayMode({ width: 390, height: 844 }), DISPLAY_MODES.SPLIT);
+  assert.equal(getResponsiveDisplayMode({ width: 820, height: 1180 }), DISPLAY_MODES.SPLIT);
+  assert.equal(getResponsiveDisplayMode({ width: 1024, height: 1366 }), DISPLAY_MODES.SPLIT);
+  assert.equal(getResponsiveDisplayMode({ width: 844, height: 390, isCoarsePointer: true }), DISPLAY_MODES.SPLIT);
+});
+
+test('uses the full footer in classic mode and compact status footer in split mode', () => {
+  assert.equal(getSidebarFooterVariant(DISPLAY_MODES.CLASSIC), 'full');
+  assert.equal(getSidebarFooterVariant(DISPLAY_MODES.SPLIT), 'compact');
+  assert.equal(getSidebarFooterVariant('unknown'), 'full');
+});
 
 test('supports classic and split display modes with classic as the fallback', () => {
   assert.equal(normalizeDisplayMode(DISPLAY_MODES.CLASSIC), DISPLAY_MODES.CLASSIC);
