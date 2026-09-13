@@ -4289,7 +4289,6 @@ function App() {
         onPointerMove={onPointerMove}
         onPointerUp={onPointerEnd}
         onPointerCancel={onPointerEnd}
-        onScroll={splitViewScrollContainer === 'sidebar' ? handleSidebarScroll : undefined}
         style={{
           height: isSplitView
             ? '100%'
@@ -4326,6 +4325,10 @@ function App() {
           style={{ cursor: isSplitView ? 'ns-resize' : 'pointer' }}
         ></div>
 
+        <div
+          className="sidebar-scroll-region"
+          onScroll={splitViewScrollContainer === 'sidebar' ? handleSidebarScroll : undefined}
+        >
           {/* Header */}
           <div className={"sidebar-header " + (isMobileHeaderHidden ? "mobile-header-hidden" : "")} style={{ padding: '24px 32px', borderBottom: '1px solid #f3f4f6', backgroundColor: 'white', userSelect: 'none' }}>
             {/* Row 1: Logo & Auth */}
@@ -5880,6 +5883,7 @@ function App() {
               </span>
             </div>
           </div>
+        </div>
 
           {/* Footer */}
         <div className={`sidebar-footer sidebar-footer-${sidebarFooterVariant}`} style={{ padding: '18px 32px', borderTop: '1px solid #f3f4f6', backgroundColor: '#f9fafb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
