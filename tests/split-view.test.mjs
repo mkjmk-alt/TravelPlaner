@@ -21,6 +21,12 @@ test('selects classic on desktop and tablet landscape, split on mobile and table
   assert.equal(getResponsiveDisplayMode({ width: 844, height: 390, isCoarsePointer: true }), DISPLAY_MODES.SPLIT);
 });
 
+test('keeps small landscape tablets and narrow desktop windows in classic mode', () => {
+  assert.equal(getResponsiveDisplayMode({ width: 800, height: 600, isCoarsePointer: true }), DISPLAY_MODES.CLASSIC);
+  assert.equal(getResponsiveDisplayMode({ width: 900, height: 700, isCoarsePointer: true }), DISPLAY_MODES.CLASSIC);
+  assert.equal(getResponsiveDisplayMode({ width: 768, height: 600 }), DISPLAY_MODES.CLASSIC);
+});
+
 test('uses the full footer in classic mode and compact status footer in split mode', () => {
   assert.equal(getSidebarFooterVariant(DISPLAY_MODES.CLASSIC), 'full');
   assert.equal(getSidebarFooterVariant(DISPLAY_MODES.SPLIT), 'compact');
@@ -43,9 +49,9 @@ test('allocates the split view into map and itinerary panes', () => {
 
 test('keeps a handle-sized pane visible at the map and itinerary extremes', () => {
   assert.deepEqual(getSplitPaneLayout({ height: 800, sheetMode: 'collapsed' }), {
-    mapHeight: 740,
-    itineraryHeight: 60,
-    sheetPosition: 740
+    mapHeight: 704,
+    itineraryHeight: 96,
+    sheetPosition: 704
   });
   assert.deepEqual(getSplitPaneLayout({ height: 800, sheetMode: 'full' }), {
     mapHeight: 112,
@@ -76,5 +82,5 @@ test('keeps a split divider at any released position instead of snapping it', ()
 
 test('clamps a free split divider to the visible pane limits', () => {
   assert.equal(getFreeSplitPanePosition({ height: 800, position: 275, dragOffset: -500 }), 112);
-  assert.equal(getFreeSplitPanePosition({ height: 800, position: 275, dragOffset: 600 }), 740);
+  assert.equal(getFreeSplitPanePosition({ height: 800, position: 275, dragOffset: 600 }), 704);
 });

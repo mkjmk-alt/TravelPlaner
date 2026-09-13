@@ -253,7 +253,7 @@ body {
   background: #f8fafc;
 }
 
-.sidebar-display-mode-switch button {
+.sidebar-display-mode-indicator {
   width: 25px;
   height: 25px;
   display: inline-flex;
@@ -267,15 +267,11 @@ body {
   font-size: 11px;
   font-weight: 900;
   line-height: 1;
-  cursor: pointer;
+  cursor: default;
   transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.sidebar-display-mode-switch button:hover {
-  color: #2563eb;
-}
-
-.sidebar-display-mode-switch button.is-selected {
+.sidebar-display-mode-indicator.is-selected {
   background: white;
   color: #2563eb;
   box-shadow: 0 2px 6px rgba(37, 99, 235, 0.15);
@@ -381,7 +377,6 @@ body {
   backdrop-filter: blur(14px);
 }
 
-.app-container.split-view-mode .sidebar-footer-compact .sidebar-footer-meta,
 .app-container.split-view-mode .sidebar-footer-compact button {
   display: none;
 }

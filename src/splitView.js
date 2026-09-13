@@ -5,6 +5,8 @@ export const DISPLAY_MODES = Object.freeze({
   SPLIT: 'split'
 });
 
+export const SPLIT_VIEW_MIN_PANE_HEIGHT = 96;
+
 export const normalizeDisplayMode = (mode) => (
   mode === DISPLAY_MODES.SPLIT ? DISPLAY_MODES.SPLIT : DISPLAY_MODES.CLASSIC
 );
@@ -13,10 +15,15 @@ export const getResponsiveDisplayMode = ({ width, height, isCoarsePointer = fals
   const viewportWidth = Math.max(0, Number(width) || 0);
   const viewportHeight = Math.max(0, Number(height) || 0);
   const isPortrait = viewportHeight > viewportWidth;
-  const isMobileViewport = viewportWidth <= 768 || (isCoarsePointer && viewportWidth <= 900);
   const isPortraitTablet = isPortrait && viewportWidth <= 1024;
+  const isPhoneLandscape = (
+    !isPortrait
+    && isCoarsePointer
+    && viewportHeight <= 500
+    && viewportWidth <= 900
+  );
 
-  return isMobileViewport || isPortraitTablet
+  return isPortraitTablet || isPhoneLandscape
     ? DISPLAY_MODES.SPLIT
     : DISPLAY_MODES.CLASSIC;
 };
@@ -34,7 +41,7 @@ export const getFreeSplitPanePosition = ({
   position,
   dragOffset = 0,
   topOffset = 112,
-  dividerHeight = 60
+  dividerHeight = SPLIT_VIEW_MIN_PANE_HEIGHT
 }) => {
   const viewportHeight = Math.max(0, Number(height) || 0);
   const maximumPosition = Math.max(0, viewportHeight - dividerHeight);
@@ -53,7 +60,7 @@ export const getSplitPaneLayout = ({
   dragOffset = 0,
   position,
   topOffset = 112,
-  dividerHeight = 60
+  dividerHeight = SPLIT_VIEW_MIN_PANE_HEIGHT
 }) => {
   const viewportHeight = Math.max(0, Number(height) || 0);
   const sheetPosition = Number.isFinite(Number(position))

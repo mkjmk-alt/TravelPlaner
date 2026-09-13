@@ -4338,25 +4338,23 @@ function App() {
                 <h1 style={{ fontSize: '24px', fontWeight: '900', color: '#111827', margin: 0, letterSpacing: '-0.05em' }}>TravelPlaner</h1>
                 <p style={{ fontSize: '9px', fontWeight: '800', color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.15em', margin: '2px 0 0 0' }}>여행 일정 플래너</p>
                 </div>
-                <div className="sidebar-display-mode-switch" role="group" aria-label="화면 모드 선택">
-                  <button
-                    type="button"
-                    className={displayMode === DISPLAY_MODES.CLASSIC ? 'is-selected' : ''}
-                    aria-label="자동 화면 모드: 1번"
-                    aria-pressed={displayMode === DISPLAY_MODES.CLASSIC}
+                <div
+                  className="sidebar-display-mode-switch"
+                  role="status"
+                  aria-live="polite"
+                  aria-atomic="true"
+                  aria-label={`자동 화면 모드: ${displayMode === DISPLAY_MODES.CLASSIC ? '1번 현재 화면' : '2번 지도·일정 스플릿 뷰'}`}
+                >
+                  <span
+                    className={`sidebar-display-mode-indicator${displayMode === DISPLAY_MODES.CLASSIC ? ' is-selected' : ''}`}
+                    aria-hidden="true"
                     title="1번: 현재 화면"
-                    disabled
-                    style={{ cursor: 'default' }}
-                  >1</button>
-                  <button
-                    type="button"
-                    className={displayMode === DISPLAY_MODES.SPLIT ? 'is-selected' : ''}
-                    aria-label="자동 화면 모드: 2번"
-                    aria-pressed={displayMode === DISPLAY_MODES.SPLIT}
+                  >1</span>
+                  <span
+                    className={`sidebar-display-mode-indicator${displayMode === DISPLAY_MODES.SPLIT ? ' is-selected' : ''}`}
+                    aria-hidden="true"
                     title="2번: 지도·일정 스플릿 뷰"
-                    disabled
-                    style={{ cursor: 'default' }}
-                  >2</button>
+                  >2</span>
                 </div>
               </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -5887,6 +5885,7 @@ function App() {
 
           {/* Footer */}
         <div className={`sidebar-footer sidebar-footer-${sidebarFooterVariant}`} style={{ padding: '18px 32px', borderTop: '1px solid #f3f4f6', backgroundColor: '#f9fafb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+          {sidebarFooterVariant === 'full' && (
             <div className="sidebar-footer-meta" style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
               <span style={{ fontSize: "11px", fontWeight: "900", color: "#111827", letterSpacing: "0.05em" }}>{(favorites || []).length} 저장 • {totalSpots} 일정</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '9px', fontWeight: '800' }}>
@@ -5897,6 +5896,7 @@ function App() {
                 <a href="/support.html" style={{ color: '#64748b', textDecoration: 'none' }}>지원</a>
               </span>
             </div>
+          )}
             <span style={{ fontSize: "10px", fontWeight: "800", color: !isOnline || syncStatus === "offline" ? "#d97706" : syncStatus === "error" ? "#ef4444" : syncStatus === "saving" ? "#f59e0b" : "#10b981" }}>{!isOnline || syncStatus === "offline" ? "오프라인 저장" : isLoadingDB ? "동기화 중…" : syncStatus === "saving" ? "저장 중…" : syncStatus === "error" ? "로컬 저장됨" : "저장됨"}</span>
             {sidebarFooterVariant === 'full' && (
               <button onClick={() => setSidebarOpen(false)} style={{ fontSize: '11px', fontWeight: '900', color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer', letterSpacing: '0.05em' }}>닫기</button>
