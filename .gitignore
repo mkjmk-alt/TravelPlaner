@@ -30,6 +30,7 @@ dist-ssr
 
 # Scratch and test files
 scratch/
+.worktrees/
 
 # Native iOS
 ios/DerivedData/

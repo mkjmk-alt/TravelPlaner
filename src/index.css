@@ -313,6 +313,11 @@ body {
   border-top: 1px solid #e2e8f0;
   border-radius: 0;
   box-shadow: none;
+  overflow-x: hidden;
+  overflow-y: auto !important;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   transition: none;
 }
 
@@ -321,10 +326,16 @@ body {
 }
 
 .app-container.split-view-mode .sidebar-list-content {
-  min-height: 0;
-  overflow-y: auto;
+  flex: 0 0 auto !important;
+  min-height: auto;
+  overflow: visible !important;
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+
+.app-container.split-view-mode .sidebar-header {
+  flex: 0 0 auto;
   touch-action: pan-y;
 }
 

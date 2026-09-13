@@ -9,6 +9,10 @@ export const normalizeDisplayMode = (mode) => (
   mode === DISPLAY_MODES.SPLIT ? DISPLAY_MODES.SPLIT : DISPLAY_MODES.CLASSIC
 );
 
+export const getSplitViewScrollContainer = (mode) => (
+  normalizeDisplayMode(mode) === DISPLAY_MODES.SPLIT ? 'sidebar' : 'list'
+);
+
 export const getFreeSplitPanePosition = ({
   height,
   position,

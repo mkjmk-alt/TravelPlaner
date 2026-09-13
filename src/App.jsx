@@ -7,7 +7,7 @@ import { supabase } from './supabaseClient';
 import { getMapAvailability } from './mapAvailability';
 import { getMobileViewModeSheetMode } from './mobileSidebar';
 import { getClosestMobileSheetMode, getMobileSheetPosition, getMobileSheetSnapPoints } from './mobileSheet';
-import { DISPLAY_MODES, getFreeSplitPanePosition, getSplitViewGridRows, normalizeDisplayMode } from './splitView';
+import { DISPLAY_MODES, getFreeSplitPanePosition, getSplitViewGridRows, getSplitViewScrollContainer, normalizeDisplayMode } from './splitView';
 import './index.css';
 
 // --- CONFIGURATION ---
@@ -1190,6 +1190,7 @@ function App() {
     dragOffset
   });
   const isSplitView = displayMode === DISPLAY_MODES.SPLIT;
+  const splitViewScrollContainer = getSplitViewScrollContainer(displayMode);
   const splitPanePositionForRender = isSplitView
     ? getFreeSplitPanePosition({
       height: windowSize.height,
@@ -1201,8 +1202,8 @@ function App() {
   const onPointerDown = (e) => {
     const target = e.target;
     if (
-      target.closest('.drag-handle') || 
-      (target.closest('.sidebar-header') && !target.closest('button') && !target.closest('a') && !target.closest('input'))
+      target.closest('.drag-handle') ||
+      (!isSplitView && target.closest('.sidebar-header') && !target.closest('button') && !target.closest('a') && !target.closest('input'))
     ) {
       e.currentTarget.setPointerCapture?.(e.pointerId);
       setIsDragging(true);
@@ -1268,7 +1269,7 @@ function App() {
   };
 
   const handleSidebarScroll = (e) => {
-    if (windowSize.width >= 768) return;
+    if (isSplitView || windowSize.width >= 768) return;
     const shouldHideHeader = e.currentTarget.scrollTop > 8;
     setIsMobileHeaderHidden((hidden) => hidden === shouldHideHeader ? hidden : shouldHideHeader);
   };
@@ -4258,6 +4259,7 @@ function App() {
         onPointerMove={onPointerMove}
         onPointerUp={onPointerEnd}
         onPointerCancel={onPointerEnd}
+        onScroll={splitViewScrollContainer === 'sidebar' ? handleSidebarScroll : undefined}
         style={{
           height: isSplitView
             ? '100%'
@@ -4441,7 +4443,7 @@ function App() {
           {/* List Content */}
           <div
             className="sidebar-list-content"
-            onScroll={handleSidebarScroll}
+            onScroll={splitViewScrollContainer === 'list' ? handleSidebarScroll : undefined}
             style={{
             flex: 1,
             overflowY: 'auto', 

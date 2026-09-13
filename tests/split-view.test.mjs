@@ -5,6 +5,7 @@ import {
   DISPLAY_MODES,
   getFreeSplitPanePosition,
   getSplitPaneLayout,
+  getSplitViewScrollContainer,
   getSplitViewGridRows,
   normalizeDisplayMode
 } from '../src/splitView.js';
@@ -38,6 +39,12 @@ test('keeps a handle-sized pane visible at the map and itinerary extremes', () =
 
 test('uses explicit grid rows so split panes cannot overlap', () => {
   assert.equal(getSplitViewGridRows({ height: 800, sheetMode: 'half' }), '400px 400px');
+});
+
+test('scrolls the whole sidebar in split mode so the brand header moves with the itinerary', () => {
+  assert.equal(getSplitViewScrollContainer(DISPLAY_MODES.SPLIT), 'sidebar');
+  assert.equal(getSplitViewScrollContainer(DISPLAY_MODES.CLASSIC), 'list');
+  assert.equal(getSplitViewScrollContainer('unknown'), 'list');
 });
 
 test('keeps a split divider at any released position instead of snapping it', () => {
