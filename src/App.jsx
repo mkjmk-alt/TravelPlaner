@@ -7,7 +7,7 @@ import { supabase } from './supabaseClient';
 import { getMapAvailability } from './mapAvailability';
 import { getMobileViewModeSheetMode } from './mobileSidebar';
 import { getClosestMobileSheetMode, getMobileSheetPosition, getMobileSheetSnapPoints } from './mobileSheet';
-import { DISPLAY_MODES, getFreeSplitPanePosition, getSplitViewGridRows, getSplitViewScrollContainer, normalizeDisplayMode } from './splitView';
+import { DISPLAY_MODES, getFreeSplitPanePosition, getResponsiveDisplayMode, getSplitViewGridRows, getSplitViewScrollContainer } from './splitView';
 import './index.css';
 
 // --- CONFIGURATION ---
@@ -1171,10 +1171,34 @@ function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  const [isCoarsePointer, setIsCoarsePointer] = useState(() => (
+    window.matchMedia?.('(pointer: coarse)').matches ?? false
+  ));
+
+  useEffect(() => {
+    if (!window.matchMedia) return undefined;
+
+    const pointerQuery = window.matchMedia('(pointer: coarse)');
+    const handlePointerChange = (event) => setIsCoarsePointer(event.matches);
+
+    if (pointerQuery.addEventListener) {
+      pointerQuery.addEventListener('change', handlePointerChange);
+      return () => pointerQuery.removeEventListener('change', handlePointerChange);
+    }
+
+    pointerQuery.addListener(handlePointerChange);
+    return () => pointerQuery.removeListener(handlePointerChange);
+  }, []);
+
   const [sheetMode, setSheetMode] = useState('half'); // 'collapsed' | 'half' | 'full'
-  const [displayMode, setDisplayMode] = useState(DISPLAY_MODES.CLASSIC);
+  const displayMode = getResponsiveDisplayMode({
+    width: windowSize.width,
+    height: windowSize.height,
+    isCoarsePointer
+  });
+  const isSplitView = displayMode === DISPLAY_MODES.SPLIT;
   const [splitPanePosition, setSplitPanePosition] = useState(null);
-  const sidebarOpen = sheetMode !== 'collapsed';
+  const sidebarOpen = isSplitView || sheetMode !== 'collapsed';
   const setSidebarOpen = (open) => {
     setSheetMode(open ? 'half' : 'collapsed');
   };
@@ -1189,7 +1213,6 @@ function App() {
     mode: sheetMode,
     dragOffset
   });
-  const isSplitView = displayMode === DISPLAY_MODES.SPLIT;
   const splitViewScrollContainer = getSplitViewScrollContainer(displayMode);
   const splitPanePositionForRender = isSplitView
     ? getFreeSplitPanePosition({
@@ -1198,6 +1221,23 @@ function App() {
       dragOffset
     })
     : null;
+
+  useEffect(() => {
+    const animationFrame = window.requestAnimationFrame(() => {
+      if (!isSplitView) {
+        setSplitPanePosition(null);
+        setDragOffset(0);
+        return;
+      }
+
+      setSplitPanePosition((currentPosition) => getFreeSplitPanePosition({
+        height: windowSize.height,
+        position: currentPosition ?? windowSize.height * 0.5
+      }));
+    });
+
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, [isSplitView, windowSize.height]);
 
   const onPointerDown = (e) => {
     const target = e.target;
@@ -1242,17 +1282,6 @@ function App() {
   };
   const [viewMode, setViewMode] = useState('trips');
   const [isMobileHeaderHidden, setIsMobileHeaderHidden] = useState(false);
-  const changeDisplayMode = (mode) => {
-    const nextMode = normalizeDisplayMode(mode);
-    setDisplayMode(nextMode);
-    setDragOffset(0);
-    if (nextMode === DISPLAY_MODES.SPLIT) {
-      setSheetMode('half');
-      setSplitPanePosition(getFreeSplitPanePosition({ height: windowSize.height, position: windowSize.height * 0.5 }));
-    } else {
-      setSplitPanePosition(null);
-    }
-  };
   const openItinerary = () => {
     setIsMobileHeaderHidden(false);
     setViewMode('itinerary');
@@ -4309,18 +4338,20 @@ function App() {
                   <button
                     type="button"
                     className={displayMode === DISPLAY_MODES.CLASSIC ? 'is-selected' : ''}
-                    aria-label="기본 화면 모드"
+                    aria-label="자동 화면 모드: 1번"
                     aria-pressed={displayMode === DISPLAY_MODES.CLASSIC}
                     title="1번: 현재 화면"
-                    onClick={() => changeDisplayMode(DISPLAY_MODES.CLASSIC)}
+                    disabled
+                    style={{ cursor: 'default' }}
                   >1</button>
                   <button
                     type="button"
                     className={displayMode === DISPLAY_MODES.SPLIT ? 'is-selected' : ''}
-                    aria-label="스플릿 뷰 모드"
+                    aria-label="자동 화면 모드: 2번"
                     aria-pressed={displayMode === DISPLAY_MODES.SPLIT}
                     title="2번: 지도·일정 스플릿 뷰"
-                    onClick={() => changeDisplayMode(DISPLAY_MODES.SPLIT)}
+                    disabled
+                    style={{ cursor: 'default' }}
                   >2</button>
                 </div>
               </div>
