@@ -7,7 +7,7 @@ import { supabase } from './supabaseClient';
 import { getMapAvailability } from './mapAvailability';
 import { getMobileViewModeSheetMode } from './mobileSidebar';
 import { getClosestMobileSheetMode, getMobileSheetPosition, getMobileSheetSnapPoints } from './mobileSheet';
-import { DISPLAY_MODES, getFreeSplitPanePosition, getResponsiveDisplayMode, getSplitViewGridRows, getSplitViewScrollContainer } from './splitView';
+import { DISPLAY_MODES, getFreeSplitPanePosition, getResponsiveDisplayMode, getSidebarFooterVariant, getSplitViewGridRows, getSplitViewScrollContainer } from './splitView';
 import './index.css';
 
 // --- CONFIGURATION ---
@@ -1197,6 +1197,7 @@ function App() {
     isCoarsePointer
   });
   const isSplitView = displayMode === DISPLAY_MODES.SPLIT;
+  const sidebarFooterVariant = getSidebarFooterVariant(displayMode);
   const [splitPanePosition, setSplitPanePosition] = useState(null);
   const sidebarOpen = isSplitView || sheetMode !== 'collapsed';
   const setSidebarOpen = (open) => {
@@ -5868,11 +5869,21 @@ function App() {
               </>
             )}
 
+            <div className="sidebar-list-end-meta">
+              <span style={{ fontSize: "11px", fontWeight: "900", color: "#111827", letterSpacing: "0.05em" }}>{(favorites || []).length} 저장 • {totalSpots} 일정</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '9px', fontWeight: '800' }}>
+                <a href="/privacy.html" style={{ color: '#64748b', textDecoration: 'none' }}>개인정보처리방침</a>
+                <span aria-hidden="true" style={{ color: '#cbd5e1' }}>·</span>
+                <a href="/terms.html" style={{ color: '#64748b', textDecoration: 'none' }}>이용약관</a>
+                <span aria-hidden="true" style={{ color: '#cbd5e1' }}>·</span>
+                <a href="/support.html" style={{ color: '#64748b', textDecoration: 'none' }}>지원</a>
+              </span>
+            </div>
           </div>
 
           {/* Footer */}
-        <div style={{ padding: '18px 32px', borderTop: '1px solid #f3f4f6', backgroundColor: '#f9fafb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
+        <div className={`sidebar-footer sidebar-footer-${sidebarFooterVariant}`} style={{ padding: '18px 32px', borderTop: '1px solid #f3f4f6', backgroundColor: '#f9fafb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+            <div className="sidebar-footer-meta" style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
               <span style={{ fontSize: "11px", fontWeight: "900", color: "#111827", letterSpacing: "0.05em" }}>{(favorites || []).length} 저장 • {totalSpots} 일정</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '9px', fontWeight: '800' }}>
                 <a href="/privacy.html" style={{ color: '#64748b', textDecoration: 'none' }}>개인정보처리방침</a>
@@ -5883,7 +5894,9 @@ function App() {
               </span>
             </div>
             <span style={{ fontSize: "10px", fontWeight: "800", color: !isOnline || syncStatus === "offline" ? "#d97706" : syncStatus === "error" ? "#ef4444" : syncStatus === "saving" ? "#f59e0b" : "#10b981" }}>{!isOnline || syncStatus === "offline" ? "오프라인 저장" : isLoadingDB ? "동기화 중…" : syncStatus === "saving" ? "저장 중…" : syncStatus === "error" ? "로컬 저장됨" : "저장됨"}</span>
-            <button onClick={() => setSidebarOpen(false)} style={{ fontSize: '11px', fontWeight: '900', color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer', letterSpacing: '0.05em' }}>닫기</button>
+            {sidebarFooterVariant === 'full' && (
+              <button onClick={() => setSidebarOpen(false)} style={{ fontSize: '11px', fontWeight: '900', color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer', letterSpacing: '0.05em' }}>닫기</button>
+            )}
           </div>
         </aside>
 
