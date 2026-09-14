@@ -219,3 +219,19 @@
 - 수정 내용: 검증된 `main` 커밋 `00522473665038ca84aaaa2bd3c3ff1aa2bbd0d4`를 `origin/main`에 푸시함. 기존 iOS 미커밋 변경은 제외함.
 - 배포: Cloudflare Pages 프로젝트 `travelplaner` 배포 완료. 배포 URL `https://3eec6bd9.travelplaner-545.pages.dev`, 운영 URL `https://travelplaner-545.pages.dev` 모두 HTTP 200 응답 확인.
 - 답변: GitHub 푸시 및 Cloudflare Pages 배포 완료.
+
+## 2026-09-14
+
+- ID: `Q7mR4xN9Lp`
+- 요청: 모바일·태블릿 세로 스플릿 뷰에서 하단 `저장됨` 표시가 일정 내용을 가리는 문제 수정.
+- 수정 내용: 스플릿 모드의 하단 compact 푸터를 제거하고 저장 상태를 지도·일정 사이 드래그 핸들 오른쪽에 표시하도록 변경함. 저장 상태는 계속 확인할 수 있고 일정 스크롤 영역을 차지하거나 하단 콘텐츠를 덮지 않도록 조정함. 데스크톱 classic 모드의 전체 푸터는 유지함.
+- 검증: 회귀 테스트 RED→GREEN 확인, `npm test` 39개 통과, `npm run lint` 오류 없음(기존 경고 4건), `npm run build` 통과, `git diff --check` 통과. Vite의 기존 500kB 초과 청크 경고만 남음.
+- 답변: 하단 저장 상태를 분할선 옆으로 이동해 일정 콘텐츠를 가리지 않도록 수정 완료함.
+
+## 2026-09-15
+
+- ID: `K4pN8rQ2Vz`
+- 요청: 저장 상태가 하단 일정 콘텐츠를 가리는 수정사항을 GitHub에 푸시하고 Cloudflare Pages에 배포.
+- 수정 내용: 웹 변경 파일과 작업 기록만 커밋 대상으로 지정하고, 기존 iOS 미커밋 변경은 제외함.
+- 검증: `npm test` 39개 통과, `npm run lint` 오류 없음(기존 경고 4건), `npm run build` 통과, `git diff --check` 통과.
+- 답변: GitHub 푸시 및 Cloudflare Pages 배포를 진행함.

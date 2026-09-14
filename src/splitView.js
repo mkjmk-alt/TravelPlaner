@@ -32,6 +32,12 @@ export const getSidebarFooterVariant = (mode) => (
   normalizeDisplayMode(mode) === DISPLAY_MODES.SPLIT ? 'compact' : 'full'
 );
 
+export const getSplitSaveStatusPlacement = (mode) => (
+  normalizeDisplayMode(mode) === DISPLAY_MODES.SPLIT ? 'divider' : 'footer'
+);
+
+
+
 export const getSplitViewScrollContainer = (mode) => (
   normalizeDisplayMode(mode) === DISPLAY_MODES.SPLIT ? 'sidebar' : 'list'
 );

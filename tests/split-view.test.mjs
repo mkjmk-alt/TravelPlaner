@@ -5,6 +5,7 @@ import {
   DISPLAY_MODES,
   getFreeSplitPanePosition,
   getResponsiveDisplayMode,
+  getSplitSaveStatusPlacement,
   getSidebarFooterVariant,
   getSplitPaneLayout,
   getSplitViewScrollContainer,
@@ -31,6 +32,11 @@ test('uses the full footer in classic mode and compact status footer in split mo
   assert.equal(getSidebarFooterVariant(DISPLAY_MODES.CLASSIC), 'full');
   assert.equal(getSidebarFooterVariant(DISPLAY_MODES.SPLIT), 'compact');
   assert.equal(getSidebarFooterVariant('unknown'), 'full');
+});
+
+test('places split save status beside the divider instead of covering itinerary content', () => {
+  assert.equal(getSplitSaveStatusPlacement(DISPLAY_MODES.SPLIT), 'divider');
+  assert.equal(getSplitSaveStatusPlacement(DISPLAY_MODES.CLASSIC), 'footer');
 });
 
 test('supports classic and split display modes with classic as the fallback', () => {

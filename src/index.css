@@ -353,6 +353,7 @@ body {
 .app-container.split-view-mode .drag-handle {
   display: flex;
   position: relative;
+  height: 32px;
   flex: 0 0 auto;
   z-index: 3;
   border-bottom: 1px solid #e2e8f0;
@@ -360,24 +361,20 @@ body {
   cursor: ns-resize;
 }
 
+.app-container.split-view-mode .split-save-status {
+  position: absolute;
+  top: 50%;
+  right: 16px;
+  transform: translateY(-50%);
+  z-index: 1;
+  pointer-events: none;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .app-container.split-view-mode .sidebar-toggle-btn {
-  display: none;
-}
-
-.app-container.split-view-mode .sidebar-footer-compact {
-  position: relative;
-  flex: 0 0 auto;
-  z-index: 4;
-  min-height: 46px;
-  padding: 10px 16px max(10px, env(safe-area-inset-bottom)) !important;
-  justify-content: center !important;
-  background: rgba(255, 255, 255, 0.96) !important;
-  border-top: 1px solid #e2e8f0 !important;
-  box-shadow: 0 -8px 20px rgba(15, 23, 42, 0.08);
-  backdrop-filter: blur(14px);
-}
-
-.app-container.split-view-mode .sidebar-footer-compact button {
   display: none;
 }
 

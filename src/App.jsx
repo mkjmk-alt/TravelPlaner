@@ -7,7 +7,7 @@ import { supabase } from './supabaseClient';
 import { getMapAvailability } from './mapAvailability';
 import { getMobileViewModeSheetMode } from './mobileSidebar';
 import { getClosestMobileSheetMode, getMobileSheetPosition, getMobileSheetSnapPoints } from './mobileSheet';
-import { DISPLAY_MODES, getFreeSplitPanePosition, getResponsiveDisplayMode, getSidebarFooterVariant, getSplitViewGridRows, getSplitViewScrollContainer } from './splitView';
+import { DISPLAY_MODES, getFreeSplitPanePosition, getResponsiveDisplayMode, getSidebarFooterVariant, getSplitSaveStatusPlacement, getSplitViewGridRows, getSplitViewScrollContainer } from './splitView';
 import './index.css';
 
 // --- CONFIGURATION ---
@@ -1198,6 +1198,23 @@ function App() {
   });
   const isSplitView = displayMode === DISPLAY_MODES.SPLIT;
   const sidebarFooterVariant = getSidebarFooterVariant(displayMode);
+  const splitSaveStatusPlacement = getSplitSaveStatusPlacement(displayMode);
+  const saveStatusLabel = !isOnline || syncStatus === 'offline'
+    ? '오프라인 저장'
+    : isLoadingDB
+      ? '동기화 중…'
+      : syncStatus === 'saving'
+        ? '저장 중…'
+        : syncStatus === 'error'
+          ? '로컬 저장됨'
+          : '저장됨';
+  const saveStatusColor = !isOnline || syncStatus === 'offline'
+    ? '#d97706'
+    : syncStatus === 'error'
+      ? '#ef4444'
+      : syncStatus === 'saving'
+        ? '#f59e0b'
+        : '#10b981';
   const [splitPanePosition, setSplitPanePosition] = useState(null);
   const sidebarOpen = isSplitView || sheetMode !== 'collapsed';
   const setSidebarOpen = (open) => {
@@ -4323,7 +4340,13 @@ function App() {
             }
           }}
           style={{ cursor: isSplitView ? 'ns-resize' : 'pointer' }}
-        ></div>
+        >
+          {splitSaveStatusPlacement === 'divider' && (
+            <span className="split-save-status" style={{ color: saveStatusColor }} role="status" aria-live="polite">
+              {saveStatusLabel}
+            </span>
+          )}
+        </div>
 
         <div
           className="sidebar-scroll-region"
@@ -5884,8 +5907,8 @@ function App() {
         </div>
 
           {/* Footer */}
-        <div className={`sidebar-footer sidebar-footer-${sidebarFooterVariant}`} style={{ padding: '18px 32px', borderTop: '1px solid #f3f4f6', backgroundColor: '#f9fafb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
-          {sidebarFooterVariant === 'full' && (
+        {sidebarFooterVariant === 'full' && (
+          <div className="sidebar-footer sidebar-footer-full" style={{ padding: '18px 32px', borderTop: '1px solid #f3f4f6', backgroundColor: '#f9fafb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
             <div className="sidebar-footer-meta" style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
               <span style={{ fontSize: "11px", fontWeight: "900", color: "#111827", letterSpacing: "0.05em" }}>{(favorites || []).length} 저장 • {totalSpots} 일정</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '9px', fontWeight: '800' }}>
@@ -5896,12 +5919,10 @@ function App() {
                 <a href="/support.html" style={{ color: '#64748b', textDecoration: 'none' }}>지원</a>
               </span>
             </div>
-          )}
-            <span style={{ fontSize: "10px", fontWeight: "800", color: !isOnline || syncStatus === "offline" ? "#d97706" : syncStatus === "error" ? "#ef4444" : syncStatus === "saving" ? "#f59e0b" : "#10b981" }}>{!isOnline || syncStatus === "offline" ? "오프라인 저장" : isLoadingDB ? "동기화 중…" : syncStatus === "saving" ? "저장 중…" : syncStatus === "error" ? "로컬 저장됨" : "저장됨"}</span>
-            {sidebarFooterVariant === 'full' && (
-              <button onClick={() => setSidebarOpen(false)} style={{ fontSize: '11px', fontWeight: '900', color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer', letterSpacing: '0.05em' }}>닫기</button>
-            )}
+            <span style={{ fontSize: "10px", fontWeight: "800", color: saveStatusColor }} role="status" aria-live="polite">{saveStatusLabel}</span>
+            <button onClick={() => setSidebarOpen(false)} style={{ fontSize: '11px', fontWeight: '900', color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer', letterSpacing: '0.05em' }}>닫기</button>
           </div>
+        )}
         </aside>
 
         {syncConflictNotice && (
