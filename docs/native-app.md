@@ -1,10 +1,10 @@
-# TravelPlaner 네이티브 앱 개발 및 출시 가이드
+# 트리블리 (Tribly) 네이티브 앱 개발 및 출시 가이드
 
 ## 확정된 기본값
 
 | 항목 | 값 |
 | --- | --- |
-| 앱 이름 | TravelPlaner |
+| 앱 이름 | 트리블리 (Tribly) |
 | iOS Bundle ID | `com.travelplaner.app` |
 | Android Application ID | `com.travelplaner.app` |
 | 운영 URL | `https://travelplaner-545.pages.dev/` |

@@ -8,6 +8,9 @@ import { getMapAvailability } from './mapAvailability';
 import { getMobileViewModeSheetMode } from './mobileSidebar';
 import { getClosestMobileSheetMode, getMobileSheetPosition, getMobileSheetSnapPoints } from './mobileSheet';
 import { DISPLAY_MODES, getFreeSplitPanePosition, getResponsiveDisplayMode, getSaveStatusPresentation, getSidebarFooterVariant, getSplitSaveStatusPlacement, getSplitViewGridRows, getSplitViewScrollContainer } from './splitView';
+import { BRAND_NAME_EN, BRAND_NAME_KO } from './brand';
+import TravelMemoryPanel from './TravelMemoryPanel';
+import { getJournalEntries, getTravelDetails } from './travelMemory';
 import './index.css';
 
 // --- CONFIGURATION ---
@@ -1289,6 +1292,11 @@ function App() {
     setViewMode('itinerary');
     if (windowSize.width < 768) setSheetMode('full');
   };
+  const openTravelMemory = () => {
+    setIsMobileHeaderHidden(false);
+    setViewMode('memory');
+    if (windowSize.width < 768) setSheetMode('full');
+  };
   const openFavorites = () => {
     setIsMobileHeaderHidden(false);
     setViewMode('favorites');
@@ -1445,6 +1453,8 @@ function App() {
         updatedAt: getTripUpdatedAt(trip),
         reserveItems: Array.isArray(trip.reserveItems) ? trip.reserveItems : [],
         checklist: Array.isArray(trip.checklist) ? trip.checklist : getDefaultChecklist(),
+        travelDetails: getTravelDetails(trip),
+        journalEntries: getJournalEntries(trip),
         expenses: Array.isArray(trip.expenses) ? trip.expenses.map(expense => ({
           ...expense,
           category: expense.category || 'other',
@@ -1466,6 +1476,8 @@ function App() {
         budgetSettings: oldBudget,
         expenses: oldExpenses,
         checklist: getDefaultChecklist(),
+        travelDetails: getTravelDetails({}),
+        journalEntries: [],
         createdAt: Date.now(),
         updatedAt: Date.now()
       };
@@ -2741,6 +2753,8 @@ function App() {
       budgetSettings: { limitKRW: 1000000, travelCurrency: countryToCurrency[country] || 'USD' },
       expenses: [],
       checklist: getDefaultChecklist(),
+      travelDetails: getTravelDetails({}),
+      journalEntries: [],
       reminders: { enabled: false, minutesBefore: 30 },
       createdAt: Date.now(),
       updatedAt: Date.now()
@@ -2815,7 +2829,7 @@ function App() {
         'END:VEVENT'
       ].join('\r\n');
     }));
-    const ical = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//TravelPlaner//Itinerary//KO', 'CALSCALE:GREGORIAN', ...events, 'END:VCALENDAR'].join('\r\n');
+    const ical = ['BEGIN:VCALENDAR', 'VERSION:2.0', `PRODID:-//${BRAND_NAME_EN}//Itinerary//KO`, 'CALSCALE:GREGORIAN', ...events, 'END:VCALENDAR'].join('\r\n');
     downloadTextFile(`${(trip.name || 'travel-plan').replace(/[^\w가-힣-]+/g, '_')}.ics`, ical, 'text/calendar;charset=utf-8');
     setModalConfig({ type: 'success', title: '캘린더 내보내기 완료', message: 'Google Calendar, Apple 캘린더 등에서 열 수 있는 iCal 파일을 저장했습니다.' });
     setShowCustomModal(true);
@@ -2922,6 +2936,8 @@ function App() {
               memo: exp.memo || ''
             })),
             checklist: Array.isArray(data.checklist) ? data.checklist : getDefaultChecklist(),
+            travelDetails: getTravelDetails(data),
+            journalEntries: getJournalEntries(data),
             reminders: data.reminders || { enabled: false, minutesBefore: 30 },
             createdAt: Date.now()
           };
@@ -2988,8 +3004,14 @@ function App() {
         expenses: (data.expenses || []).map(exp => ({
           ...exp,
           id: exp.id || Math.random().toString(36).substr(2, 9),
-          createdAt: exp.createdAt || Date.now()
+          createdAt: exp.createdAt || Date.now(),
+          category: exp.category || 'other',
+          memo: exp.memo || ''
         })),
+        checklist: Array.isArray(data.checklist) ? data.checklist : getDefaultChecklist(),
+        travelDetails: getTravelDetails(data),
+        journalEntries: getJournalEntries(data),
+        reminders: data.reminders || { enabled: false, minutesBefore: 30 },
         createdAt: Date.now()
       };
 
@@ -4006,7 +4028,7 @@ function App() {
     ctx.fillStyle = '#f8fafc';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     drawCard(40, 36, 1120, 105, '#ffffff', '#e9d5ff');
-    drawText('TRAVELPLANER', 72, 78, 17, '#7c3aed', 900);
+    drawText(BRAND_NAME_EN.toUpperCase(), 72, 78, 17, '#7c3aed', 900);
     drawText(truncate(activeTrip.name || '여행 지출 통계', 34), 72, 116, 28, '#0f172a', 900);
     drawText(`${expenses.length}건 · ${itinerary.length}일`, 1128, 91, 13, '#64748b', 800, 'right');
     drawText('지출 통계 리포트', 1128, 116, 12, '#8b5cf6', 800, 'right');
@@ -4118,7 +4140,7 @@ function App() {
       drawText(formatKRW(amount), 1132, y, 11, '#6d28d9', 900, 'right');
     });
     if (dailyStats.length === 0) drawText('아직 기록된 지출이 없습니다.', 600, dailyPanelY + 85, 12, '#94a3b8', 800, 'center');
-    drawText('TravelPlaner · 모든 금액은 저장된 환율 기준으로 원화 환산되었습니다.', 600, footerY, 11, '#94a3b8', 700, 'center');
+    drawText(`${BRAND_NAME_KO} · 모든 금액은 저장된 환율 기준으로 원화 환산되었습니다.`, 600, footerY, 11, '#94a3b8', 700, 'center');
 
     const saveImage = (blob) => {
       if (!blob) return;
@@ -4346,7 +4368,7 @@ function App() {
             {/* Row 1: Logo & Auth */}
             <div className="sidebar-brand-auth-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <div className="sidebar-brand-copy">
-                <h1 style={{ fontSize: '24px', fontWeight: '900', color: '#111827', margin: 0, letterSpacing: '-0.05em' }}>TravelPlaner</h1>
+                <h1 style={{ fontSize: '24px', fontWeight: '900', color: '#111827', margin: 0, letterSpacing: '-0.05em' }}>{BRAND_NAME_KO}</h1>
                 <p style={{ fontSize: '9px', fontWeight: '800', color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.15em', margin: '2px 0 0 0' }}>여행 일정 플래너</p>
               </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -4418,6 +4440,13 @@ function App() {
                     aria-label="예산·지출" title="예산·지출"
                   >
                     <Wallet size={18} />
+                  </button>
+                  <button
+                    onClick={openTravelMemory}
+                    style={{ width: '40px', height: '40px', padding: 0, borderRadius: '12px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.2s', backgroundColor: viewMode === 'memory' ? '#0ea5e9' : '#f3f4f6', color: viewMode === 'memory' ? 'white' : '#64748b' }}
+                    aria-label="여행 기록" title="여행 기록"
+                  >
+                    <FileText size={18} />
                   </button>
                   
                   {/* Unified Invite Action */}
@@ -4696,15 +4725,24 @@ function App() {
                               <span style={{ color: '#111827' }}>총 지출 ₩ {(trip.expenses || []).reduce((sum, e) => sum + getExpenseAmountKRW(e.amount, e.currency, trip.budgetSettings), 0).toLocaleString()}</span>
                             </div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginTop: '18px', paddingTop: '14px', borderTop: '1px solid #f1f5f9' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', marginTop: '18px', paddingTop: '14px', borderTop: '1px solid #f1f5f9' }}>
                             <span style={{ color: '#94a3b8', fontSize: '11px', fontWeight: '800' }}>{(trip.itinerary || []).reduce((sum, day) => sum + (day.items || []).length, 0)}개 일정</span>
-                            <button
-                              type="button"
-                              onClick={(event) => { event.stopPropagation(); setActiveTripId(trip.id); openItinerary(); }}
-                              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '9px 12px', border: 'none', borderRadius: '10px', backgroundColor: '#eff6ff', color: '#2563eb', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}
-                            >
-                              <Calendar size={14} /> 일정 보기
-                            </button>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <button
+                                type="button"
+                                onClick={(event) => { event.stopPropagation(); setActiveTripId(trip.id); openItinerary(); }}
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '9px 12px', border: 'none', borderRadius: '10px', backgroundColor: '#eff6ff', color: '#2563eb', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}
+                              >
+                                <Calendar size={14} /> 일정 보기
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(event) => { event.stopPropagation(); setActiveTripId(trip.id); openTravelMemory(); }}
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '9px 12px', border: 'none', borderRadius: '10px', backgroundColor: '#f0f9ff', color: '#0284c7', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}
+                              >
+                                <FileText size={14} /> 여행 기록
+                              </button>
+                            </div>
                         </div>
                       </div>
                       );
@@ -5348,6 +5386,17 @@ function App() {
                   </div>
                 ))}
               </>
+            )}
+
+            {/* --- TRAVEL MEMORY MODE --- */}
+            {viewMode === 'memory' && activeTrip && (
+              <TravelMemoryPanel
+                key={activeTrip.id}
+                trip={activeTrip}
+                readOnly={isReadOnlyTrip}
+                onUpdateTrip={updateActiveTrip}
+                onOpenItinerary={openItinerary}
+              />
             )}
 
             {/* --- BUDGET MODE --- */}
@@ -6051,7 +6100,7 @@ function App() {
                 {authMode === 'signup' ? '회원가입' : authMode === 'reset' ? '비밀번호 찾기' : authMode === 'new-password' ? '새 비밀번호 설정' : '로그인'}
               </h2>
               <p style={{ margin: '7px 0 0', color: '#64748b', fontSize: '12px', lineHeight: 1.5 }}>
-                {authMode === 'signup' ? '이메일로 계정을 만들고 여행 데이터를 안전하게 동기화하세요.' : authMode === 'reset' ? '가입한 이메일을 입력하면 비밀번호 재설정 링크를 보내드립니다.' : authMode === 'new-password' ? '새 비밀번호를 입력하면 계정 복구가 완료됩니다.' : 'Google 또는 이메일로 TravelPlaner를 이용하세요.'}
+                {authMode === 'signup' ? '이메일로 계정을 만들고 여행 데이터를 안전하게 동기화하세요.' : authMode === 'reset' ? '가입한 이메일을 입력하면 비밀번호 재설정 링크를 보내드립니다.' : authMode === 'new-password' ? '새 비밀번호를 입력하면 계정 복구가 완료됩니다.' : `Google 또는 이메일로 ${BRAND_NAME_KO}를 이용하세요.`}
               </p>
             </div>
 

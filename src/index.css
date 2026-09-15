@@ -2551,3 +2551,475 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     margin: 10px 16px 16px !important;
   }
 }
+
+/* Travel Mapmory-inspired trip memory surface. Keep it inside the existing
+   sidebar scroll region so classic and split layouts share the same behavior. */
+.travel-memory-panel {
+  display: grid;
+  gap: 14px;
+  padding-bottom: 24px;
+}
+
+.travel-memory-hero,
+.travel-memory-summary-card,
+.travel-memory-card,
+.travel-memory-entry-card,
+.travel-memory-empty-state {
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, .04);
+}
+
+.travel-memory-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px;
+  border-color: #bae6fd;
+  background: linear-gradient(135deg, #f0f9ff, #eff6ff);
+}
+
+.travel-memory-eyebrow,
+.travel-memory-card-kicker {
+  display: block;
+  color: #0284c7;
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: .08em;
+}
+
+.travel-memory-hero .menu-section-title {
+  margin: 4px 0 2px;
+  color: #0f172a;
+}
+
+.travel-memory-hero p {
+  margin: 0;
+  overflow: hidden;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.travel-memory-status-chip {
+  flex-shrink: 0;
+  padding: 7px 9px;
+  border-radius: 999px;
+  background: #fff;
+  color: #0369a1;
+  font-size: 10px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.travel-memory-summary-card,
+.travel-memory-card {
+  padding: 16px;
+}
+
+.travel-memory-summary-heading,
+.travel-memory-card-heading,
+.travel-memory-entry-meta,
+.travel-memory-summary-meta,
+.travel-memory-form-actions,
+.travel-memory-photo-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.travel-memory-summary-heading strong,
+.travel-memory-card-heading h3 {
+  display: block;
+  margin: 0;
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 950;
+}
+
+.travel-memory-summary-heading span {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.travel-memory-summary-heading > svg,
+.travel-memory-card-heading > svg {
+  flex-shrink: 0;
+  color: #0284c7;
+}
+
+.travel-memory-summary-meta {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.travel-memory-summary-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.travel-memory-day-strip {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  margin-top: 12px;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.travel-memory-day-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.travel-memory-day-strip span {
+  flex: 0 0 auto;
+  padding: 7px 9px;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.travel-memory-day-strip span.has-places {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.travel-memory-day-strip b {
+  margin-left: 3px;
+  font-weight: 950;
+}
+
+.travel-memory-link-button,
+.travel-memory-secondary-button,
+.travel-memory-primary-button,
+.travel-memory-cancel-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 0;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.travel-memory-link-button {
+  margin-top: 12px;
+  padding: 0;
+  background: transparent;
+  color: #0284c7;
+}
+
+.travel-memory-card-heading {
+  margin-bottom: 14px;
+}
+
+.travel-memory-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.travel-memory-form-grid-wide {
+  grid-column: 1 / -1;
+}
+
+.travel-memory-form-grid label,
+.travel-memory-journal-form > label {
+  display: block;
+  min-width: 0;
+}
+
+.travel-memory-form-grid label > span,
+.travel-memory-journal-form > label > span {
+  display: block;
+  margin-bottom: 6px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.travel-memory-form-grid input,
+.travel-memory-journal-form input,
+.travel-memory-journal-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 11px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  color: #1e293b;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  outline: none;
+}
+
+.travel-memory-form-grid input:focus,
+.travel-memory-journal-form input:focus,
+.travel-memory-journal-form textarea:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, .13);
+}
+
+.travel-memory-form-grid input:disabled {
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.travel-memory-secondary-button {
+  margin-top: 12px;
+  padding: 9px 11px;
+  background: #f0f9ff;
+  color: #0369a1;
+}
+
+.travel-memory-journal-card {
+  border-color: #ddd6fe;
+  background: linear-gradient(180deg, #fff, #fafaff);
+}
+
+.travel-memory-journal-card .travel-memory-card-kicker {
+  color: #7c3aed;
+}
+
+.travel-memory-journal-card .travel-memory-card-heading > svg {
+  color: #7c3aed;
+}
+
+.travel-memory-journal-form {
+  display: grid;
+  gap: 10px;
+}
+
+.travel-memory-journal-form textarea {
+  min-height: 92px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.travel-memory-photo-row {
+  justify-content: flex-start;
+  align-items: flex-start;
+}
+
+.travel-memory-photo-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 9px 11px;
+  border: 1px dashed #c4b5fd;
+  border-radius: 10px;
+  background: #faf5ff;
+  color: #7c3aed;
+  font-size: 11px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.travel-memory-photo-picker input {
+  display: none;
+}
+
+.travel-memory-photo-preview {
+  position: relative;
+  width: 54px;
+  height: 54px;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #f1f5f9;
+}
+
+.travel-memory-photo-preview img,
+.travel-memory-entry-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.travel-memory-photo-preview button {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, .7);
+  color: #fff;
+  cursor: pointer;
+}
+
+.travel-memory-form-error {
+  margin: 0;
+  color: #dc2626;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.travel-memory-form-actions {
+  justify-content: flex-end;
+}
+
+.travel-memory-primary-button,
+.travel-memory-cancel-button {
+  min-height: 36px;
+  padding: 8px 12px;
+}
+
+.travel-memory-primary-button {
+  background: #7c3aed;
+  color: #fff;
+}
+
+.travel-memory-cancel-button {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.travel-memory-readonly-note {
+  margin: 0;
+  padding: 10px 11px;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.travel-memory-entry-list {
+  display: grid;
+  gap: 10px;
+}
+
+.travel-memory-entry-card {
+  display: flex;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.travel-memory-entry-image {
+  width: 96px;
+  min-height: 118px;
+  flex: 0 0 96px;
+}
+
+.travel-memory-entry-content {
+  min-width: 0;
+  flex: 1;
+  padding: 13px;
+}
+
+.travel-memory-entry-meta {
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.travel-memory-entry-meta > div {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.travel-memory-entry-meta button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 25px;
+  height: 25px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.travel-memory-entry-meta button:last-child {
+  color: #f87171;
+  background: #fff5f5;
+}
+
+.travel-memory-entry-card h4 {
+  margin: 8px 0 4px;
+  overflow: hidden;
+  color: #1e293b;
+  font-size: 13px;
+  font-weight: 950;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.travel-memory-entry-card p {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
+.travel-memory-empty-state {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 28px 16px;
+  color: #94a3b8;
+  text-align: center;
+}
+
+.travel-memory-empty-state svg {
+  color: #c4b5fd;
+}
+
+.travel-memory-empty-state strong {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.travel-memory-empty-state span {
+  font-size: 10px;
+  font-weight: 700;
+}
+
+@media (max-width: 520px) {
+  .travel-memory-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .travel-memory-form-grid-wide {
+    grid-column: auto;
+  }
+
+  .travel-memory-entry-image {
+    width: 78px;
+    flex-basis: 78px;
+  }
+}
