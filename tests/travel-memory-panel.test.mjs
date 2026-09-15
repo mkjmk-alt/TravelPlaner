@@ -16,3 +16,25 @@ test('exposes a separate travel memory view without deferred features', () => {
   assert.match(panelSource, /항공·숙소 정보/);
   assert.doesNotMatch(panelSource, /음성 메모|예약 링크|방문 국가 색칠/);
 });
+
+test('connects journal drafts and saved entries to itinerary places', () => {
+  assert.match(panelSource, /getItineraryPlaceOptions/);
+  assert.match(panelSource, /placeKey/);
+  assert.match(panelSource, /onOpenPlace/);
+  assert.match(panelSource, /장소 연결/);
+  assert.match(panelSource, /지도에서 장소 보기/);
+});
+
+test('organizes saved memories as a day-filtered chronological timeline', () => {
+  assert.match(panelSource, /getJournalEntryDay/);
+  assert.match(panelSource, /sortJournalEntriesForTimeline/);
+  assert.match(panelSource, /journalDayFilter/);
+  assert.match(panelSource, /전체 기록/);
+  assert.match(panelSource, /날짜별 여행 기록/);
+  assert.match(panelSource, /TIMELINE/);
+});
+
+test('passes a map focus callback into the travel memory panel', () => {
+  assert.match(appSource, /onOpenPlace=\{openMemoryPlace\}/);
+  assert.match(appSource, /map\.panTo\(\{ lat, lng \}\)/);
+});

@@ -1297,6 +1297,26 @@ function App() {
     setViewMode('memory');
     if (windowSize.width < 768) setSheetMode('full');
   };
+  const openMemoryPlace = (place) => {
+    const lat = Number(place?.lat);
+    const lng = Number(place?.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+    const mapPlace = {
+      ...place,
+      name: place.name || '일정 장소',
+      displayName: place.name || '일정 장소',
+      loc: place.address || '',
+      lat,
+      lng,
+      emoji: place.emoji || '📍'
+    };
+    setSelectedPlace(mapPlace);
+    if (map) {
+      map.panTo({ lat, lng });
+      map.setZoom(16);
+    }
+  };
   const openFavorites = () => {
     setIsMobileHeaderHidden(false);
     setViewMode('favorites');
@@ -5396,6 +5416,7 @@ function App() {
                 readOnly={isReadOnlyTrip}
                 onUpdateTrip={updateActiveTrip}
                 onOpenItinerary={openItinerary}
+                onOpenPlace={openMemoryPlace}
               />
             )}
 
