@@ -266,3 +266,61 @@
 - 수정 내용: `src/App.jsx`에서 헤더의 `1·2` 모드 표시 마크업과 전용 접근성 문구를 제거하고, `src/index.css`에서 전용 래퍼·표시 스타일을 삭제함. 삭제 전 원문은 `backup/removed-display-mode-controls/display-mode-controls.md`에 별도 보관함. `displayMode` 자동 판정 및 스플릿 레이아웃 분기 코드는 유지함. 재발 방지 회귀 테스트 `tests/display-mode-controls.test.mjs`를 추가함. 기존 iOS 미커밋 변경은 제외함.
 - 검증: 삭제 대상 회귀 테스트 RED→GREEN 확인, `npm test` 41개 통과, `npm run lint` 오류 없음(기존 경고 4건), `npm run build` 통과, `git diff --check` 통과. Vite의 기존 500kB 초과 청크 경고만 남음.
 - 답변: 헤더의 `1·2` 버튼과 관련 전용 코드를 제거하고 백업본을 별도 보관함. 데스크톱·모바일·태블릿 반응형 자동 분기는 유지됨. 이번 요청에서는 GitHub 푸시 및 배포를 진행하지 않음.
+
+## 2026-09-15
+
+- ID: `C8nR5vL2Qx`
+- 요청: 방금 수정한 웹 변경사항을 GitHub에 푸시하고 Cloudflare Pages에 배포.
+- 수정 내용: 검증된 웹 변경사항과 백업·회귀 테스트·작업 기록을 `8ca1fed87213d14a2d07d93f30e8ac4a8a4f361f`로 로컬 커밋함. 기존 iOS 미커밋 변경은 제외함.
+- 배포: Cloudflare Pages 프로젝트 `travelplaner` 배포 완료. 미리보기 URL `https://68631477.travelplaner-545.pages.dev`, 운영 URL `https://travelplaner-545.pages.dev` 모두 HTTP 200 응답 확인.
+- 푸시: GitHub 계정의 기존 인증 토큰이 만료되어 `origin/main` 푸시는 완료하지 못함. 재인증 후 동일 커밋을 푸시해야 함.
+- 답변: Cloudflare Pages 배포는 완료했으며, GitHub 푸시는 인증 만료로 보류됨.
+
+## 2026-09-15
+
+- ID: `D7kP3xM8Qa`
+- 요청: GitHub 인증 토큰 만료를 방지하는 방법 문의.
+- 수정 내용: 없음. 현재 저장소의 GitHub CLI 인증 상태가 만료된 것을 확인했고, SSH 인증 전환과 GitHub CLI 웹 재인증 방법을 안내하기로 함.
+- 답변: 장기적으로는 PAT 대신 SSH remote를 사용하는 방식을 권장함. HTTPS·GitHub CLI를 유지할 경우 `gh auth login --web --git-protocol https`로 재인증하고 `gh auth setup-git`으로 Git credential helper를 설정함. fine-grained PAT는 저장소 범위를 최소화하고 만료일을 관리해야 하며, 비밀번호처럼 안전하게 보관해야 함.
+
+## 2026-09-15
+
+- ID: `F4mR8qK2Vz`
+- 요청: SSH 인증으로 전환했다고 알려 이전 GitHub 푸시를 재시도.
+- 수정 내용: 확인 결과 remote는 아직 HTTPS였고, SSH 호스트 키가 등록되지 않아 인증 전 단계에서 중단됨. iOS 미커밋 변경은 건드리지 않음.
+- 답변: SSH 설정이 아직 완료되지 않은 상태임을 안내하고 GitHub CLI SSH 로그인 절차를 시작함.
+
+## 2026-09-15
+
+- ID: `G8vL2mQ7Rx`
+- 요청: GitHub SSH 인증 설정을 실제로 진행하고 싶다고 확인.
+- 수정 내용: `gh auth login --hostname github.com --git-protocol ssh --web`을 시작하고, 새 SSH 키 생성 및 GitHub 기기 인증을 대기 중임. 아직 remote 변경이나 푸시는 완료하지 않음.
+- 답변: GitHub 기기 인증 페이지에서 일회용 코드를 입력하고 승인하면 SSH 설정을 이어서 완료할 수 있도록 안내함.
+
+## 2026-09-15
+
+- ID: `H5qN8mR3Lx`
+- 요청: 현재 노트북을 사용할 수 없어 GitHub 로그인을 진행할 수 없음을 알림.
+- 수정 내용: 대기 중이던 GitHub CLI 기기 인증을 중단함. 로컬 SSH 키 파일은 존재하지만 GitHub 계정 등록과 remote SSH 전환은 아직 완료하지 않음. 기존 로컬 커밋과 Cloudflare 배포는 보존함.
+- 답변: 노트북 사용이 가능해진 뒤 GitHub 기기 인증을 완료하고 SSH remote 전환 및 푸시를 이어서 진행할 수 있다고 안내함.
+
+## 2026-09-15
+
+- ID: `J3mQ7vR9Lx`
+- 요청: GitHub 푸시에 SSH 방식을 사용하도록 설정.
+- 수정 내용: 저장소 `origin` remote를 HTTPS에서 `git@github.com:mkjmk-alt/TravelPlaner.git` SSH 주소로 변경함. GitHub 계정에 SSH 키를 등록하는 기기 인증은 아직 완료하지 않음.
+- 답변: 저장소는 SSH 푸시 방식으로 준비했으며, 노트북 사용이 가능해진 뒤 GitHub SSH 인증을 완료하고 `git push origin main`을 실행하면 됨.
+
+## 2026-09-15
+
+- ID: `K9rM4qV7Lx`
+- 요청: GitHub SSH 인증을 즉시 진행.
+- 수정 내용: 기존 로컬 SSH 공개키를 GitHub 계정에 등록하는 `gh auth login --hostname github.com --git-protocol ssh --web` 절차를 시작하고 인증 페이지를 열도록 요청함. 기기 인증 코드 `A5A2-1FCA` 입력과 승인을 대기 중임.
+- 답변: GitHub 기기 인증 승인 후 SSH 연결 확인과 `main` 브랜치 푸시를 이어서 진행할 예정임.
+
+## 2026-09-15
+
+- ID: `L6vQ2mR8Kx`
+- 요청: 사파리에서 GitHub 기기 인증을 완료했다고 알림.
+- 수정 내용: GitHub 계정 인증과 SSH 공개키 등록을 확인하고, GitHub 공식 호스트 지문과 일치하는 Ed25519 호스트 키를 로컬 `known_hosts`에 등록함. SSH 연결 성공 후 로컬 커밋 `8ca1fed87213d14a2d07d93f30e8ac4a8a4f361f`를 `origin/main`에 푸시함. 운영 사이트 HTTP 200 응답도 재확인함. 기존 iOS 미커밋 변경은 제외함.
+- 답변: SSH 인증 및 GitHub 푸시를 완료했으며, 운영 사이트도 정상 응답함.
