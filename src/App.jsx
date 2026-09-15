@@ -4345,29 +4345,9 @@ function App() {
           <div className={"sidebar-header " + (isMobileHeaderHidden ? "mobile-header-hidden" : "")} style={{ padding: '24px 32px', borderBottom: '1px solid #f3f4f6', backgroundColor: 'white', userSelect: 'none' }}>
             {/* Row 1: Logo & Auth */}
             <div className="sidebar-brand-auth-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <div className="sidebar-brand-mode-row" style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                <div className="sidebar-brand-copy">
+              <div className="sidebar-brand-copy">
                 <h1 style={{ fontSize: '24px', fontWeight: '900', color: '#111827', margin: 0, letterSpacing: '-0.05em' }}>TravelPlaner</h1>
                 <p style={{ fontSize: '9px', fontWeight: '800', color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.15em', margin: '2px 0 0 0' }}>여행 일정 플래너</p>
-                </div>
-                <div
-                  className="sidebar-display-mode-switch"
-                  role="status"
-                  aria-live="polite"
-                  aria-atomic="true"
-                  aria-label={`자동 화면 모드: ${displayMode === DISPLAY_MODES.CLASSIC ? '1번 현재 화면' : '2번 지도·일정 스플릿 뷰'}`}
-                >
-                  <span
-                    className={`sidebar-display-mode-indicator${displayMode === DISPLAY_MODES.CLASSIC ? ' is-selected' : ''}`}
-                    aria-hidden="true"
-                    title="1번: 현재 화면"
-                  >1</span>
-                  <span
-                    className={`sidebar-display-mode-indicator${displayMode === DISPLAY_MODES.SPLIT ? ' is-selected' : ''}`}
-                    aria-hidden="true"
-                    title="2번: 지도·일정 스플릿 뷰"
-                  >2</span>
-                </div>
               </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 {session ? (

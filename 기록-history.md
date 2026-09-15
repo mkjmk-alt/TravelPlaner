@@ -258,3 +258,11 @@
 - 수정 내용: 검증된 웹 수정사항과 작업 기록만 커밋 대상으로 지정하고, 기존 iOS 미커밋 변경은 제외함.
 - 검증: `npm test` 40개 통과, `npm run lint` 오류 없음(기존 경고 4건), `npm run build` 통과, `git diff --check` 통과.
 - 답변: GitHub 푸시 및 Cloudflare Pages 배포를 진행함.
+
+## 2026-09-15
+
+- ID: `B6rQ9mK2Vx`
+- 요청: 이전에 추가한 `1·2` 화면 모드 버튼과 관련 코드를 삭제하고, 현재 데스크톱·모바일 자동 반응형 분기 방식은 유지.
+- 수정 내용: `src/App.jsx`에서 헤더의 `1·2` 모드 표시 마크업과 전용 접근성 문구를 제거하고, `src/index.css`에서 전용 래퍼·표시 스타일을 삭제함. 삭제 전 원문은 `backup/removed-display-mode-controls/display-mode-controls.md`에 별도 보관함. `displayMode` 자동 판정 및 스플릿 레이아웃 분기 코드는 유지함. 재발 방지 회귀 테스트 `tests/display-mode-controls.test.mjs`를 추가함. 기존 iOS 미커밋 변경은 제외함.
+- 검증: 삭제 대상 회귀 테스트 RED→GREEN 확인, `npm test` 41개 통과, `npm run lint` 오류 없음(기존 경고 4건), `npm run build` 통과, `git diff --check` 통과. Vite의 기존 500kB 초과 청크 경고만 남음.
+- 답변: 헤더의 `1·2` 버튼과 관련 전용 코드를 제거하고 백업본을 별도 보관함. 데스크톱·모바일·태블릿 반응형 자동 분기는 유지됨. 이번 요청에서는 GitHub 푸시 및 배포를 진행하지 않음.
