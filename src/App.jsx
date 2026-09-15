@@ -11,6 +11,7 @@ import { DISPLAY_MODES, getFreeSplitPanePosition, getResponsiveDisplayMode, getS
 import { BRAND_NAME_EN, BRAND_NAME_KO } from './brand';
 import TravelMemoryPanel from './TravelMemoryPanel';
 import { getJournalEntries, getTravelDetails } from './travelMemory';
+import { calculateSettlement, normalizeExpenseParticipants, normalizeSettlementParticipants } from './expenseSettlement';
 import './index.css';
 
 // --- CONFIGURATION ---
@@ -1076,6 +1077,67 @@ const ExpenseCurrencyPicker = ({ value, options, onChange, placeholder = '추가
   );
 };
 
+const ExpenseSplitFields = ({ participants, payerId, participantIds, onChange, compact = false }) => {
+  const safeParticipants = normalizeSettlementParticipants(participants);
+  const selectedIds = Array.isArray(participantIds) && participantIds.length > 0
+    ? participantIds
+    : ['self'];
+  const safePayerId = safeParticipants.some(person => person.id === payerId) ? payerId : 'self';
+  const selectPayer = (nextPayerId) => {
+    onChange({
+      payerId: nextPayerId,
+      participantIds: selectedIds.includes(nextPayerId) ? selectedIds : [...selectedIds, nextPayerId]
+    });
+  };
+  const toggleParticipant = (participantId) => {
+    const nextIds = selectedIds.includes(participantId)
+      ? selectedIds.filter(id => id !== participantId)
+      : [...selectedIds, participantId];
+    if (participantId === safePayerId && selectedIds.includes(participantId)) return;
+    onChange({
+      payerId: safePayerId,
+      participantIds: nextIds.length > 0 ? nextIds : [safePayerId]
+    });
+  };
+
+  return (
+    <div className={`expense-split-fields${compact ? ' is-compact' : ''}`}>
+      <div className="expense-split-payer-field">
+        <label className="expense-form-label" htmlFor={compact ? 'expense-edit-payer-select' : 'expense-payer-select'}>지출자</label>
+        <select
+          id={compact ? 'expense-edit-payer-select' : 'expense-payer-select'}
+          className="expense-form-control"
+          value={safePayerId}
+          onChange={event => selectPayer(event.target.value)}
+          aria-label="누가 결제했는지 선택"
+        >
+          {safeParticipants.map(person => <option key={`expense-payer-${person.id}`} value={person.id}>{person.name}</option>)}
+        </select>
+      </div>
+      <div className="expense-split-participants-field">
+        <div className="expense-form-label">함께 사용한 사람 <span className="expense-split-count">{selectedIds.length}명</span></div>
+        <div className="expense-split-participant-list" role="group" aria-label="함께 사용한 사람 선택">
+          {safeParticipants.map(person => {
+            const isSelected = selectedIds.includes(person.id);
+            return (
+              <button
+                key={`expense-participant-${person.id}`}
+                type="button"
+                className={`expense-split-participant${isSelected ? ' is-selected' : ''}`}
+                aria-pressed={isSelected}
+                onClick={() => toggleParticipant(person.id)}
+              >
+                {person.name}
+              </button>
+            );
+          })}
+        </div>
+        <p className="expense-split-hint">선택한 사람 수로 1/n 정산합니다. 지출자는 자동으로 포함됩니다.</p>
+      </div>
+    </div>
+  );
+};
+
 const ITINERARY_EMOJI_OPTIONS = ['📍', '✈️', '🏨', '🍽️', '☕', '🏖️', '🛍️', '🚗', '🎫', '📸', '🌅', '🏛️', '🎉', '🧳'];
 
 const ItineraryEmojiPicker = ({ value, onChange }) => (
@@ -1377,6 +1439,7 @@ function App() {
     typeof Notification === 'undefined' ? 'unsupported' : Notification.permission
   ));
   const [budgetPanel, setBudgetPanel] = useState(null);
+  const [settlementParticipantName, setSettlementParticipantName] = useState('');
   const [showChecklist, setShowChecklist] = useState(false);
   const [checklistDraft, setChecklistDraft] = useState('');
   const [cashWalletId, setCashWalletId] = useState(null);
@@ -1475,6 +1538,7 @@ function App() {
         checklist: Array.isArray(trip.checklist) ? trip.checklist : getDefaultChecklist(),
         travelDetails: getTravelDetails(trip),
         journalEntries: getJournalEntries(trip),
+        settlementParticipants: normalizeSettlementParticipants(trip.settlementParticipants),
         expenses: Array.isArray(trip.expenses) ? trip.expenses.map(expense => ({
           ...expense,
           category: expense.category || 'other',
@@ -1495,6 +1559,7 @@ function App() {
         reserveItems: [],
         budgetSettings: oldBudget,
         expenses: oldExpenses,
+        settlementParticipants: [{ id: 'self', name: '나' }],
         checklist: getDefaultChecklist(),
         travelDetails: getTravelDetails({}),
         journalEntries: [],
@@ -1511,7 +1576,7 @@ function App() {
 
   const [exchangeRates, setExchangeRates] = useState({});
   const [exchangeRateInfo, setExchangeRateInfo] = useState({ date: '', source: '자동 환율' });
-  const [expenseInput, setExpenseInput] = useState(() => ({ desc: '', amount: '', currency: '', paymentMethod: '', category: 'other', memo: '', day: 1, time: getCurrentTimeInputValue() }));
+  const [expenseInput, setExpenseInput] = useState(() => ({ desc: '', amount: '', currency: '', paymentMethod: '', category: 'other', memo: '', day: 1, time: getCurrentTimeInputValue(), payerId: 'self', participantIds: ['self'] }));
   const [editingExpenseId, setEditingExpenseId] = useState(null);
   const [placeSuggestions, setPlaceSuggestions] = useState([]);
 
@@ -1818,6 +1883,9 @@ function App() {
     // Intentionally reset the selected day when switching trips.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setActiveDay(null);
+    // Do not carry a previous trip's payer or participants into a new trip.
+    setExpenseInput(current => ({ ...current, payerId: 'self', participantIds: ['self'] }));
+    setSettlementParticipantName('');
   }, [activeTripId]);
 
   // Reset the custom itinerary name when the selected place changes
@@ -2033,6 +2101,7 @@ function App() {
   const reserveItems = useMemo(() => activeTrip?.reserveItems || [], [activeTrip]);
   const budgetSettings = activeTrip?.budgetSettings || { limitKRW: 1000000, travelCurrency: 'USD', exchangeRates: {}, categoryBudgets: {} };
   const expenses = useMemo(() => activeTrip?.expenses || [], [activeTrip]);
+  const settlementParticipants = useMemo(() => normalizeSettlementParticipants(activeTrip?.settlementParticipants), [activeTrip]);
   const createTripDayCount = useMemo(() => {
     if (!createTripData.startDate || !createTripData.endDate) return 0;
     const start = new Date(`${createTripData.startDate}T00:00:00`);
@@ -2057,6 +2126,14 @@ function App() {
     }
     return Math.round(numericAmount);
   };
+
+  /* eslint-disable react-hooks/exhaustive-deps */
+  const settlementResult = useMemo(() => calculateSettlement(
+    expenses,
+    settlementParticipants,
+    (amount, currency) => getExpenseAmountKRW(amount, currency)
+  ), [expenses, settlementParticipants, exchangeRates, budgetSettings]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const getTodayExpenseDay = (trip) => {
     const availableDays = (trip?.itinerary || [])
@@ -2706,6 +2783,24 @@ function App() {
   const saveItinerary = (newItinerary) => updateActiveTrip({ itinerary: newItinerary });
   const saveBudgetSettings = (newSettings) => updateActiveTrip({ budgetSettings: newSettings });
   const saveExpenses = (newExpenses) => updateActiveTrip({ expenses: newExpenses });
+  const saveSettlementParticipants = (nextParticipants) => updateActiveTrip({
+    settlementParticipants: normalizeSettlementParticipants(nextParticipants)
+  });
+
+  const addSettlementParticipant = () => {
+    const name = settlementParticipantName.trim();
+    if (!name || settlementParticipants.some(person => person.name === name)) return;
+    saveSettlementParticipants([
+      ...settlementParticipants,
+      { id: makeEntityId(), name }
+    ]);
+    setSettlementParticipantName('');
+  };
+
+  const removeSettlementParticipant = (participantId) => {
+    if (participantId === 'self') return;
+    saveSettlementParticipants(settlementParticipants.filter(person => person.id !== participantId));
+  };
 
   const undoLastChange = async () => {
     const lastChange = undoStack[undoStack.length - 1];
@@ -2772,6 +2867,7 @@ function App() {
       reserveItems: [],
       budgetSettings: { limitKRW: 1000000, travelCurrency: countryToCurrency[country] || 'USD' },
       expenses: [],
+      settlementParticipants: [{ id: 'self', name: '나' }],
       checklist: getDefaultChecklist(),
       travelDetails: getTravelDetails({}),
       journalEntries: [],
@@ -2955,6 +3051,7 @@ function App() {
               category: exp.category || 'other',
               memo: exp.memo || ''
             })),
+            settlementParticipants: normalizeSettlementParticipants(data.settlementParticipants),
             checklist: Array.isArray(data.checklist) ? data.checklist : getDefaultChecklist(),
             travelDetails: getTravelDetails(data),
             journalEntries: getJournalEntries(data),
@@ -3028,6 +3125,7 @@ function App() {
           category: exp.category || 'other',
           memo: exp.memo || ''
         })),
+        settlementParticipants: normalizeSettlementParticipants(data.settlementParticipants),
         checklist: Array.isArray(data.checklist) ? data.checklist : getDefaultChecklist(),
         travelDetails: getTravelDetails(data),
         journalEntries: getJournalEntries(data),
@@ -3306,6 +3404,7 @@ function App() {
     if (!activeTripId || !expenseInput.desc.trim() || !expenseInput.paymentMethod || !Number.isFinite(numericAmount) || numericAmount <= 0) return;
 
     const currentCurrency = expenseInput.currency || budgetSettings.travelCurrency || 'USD';
+    const split = normalizeExpenseParticipants(expenseInput, settlementParticipants);
 
     const newExpense = {
       id: makeEntityId(),
@@ -3317,7 +3416,9 @@ function App() {
       memo: expenseInput.memo?.trim() || '',
       amountKRW: getExpenseAmountKRW(expenseInput.amount, currentCurrency),
       day: parseInt(expenseInput.day, 10) || 0,
-      time: expenseInput.time || ''
+      time: expenseInput.time || '',
+      payerId: split.payerId,
+      participantIds: split.participantIds
     };
 
     saveExpenses([...expenses, newExpense]);
@@ -3326,6 +3427,7 @@ function App() {
 
   const startEditingExpense = (expense) => {
     setEditingExpenseId(expense.id);
+    const split = normalizeExpenseParticipants(expense, settlementParticipants);
     setExpenseInput({
       desc: expense.desc || '',
       amount: String(expense.amount ?? ''),
@@ -3334,7 +3436,9 @@ function App() {
       category: expense.category || 'other',
       memo: expense.memo || '',
       day: expense.day ?? 1,
-      time: expense.time || ''
+      time: expense.time || '',
+      payerId: split.payerId,
+      participantIds: split.participantIds
     });
   };
 
@@ -3347,6 +3451,7 @@ function App() {
     if (!activeTripId || !editingExpenseId || !expenseInput.desc.trim() || !expenseInput.paymentMethod || !expenseInput.amount) return;
 
     const currentCurrency = expenseInput.currency || budgetSettings.travelCurrency || 'USD';
+    const split = normalizeExpenseParticipants(expenseInput, settlementParticipants);
     const nextExpenses = expenses.map(expense => expense.id === editingExpenseId ? {
       ...expense,
       desc: expenseInput.desc.trim(),
@@ -3357,7 +3462,9 @@ function App() {
       memo: expenseInput.memo?.trim() || '',
       amountKRW: getExpenseAmountKRW(expenseInput.amount, currentCurrency),
       day: parseInt(expenseInput.day, 10) || 0,
-      time: expenseInput.time || ''
+      time: expenseInput.time || '',
+      payerId: split.payerId,
+      participantIds: split.participantIds
     } : expense);
 
     saveExpenses(nextExpenses);
@@ -3864,6 +3971,7 @@ function App() {
     { key: 'exchange', label: '통화 설정', activeColor: '#1d4ed8', activeBackground: '#dbeafe' },
     { key: 'category', label: '카테고리별 예산', activeColor: '#92400e', activeBackground: '#fef3c7' },
     { key: 'cash', label: '현금 정산', activeColor: '#92400e', activeBackground: '#fef3c7' },
+    { key: 'settlement', label: '함께 정산', activeColor: '#0f766e', activeBackground: '#ccfbf1' },
     { key: 'stats', label: '통계', activeColor: '#7c3aed', activeBackground: '#ede9fe' }
   ];
   const todayItinerarySummary = useMemo(() => {
@@ -3992,6 +4100,98 @@ function App() {
       </div>
     </div>
   );
+
+  const renderSettlementPanel = () => {
+    const participantNames = Object.fromEntries(settlementParticipants.map(person => [person.id, person.name]));
+    const formatSettlementAmount = (amount) => `₩${Math.round(Number(amount) || 0).toLocaleString()}`;
+
+    return (
+      <div className="settlement-panel" aria-label="여행 경비 정산">
+        <div className="settlement-panel-heading">
+          <div>
+            <strong>함께 정산</strong>
+            <span>지출자와 함께 사용한 사람을 기준으로 자동 계산합니다.</span>
+          </div>
+          <span className="settlement-panel-total">총 {formatSettlementAmount(settlementResult.totalKRW)}</span>
+        </div>
+
+        <div className="settlement-participant-manager">
+          <div className="settlement-section-heading">
+            <strong>정산 참여자</strong>
+            <span>여행에 함께한 사람을 추가하세요.</span>
+          </div>
+          {!isReadOnlyTrip && (
+            <form className="settlement-participant-add" onSubmit={(event) => { event.preventDefault(); addSettlementParticipant(); }}>
+              <input
+                type="text"
+                value={settlementParticipantName}
+                onChange={event => setSettlementParticipantName(event.target.value)}
+                placeholder="예: 지수"
+                aria-label="정산 참여자 이름"
+                maxLength={30}
+              />
+              <button type="submit" disabled={!settlementParticipantName.trim()}>추가</button>
+            </form>
+          )}
+          <div className="settlement-participant-chips">
+            {settlementParticipants.map(person => (
+              <span className="settlement-participant-chip" key={`settlement-person-${person.id}`}>
+                {person.name}
+                {person.id !== 'self' && !isReadOnlyTrip && (
+                  <button type="button" onClick={() => removeSettlementParticipant(person.id)} aria-label={`${person.name} 정산 참여자에서 제거`}>×</button>
+                )}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div className="settlement-summary-grid">
+          <div><span>정산 지출</span><strong>{settlementResult.expenseCount}건</strong></div>
+          <div><span>참여자</span><strong>{settlementParticipants.length}명</strong></div>
+          <div><span>총 부담액</span><strong>{formatSettlementAmount(settlementResult.totalKRW)}</strong></div>
+        </div>
+
+        {expenses.length === 0 ? (
+          <p className="settlement-empty">지출을 추가하면 사람별 정산 금액이 표시됩니다.</p>
+        ) : (
+          <>
+            <div className="settlement-people-list" aria-label="사람별 정산 결과">
+              <div className="settlement-section-heading"><strong>사람별 정산</strong><span>결제한 금액과 실제 부담액의 차이입니다.</span></div>
+              {settlementResult.people.map(person => {
+                const balanceLabel = person.balanceKRW > 0
+                  ? `받을 금액 +${formatSettlementAmount(person.balanceKRW)}`
+                  : person.balanceKRW < 0
+                    ? `낼 금액 ${formatSettlementAmount(Math.abs(person.balanceKRW))}`
+                    : '정산 완료';
+                return (
+                  <div className="settlement-person-row" key={`settlement-result-${person.id}`}>
+                    <div>
+                      <strong>{person.name}</strong>
+                      <span>결제 {formatSettlementAmount(person.paidKRW)} · 부담 {formatSettlementAmount(person.shareKRW)}</span>
+                    </div>
+                    <b className={person.balanceKRW > 0 ? 'is-credit' : person.balanceKRW < 0 ? 'is-debit' : 'is-even'}>{balanceLabel}</b>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="settlement-transfer-list">
+              <div className="settlement-section-heading"><strong>정산 방법</strong><span>누구에게 얼마를 보내면 되는지 안내합니다.</span></div>
+              {settlementResult.transfers.length === 0 ? (
+                <p className="settlement-empty">현재 정산할 금액이 없습니다.</p>
+              ) : settlementResult.transfers.map(transfer => (
+                <div className="settlement-transfer-row" key={`settlement-transfer-${transfer.fromId}-${transfer.toId}`}>
+                  <span>{participantNames[transfer.fromId] || '참여자'} → {participantNames[transfer.toId] || '참여자'}</span>
+                  <strong>{formatSettlementAmount(transfer.amountKRW)}</strong>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+        <p className="settlement-panel-note">공동 지출은 선택한 사람 수로 1/n 계산하며, 기존 지출은 ‘나’의 개인 지출로 처리합니다.</p>
+      </div>
+    );
+  };
 
   const exportBudgetStatisticsAsImage = () => {
     if (!activeTrip) return;
@@ -5515,6 +5715,7 @@ function App() {
                 )}
 
                 {budgetPanel === 'cash' && renderCashReconciliationPanel()}
+                {budgetPanel === 'settlement' && renderSettlementPanel()}
                 {budgetPanel === 'exchange' && renderCurrencyManagerPanel()}
                 {budgetPanel === 'stats' && renderBudgetStatisticsPanel()}
 
@@ -5590,6 +5791,13 @@ function App() {
                       />
                     </div>
                   </div>
+
+                  <ExpenseSplitFields
+                    participants={settlementParticipants}
+                    payerId={expenseInput.payerId}
+                    participantIds={expenseInput.participantIds}
+                    onChange={split => setExpenseInput(current => ({ ...current, ...split }))}
+                  />
 
                   <div className="expense-form-row expense-form-currency-payment-amount">
                     <div className="expense-form-field expense-form-currency-field">
@@ -5702,6 +5910,11 @@ function App() {
                               const localAmount = Number(exp.amount) || 0;
                               const amountKRW = getExpenseAmountKRW(exp.amount, exp.currency);
                               const expenseCurrency = exp.currency || 'KRW';
+                              const expenseSplit = normalizeExpenseParticipants(exp, settlementParticipants);
+                              const payerName = settlementParticipants.find(person => person.id === expenseSplit.payerId)?.name || '나';
+                              const sharedParticipantNames = expenseSplit.participantIds
+                                .map(participantId => settlementParticipants.find(person => person.id === participantId)?.name)
+                                .filter(Boolean);
 
                               return (
                               <div key={exp.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '12px 16px', backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
@@ -5718,6 +5931,7 @@ function App() {
                                     <span className={`expense-payment-badge${exp.paymentMethod ? ` is-${exp.paymentMethod}` : ' is-unassigned'}`}>
                                       {getPaymentMethodLabel(exp.paymentMethod)}
                                     </span>
+                                    <span className="expense-participant-summary">지출자 {payerName} · 함께 사용 {sharedParticipantNames.join(', ')}</span>
                                     {expenseCurrency !== 'KRW' && (
                                       <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', whiteSpace: 'nowrap' }}>
                                         현지 {getCurrencySymbol(expenseCurrency)}{localAmount.toLocaleString()} ({expenseCurrency})
@@ -7349,6 +7563,14 @@ function App() {
                 />
               </div>
             </div>
+
+            <ExpenseSplitFields
+              participants={settlementParticipants}
+              payerId={expenseInput.payerId}
+              participantIds={expenseInput.participantIds}
+              onChange={split => setExpenseInput(current => ({ ...current, ...split }))}
+              compact
+            />
 
             <div className="expense-edit-currency-payment-amount" style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.9fr 0.9fr', gap: '10px', marginBottom: '14px' }}>
               <div style={{ minWidth: 0 }}>
