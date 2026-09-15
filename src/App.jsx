@@ -7,7 +7,7 @@ import { supabase } from './supabaseClient';
 import { getMapAvailability } from './mapAvailability';
 import { getMobileViewModeSheetMode } from './mobileSidebar';
 import { getClosestMobileSheetMode, getMobileSheetPosition, getMobileSheetSnapPoints } from './mobileSheet';
-import { DISPLAY_MODES, getFreeSplitPanePosition, getResponsiveDisplayMode, getSidebarFooterVariant, getSplitSaveStatusPlacement, getSplitViewGridRows, getSplitViewScrollContainer } from './splitView';
+import { DISPLAY_MODES, getFreeSplitPanePosition, getResponsiveDisplayMode, getSaveStatusPresentation, getSidebarFooterVariant, getSplitSaveStatusPlacement, getSplitViewGridRows, getSplitViewScrollContainer } from './splitView';
 import './index.css';
 
 // --- CONFIGURATION ---
@@ -1199,22 +1199,6 @@ function App() {
   const isSplitView = displayMode === DISPLAY_MODES.SPLIT;
   const sidebarFooterVariant = getSidebarFooterVariant(displayMode);
   const splitSaveStatusPlacement = getSplitSaveStatusPlacement(displayMode);
-  const saveStatusLabel = !isOnline || syncStatus === 'offline'
-    ? '오프라인 저장'
-    : isLoadingDB
-      ? '동기화 중…'
-      : syncStatus === 'saving'
-        ? '저장 중…'
-        : syncStatus === 'error'
-          ? '로컬 저장됨'
-          : '저장됨';
-  const saveStatusColor = !isOnline || syncStatus === 'offline'
-    ? '#d97706'
-    : syncStatus === 'error'
-      ? '#ef4444'
-      : syncStatus === 'saving'
-        ? '#f59e0b'
-        : '#10b981';
   const [splitPanePosition, setSplitPanePosition] = useState(null);
   const sidebarOpen = isSplitView || sheetMode !== 'collapsed';
   const setSidebarOpen = (open) => {
@@ -1376,6 +1360,11 @@ function App() {
   const [readOnlySharedTrip, setReadOnlySharedTrip] = useState(null);
   const [sharedViewError, setSharedViewError] = useState('');
   const [isOnline, setIsOnline] = useState(() => typeof navigator === 'undefined' ? true : navigator.onLine);
+  const { label: saveStatusLabel, color: saveStatusColor } = getSaveStatusPresentation({
+    isOnline,
+    isLoadingDB,
+    syncStatus
+  });
 
   const dismissSyncConflictNotice = () => {
     const signature = syncConflictNotice?.signature;

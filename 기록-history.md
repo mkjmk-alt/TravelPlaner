@@ -235,3 +235,26 @@
 - 수정 내용: 웹 변경 파일과 작업 기록만 커밋 대상으로 지정하고, 기존 iOS 미커밋 변경은 제외함.
 - 검증: `npm test` 39개 통과, `npm run lint` 오류 없음(기존 경고 4건), `npm run build` 통과, `git diff --check` 통과.
 - 답변: GitHub 푸시 및 Cloudflare Pages 배포를 진행함.
+
+## 2026-09-15
+
+- ID: `V8qL3mR7Tx`
+- 요청: 배포 후 표시된 `ReferenceError: Cannot access 'on' before initialization` 오류의 원인 확인.
+- 수정 내용: 없음. `src/App.jsx`에서 저장 상태 변수(`saveStatusLabel`, `saveStatusColor`)가 `isOnline`, `syncStatus`, `isLoadingDB` 상태 선언보다 앞에서 해당 값을 참조하는 초기화 순서 문제를 확인함. 번들에서 변수명이 축약되어 `on`으로 표시되었으며, React 앱 초기 렌더링이 중단되어 ErrorBoundary 화면이 나온 원인임.
+- 답변: 최근 `751214a` 배포에 포함된 변수 선언 순서 오류이며, 상태 선언 이후에 저장 상태 계산을 수행하도록 순서를 조정하면 해결됨. 이번 요청에서는 원인 분석만 진행함.
+
+## 2026-09-15
+
+- ID: `M7qR2vK9Lx`
+- 요청: `ReferenceError: Cannot access 'on' before initialization` 오류 수정.
+- 수정 내용: 저장 상태 표시 계산을 관련 React 상태 선언 이후로 이동하고 `getSaveStatusPresentation`으로 분리함. 저장 상태별 문구·색상 우선순위를 테스트에 추가함. 기존 iOS 미커밋 변경은 제외함.
+- 검증: 회귀 테스트 RED→GREEN 확인, `npm test` 40개 통과, `npm run lint` 오류 없음(기존 경고 4건), `npm run build` 통과, `git diff --check` 통과. Vite의 기존 500kB 초과 청크 경고만 남음.
+- 답변: 초기 렌더링을 중단시키던 변수 초기화 순서 오류 수정 완료. GitHub 푸시 및 배포는 별도 요청이 없어 진행하지 않음.
+
+## 2026-09-15
+
+- ID: `T9kM4rQ7Lp`
+- 요청: 초기 렌더링 오류 수정사항을 GitHub에 푸시하고 Cloudflare Pages에 배포.
+- 수정 내용: 검증된 웹 수정사항과 작업 기록만 커밋 대상으로 지정하고, 기존 iOS 미커밋 변경은 제외함.
+- 검증: `npm test` 40개 통과, `npm run lint` 오류 없음(기존 경고 4건), `npm run build` 통과, `git diff --check` 통과.
+- 답변: GitHub 푸시 및 Cloudflare Pages 배포를 진행함.

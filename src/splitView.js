@@ -36,6 +36,33 @@ export const getSplitSaveStatusPlacement = (mode) => (
   normalizeDisplayMode(mode) === DISPLAY_MODES.SPLIT ? 'divider' : 'footer'
 );
 
+export const getSaveStatusPresentation = ({
+  isOnline = true,
+  isLoadingDB = false,
+  syncStatus = 'saved'
+} = {}) => {
+  const isOffline = !isOnline || syncStatus === 'offline';
+
+  return {
+    label: isOffline
+      ? '오프라인 저장'
+      : isLoadingDB
+        ? '동기화 중…'
+        : syncStatus === 'saving'
+          ? '저장 중…'
+          : syncStatus === 'error'
+            ? '로컬 저장됨'
+            : '저장됨',
+    color: isOffline
+      ? '#d97706'
+      : syncStatus === 'error'
+        ? '#ef4444'
+        : syncStatus === 'saving'
+          ? '#f59e0b'
+          : '#10b981'
+  };
+};
+
 
 
 export const getSplitViewScrollContainer = (mode) => (

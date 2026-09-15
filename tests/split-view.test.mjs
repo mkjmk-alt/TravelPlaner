@@ -5,6 +5,7 @@ import {
   DISPLAY_MODES,
   getFreeSplitPanePosition,
   getResponsiveDisplayMode,
+  getSaveStatusPresentation,
   getSplitSaveStatusPlacement,
   getSidebarFooterVariant,
   getSplitPaneLayout,
@@ -37,6 +38,29 @@ test('uses the full footer in classic mode and compact status footer in split mo
 test('places split save status beside the divider instead of covering itinerary content', () => {
   assert.equal(getSplitSaveStatusPlacement(DISPLAY_MODES.SPLIT), 'divider');
   assert.equal(getSplitSaveStatusPlacement(DISPLAY_MODES.CLASSIC), 'footer');
+});
+
+test('derives save status presentation from initialized sync state', () => {
+  assert.deepEqual(getSaveStatusPresentation({ isOnline: false, isLoadingDB: true, syncStatus: 'saving' }), {
+    label: '오프라인 저장',
+    color: '#d97706'
+  });
+  assert.deepEqual(getSaveStatusPresentation({ isOnline: true, isLoadingDB: true, syncStatus: 'saved' }), {
+    label: '동기화 중…',
+    color: '#10b981'
+  });
+  assert.deepEqual(getSaveStatusPresentation({ isOnline: true, isLoadingDB: false, syncStatus: 'saving' }), {
+    label: '저장 중…',
+    color: '#f59e0b'
+  });
+  assert.deepEqual(getSaveStatusPresentation({ isOnline: true, isLoadingDB: false, syncStatus: 'error' }), {
+    label: '로컬 저장됨',
+    color: '#ef4444'
+  });
+  assert.deepEqual(getSaveStatusPresentation({ isOnline: true, isLoadingDB: false, syncStatus: 'saved' }), {
+    label: '저장됨',
+    color: '#10b981'
+  });
 });
 
 test('supports classic and split display modes with classic as the fallback', () => {
