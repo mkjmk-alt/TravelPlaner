@@ -3520,6 +3520,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   display: none;
 }
 
+.mobile-context-bar {
+  display: none;
+}
+
 .mobile-more-list {
   display: grid;
   gap: 10px;
@@ -3615,6 +3619,61 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 }
 
 @media (max-width: 1024px) {
+  .app-container.split-view-mode .sidebar-top-actions {
+    display: none !important;
+  }
+
+  .app-container.split-view-mode .mobile-context-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 48px;
+    margin: 0 0 14px;
+    padding: 8px 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    background: #ffffff;
+  }
+
+  .mobile-context-back {
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 32px;
+    border: 0;
+    border-radius: 10px;
+    background: #f5f3ff;
+    color: #6d28d9;
+    cursor: pointer;
+  }
+
+  .mobile-context-back svg {
+    transform: rotate(180deg);
+  }
+
+  .mobile-context-copy {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+  }
+
+  .mobile-context-copy small {
+    overflow: hidden;
+    color: #94a3b8;
+    font-size: 10px;
+    font-weight: 800;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-context-copy strong {
+    color: #1e293b;
+    font-size: 15px;
+    font-weight: 900;
+  }
+
   .mobile-bottom-navigation {
     position: absolute;
     right: 0;

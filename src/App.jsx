@@ -5,7 +5,8 @@ import { GoogleMap, useJsApiLoader, OverlayViewF, InfoWindow, Polyline } from '@
 import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronUp, ChevronDown, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Clock, Upload, Clipboard, LocateFixed, Download, Bell, FileText, Mail, Lock, Eye, EyeOff, WifiOff, Link2, LockKeyhole } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { getMapAvailability } from './mapAvailability';
-import { getBottomNavigationItems, getBottomNavigationSelection, getMobileViewModeSheetMode } from './mobileSidebar';
+import { getBottomNavigationItems, getMobileViewModeSheetMode } from './mobileSidebar';
+import { createNavigationHistoryState, getDefaultNavigationState, getMobileRootPresentation, getNavigationStateFromHistory, getTabSelection, normalizeNavigationState } from './appNavigation';
 import { getClosestMobileSheetMode, getMobileSheetPosition, getMobileSheetSnapPoints } from './mobileSheet';
 import { DISPLAY_MODES, getFreeSplitPanePosition, getResponsiveDisplayMode, getSaveStatusPresentation, getSidebarFooterVariant, getSplitSaveStatusPlacement, getSplitViewGridRows, getSplitViewScrollContainer, getViewportSize } from './splitView';
 import { BRAND_NAME_EN, BRAND_NAME_KO } from './brand';
@@ -39,6 +40,8 @@ const writeStoredJson = (key, value) => {
     return false;
   }
 };
+
+const getTimestamp = () => Date.now();
 
 const dataUrlToBlob = (dataUrl) => {
   const [header, encoded] = dataUrl.split(',');
@@ -94,6 +97,7 @@ const openNativeAuthSession = (url) => {
 };
 
 const ONBOARDING_STORAGE_KEY = 'travelplaner_onboarding_seen_v1';
+const NAVIGATION_STORAGE_KEY = 'travelplaner_navigation_state_v1';
 const SYNC_CONFLICT_DISMISSED_STORAGE_PREFIX = 'travelplaner_sync_conflict_dismissed_v1';
 const ACCOUNT_DELETE_PENDING_STORAGE_KEY = 'travelplaner_account_delete_pending_v1';
 
@@ -1355,19 +1359,39 @@ function App() {
     }
     setDragOffset(0);
   };
-  const [viewMode, setViewMode] = useState('trips');
-  const [mobileRootTab, setMobileRootTab] = useState('trips');
+  const [initialNavigationState] = useState(() => readStoredJson(NAVIGATION_STORAGE_KEY, getDefaultNavigationState()));
+  const [viewMode, setViewMode] = useState(() => initialNavigationState?.viewMode || 'trips');
+  const [mobileRootTab, setMobileRootTab] = useState(() => initialNavigationState?.rootTab || 'trips');
+  const [tabSnapshots, setTabSnapshots] = useState(() => (
+    initialNavigationState?.tabSnapshots || getDefaultNavigationState().tabSnapshots
+  ));
+  const sidebarScrollRegionRef = useRef(null);
+  const sidebarListContentRef = useRef(null);
+  const sidebarScrollPositionsRef = useRef({});
+  const navigationHistoryInitializedRef = useRef(false);
+  const navigationHistoryKeyRef = useRef('');
+  const skipNavigationHistoryPushRef = useRef(false);
   const [isMobileHeaderHidden, setIsMobileHeaderHidden] = useState(false);
-  const openItinerary = () => {
+  const updateTabSnapshot = (rootTab, updates) => {
+    setTabSnapshots((current) => ({
+      ...current,
+      [rootTab]: { ...(current[rootTab] || {}), ...updates }
+    }));
+  };
+  const openItinerary = (tripId = activeTripId) => {
     setIsMobileHeaderHidden(false);
     setMobileRootTab('trips');
     setViewMode('itinerary');
+    if (tripId) setActiveTripId(tripId);
+    updateTabSnapshot('trips', { viewMode: 'itinerary', activeTripId: tripId || null });
     if (windowSize.width < 768) setSheetMode('full');
   };
-  const openTravelMemory = () => {
+  const openTravelMemory = (tripId = activeTripId) => {
     setIsMobileHeaderHidden(false);
     setMobileRootTab('trips');
     setViewMode('memory');
+    if (tripId) setActiveTripId(tripId);
+    updateTabSnapshot('trips', { viewMode: 'memory', activeTripId: tripId || null });
     if (windowSize.width < 768) setSheetMode('full');
   };
   const openMemoryPlace = (place) => {
@@ -1385,6 +1409,12 @@ function App() {
       emoji: place.emoji || '📍'
     };
     setSelectedPlace(mapPlace);
+    if (isBottomNavigationViewport) {
+      setMobileRootTab('map');
+      setViewMode('trips');
+      updateTabSnapshot('map', { viewMode: 'trips', activeTripId });
+      setSidebarOpen(false);
+    }
     if (map) {
       map.panTo({ lat, lng });
       map.setZoom(16);
@@ -1394,6 +1424,7 @@ function App() {
     setIsMobileHeaderHidden(false);
     setMobileRootTab('favorites');
     setViewMode('favorites');
+    updateTabSnapshot('favorites', { viewMode: 'favorites', activeTripId });
     setSheetMode(currentMode => getMobileViewModeSheetMode({
       viewMode: 'favorites',
       viewportWidth: windowSize.width,
@@ -1402,26 +1433,39 @@ function App() {
   };
 
   const handleBottomNavigationSelect = (key) => {
-    const selection = getBottomNavigationSelection(key);
+    const selection = getTabSelection({
+      currentRootTab: mobileRootTab,
+      key,
+      tabSnapshots
+    });
+    const nextActiveTripId = selection.activeTripId || activeTripId || null;
     setIsMobileHeaderHidden(false);
     setMobileRootTab(selection.rootTab);
     setViewMode(selection.viewMode);
-    setSidebarOpen(selection.showSidebar);
-
-    if (selection.rootTab === 'favorites') {
-      setSheetMode(currentMode => getMobileViewModeSheetMode({
-        viewMode: 'favorites',
-        viewportWidth: windowSize.width,
-        currentMode
-      }));
-    }
+    if (selection.rootTab === 'trips' && selection.activeTripId) setActiveTripId(selection.activeTripId);
+    updateTabSnapshot(selection.rootTab, { viewMode: selection.viewMode, activeTripId: nextActiveTripId });
+    setSidebarOpen(selection.rootTab !== 'map');
+    if (windowSize.width < 768 && selection.rootTab !== 'map') setSheetMode('full');
   };
 
   const handleSidebarScroll = (e) => {
+    sidebarScrollPositionsRef.current[`${mobileRootTab}:${viewMode}`] = e.currentTarget.scrollTop;
     if (isSplitView || windowSize.width >= 768) return;
     const shouldHideHeader = e.currentTarget.scrollTop > 8;
     setIsMobileHeaderHidden((hidden) => hidden === shouldHideHeader ? hidden : shouldHideHeader);
   };
+
+  useEffect(() => {
+    const scrollTarget = isSplitView ? sidebarScrollRegionRef.current : sidebarListContentRef.current;
+    if (!scrollTarget) return undefined;
+
+    const frame = window.requestAnimationFrame(() => {
+      scrollTarget.scrollTop = sidebarScrollPositionsRef.current[`${mobileRootTab}:${viewMode}`] || 0;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [isSplitView, mobileRootTab, viewMode]);
+
+  const mobileRootPresentation = getMobileRootPresentation({ rootTab: mobileRootTab, viewMode });
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchInput, setSearchInput] = useState('');
@@ -1600,7 +1644,7 @@ function App() {
     return [];
   });
 
-  const [activeTripId, setActiveTripId] = useState(null);
+  const [activeTripId, setActiveTripId] = useState(() => initialNavigationState?.activeTripId || null);
 
   const [exchangeRates, setExchangeRates] = useState({});
   const [exchangeRateInfo, setExchangeRateInfo] = useState({ date: '', source: '자동 환율' });
@@ -1858,6 +1902,78 @@ function App() {
       });
 
     return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (readOnlySharedTrip) return;
+    const currentState = {
+      rootTab: mobileRootTab,
+      viewMode,
+      activeTripId,
+      tabSnapshots
+    };
+    const normalizedState = normalizeNavigationState(
+      currentState,
+      (trips || []).map(trip => trip.id)
+    );
+    const currentKey = JSON.stringify(currentState);
+    const normalizedKey = JSON.stringify(normalizedState);
+
+    // This effect reconciles persisted navigation with the currently available trips.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (normalizedState.rootTab !== mobileRootTab) setMobileRootTab(normalizedState.rootTab);
+    if (normalizedState.viewMode !== viewMode) setViewMode(normalizedState.viewMode);
+    if (normalizedState.activeTripId !== activeTripId) setActiveTripId(normalizedState.activeTripId);
+    if (JSON.stringify(normalizedState.tabSnapshots) !== JSON.stringify(tabSnapshots)) {
+      setTabSnapshots(normalizedState.tabSnapshots);
+    }
+    if (currentKey !== normalizedKey || readStoredJson(NAVIGATION_STORAGE_KEY, null) === null) {
+      writeStoredJson(NAVIGATION_STORAGE_KEY, normalizedState);
+    }
+  }, [activeTripId, mobileRootTab, readOnlySharedTrip, tabSnapshots, trips, viewMode]);
+
+  useEffect(() => {
+    const currentState = {
+      rootTab: mobileRootTab,
+      viewMode,
+      activeTripId,
+      tabSnapshots
+    };
+    const historyState = createNavigationHistoryState(currentState);
+    const historyKey = JSON.stringify(historyState);
+
+    if (!navigationHistoryInitializedRef.current) {
+      window.history.replaceState(historyState, '', window.location.href);
+      navigationHistoryInitializedRef.current = true;
+      navigationHistoryKeyRef.current = historyKey;
+      return;
+    }
+    if (skipNavigationHistoryPushRef.current) {
+      skipNavigationHistoryPushRef.current = false;
+      navigationHistoryKeyRef.current = historyKey;
+      return;
+    }
+    if (navigationHistoryKeyRef.current === historyKey) return;
+    window.history.pushState(historyState, '', window.location.href);
+    navigationHistoryKeyRef.current = historyKey;
+  }, [activeTripId, mobileRootTab, tabSnapshots, viewMode]);
+
+  useEffect(() => {
+    const restoreNavigationFromHistory = (event) => {
+      const nextState = getNavigationStateFromHistory(event.state);
+      if (!nextState) return;
+
+      skipNavigationHistoryPushRef.current = true;
+      setMobileRootTab(nextState.rootTab);
+      setViewMode(nextState.viewMode);
+      setActiveTripId(nextState.activeTripId);
+      setTabSnapshots(nextState.tabSnapshots);
+      setIsMobileHeaderHidden(false);
+      if (window.innerWidth < 768) setSheetMode(nextState.rootTab === 'map' ? 'collapsed' : 'full');
+    };
+
+    window.addEventListener('popstate', restoreNavigationFromHistory);
+    return () => window.removeEventListener('popstate', restoreNavigationFromHistory);
   }, []);
 
   // Also clear a test trip that may still be held by an already-open local page.
@@ -2190,6 +2306,7 @@ function App() {
       time: editingExpenseId ? current.time : getCurrentTimeInputValue()
     }));
     setViewMode('budget');
+    updateTabSnapshot('trips', { viewMode: 'budget', activeTripId });
   };
 
   const requestNotificationPermission = async () => {
@@ -2636,8 +2753,7 @@ function App() {
       const joinedTrip = { ...data.trip_data, sharedId: data.id };
       const newTrips = [joinedTrip, ...(trips || [])];
       await syncTripsToCloud(newTrips);
-      setActiveTripId(joinedTrip.id);
-      openItinerary();
+      openItinerary(joinedTrip.id);
       setShowJoinTripModal(false);
       setJoinTripCode('');
       setModalConfig({ type: 'success', title: '참여 완료', message: `'${joinedTrip.name}' 일정에 참여했습니다!` });
@@ -2886,7 +3002,7 @@ function App() {
       return;
     }
 
-    const newId = Date.now().toString();
+    const newId = getTimestamp().toString();
     const newTrip = {
       id: newId,
       name: trimmedName,
@@ -2902,8 +3018,8 @@ function App() {
       travelDetails: getTravelDetails({}),
       journalEntries: [],
       reminders: { enabled: false, minutesBefore: 30 },
-      createdAt: Date.now(),
-      updatedAt: Date.now()
+      createdAt: getTimestamp(),
+      updatedAt: getTimestamp()
     };
 
     const newTrips = [newTrip, ...(trips || [])];
@@ -2913,8 +3029,7 @@ function App() {
     setOpenItineraryAfterCreate(false);
 
     if (shouldOpenItinerary) {
-      setActiveTripId(newId);
-      openItinerary();
+      openItinerary(newId);
       setOnboardingStep(1);
       setShowOnboarding(true);
     }
@@ -3003,7 +3118,7 @@ function App() {
 
   const duplicateTrip = (trip) => {
     if (!trip) return;
-    const duplicateId = Date.now().toString();
+    const duplicateId = getTimestamp().toString();
     const tripWithoutShare = { ...trip };
     delete tripWithoutShare.sharedId;
     delete tripWithoutShare.sharedManagementToken;
@@ -3011,8 +3126,8 @@ function App() {
       ...tripWithoutShare,
       id: duplicateId,
       name: (trip.name || "여행") + " 복사본",
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      createdAt: getTimestamp(),
+      updatedAt: getTimestamp(),
       itinerary: (trip.itinerary || []).map((day, dayIndex) => ({
         ...day,
         items: (day.items || []).map((item, itemIndex) => ({
@@ -3026,8 +3141,7 @@ function App() {
       }))
     };
     syncTripsToCloud([duplicate, ...(trips || [])]);
-    setActiveTripId(duplicateId);
-    openItinerary();
+    openItinerary(duplicateId);
   };
 
   const handleUploadJson = () => {
@@ -3313,10 +3427,12 @@ function App() {
     await syncTripsToCloud(newTrips);
     
     if (activeTripId === id) {
-      setActiveTripId(newTrips.length > 0 ? newTrips[0].id : null);
+      const nextActiveTripId = newTrips.length > 0 ? newTrips[0].id : null;
+      setActiveTripId(nextActiveTripId);
       setIsMobileHeaderHidden(false);
       setMobileRootTab('trips');
       setViewMode('trips');
+      updateTabSnapshot('trips', { viewMode: 'trips', activeTripId: nextActiveTripId });
     }
   };
 
@@ -4471,9 +4587,11 @@ function App() {
       style={{
         height: `${windowSize.height}px`,
         ...(isSplitView ? {
-          gridTemplateRows: mobileRootTab === 'map'
+          gridTemplateRows: mobileRootPresentation.mapVisible && !mobileRootPresentation.contentVisible
             ? `${windowSize.height}px 0px`
-            : getSplitViewGridRows({ height: windowSize.height, position: splitPanePosition, dragOffset })
+            : mobileRootPresentation.split
+            ? getSplitViewGridRows({ height: windowSize.height, position: splitPanePosition, dragOffset })
+            : `0px ${windowSize.height}px`
         } : {})
       }}
     >
@@ -4619,6 +4737,7 @@ function App() {
 
         <div
           className="sidebar-scroll-region"
+          ref={sidebarScrollRegionRef}
           onScroll={splitViewScrollContainer === 'sidebar' ? handleSidebarScroll : undefined}
         >
           {/* Header */}
@@ -4654,7 +4773,7 @@ function App() {
               <div className="shared-read-only-banner" role="status">
                 <LockKeyhole size={14} aria-hidden="true" />
                 <span>공유 일정 읽기 전용</span>
-                <button type="button" onClick={() => { setReadOnlySharedTrip(null); setActiveTripId(null); setMobileRootTab('trips'); setViewMode('trips'); window.history.replaceState({}, '', window.location.pathname); }}>내 여행으로</button>
+                <button type="button" onClick={() => { setReadOnlySharedTrip(null); setActiveTripId(null); setMobileRootTab('trips'); setViewMode('trips'); updateTabSnapshot('trips', { viewMode: 'trips', activeTripId: null }); window.history.replaceState({}, '', window.location.pathname); }}>내 여행으로</button>
               </div>
             )}
             {sharedViewError && !isReadOnlyTrip && (
@@ -4665,10 +4784,10 @@ function App() {
             )}
 
             {/* Row 2: Navigation Tabs & Share Actions */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <div className="sidebar-top-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', gap: '6px', paddingRight: '12px', borderRight: '1px solid #f3f4f6' }}>
                 <button 
-                  onClick={() => { setIsMobileHeaderHidden(false); setMobileRootTab('trips'); setViewMode('trips'); }}
+                  onClick={() => { setIsMobileHeaderHidden(false); setMobileRootTab('trips'); setViewMode('trips'); updateTabSnapshot('trips', { viewMode: 'trips', activeTripId }); }}
                   style={{ width: '40px', height: '40px', borderRadius: '12px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.2s', backgroundColor: viewMode === 'trips' ? '#8b5cf6' : '#f3f4f6', color: viewMode === 'trips' ? 'white' : '#9ca3af' }}
                   aria-label="내 여행" title="내 여행"
                 >
@@ -4755,6 +4874,7 @@ function App() {
           {/* List Content */}
           <div
             className="sidebar-list-content"
+            ref={sidebarListContentRef}
             onScroll={splitViewScrollContainer === 'list' ? handleSidebarScroll : undefined}
             style={{
             flex: 1,
@@ -4766,6 +4886,23 @@ function App() {
             <style>{`
               div::-webkit-scrollbar { display: none; }
             `}</style>
+
+            {isBottomNavigationViewport && ['itinerary', 'budget', 'memory'].includes(viewMode) && (
+              <div className="mobile-context-bar">
+                <button
+                  type="button"
+                  className="mobile-context-back"
+                  onClick={() => handleBottomNavigationSelect('trips')}
+                  aria-label="내 여행 목록으로 돌아가기"
+                >
+                  <ChevronRight size={16} aria-hidden="true" />
+                </button>
+                <div className="mobile-context-copy">
+                  <small>{activeTrip?.name || '내 여행'}</small>
+                  <strong>{viewMode === 'itinerary' ? '내 일정' : viewMode === 'budget' ? '예산 및 지출' : '여행 기록'}</strong>
+                </div>
+              </div>
+            )}
             
             {/* --- TRIPS MODE --- */}
             {viewMode === 'trips' && (
@@ -4809,7 +4946,7 @@ function App() {
                       return (
                       <div 
                         key={trip.id} 
-                        onClick={() => { setActiveTripId(trip.id); openItinerary(); }}
+                        onClick={() => openItinerary(trip.id)}
                         style={{ padding: '24px', backgroundColor: activeTripId === trip.id ? '#f5f3ff' : 'white', border: activeTripId === trip.id ? '2px solid #ddd6fe' : '1px solid #f3f4f6', borderRadius: '20px', cursor: 'pointer', transition: '0.2s', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
@@ -4988,14 +5125,14 @@ function App() {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                               <button
                                 type="button"
-                                onClick={(event) => { event.stopPropagation(); setActiveTripId(trip.id); openItinerary(); }}
+                                onClick={(event) => { event.stopPropagation(); openItinerary(trip.id); }}
                                 style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '9px 12px', border: 'none', borderRadius: '10px', backgroundColor: '#eff6ff', color: '#2563eb', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}
                               >
                                 <Calendar size={14} /> 일정 보기
                               </button>
                               <button
                                 type="button"
-                                onClick={(event) => { event.stopPropagation(); setActiveTripId(trip.id); openTravelMemory(); }}
+                                onClick={(event) => { event.stopPropagation(); openTravelMemory(trip.id); }}
                                 style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '9px 12px', border: 'none', borderRadius: '10px', backgroundColor: '#f0f9ff', color: '#0284c7', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}
                               >
                                 <FileText size={14} /> 여행 기록
@@ -5067,9 +5204,7 @@ function App() {
                                         <div
                                           key={`fav-list-${loc.id || loc.name}`}
                                           onClick={() => {
-                                            setSelectedPlace(loc);
-                                            map?.panTo({ lat: loc.lat, lng: loc.lng });
-                                            map?.setZoom(18);
+                                            openMemoryPlace(loc);
                                           }}
                                           style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px', backgroundColor: selectedPlace?.name === loc.name ? '#fef2f2' : 'transparent', borderRadius: '12px', cursor: 'pointer', border: '1px solid transparent' }}
                                         >
