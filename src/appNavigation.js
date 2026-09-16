@@ -104,7 +104,7 @@ export const getMobileRootPresentation = ({ rootTab, viewMode } = {}) => {
   if (rootTab === 'map') {
     return { mapVisible: true, contentVisible: false, split: false };
   }
-  if (viewMode === 'itinerary') {
+  if (rootTab === 'trips' && ['trips', 'itinerary'].includes(viewMode)) {
     return { mapVisible: true, contentVisible: true, split: true };
   }
   return { mapVisible: false, contentVisible: true, split: false };

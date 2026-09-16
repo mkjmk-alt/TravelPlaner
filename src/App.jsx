@@ -13,6 +13,7 @@ import { BRAND_NAME_EN, BRAND_NAME_KO } from './brand';
 import TravelMemoryPanel from './TravelMemoryPanel';
 import { getJournalEntries, getTravelDetails } from './travelMemory';
 import { calculateSettlement, normalizeExpenseParticipants, normalizeSettlementParticipants } from './expenseSettlement';
+import { createCashWallet, getCashWalletCreationCurrency, removeCashWalletState } from './cashWallets';
 import './index.css';
 
 // --- CONFIGURATION ---
@@ -4070,21 +4071,44 @@ function App() {
     });
   };
   const addCashWallet = () => {
-    const currency = cashCurrencyChoices.find(code => code !== defaultCashCurrency) || defaultCashCurrency;
-    const newWallet = {
-      id: makeEntityId(),
-      name: `${currency} 현금 지갑`,
-      currency,
-      initial: 0,
-      additional: 0,
-      actualRemaining: ''
-    };
+    const currency = getCashWalletCreationCurrency({
+      selectedCurrency: cashLedgerCurrency,
+      currencyChoices: cashCurrencyChoices,
+      fallbackCurrency: defaultCashCurrency
+    });
+    const newWallet = createCashWallet({ id: makeEntityId(), currency });
     saveBudgetSettings({
       ...budgetSettings,
       cashWallets: [...allCashWallets, newWallet],
       cashLedgerCurrency: currency
     });
     setCashWalletId(newWallet.id);
+  };
+  const removeCashWallet = (walletId) => {
+    if (isReadOnlyTrip) return;
+    const wallet = allCashWallets.find(candidate => candidate.id === walletId);
+    if (!wallet) return;
+    const confirmed = window.confirm(`"${wallet.name}"을 삭제할까요?\n환전·인출·잔액 기록도 함께 삭제됩니다.`);
+    if (!confirmed) return;
+
+    const nextState = removeCashWalletState({
+      wallets: allCashWallets,
+      walletId,
+      activeWalletId: activeCashWalletId,
+      selectedCurrency: cashLedgerCurrency,
+      fallbackCurrency: defaultCashCurrency
+    });
+    const nextCashLedgers = { ...cashLedgers };
+    if (!Array.isArray(budgetSettings.cashWallets) && wallet.id === wallet.currency) {
+      delete nextCashLedgers[wallet.currency];
+    }
+    saveBudgetSettings({
+      ...budgetSettings,
+      cashWallets: nextState.wallets,
+      cashLedgers: nextCashLedgers,
+      cashLedgerCurrency: nextState.cashLedgerCurrency
+    });
+    setCashWalletId(nextState.activeWalletId);
   };
   const editingExpense = (expenses || []).find(expense => expense.id === editingExpenseId);
   const budgetProgress = budgetSettings.limitKRW > 0 ? Math.min((totalSpentKRW / budgetSettings.limitKRW) * 100, 100) : 0;
@@ -4207,6 +4231,36 @@ function App() {
   const selectedPlaceOpeningHours = getOpeningHours(selectedPlace);
   const selectedPlaceBusinessStatus = getBusinessStatusLabel(selectedPlace?.businessStatus);
 
+  const renderCashWalletControls = () => (
+    <div className="cash-wallet-controls">
+      <span className="cash-wallet-controls-label">통화별 현금 지갑</span>
+      {cashWallets.map(wallet => (
+        <div className="cash-wallet-chip" key={`cash-wallet-${wallet.id}`}>
+          <button
+            type="button"
+            className={`cash-wallet-select${activeCashWalletId === wallet.id ? ' is-active' : ''}`}
+            onClick={() => { setCashWalletId(wallet.id); saveBudgetSettings({ ...budgetSettings, cashLedgerCurrency: wallet.currency }); }}
+            aria-pressed={activeCashWalletId === wallet.id}
+          >
+            {wallet.name} · {wallet.currency}
+          </button>
+          {!isReadOnlyTrip && (
+            <button
+              type="button"
+              className="cash-wallet-delete"
+              onClick={(event) => { event.stopPropagation(); removeCashWallet(wallet.id); }}
+              aria-label={`${wallet.name} 삭제`}
+              title="지갑 삭제"
+            >
+              <Trash2 size={12} aria-hidden="true" />
+            </button>
+          )}
+        </div>
+      ))}
+      {!isReadOnlyTrip && <button type="button" className="cash-wallet-add" onClick={addCashWallet}>+ 지갑 추가</button>}
+    </div>
+  );
+
   const renderCashReconciliationPanel = () => (
     <div className="cash-reconciliation-card" style={{ padding: '16px', backgroundColor: '#fffaf0', border: '1px solid #fde68a', borderRadius: '16px', marginBottom: '18px' }}>
       <div className="cash-reconciliation-panel-heading">
@@ -4220,11 +4274,7 @@ function App() {
             {cashCurrencyChoices.map(code => <option key={`cash-ledger-currency-${code}`} value={code}>{getCurrencySymbol(code)} {getCurrencyNameKO(code)} ({code})</option>)}
           </select>
         </div>
-        <div style={{ display: 'flex', gap: '7px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '12px' }}>
-          <span style={{ color: '#92400e', fontSize: '10px', fontWeight: '900' }}>통화별 현금 지갑</span>
-          {cashWallets.map(wallet => <button key={`cash-wallet-${wallet.id}`} type="button" onClick={() => { setCashWalletId(wallet.id); saveBudgetSettings({ ...budgetSettings, cashLedgerCurrency: wallet.currency }); }} style={{ padding: '6px 8px', border: `1px solid ${activeCashWalletId === wallet.id ? '#f59e0b' : '#fde68a'}`, borderRadius: '8px', background: activeCashWalletId === wallet.id ? '#fef3c7' : 'white', color: '#92400e', fontSize: '10px', fontWeight: '800', cursor: 'pointer' }}>{wallet.name} · {wallet.currency}</button>)}
-          {!isReadOnlyTrip && <button type="button" onClick={addCashWallet} style={{ padding: '6px 8px', border: '1px dashed #f59e0b', borderRadius: '8px', background: 'transparent', color: '#b45309', fontSize: '10px', fontWeight: '900', cursor: 'pointer' }}>+ 지갑 추가</button>}
-        </div>
+        {renderCashWalletControls()}
         {activeCashWalletId && <label style={{ display: 'block', marginBottom: '12px', color: '#92400e', fontSize: '10px', fontWeight: '900' }}>지갑 이름<input type="text" value={cashLedger.name || ''} onChange={(event) => updateCashLedger({ name: event.target.value })} placeholder="예: 지갑 1" style={{ width: '100%', boxSizing: 'border-box', marginTop: '6px', padding: '9px 10px', border: '1px solid #fde68a', borderRadius: '9px', background: 'white' }} /></label>}
         <div className="cash-reconciliation-fields">
           <div className="expense-form-field"><label className="expense-form-label" htmlFor="cash-initial-input">여행 전 환전·인출</label><div className="expense-form-amount-control cash-reconciliation-input"><span aria-hidden="true">{getCurrencySymbol(cashLedgerCurrency)}</span><input id="cash-initial-input" type="number" min="0" step="any" inputMode="decimal" value={cashLedger.initial ?? ''} onChange={(e) => updateCashLedger({ initial: e.target.value })} placeholder="0" aria-label={`여행 전 환전·인출 금액(${cashLedgerCurrency})`} /></div></div>
@@ -6209,11 +6259,7 @@ function App() {
                         </select>
                       </div>
 
-                      <div style={{ display: 'flex', gap: '7px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '12px' }}>
-                        <span style={{ color: '#92400e', fontSize: '10px', fontWeight: '900' }}>통화별 현금 지갑</span>
-                        {cashWallets.map(wallet => <button key={`cash-wallet-${wallet.id}`} type="button" onClick={() => { setCashWalletId(wallet.id); saveBudgetSettings({ ...budgetSettings, cashLedgerCurrency: wallet.currency }); }} style={{ padding: '6px 8px', border: `1px solid ${activeCashWalletId === wallet.id ? '#f59e0b' : '#fde68a'}`, borderRadius: '8px', background: activeCashWalletId === wallet.id ? '#fef3c7' : 'white', color: '#92400e', fontSize: '10px', fontWeight: '800', cursor: 'pointer' }}>{wallet.name} · {wallet.currency}</button>)}
-                        {!isReadOnlyTrip && <button type="button" onClick={addCashWallet} style={{ padding: '6px 8px', border: '1px dashed #f59e0b', borderRadius: '8px', background: 'transparent', color: '#b45309', fontSize: '10px', fontWeight: '900', cursor: 'pointer' }}>+ 지갑 추가</button>}
-                      </div>
+                      {renderCashWalletControls()}
 
                       {activeCashWalletId && <label style={{ display: 'block', marginBottom: '12px', color: '#92400e', fontSize: '10px', fontWeight: '900' }}>지갑 이름
                         <input type="text" value={cashLedger.name || ''} onChange={(event) => updateCashLedger({ name: event.target.value })} placeholder="예: 지갑 1" style={{ width: '100%', boxSizing: 'border-box', marginTop: '6px', padding: '9px 10px', border: '1px solid #fde68a', borderRadius: '9px', background: 'white' }} />

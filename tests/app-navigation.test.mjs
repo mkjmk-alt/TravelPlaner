@@ -83,6 +83,9 @@ test('uses map-only, itinerary-split, and content-only mobile roots', () => {
   assert.deepEqual(getMobileRootPresentation({ rootTab: 'map', viewMode: 'trips' }), {
     mapVisible: true, contentVisible: false, split: false
   });
+  assert.deepEqual(getMobileRootPresentation({ rootTab: 'trips', viewMode: 'trips' }), {
+    mapVisible: true, contentVisible: true, split: true
+  });
   assert.deepEqual(getMobileRootPresentation({ rootTab: 'trips', viewMode: 'itinerary' }), {
     mapVisible: true, contentVisible: true, split: true
   });
