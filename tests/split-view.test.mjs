@@ -11,6 +11,7 @@ import {
   getSplitPaneLayout,
   getSplitViewScrollContainer,
   getSplitViewGridRows,
+  getViewportSize,
   normalizeDisplayMode
 } from '../src/splitView.js';
 
@@ -21,6 +22,25 @@ test('selects classic on desktop and tablet landscape, split on mobile and table
   assert.equal(getResponsiveDisplayMode({ width: 820, height: 1180 }), DISPLAY_MODES.SPLIT);
   assert.equal(getResponsiveDisplayMode({ width: 1024, height: 1366 }), DISPLAY_MODES.SPLIT);
   assert.equal(getResponsiveDisplayMode({ width: 844, height: 390, isCoarsePointer: true }), DISPLAY_MODES.SPLIT);
+});
+
+test('uses the visible viewport size when browser chrome or keyboard changes it', () => {
+  assert.deepEqual(getViewportSize({
+    innerWidth: 390,
+    innerHeight: 844,
+    visualViewport: { width: 390, height: 640 }
+  }), {
+    width: 390,
+    height: 640
+  });
+  assert.deepEqual(getViewportSize({
+    innerWidth: 390,
+    innerHeight: 844,
+    visualViewport: { width: 0, height: 0 }
+  }), {
+    width: 390,
+    height: 844
+  });
 });
 
 test('keeps small landscape tablets and narrow desktop windows in classic mode', () => {

@@ -13,6 +13,13 @@
 | 최소 Android | Android 8.0 (API 26) |
 | Android Target SDK | API 36 |
 
+### 2026-09-16 개발 기준
+
+- iOS: Xcode 27.0, XcodeGen, iOS 16.0 이상, 표시명 `TripPlot`, Bundle ID `com.travelplaner.app`.
+- Android: Gradle 8.13, JDK 17.0.20, Android SDK 36, minSdk 26, targetSdk 36, Application ID `com.travelplaner.app`.
+- 확인한 개발 빌드: iOS Simulator Debug 빌드와 Android Debug APK 빌드/lint.
+- 이 확인은 개발용 빌드 기준이며, 배포 서명·TestFlight·Google Play 업로드를 의미하지 않습니다.
+
 스토어 등록 전에 Bundle ID가 Apple Developer/Google Play Console에서 사용 가능한지 확인해야 합니다. 이미 사용 중이면 `ios/project.yml`과 `android/app/build.gradle.kts`의 값을 함께 변경합니다.
 
 ## 로그인 없는 데이터 저장

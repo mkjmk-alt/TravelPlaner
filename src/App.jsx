@@ -5,9 +5,9 @@ import { GoogleMap, useJsApiLoader, OverlayViewF, InfoWindow, Polyline } from '@
 import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronUp, ChevronDown, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Clock, Upload, Clipboard, LocateFixed, Download, Bell, FileText, Mail, Lock, Eye, EyeOff, WifiOff, Link2, LockKeyhole } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { getMapAvailability } from './mapAvailability';
-import { getMobileViewModeSheetMode } from './mobileSidebar';
+import { getBottomNavigationItems, getBottomNavigationSelection, getMobileViewModeSheetMode } from './mobileSidebar';
 import { getClosestMobileSheetMode, getMobileSheetPosition, getMobileSheetSnapPoints } from './mobileSheet';
-import { DISPLAY_MODES, getFreeSplitPanePosition, getResponsiveDisplayMode, getSaveStatusPresentation, getSidebarFooterVariant, getSplitSaveStatusPlacement, getSplitViewGridRows, getSplitViewScrollContainer } from './splitView';
+import { DISPLAY_MODES, getFreeSplitPanePosition, getResponsiveDisplayMode, getSaveStatusPresentation, getSidebarFooterVariant, getSplitSaveStatusPlacement, getSplitViewGridRows, getSplitViewScrollContainer, getViewportSize } from './splitView';
 import { BRAND_NAME_EN, BRAND_NAME_KO } from './brand';
 import TravelMemoryPanel from './TravelMemoryPanel';
 import { getJournalEntries, getTravelDetails } from './travelMemory';
@@ -1220,20 +1220,26 @@ function App() {
   const [accountDeleteError, setAccountDeleteError] = useState('');
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   
-  const [windowSize, setWindowSize] = useState({
-    width: window.innerWidth,
-    height: window.innerHeight
-  });
+  const [windowSize, setWindowSize] = useState(() => getViewportSize({
+    innerWidth: window.innerWidth,
+    innerHeight: window.innerHeight,
+    visualViewport: window.visualViewport
+  }));
 
   useEffect(() => {
     const handleResize = () => {
-      setWindowSize({
-        width: window.innerWidth,
-        height: window.innerHeight
-      });
+      setWindowSize(getViewportSize({
+        innerWidth: window.innerWidth,
+        innerHeight: window.innerHeight,
+        visualViewport: window.visualViewport
+      }));
     };
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.visualViewport?.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.visualViewport?.removeEventListener('resize', handleResize);
+    };
   }, []);
 
   const [isCoarsePointer, setIsCoarsePointer] = useState(() => (
@@ -1262,6 +1268,8 @@ function App() {
     isCoarsePointer
   });
   const isSplitView = displayMode === DISPLAY_MODES.SPLIT;
+  const isBottomNavigationViewport = isSplitView || windowSize.width < 768;
+  const bottomNavigationItems = getBottomNavigationItems();
   const sidebarFooterVariant = getSidebarFooterVariant(displayMode);
   const splitSaveStatusPlacement = getSplitSaveStatusPlacement(displayMode);
   const [splitPanePosition, setSplitPanePosition] = useState(null);
@@ -1348,14 +1356,17 @@ function App() {
     setDragOffset(0);
   };
   const [viewMode, setViewMode] = useState('trips');
+  const [mobileRootTab, setMobileRootTab] = useState('trips');
   const [isMobileHeaderHidden, setIsMobileHeaderHidden] = useState(false);
   const openItinerary = () => {
     setIsMobileHeaderHidden(false);
+    setMobileRootTab('trips');
     setViewMode('itinerary');
     if (windowSize.width < 768) setSheetMode('full');
   };
   const openTravelMemory = () => {
     setIsMobileHeaderHidden(false);
+    setMobileRootTab('trips');
     setViewMode('memory');
     if (windowSize.width < 768) setSheetMode('full');
   };
@@ -1381,12 +1392,29 @@ function App() {
   };
   const openFavorites = () => {
     setIsMobileHeaderHidden(false);
+    setMobileRootTab('favorites');
     setViewMode('favorites');
     setSheetMode(currentMode => getMobileViewModeSheetMode({
       viewMode: 'favorites',
       viewportWidth: windowSize.width,
       currentMode
     }));
+  };
+
+  const handleBottomNavigationSelect = (key) => {
+    const selection = getBottomNavigationSelection(key);
+    setIsMobileHeaderHidden(false);
+    setMobileRootTab(selection.rootTab);
+    setViewMode(selection.viewMode);
+    setSidebarOpen(selection.showSidebar);
+
+    if (selection.rootTab === 'favorites') {
+      setSheetMode(currentMode => getMobileViewModeSheetMode({
+        viewMode: 'favorites',
+        viewportWidth: windowSize.width,
+        currentMode
+      }));
+    }
   };
 
   const handleSidebarScroll = (e) => {
@@ -1817,6 +1845,7 @@ function App() {
         if (cancelled) return;
         setReadOnlySharedTrip({ ...data.trip_data, sharedId: data.id });
         setActiveTripId(`readonly-${data.id}`);
+        setMobileRootTab('trips');
         setViewMode('itinerary');
         setShowOnboarding(false);
         setSyncStatus('saved');
@@ -2154,6 +2183,7 @@ function App() {
 
   const openBudget = () => {
     setIsMobileHeaderHidden(false);
+    setMobileRootTab('trips');
     setExpenseInput(current => ({
       ...current,
       day: getTodayExpenseDay(activeTrip),
@@ -3285,6 +3315,7 @@ function App() {
     if (activeTripId === id) {
       setActiveTripId(newTrips.length > 0 ? newTrips[0].id : null);
       setIsMobileHeaderHidden(false);
+      setMobileRootTab('trips');
       setViewMode('trips');
     }
   };
@@ -4436,8 +4467,15 @@ function App() {
 
   return (
     <div
-      className={`app-container ${!sidebarOpen ? 'sidebar-closed' : ''} ${isReadOnlyTrip ? 'read-only-view' : ''} ${isSplitView ? 'split-view-mode' : ''}`}
-      style={isSplitView ? { gridTemplateRows: getSplitViewGridRows({ height: windowSize.height, position: splitPanePosition, dragOffset }) } : undefined}
+      className={`app-container ${!sidebarOpen ? 'sidebar-closed' : ''} ${isReadOnlyTrip ? 'read-only-view' : ''} ${isSplitView ? 'split-view-mode' : ''} ${isBottomNavigationViewport && mobileRootTab === 'map' ? 'mobile-map-root' : ''}`}
+      style={{
+        height: `${windowSize.height}px`,
+        ...(isSplitView ? {
+          gridTemplateRows: mobileRootTab === 'map'
+            ? `${windowSize.height}px 0px`
+            : getSplitViewGridRows({ height: windowSize.height, position: splitPanePosition, dragOffset })
+        } : {})
+      }}
     >
       
       {/* GLOBAL SEARCH BAR */}
@@ -4616,7 +4654,7 @@ function App() {
               <div className="shared-read-only-banner" role="status">
                 <LockKeyhole size={14} aria-hidden="true" />
                 <span>공유 일정 읽기 전용</span>
-                <button type="button" onClick={() => { setReadOnlySharedTrip(null); setActiveTripId(null); setViewMode('trips'); window.history.replaceState({}, '', window.location.pathname); }}>내 여행으로</button>
+                <button type="button" onClick={() => { setReadOnlySharedTrip(null); setActiveTripId(null); setMobileRootTab('trips'); setViewMode('trips'); window.history.replaceState({}, '', window.location.pathname); }}>내 여행으로</button>
               </div>
             )}
             {sharedViewError && !isReadOnlyTrip && (
@@ -4630,7 +4668,7 @@ function App() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', gap: '6px', paddingRight: '12px', borderRight: '1px solid #f3f4f6' }}>
                 <button 
-                  onClick={() => { setIsMobileHeaderHidden(false); setViewMode('trips'); }}
+                  onClick={() => { setIsMobileHeaderHidden(false); setMobileRootTab('trips'); setViewMode('trips'); }}
                   style={{ width: '40px', height: '40px', borderRadius: '12px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.2s', backgroundColor: viewMode === 'trips' ? '#8b5cf6' : '#f3f4f6', color: viewMode === 'trips' ? 'white' : '#9ca3af' }}
                   aria-label="내 여행" title="내 여행"
                 >
@@ -6146,6 +6184,83 @@ function App() {
               </>
             )}
 
+            {/* --- MORE MODE --- */}
+            {viewMode === 'more' && (
+              <>
+                <div style={{ marginBottom: '20px' }}>
+                  <h2 className="menu-section-title" style={{ marginBottom: '8px' }}>더보기</h2>
+                  <p style={{ color: '#94a3b8', fontSize: '11px', fontWeight: '700', lineHeight: 1.5 }}>여행 관리와 앱 기능을 한곳에서 확인하세요.</p>
+                </div>
+
+                <div className="mobile-more-list">
+                  <button type="button" className="mobile-more-item" onClick={() => (session ? supabase.auth.signOut() : openAuthModal('login'))}>
+                    <span className="mobile-more-item-icon"><Lock size={17} /></span>
+                    <span className="mobile-more-item-copy">
+                      <strong>{session ? '로그아웃' : '로그인 / 회원가입'}</strong>
+                      <small>{session ? '현재 계정에서 로그아웃합니다.' : '여러 기기에서 여행을 이어갈 수 있어요.'}</small>
+                    </span>
+                    <ChevronRight size={16} aria-hidden="true" />
+                  </button>
+
+                  {activeTrip && (
+                    <>
+                      <button type="button" className="mobile-more-item" onClick={openItinerary}>
+                        <span className="mobile-more-item-icon is-blue"><Calendar size={17} /></span>
+                        <span className="mobile-more-item-copy">
+                          <strong>내 일정</strong>
+                          <small>{activeTrip.name}의 일정을 확인하고 편집합니다.</small>
+                        </span>
+                        <ChevronRight size={16} aria-hidden="true" />
+                      </button>
+                      <button type="button" className="mobile-more-item" onClick={openBudget}>
+                        <span className="mobile-more-item-icon is-green"><Wallet size={17} /></span>
+                        <span className="mobile-more-item-copy">
+                          <strong>예산·지출</strong>
+                          <small>지출을 기록하고 동행자별 정산을 확인합니다.</small>
+                        </span>
+                        <ChevronRight size={16} aria-hidden="true" />
+                      </button>
+                      <button type="button" className="mobile-more-item" onClick={openTravelMemory}>
+                        <span className="mobile-more-item-icon is-sky"><FileText size={17} /></span>
+                        <span className="mobile-more-item-copy">
+                          <strong>여행 기록</strong>
+                          <small>여행 중 남긴 사진과 메모를 모아봅니다.</small>
+                        </span>
+                        <ChevronRight size={16} aria-hidden="true" />
+                      </button>
+                      <button type="button" className="mobile-more-item" onClick={() => exportTripBackupAsJson(activeTrip)}>
+                        <span className="mobile-more-item-icon is-slate"><Download size={17} /></span>
+                        <span className="mobile-more-item-copy">
+                          <strong>여행 데이터 백업</strong>
+                          <small>일정·지출·예산을 파일로 저장합니다.</small>
+                        </span>
+                        <ChevronRight size={16} aria-hidden="true" />
+                      </button>
+                      {!isReadOnlyTrip && (
+                        <button type="button" className="mobile-more-item" onClick={handleUploadJson}>
+                          <span className="mobile-more-item-icon is-slate"><Upload size={17} /></span>
+                          <span className="mobile-more-item-copy">
+                            <strong>백업 복원</strong>
+                            <small>저장해 둔 여행 데이터 파일을 불러옵니다.</small>
+                          </span>
+                          <ChevronRight size={16} aria-hidden="true" />
+                        </button>
+                      )}
+                    </>
+                  )}
+
+                  <a className="mobile-more-item" href="/support.html">
+                    <span className="mobile-more-item-icon is-slate"><Link2 size={17} /></span>
+                    <span className="mobile-more-item-copy">
+                      <strong>지원 및 약관</strong>
+                      <small>서비스 도움말과 이용 안내를 확인합니다.</small>
+                    </span>
+                    <ChevronRight size={16} aria-hidden="true" />
+                  </a>
+                </div>
+              </>
+            )}
+
             <div className="sidebar-list-end-meta">
               <span style={{ fontSize: "11px", fontWeight: "900", color: "#111827", letterSpacing: "0.05em" }}>{(favorites || []).length} 저장 • {totalSpots} 일정</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '9px', fontWeight: '800' }}>
@@ -6177,6 +6292,33 @@ function App() {
           </div>
         )}
         </aside>
+
+        {isBottomNavigationViewport && (
+          <nav className="mobile-bottom-navigation" aria-label="주요 메뉴">
+            {bottomNavigationItems.map((item) => {
+              const isActive = mobileRootTab === item.key;
+              const Icon = item.key === 'trips'
+                ? Plane
+                : item.key === 'map'
+                ? MapPin
+                : item.key === 'favorites'
+                ? Heart
+                : Menu;
+              return (
+                <button
+                  key={`mobile-bottom-nav-${item.key}`}
+                  type="button"
+                  className={`mobile-bottom-navigation-item${isActive ? ' is-active' : ''}`}
+                  onClick={() => handleBottomNavigationSelect(item.key)}
+                  aria-current={isActive ? 'page' : undefined}
+                >
+                  <Icon size={19} strokeWidth={isActive ? 2.5 : 2} fill={item.key === 'favorites' && isActive ? 'currentColor' : 'none'} aria-hidden="true" />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+        )}
 
         {syncConflictNotice && (
           <div className="sync-conflict-banner" role="status" aria-live="polite">

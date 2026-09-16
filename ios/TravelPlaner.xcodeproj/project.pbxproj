@@ -32,12 +32,12 @@
 		18736DBDD0AD2C09C8AE6A06 /* PersistenceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceUITests.swift; sourceTree = "<group>"; };
 		322CCCFB6536D4D44DEEC671 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		7D8EF23A7C2017FBA00D22BB /* BrowserModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserModel.swift; sourceTree = "<group>"; };
-		A3A22732A2DE379FAFC15878 /* TravelPlaner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TravelPlaner.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		AA3DE89BDF2FD26F6EBD7FE3 /* TravelPlanerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TravelPlanerUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A3A22732A2DE379FAFC15878 /* TravelPlaner.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = TravelPlaner.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA3DE89BDF2FD26F6EBD7FE3 /* TravelPlanerUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = TravelPlanerUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BDD5C341624831DF3F2E2CCA /* TravelWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TravelWebView.swift; sourceTree = "<group>"; };
 		D9DE951BCF0113523667075A /* TravelPlanerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TravelPlanerApp.swift; sourceTree = "<group>"; };
 		EDD7EA4149F3B6BF52C259F9 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		FE723B0C1EBB5F66FF7C24B5 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		FE723B0C1EBB5F66FF7C24B5 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		FF04ADB524AC74B46EF167B1 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -132,9 +132,11 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					307ABC8F2D9062D0994E3E60 = {
+						DevelopmentTeam = BTT4JXSL86;
 						TestTargetID = D2C37761098216D472FAE15E;
 					};
 					D2C37761098216D472FAE15E = {
+						DevelopmentTeam = BTT4JXSL86;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -209,10 +211,9 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = P3QCXGPNU9;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = TravelPlaner/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = TravelPlaner;
+				INFOPLIST_KEY_CFBundleDisplayName = TripPlot;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.travel";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -231,10 +232,9 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = P3QCXGPNU9;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = TravelPlaner/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = TravelPlaner;
+				INFOPLIST_KEY_CFBundleDisplayName = TripPlot;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.travel";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -376,7 +376,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
-				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -394,7 +393,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
-				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

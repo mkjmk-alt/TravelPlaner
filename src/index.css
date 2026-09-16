@@ -89,8 +89,10 @@ body {
   flex-direction: row;
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   position: relative;
   overflow: hidden;
+  min-height: 0;
 }
 
 .sidebar-container {
@@ -3509,5 +3511,182 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .travel-memory-entry-image {
     width: 78px;
     flex-basis: 78px;
+  }
+}
+
+/* Primary navigation for phone and portrait-tablet layouts. The desktop
+   sidebar remains the source of navigation on wider screens. */
+.mobile-bottom-navigation {
+  display: none;
+}
+
+.mobile-more-list {
+  display: grid;
+  gap: 10px;
+}
+
+.mobile-more-item {
+  width: 100%;
+  min-height: 66px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #ffffff;
+  color: #334155;
+  text-align: left;
+  text-decoration: none;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
+}
+
+.mobile-more-item:hover,
+.mobile-more-item:focus-visible {
+  border-color: #c4b5fd;
+  background: #fafaff;
+  outline: none;
+}
+
+.mobile-more-item:active {
+  transform: scale(0.99);
+}
+
+.mobile-more-item > svg {
+  flex: 0 0 auto;
+  color: #94a3b8;
+}
+
+.mobile-more-item-icon {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+  background: #f5f3ff;
+  color: #7c3aed;
+}
+
+.mobile-more-item-icon.is-blue {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.mobile-more-item-icon.is-green {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.mobile-more-item-icon.is-sky {
+  background: #f0f9ff;
+  color: #0284c7;
+}
+
+.mobile-more-item-icon.is-slate {
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.mobile-more-item-copy {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 3px;
+}
+
+.mobile-more-item-copy strong {
+  color: #1e293b;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.mobile-more-item-copy small {
+  overflow: hidden;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1024px) {
+  .mobile-bottom-navigation {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 3200;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+    min-height: 72px;
+    padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+    border-top: 1px solid rgba(226, 232, 240, 0.95);
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 -10px 30px rgba(15, 23, 42, 0.08);
+    backdrop-filter: blur(18px);
+  }
+
+  .mobile-bottom-navigation-item {
+    min-width: 0;
+    min-height: 48px;
+    padding: 5px 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    border: 0;
+    border-radius: 13px;
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+    font: inherit;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  .mobile-bottom-navigation-item span {
+    overflow: hidden;
+    max-width: 100%;
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-bottom-navigation-item.is-active {
+    background: #f5f3ff;
+    color: #6d28d9;
+  }
+
+  .mobile-bottom-navigation-item:focus-visible {
+    outline: 2px solid #8b5cf6;
+    outline-offset: -2px;
+  }
+
+  .app-container.split-view-mode .sidebar-list-content,
+  .app-container:not(.split-view-mode) .sidebar-list-content {
+    padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .app-container.mobile-map-root .sidebar-container {
+    display: none;
+  }
+
+  .app-container.mobile-map-root .map-wrapper {
+    height: 100% !important;
+    min-height: 100%;
+  }
+}
+
+@media (min-width: 1025px) {
+  .mobile-bottom-navigation {
+    display: none !important;
   }
 }

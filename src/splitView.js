@@ -11,6 +11,19 @@ export const normalizeDisplayMode = (mode) => (
   mode === DISPLAY_MODES.SPLIT ? DISPLAY_MODES.SPLIT : DISPLAY_MODES.CLASSIC
 );
 
+const getPositiveViewportDimension = (value, fallback) => {
+  const dimension = Number(value);
+  if (Number.isFinite(dimension) && dimension > 0) return dimension;
+
+  const fallbackDimension = Number(fallback);
+  return Number.isFinite(fallbackDimension) && fallbackDimension > 0 ? fallbackDimension : 0;
+};
+
+export const getViewportSize = ({ innerWidth = 0, innerHeight = 0, visualViewport } = {}) => ({
+  width: getPositiveViewportDimension(visualViewport?.width, innerWidth),
+  height: getPositiveViewportDimension(visualViewport?.height, innerHeight)
+});
+
 export const getResponsiveDisplayMode = ({ width, height, isCoarsePointer = false }) => {
   const viewportWidth = Math.max(0, Number(width) || 0);
   const viewportHeight = Math.max(0, Number(height) || 0);

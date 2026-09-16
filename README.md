@@ -30,7 +30,7 @@ npm run build
 
 ## iOS 앱
 
-요구 사항: Xcode 16 이상, XcodeGen.
+요구 사항: Xcode 27 이상(iOS 26 SDK 포함), XcodeGen.
 
 ```bash
 cd ios
