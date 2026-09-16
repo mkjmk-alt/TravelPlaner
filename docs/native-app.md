@@ -1,10 +1,10 @@
-# 트리블리 (Tribly) 네이티브 앱 개발 및 출시 가이드
+# 트립 플롯 (Trip Plot) 네이티브 앱 개발 및 출시 가이드
 
 ## 확정된 기본값
 
 | 항목 | 값 |
 | --- | --- |
-| 앱 이름 | 트리블리 (Tribly) |
+| 앱 이름 | 트립 플롯 (Trip Plot) |
 | iOS Bundle ID | `com.travelplaner.app` |
 | Android Application ID | `com.travelplaner.app` |
 | 운영 URL | `https://travelplaner-545.pages.dev/` |

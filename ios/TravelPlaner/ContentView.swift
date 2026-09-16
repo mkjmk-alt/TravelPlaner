@@ -9,7 +9,7 @@ struct ContentView: View {
             TravelWebView(browser: browser)
 
             if browser.isLoading {
-                ProgressView("트리블리 불러오는 중…")
+                ProgressView("트립 플롯 불러오는 중…")
                     .padding(.horizontal, 22)
                     .padding(.vertical, 16)
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))

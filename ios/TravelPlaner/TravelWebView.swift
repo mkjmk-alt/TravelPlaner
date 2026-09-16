@@ -273,7 +273,7 @@ struct TravelWebView: UIViewRepresentable {
                 .joined(separator: "-")
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             return sanitized.isEmpty || sanitized == "." || sanitized == ".."
-                ? "Tribly-file"
+                ? "Trip-Plot-file"
                 : sanitized
         }
 

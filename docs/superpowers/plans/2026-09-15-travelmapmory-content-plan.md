@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 현재 트리블리에 Travel Mapmory의 여행 정보·사진 기록 흐름을 통합하되, 방문 국가 색칠·음성 메모·예약 링크는 제외한다.
+**Goal:** 현재 트립 플롯에 Travel Mapmory의 여행 정보·사진 기록 흐름을 통합하되, 방문 국가 색칠·음성 메모·예약 링크는 제외한다.
 
 **Architecture:** 기존 `trip` 객체를 확장하고, 여행 기록 UI를 독립 React 컴포넌트로 분리한다. App은 기존 저장·동기화 함수와 새 컴포넌트를 연결하며, 지도·장소·일정·경비 화면은 그대로 유지한다.
 
@@ -83,4 +83,3 @@
 - [ ] **Step 3: Run `npm run build`.**
 - [ ] **Step 4: Verify the saved data contract and confirm no code contains the deferred feature labels or controls.**
 - [ ] **Step 5: Record the request, changes, verification, and fresh request ID in `기록-history.md`.**
-
