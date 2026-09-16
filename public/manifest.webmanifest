@@ -1,6 +1,6 @@
 {
-  "name": "트립 플롯 (Trip Plot) 여행 일정 플래너",
-  "short_name": "트립 플롯",
+  "name": "TripPlot 여행 일정 플래너",
+  "short_name": "TripPlot",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

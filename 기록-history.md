@@ -549,3 +549,27 @@
 - 수정 내용: 표시명 변경 커밋과 작업 기록을 GitHub `main`에 푸시함. 기존 GitHub 연동 Cloudflare Pages 자동 배포를 통해 운영 주소에 반영함.
 - 검증: 푸시 전 전체 `npm test` 64개, `npm run lint`, `npm run build`, `npm run store:validate`, `npm run native:security`, `git diff --check` 통과를 확인함. 로컬과 GitHub 원격 HEAD 일치를 확인하고, 운영 페이지의 새 브랜드명과 새 번들 반영을 확인함.
 - 답변: GitHub 푸시와 운영 배포가 완료됐다고 안내함.
+
+## 2026-09-16
+
+- ID: `C7pL2xN8Qa`
+- 요청: 화면에 보이는 서비스명을 영어·무공백 형태로 바꾸고, 대소문자 스타일 `TriPPloT` 적용 의견을 요청함.
+- 수정 내용: 코드 변경 없음. `TriPPloT`는 개성은 있으나 가독성이 낮을 수 있음을 검토하고, 표시명으로는 `TripPlot`을 추천함. 기술 식별자는 유지하는 기준을 재확인함.
+- 검증: 기존 표시명 변경 범위와 운영 사이트의 표시 구조를 기준으로 로고·웹 제목·앱 표시명·스토어 표시명 적용 가능성을 확인함.
+- 답변: `TriPPloT`보다 `TripPlot`이 읽기 쉽고 서비스명으로 자연스럽다고 안내하며, 적용할 영문 표기를 선택해 달라고 요청함.
+
+## 2026-09-16
+
+- ID: `L3xQ8mR2Vb`
+- 요청: 표시명을 `TripPlot`으로 확정하고 전체 표시 영역에 적용해 달라고 승인함.
+- 수정 내용: 웹 앱 화면·브라우저 제목·설치형 웹앱 이름·약관·개인정보·지원·계정 삭제 페이지·스토어 메타데이터·스토어 그래픽·iOS/Android 표시명·다운로드 기본 파일명·문서의 표시 브랜드를 `TripPlot`으로 통일함. 도메인·GitHub 저장소명·딥링크·번들 ID·패키지명·내부 타입과 브리지 식별자는 유지함.
+- 검증: 기존 `트리블리`·`Tribly`·`트립 플롯`·`Trip Plot` 표시 문자열이 활성 소스와 문서에 남아 있지 않음을 확인함. 브랜드 테스트의 실패 후 수정으로 통과하는 것을 확인함.
+- 답변: `TripPlot` 표시명 변경을 완료하고 전체 검증을 진행함.
+
+## 2026-09-16
+
+- ID: `P6tM3xR8Qa`
+- 요청: `TripPlot` 표시명 변경사항을 GitHub에 푸시하고 운영 배포해 달라고 요청함.
+- 수정 내용: `TripPlot` 표시명 변경과 작업 기록을 GitHub `main`에 푸시함. 기존 GitHub 연동 Cloudflare Pages 자동 배포를 통해 운영 주소에 반영함.
+- 검증: 푸시 전 전체 `npm test` 64개, `npm run lint`, `npm run build`, `npm run store:validate`, `npm run native:security`, `git diff --check` 통과를 확인함. GitHub 원격 HEAD 일치와 운영 페이지의 `TripPlot` 제목·manifest·앱 번들 반영을 확인함.
+- 답변: GitHub 푸시와 운영 배포가 완료됐다고 안내함.

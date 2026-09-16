@@ -408,7 +408,7 @@ class MainActivity : ComponentActivity() {
             .replace(Regex("[/\\\\:\\p{Cntrl}]"), "-")
             .trim()
         return sanitized.takeUnless { it.isBlank() || it == "." || it == ".." }
-            ?: "Trip-Plot-file"
+            ?: "TripPlot-file"
     }
 
     override fun onNewIntent(intent: Intent) {
