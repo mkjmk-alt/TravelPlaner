@@ -1,0 +1,30 @@
+{
+  "participants": [
+    { "id": "self", "name": "나" },
+    { "id": "jisu", "name": "지수" },
+    { "id": "minji", "name": "민지" }
+  ],
+  "expenses": [
+    {
+      "id": "expense-remainder",
+      "amount": 1001,
+      "currency": "KRW",
+      "amountKRW": 1001,
+      "payerId": "self",
+      "participantIds": ["self", "jisu", "minji"]
+    }
+  ],
+  "expected": {
+    "totalKRW": 1001,
+    "expenseCount": 1,
+    "people": [
+      { "id": "self", "paidKRW": 1001, "shareKRW": 334, "balanceKRW": 667 },
+      { "id": "jisu", "paidKRW": 0, "shareKRW": 334, "balanceKRW": -334 },
+      { "id": "minji", "paidKRW": 0, "shareKRW": 333, "balanceKRW": -333 }
+    ],
+    "transfers": [
+      { "fromId": "jisu", "toId": "self", "amountKRW": 334 },
+      { "fromId": "minji", "toId": "self", "amountKRW": 333 }
+    ]
+  }
+}

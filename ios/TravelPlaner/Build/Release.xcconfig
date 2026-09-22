@@ -1,0 +1,2 @@
+// Release builds always point to the deployed web app. Local overrides are intentionally not included.
+TRIPPLOT_WEB_URL = https:/$()/travelplaner-545.pages.dev/

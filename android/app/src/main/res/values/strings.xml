@@ -2,6 +2,8 @@
     <string name="app_name">TripPlot</string>
     <string name="offline_title">인터넷 연결을 확인해주세요</string>
     <string name="offline_message">기기에 저장된 일정은 삭제되지 않습니다.</string>
+    <string name="server_unavailable_title">앱 서버에 연결할 수 없습니다</string>
+    <string name="server_unavailable_message">잠시 후 다시 시도해주세요. 기기에 저장된 일정은 삭제되지 않습니다.</string>
     <string name="retry">다시 시도</string>
     <string name="download_description">TripPlot 파일을 저장하고 있습니다.</string>
     <string name="download_started">다운로드를 시작했습니다.</string>

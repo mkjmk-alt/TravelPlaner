@@ -1,3 +1,4 @@
+import java.net.URI
 import java.util.Properties
 
 plugins {
@@ -29,12 +30,40 @@ val releaseSigningValues = linkedMapOf(
 fun isUnsetReleaseSigningValue(value: String?): Boolean =
     value.isNullOrBlank() || value == "CHANGE_ME"
 
+val productionWebUrl = "https://travelplaner-545.pages.dev/"
+
+fun normalizedWebConfiguration(rawValue: String): Pair<String, String> {
+    val raw = rawValue.trim()
+    val uri = URI(raw)
+    require(uri.scheme?.lowercase() in setOf("http", "https")) {
+        "Web URL must use http or https: $raw"
+    }
+    require(!uri.host.isNullOrBlank() && uri.userInfo == null && uri.query == null && uri.fragment == null) {
+        "Web URL must contain a host and no credentials, query, or fragment: $raw"
+    }
+    val port = if (uri.port == -1) "" else ":${uri.port}"
+    val origin = "${uri.scheme.lowercase()}://${uri.host}$port"
+    return (raw.trimEnd('/') + "/") to origin
+}
+
+val debugWebConfiguration = normalizedWebConfiguration(
+    providers.gradleProperty("travelplanerDebugWebUrl").orElse(productionWebUrl).get(),
+)
+val releaseWebConfiguration = normalizedWebConfiguration(productionWebUrl)
+
+fun quoteBuildConfig(value: String): String =
+    "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
+
 val releaseSigningConfigured = releaseSigningValues.values.none(::isUnsetReleaseSigningValue)
 val releaseStoreFile = releaseStoreFileValue?.let(rootProject::file)
 
 android {
     namespace = "com.travelplaner.app"
     compileSdk = 36
+
+    buildFeatures {
+        buildConfig = true
+    }
 
     defaultConfig {
         applicationId = "com.travelplaner.app"
@@ -56,10 +85,16 @@ android {
     }
 
     buildTypes {
+        debug {
+            buildConfigField("String", "WEB_BASE_URL", quoteBuildConfig(debugWebConfiguration.first))
+            buildConfigField("String", "WEB_ORIGIN", quoteBuildConfig(debugWebConfiguration.second))
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.findByName("release")
+            buildConfigField("String", "WEB_BASE_URL", quoteBuildConfig(releaseWebConfiguration.first))
+            buildConfigField("String", "WEB_ORIGIN", quoteBuildConfig(releaseWebConfiguration.second))
         }
     }
 

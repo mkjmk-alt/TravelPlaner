@@ -4,6 +4,15 @@ options:
   deploymentTarget:
     iOS: "16.0"
   createIntermediateGroups: true
+packages:
+  GoogleMaps:
+    url: https://github.com/googlemaps/ios-maps-sdk
+    exactVersion: 10.15.0
+  GooglePlaces:
+    url: https://github.com/googlemaps/ios-places-sdk
+    exactVersion: 10.15.0
+  NativeCore:
+    path: NativeCore
 settings:
   base:
     SWIFT_VERSION: "5.0"
@@ -11,11 +20,56 @@ settings:
     MARKETING_VERSION: 1.0.0
     DEVELOPMENT_TEAM: BTT4JXSL86
 targets:
+  TripPlotNativePreview:
+    type: application
+    platform: iOS
+    sources:
+      - path: NativePreview
+      - path: TravelPlaner/Assets.xcassets
+    dependencies:
+      - package: NativeCore
+      - package: GoogleMaps
+      - package: GooglePlaces
+        product: GooglePlaces
+    configFiles:
+      Debug: NativePreview/Map/NativeMaps.xcconfig
+      Release: NativePreview/Map/NativeMaps.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.travelplaner.app.nativepreview
+        TARGETED_DEVICE_FAMILY: "1,2"
+        GENERATE_INFOPLIST_FILE: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        INFOPLIST_KEY_CFBundleDisplayName: TripPlot Native
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+    info:
+      path: NativePreview/Info.plist
+      properties:
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
+        TripPlotMapsAPIKey: $(TRIPPLOT_MAPS_API_KEY)
+        NSLocationWhenInUseUsageDescription: 현재 위치 버튼을 누르면 지도에서 내 위치를 확인합니다. 위치를 여행 기록으로 자동 저장하지 않습니다.
+  TripPlotNativePreviewUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: NativePreviewUITests
+    dependencies:
+      - target: TripPlotNativePreview
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.travelplaner.app.nativepreview.uitests
+        GENERATE_INFOPLIST_FILE: YES
   TravelPlaner:
     type: application
     platform: iOS
     sources:
       - path: TravelPlaner
+    configFiles:
+      Debug: TravelPlaner/Build/Debug.xcconfig
+      Release: TravelPlaner/Build/Release.xcconfig
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.travelplaner.app
@@ -26,12 +80,19 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_KEY_CFBundleDisplayName: TripPlot
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.travel
+        INFOPLIST_KEY_TripPlotWebURL: $(TRIPPLOT_WEB_URL)
+      configs:
+        Debug:
+          INFOPLIST_FILE: TravelPlaner/Info-Debug.plist
+        Release:
+          INFOPLIST_FILE: TravelPlaner/Info.plist
     info:
       path: TravelPlaner/Info.plist
       properties:
         CFBundleDisplayName: TripPlot
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        TripPlotWebURL: $(TRIPPLOT_WEB_URL)
         LSApplicationCategoryType: public.app-category.travel
         CFBundleURLTypes:
           - CFBundleTypeRole: Editor
@@ -61,6 +122,16 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.travelplaner.app.uitests
         GENERATE_INFOPLIST_FILE: YES
 schemes:
+  TripPlotNativePreview:
+    build:
+      targets:
+        TripPlotNativePreview: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - TripPlotNativePreviewUITests
   TravelPlaner:
     build:
       targets:

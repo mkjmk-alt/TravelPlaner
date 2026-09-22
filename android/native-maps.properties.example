@@ -1,0 +1,2 @@
+# Copy to native-maps.properties (ignored). Restrict to nativepreview package + signing SHA-1.
+TRIPPLOT_MAPS_API_KEY=YOUR_RESTRICTED_KEY

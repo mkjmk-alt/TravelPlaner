@@ -33,7 +33,7 @@ struct TravelWebView: UIViewRepresentable {
 
         context.coordinator.webView = webView
         browser.webView = webView
-        webView.load(URLRequest(url: AppConfiguration.productionURL))
+        webView.load(URLRequest(url: AppConfiguration.webURL))
         return webView
     }
 
@@ -64,9 +64,11 @@ struct TravelWebView: UIViewRepresentable {
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             let origin = message.frameInfo.securityOrigin
-            guard origin.protocol.lowercased() == "https",
-                  origin.host.lowercased() == AppConfiguration.productionURL.host?.lowercased(),
-                  origin.port == 0 || origin.port == 443 else { return }
+            guard AppConfiguration.isInternalWebOrigin(
+                scheme: origin.protocol,
+                host: origin.host,
+                port: origin.port
+            ) else { return }
 
             if message.name == "travelPlanerAuth",
                let urlString = message.body as? String,

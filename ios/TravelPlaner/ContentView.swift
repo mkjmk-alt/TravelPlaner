@@ -15,8 +15,8 @@ struct ContentView: View {
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
             }
 
-            if browser.lastError != nil && browser.isOffline {
-                OfflineView(retry: browser.retry)
+            if browser.lastError != nil {
+                OfflineView(retry: browser.retry, isOffline: browser.isOffline)
             }
         }
         .background(Color.white)
@@ -35,15 +35,16 @@ struct ContentView: View {
 
 private struct OfflineView: View {
     let retry: () -> Void
+    let isOffline: Bool
 
     var body: some View {
         VStack(spacing: 14) {
             Image(systemName: "wifi.slash")
                 .font(.system(size: 34, weight: .semibold))
                 .foregroundStyle(Color.secondary)
-            Text("인터넷 연결을 확인해주세요")
+            Text(isOffline ? "인터넷 연결을 확인해주세요" : "앱 서버에 연결할 수 없습니다")
                 .font(.headline)
-            Text("기기에 저장된 일정은 삭제되지 않습니다.")
+            Text(isOffline ? "기기에 저장된 일정은 삭제되지 않습니다." : "잠시 후 다시 시도해주세요. 기기에 저장된 일정은 삭제되지 않습니다.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             Button("다시 시도", action: retry)

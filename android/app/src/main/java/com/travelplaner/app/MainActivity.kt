@@ -52,6 +52,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var webView: WebView
     private lateinit var progressBar: ProgressBar
     private lateinit var offlineView: View
+    private lateinit var offlineTitle: TextView
+    private lateinit var offlineMessage: TextView
     private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
     private var geolocationCallback: GeolocationPermissions.Callback? = null
     private var geolocationOrigin: String? = null
@@ -129,7 +131,7 @@ class MainActivity : ComponentActivity() {
         val initialUrl = intent?.data
             ?.takeIf(AppConfig::isAuthenticationCallback)
             ?.let(AppConfig::deepLinkToWebUrl)
-            ?: AppConfig.PRODUCTION_URL
+            ?: AppConfig.WEB_BASE_URL
         if (savedInstanceState == null) webView.loadUrl(initialUrl) else webView.restoreState(savedInstanceState)
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -193,7 +195,7 @@ class MainActivity : ComponentActivity() {
         WebViewCompat.addWebMessageListener(
             target,
             "TravelPlanerAndroid",
-            setOf(AppConfig.PRODUCTION_ORIGIN)
+            setOf(AppConfig.WEB_ORIGIN)
         ) { _, message, sourceOrigin, isMainFrame, _ ->
             if (!isMainFrame || !AppConfig.isInternalWebUrl(sourceOrigin)) return@addWebMessageListener
             val payload = message.data?.let { runCatching { JSONObject(it) }.getOrNull() } ?: return@addWebMessageListener
@@ -241,9 +243,9 @@ class MainActivity : ComponentActivity() {
 
         override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
             super.onReceivedError(view, request, error)
-            if (request.isForMainFrame) {
-                progressBar.visibility = View.GONE
-                offlineView.visibility = if (isOnline()) View.GONE else View.VISIBLE
+                if (request.isForMainFrame) {
+                    progressBar.visibility = View.GONE
+                    showLoadError()
             }
         }
     }
@@ -374,12 +376,14 @@ class MainActivity : ComponentActivity() {
             visibility = View.GONE
         }
         layout.addView(TextView(this).apply {
+            offlineTitle = this
             text = getString(R.string.offline_title)
             textSize = 20f
             setTextColor(Color.rgb(31, 41, 55))
             gravity = Gravity.CENTER
         })
         layout.addView(TextView(this).apply {
+            offlineMessage = this
             text = getString(R.string.offline_message)
             textSize = 14f
             setTextColor(Color.rgb(107, 114, 128))
@@ -394,6 +398,17 @@ class MainActivity : ComponentActivity() {
             }
         })
         return layout
+    }
+
+    private fun showLoadError() {
+        if (isOnline()) {
+            offlineTitle.text = getString(R.string.server_unavailable_title)
+            offlineMessage.text = getString(R.string.server_unavailable_message)
+        } else {
+            offlineTitle.text = getString(R.string.offline_title)
+            offlineMessage.text = getString(R.string.offline_message)
+        }
+        offlineView.visibility = View.VISIBLE
     }
 
     private fun isOnline(): Boolean {

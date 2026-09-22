@@ -1,0 +1,16 @@
+{
+  "id": "schedule-contract", "name": "일정 계약 테스트", "country": "일본",
+  "startDate": "2026-10-10", "endDate": "2026-10-11", "createdAt": 1, "updatedAt": 2,
+  "itinerary": [
+    {"day": 1, "futureDay": true, "items": [
+      {"id": 1, "name": "같은 장소", "displayName": "", "loc": "Tokyo", "time": "12:00", "memo": "원본", "emoji": "📍", "lat": 35.1, "lng": 139.1, "reservationNumber": "ABC", "reservationUrl": "https://example.com", "futureField": {"photos": ["opaque"]}},
+      {"id": "1", "name": "같은 장소", "displayName": "", "loc": "Osaka", "time": "09:00", "memo": "", "emoji": "☕"},
+      {"id": "tie", "name": "동일 시각", "time": "09:00"},
+      {"id": "empty", "name": "미정", "time": ""}
+    ]},
+    {"day": 2, "items": []}
+  ],
+  "reserveItems": [{"id": "reserve", "name": "예비", "time": ""}],
+  "expenses": [{"id": "expense", "amount": 1000, "participants": ["a", "b"]}],
+  "futureRoot": {"nested": [1, true, null]}
+}

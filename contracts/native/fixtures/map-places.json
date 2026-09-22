@@ -1,0 +1,16 @@
+{
+ "id":"map-contract","name":"지도 계약","country":"일본","startDate":"2026-10-10","endDate":"2026-10-11","createdAt":1,"updatedAt":2,
+ "itinerary":[
+ {"day":1,"items":[
+ {"id":1,"name":"같은 장소","lat":0,"lng":0,"futureField":{"photos":["opaque"]}},
+ {"id":"1","name":"같은 장소","lat":35.123456789,"lng":139.2},
+ {"id":"invalid","name":"범위 밖","lat":91,"lng":1},
+ {"id":"east","name":"동쪽","lat":10,"lng":179.9},
+ {"id":"west","name":"서쪽","lat":11,"lng":-179.9},
+ {"id":"string","name":"문자 좌표","lat":"35","lng":139},
+ {"id":"missing","name":"위치 미정"}]},
+ {"day":2,"items":[{"id":"day2","name":"다음 날","lat":30,"lng":130}]}],
+ "reserveItems":[{"id":"reserve","name":"예비","lat":34,"lng":135}],
+ "expenses":[{"id":"expense","amount":1000,"participants":["a","b"]}],
+ "futureRoot":{"nested":[1,true,null]}
+}

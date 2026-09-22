@@ -33,7 +33,7 @@ final class BrowserModel: NSObject, ObservableObject, ASWebAuthenticationPresent
 
     func open(_ url: URL) {
         if AppConfiguration.isAuthenticationCallback(url) {
-            var components = URLComponents(url: AppConfiguration.productionURL, resolvingAgainstBaseURL: false)
+            var components = URLComponents(url: AppConfiguration.webURL, resolvingAgainstBaseURL: false)
             components?.path = url.path.isEmpty ? "/" : url.path
             components?.query = url.query
             components?.fragment = url.fragment
@@ -86,7 +86,7 @@ final class BrowserModel: NSObject, ObservableObject, ASWebAuthenticationPresent
         if let currentURL = webView?.url {
             webView?.load(URLRequest(url: currentURL))
         } else {
-            webView?.load(URLRequest(url: AppConfiguration.productionURL))
+            webView?.load(URLRequest(url: AppConfiguration.webURL))
         }
     }
 }

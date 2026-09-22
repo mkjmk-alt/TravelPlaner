@@ -1,0 +1,1 @@
+{"name":"구형 여행","startDate":"2026-10-10","itinerary":[{"items":[{"name":"도쿄","time":"09:00","lat":35.1,"lng":139.1,"futurePhoto":{"raw":"keep"}}]},{"items":[]}],"expenses":[{"id":42,"amount":500}],"sharedId":"old-share","sharedManagementToken":"fixture-only-not-a-real-token","futureRoot":{"keep":[true,null,"[quoted]"]}}

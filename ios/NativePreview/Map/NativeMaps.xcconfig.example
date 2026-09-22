@@ -1,0 +1,3 @@
+// Copy to NativeMaps.local.xcconfig. Restrict to com.travelplaner.app.nativepreview.
+// Enable Maps SDK for iOS and Places API (New) only after separate authorization.
+TRIPPLOT_MAPS_API_KEY = YOUR_RESTRICTED_KEY

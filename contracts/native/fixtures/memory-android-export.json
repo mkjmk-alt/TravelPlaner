@@ -1,0 +1,28 @@
+{
+  "id": "memory-portable-export",
+  "name": "사진 여행",
+  "country": "일본",
+  "startDate": "2026-10-10",
+  "endDate": "2026-10-10",
+  "createdAt": 1790000000000,
+  "updatedAt": 1790000000000,
+  "itinerary": [
+    { "day": 1, "items": [{ "id": "place-1", "name": "오사카성", "displayName": "오사카성", "loc": "오사카" }] }
+  ],
+  "reserveItems": [],
+  "expenses": [],
+  "journalEntries": [
+    {
+      "id": "j1",
+      "date": "2026-10-10",
+      "title": "사진",
+      "body": "",
+      "imageDataUrl": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+    }
+  ],
+  "checklist": [],
+  "budgetSettings": {},
+  "settlementParticipants": [],
+  "travelDetails": {},
+  "reminders": {}
+}

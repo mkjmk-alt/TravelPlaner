@@ -1,0 +1,22 @@
+{
+  "id": "native-contract-trip",
+  "name": "오사카 여행",
+  "country": "일본",
+  "startDate": "2026-10-10",
+  "endDate": "2026-10-11",
+  "itinerary": [
+    { "day": 1, "items": [] },
+    { "day": 2, "items": [{ "id": "place-1", "name": "오사카성", "lat": 34.6873, "lng": 135.5262, "time": "09:00" }] }
+  ],
+  "reserveItems": [{ "id": "reserve-1", "name": "카페" }],
+  "budgetSettings": { "limitKRW": 1000000, "travelCurrency": "JPY" },
+  "expenses": [{ "id": "expense-1", "amount": 1200, "currency": "JPY", "payerId": "self", "participantIds": ["self", "friend"] }],
+  "settlementParticipants": [{ "id": "self", "name": "나" }, { "id": "friend", "name": "친구" }],
+  "checklist": [{ "id": "passport", "label": "여권", "checked": true }],
+  "travelDetails": { "flightNumber": "KE001", "stayName": "숙소" },
+  "journalEntries": [],
+  "reminders": { "enabled": false, "minutesBefore": 30 },
+  "createdAt": 1790000000000,
+  "updatedAt": 1790000000000,
+  "futureField": { "mustSurvive": true, "values": [1, "보존", null] }
+}

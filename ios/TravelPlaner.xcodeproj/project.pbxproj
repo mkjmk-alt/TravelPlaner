@@ -7,17 +7,58 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		02E34861F6C034B3AC503B0D /* SavedPlaceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E88C940757FE423CC4C72A7F /* SavedPlaceUITests.swift */; };
+		05FB19C5A3A80946D274E202 /* MapConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 949F26D7BCBEB78F153A53B4 /* MapConfiguration.swift */; };
 		0631862A7F2B44BEC15FF837 /* PersistenceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18736DBDD0AD2C09C8AE6A06 /* PersistenceUITests.swift */; };
 		0BD46AE957D5E73664CB9364 /* TravelWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDD5C341624831DF3F2E2CCA /* TravelWebView.swift */; };
+		15BE74CFB2E094246B6AAF5A /* TripEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFF3746BF95CF010498AB0AA /* TripEditorView.swift */; };
+		2978051EBDC55C4486C68B24 /* GoogleMaps in Frameworks */ = {isa = PBXBuildFile; productRef = C135D3B6953AD5F7C61EE4EE /* GoogleMaps */; };
+		2C7521AB2383980927738EA3 /* NativeTripStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EC4D6A58B557A1D158FF64E /* NativeTripStore.swift */; };
 		2DB00C6EA62176E7AC744DA6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 322CCCFB6536D4D44DEEC671 /* Assets.xcassets */; };
+		3025A6FBB489A95FADA0F143 /* TripBackupFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30DFAC84C0F7D535FB50AC57 /* TripBackupFile.swift */; };
+		302626FBC7C1EDB6CDDA0B4A /* NativeTripUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0011FE2FBD72192EC52F7BC7 /* NativeTripUITests.swift */; };
+		3B5F9B95097C6CED3039781C /* TravelMemoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F2735192F3273285D079E3D /* TravelMemoryView.swift */; };
+		3D3ACE645E4701FB97DE75EB /* SplitWorkspaceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 908FFBD6418BA0A7A1D3E0BD /* SplitWorkspaceUITests.swift */; };
+		3EDEB2B0770B0DBC31C8C55A /* TripListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 407F1520A7E4290249542C6E /* TripListView.swift */; };
+		5319DC89EF7A6193DA6B1491 /* CurrentLocationClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44DF06CB509890166D087E49 /* CurrentLocationClient.swift */; };
 		59873E6A59C052B5DF132D57 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF04ADB524AC74B46EF167B1 /* ContentView.swift */; };
 		5CDE2D83D47612AD24DEF05F /* BrowserModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D8EF23A7C2017FBA00D22BB /* BrowserModel.swift */; };
+		6089E07F7EEE5E0414CC6477 /* ItineraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BBC948E9B6C666F6FACD6C5 /* ItineraryView.swift */; };
+		64709D2B4AC16307A5644E13 /* GoogleMapSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEF03EB2C60249F57AD85C30 /* GoogleMapSurface.swift */; };
 		66C8A432AE640B20CA910D13 /* TravelPlanerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9DE951BCF0113523667075A /* TravelPlanerApp.swift */; };
+		6C5A6A030B94D5E2CA999473 /* Debug.local.xcconfig.example in Resources */ = {isa = PBXBuildFile; fileRef = 1EA093AA9B7CB3498D59A207 /* Debug.local.xcconfig.example */; };
+		6C7C56B8B4D56064EEBA50C5 /* PlaceDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A40BAF47780719A54A0CEDE /* PlaceDetailView.swift */; };
+		79894D345036A513E588A94A /* NativeRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 110F4E3A5802D2C9EF6B6C52 /* NativeRootView.swift */; };
+		81DFF4B8B34BAAFF8F666B0D /* TripBackupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFB09E9F90C272B07A82A09B /* TripBackupView.swift */; };
+		8ABD4C37215C8A92CDF7D80B /* TravelDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8237658A931104091D679051 /* TravelDetailsView.swift */; };
+		92C00958C1DD8B772A54133E /* SavedPlacesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 878197A173569038509E5D71 /* SavedPlacesView.swift */; };
+		9433B9F0C52186A0982867D0 /* PlaceSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F8D9A209A2800D787B94809 /* PlaceSearchView.swift */; };
+		960DA5D8BA44DD394CB7CC4A /* PlaceDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6623DEB1C8B5280446FD6DBE /* PlaceDestinationView.swift */; };
 		9C18D912BE75A9140ABE575C /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = FE723B0C1EBB5F66FF7C24B5 /* PrivacyInfo.xcprivacy */; };
+		B3162122C53A46032261EE4D /* NativeMapPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24276F8EE9761C48F43D405C /* NativeMapPane.swift */; };
+		B33672D56E5EB0311485BFDA /* ItineraryContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F6201437C0F99866FB542DF /* ItineraryContent.swift */; };
+		B49F78691765FBA8BCA5299F /* GooglePlacesClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 410E94952414C5C97B4BEBF2 /* GooglePlacesClient.swift */; };
+		BC712B4CFB79576EF44A1B5C /* TripWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8434E4C9AF38CFE51752BBC /* TripWorkspaceView.swift */; };
 		C54649CEBE1CF9DFA6B76C60 /* AppConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FCB8F17ED7014A268A98298 /* AppConfiguration.swift */; };
+		C600C76345408949299D9D9A /* GooglePlaces in Frameworks */ = {isa = PBXBuildFile; productRef = 2555312DACF7E36F5E35C148 /* GooglePlaces */; };
+		D3227F734B00173C32B93FC9 /* MemoryPrepUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA601AA35621D3E34DDA7D09 /* MemoryPrepUITests.swift */; };
+		DD0F89CA7DC6A639B92150C9 /* PlaceEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 758B8DF568B5CE2CA8D9055C /* PlaceEditorView.swift */; };
+		DE77805AE38F0291002B3684 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 322CCCFB6536D4D44DEEC671 /* Assets.xcassets */; };
+		DEE4A0F042A8DE315670B2C8 /* TravelPrepView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE49AC322C4D10F73711F841 /* TravelPrepView.swift */; };
+		E218AD2E7216AE0185352219 /* TripPlotNativePreviewApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D36AA6F1694F2E20BDD2BE3 /* TripPlotNativePreviewApp.swift */; };
+		F5C3F6A442C5BF3F1CCECF51 /* NativeCore in Frameworks */ = {isa = PBXBuildFile; productRef = A4B0B567158C5C7DC9132BD8 /* NativeCore */; };
+		FA244EA40AD374C4F9BCF97C /* ExpenseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9715C0411884A1FF6AADA919 /* ExpenseView.swift */; };
+		FBCE33BA9E2DCF4D60EF035D /* NativeMaps.xcconfig.example in Resources */ = {isa = PBXBuildFile; fileRef = 42593D518750283ABF4774AC /* NativeMaps.xcconfig.example */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		30FB19D33DD3A23A645D71A1 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 23276F15B77F16B4BF4A227D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B9A9861849BBBFC923E355CD;
+			remoteInfo = TripPlotNativePreview;
+		};
 		45F730574CAAA98EEFA6CDDF /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 23276F15B77F16B4BF4A227D /* Project object */;
@@ -28,20 +69,89 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		0011FE2FBD72192EC52F7BC7 /* NativeTripUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeTripUITests.swift; sourceTree = "<group>"; };
 		0FCB8F17ED7014A268A98298 /* AppConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfiguration.swift; sourceTree = "<group>"; };
+		110F4E3A5802D2C9EF6B6C52 /* NativeRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeRootView.swift; sourceTree = "<group>"; };
 		18736DBDD0AD2C09C8AE6A06 /* PersistenceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceUITests.swift; sourceTree = "<group>"; };
+		1A40BAF47780719A54A0CEDE /* PlaceDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceDetailView.swift; sourceTree = "<group>"; };
+		1AB350FF4BD05087A70F773C /* Info-Debug.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Info-Debug.plist"; sourceTree = "<group>"; };
+		1BBC948E9B6C666F6FACD6C5 /* ItineraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItineraryView.swift; sourceTree = "<group>"; };
+		1EA093AA9B7CB3498D59A207 /* Debug.local.xcconfig.example */ = {isa = PBXFileReference; path = Debug.local.xcconfig.example; sourceTree = "<group>"; };
+		1EC4D6A58B557A1D158FF64E /* NativeTripStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeTripStore.swift; sourceTree = "<group>"; };
+		1F8D9A209A2800D787B94809 /* PlaceSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceSearchView.swift; sourceTree = "<group>"; };
+		24276F8EE9761C48F43D405C /* NativeMapPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeMapPane.swift; sourceTree = "<group>"; };
+		2F6201437C0F99866FB542DF /* ItineraryContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItineraryContent.swift; sourceTree = "<group>"; };
+		30DFAC84C0F7D535FB50AC57 /* TripBackupFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripBackupFile.swift; sourceTree = "<group>"; };
 		322CCCFB6536D4D44DEEC671 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		407F1520A7E4290249542C6E /* TripListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripListView.swift; sourceTree = "<group>"; };
+		410E94952414C5C97B4BEBF2 /* GooglePlacesClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GooglePlacesClient.swift; sourceTree = "<group>"; };
+		42593D518750283ABF4774AC /* NativeMaps.xcconfig.example */ = {isa = PBXFileReference; path = NativeMaps.xcconfig.example; sourceTree = "<group>"; };
+		44DF06CB509890166D087E49 /* CurrentLocationClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurrentLocationClient.swift; sourceTree = "<group>"; };
+		608755F90FBEBA09BAB34170 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
+		6623DEB1C8B5280446FD6DBE /* PlaceDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceDestinationView.swift; sourceTree = "<group>"; };
+		758B8DF568B5CE2CA8D9055C /* PlaceEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceEditorView.swift; sourceTree = "<group>"; };
+		7D36AA6F1694F2E20BDD2BE3 /* TripPlotNativePreviewApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripPlotNativePreviewApp.swift; sourceTree = "<group>"; };
 		7D8EF23A7C2017FBA00D22BB /* BrowserModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserModel.swift; sourceTree = "<group>"; };
+		8237658A931104091D679051 /* TravelDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TravelDetailsView.swift; sourceTree = "<group>"; };
+		878197A173569038509E5D71 /* SavedPlacesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedPlacesView.swift; sourceTree = "<group>"; };
+		908FFBD6418BA0A7A1D3E0BD /* SplitWorkspaceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitWorkspaceUITests.swift; sourceTree = "<group>"; };
+		9472C0C9530FEE90D4C37230 /* NativeCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = NativeCore; path = NativeCore; sourceTree = SOURCE_ROOT; };
+		949F26D7BCBEB78F153A53B4 /* MapConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapConfiguration.swift; sourceTree = "<group>"; };
+		9715C0411884A1FF6AADA919 /* ExpenseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpenseView.swift; sourceTree = "<group>"; };
+		9F2735192F3273285D079E3D /* TravelMemoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TravelMemoryView.swift; sourceTree = "<group>"; };
+		A27B15A591F7D9980BFEBD2C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		A3A22732A2DE379FAFC15878 /* TravelPlaner.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = TravelPlaner.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A60B506F42A5E991EBA5C936 /* TripPlotNativePreview.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = TripPlotNativePreview.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A69F742BA1D2AC6B4256A929 /* NativeMaps.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = NativeMaps.xcconfig; sourceTree = "<group>"; };
+		A8434E4C9AF38CFE51752BBC /* TripWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripWorkspaceView.swift; sourceTree = "<group>"; };
 		AA3DE89BDF2FD26F6EBD7FE3 /* TravelPlanerUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = TravelPlanerUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		BA601AA35621D3E34DDA7D09 /* MemoryPrepUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryPrepUITests.swift; sourceTree = "<group>"; };
 		BDD5C341624831DF3F2E2CCA /* TravelWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TravelWebView.swift; sourceTree = "<group>"; };
+		BE49AC322C4D10F73711F841 /* TravelPrepView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TravelPrepView.swift; sourceTree = "<group>"; };
+		BFF3746BF95CF010498AB0AA /* TripEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripEditorView.swift; sourceTree = "<group>"; };
+		C49FF15E0411226AE540CF92 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
+		CEF03EB2C60249F57AD85C30 /* GoogleMapSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleMapSurface.swift; sourceTree = "<group>"; };
+		CFB09E9F90C272B07A82A09B /* TripBackupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripBackupView.swift; sourceTree = "<group>"; };
 		D9DE951BCF0113523667075A /* TravelPlanerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TravelPlanerApp.swift; sourceTree = "<group>"; };
+		E88C940757FE423CC4C72A7F /* SavedPlaceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedPlaceUITests.swift; sourceTree = "<group>"; };
+		EC4A58944E1D3990CF4F9623 /* TripPlotNativePreviewUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = TripPlotNativePreviewUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		EDD7EA4149F3B6BF52C259F9 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		FE723B0C1EBB5F66FF7C24B5 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		FF04ADB524AC74B46EF167B1 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFrameworksBuildPhase section */
+		1FA7B9F46565D141F3A0889F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F5C3F6A442C5BF3F1CCECF51 /* NativeCore in Frameworks */,
+				2978051EBDC55C4486C68B24 /* GoogleMaps in Frameworks */,
+				C600C76345408949299D9D9A /* GooglePlaces in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
 /* Begin PBXGroup section */
+		146CDBC0E4E70CE2679FEB9C /* Map */ = {
+			isa = PBXGroup;
+			children = (
+				44DF06CB509890166D087E49 /* CurrentLocationClient.swift */,
+				CEF03EB2C60249F57AD85C30 /* GoogleMapSurface.swift */,
+				410E94952414C5C97B4BEBF2 /* GooglePlacesClient.swift */,
+				949F26D7BCBEB78F153A53B4 /* MapConfiguration.swift */,
+				24276F8EE9761C48F43D405C /* NativeMapPane.swift */,
+				A69F742BA1D2AC6B4256A929 /* NativeMaps.xcconfig */,
+				42593D518750283ABF4774AC /* NativeMaps.xcconfig.example */,
+				6623DEB1C8B5280446FD6DBE /* PlaceDestinationView.swift */,
+				1A40BAF47780719A54A0CEDE /* PlaceDetailView.swift */,
+				1F8D9A209A2800D787B94809 /* PlaceSearchView.swift */,
+				878197A173569038509E5D71 /* SavedPlacesView.swift */,
+			);
+			path = Map;
+			sourceTree = "<group>";
+		};
 		1D8D6732E585B9ECD653B3FC /* TravelPlanerUITests */ = {
 			isa = PBXGroup;
 			children = (
@@ -55,8 +165,45 @@
 			children = (
 				A3A22732A2DE379FAFC15878 /* TravelPlaner.app */,
 				AA3DE89BDF2FD26F6EBD7FE3 /* TravelPlanerUITests.xctest */,
+				A60B506F42A5E991EBA5C936 /* TripPlotNativePreview.app */,
+				EC4A58944E1D3990CF4F9623 /* TripPlotNativePreviewUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		48D8DFCFFA170CC18C5042C8 /* NativePreview */ = {
+			isa = PBXGroup;
+			children = (
+				9715C0411884A1FF6AADA919 /* ExpenseView.swift */,
+				A27B15A591F7D9980BFEBD2C /* Info.plist */,
+				2F6201437C0F99866FB542DF /* ItineraryContent.swift */,
+				1BBC948E9B6C666F6FACD6C5 /* ItineraryView.swift */,
+				110F4E3A5802D2C9EF6B6C52 /* NativeRootView.swift */,
+				1EC4D6A58B557A1D158FF64E /* NativeTripStore.swift */,
+				758B8DF568B5CE2CA8D9055C /* PlaceEditorView.swift */,
+				8237658A931104091D679051 /* TravelDetailsView.swift */,
+				9F2735192F3273285D079E3D /* TravelMemoryView.swift */,
+				BE49AC322C4D10F73711F841 /* TravelPrepView.swift */,
+				30DFAC84C0F7D535FB50AC57 /* TripBackupFile.swift */,
+				CFB09E9F90C272B07A82A09B /* TripBackupView.swift */,
+				BFF3746BF95CF010498AB0AA /* TripEditorView.swift */,
+				407F1520A7E4290249542C6E /* TripListView.swift */,
+				7D36AA6F1694F2E20BDD2BE3 /* TripPlotNativePreviewApp.swift */,
+				A8434E4C9AF38CFE51752BBC /* TripWorkspaceView.swift */,
+				146CDBC0E4E70CE2679FEB9C /* Map */,
+			);
+			path = NativePreview;
+			sourceTree = "<group>";
+		};
+		559F89D6A28AC49437AADD9A /* NativePreviewUITests */ = {
+			isa = PBXGroup;
+			children = (
+				BA601AA35621D3E34DDA7D09 /* MemoryPrepUITests.swift */,
+				0011FE2FBD72192EC52F7BC7 /* NativeTripUITests.swift */,
+				E88C940757FE423CC4C72A7F /* SavedPlaceUITests.swift */,
+				908FFBD6418BA0A7A1D3E0BD /* SplitWorkspaceUITests.swift */,
+			);
+			path = NativePreviewUITests;
 			sourceTree = "<group>";
 		};
 		7CAC77B52729137E546B56FB /* TravelPlaner */ = {
@@ -66,17 +213,40 @@
 				322CCCFB6536D4D44DEEC671 /* Assets.xcassets */,
 				7D8EF23A7C2017FBA00D22BB /* BrowserModel.swift */,
 				FF04ADB524AC74B46EF167B1 /* ContentView.swift */,
+				1AB350FF4BD05087A70F773C /* Info-Debug.plist */,
 				EDD7EA4149F3B6BF52C259F9 /* Info.plist */,
 				FE723B0C1EBB5F66FF7C24B5 /* PrivacyInfo.xcprivacy */,
 				D9DE951BCF0113523667075A /* TravelPlanerApp.swift */,
 				BDD5C341624831DF3F2E2CCA /* TravelWebView.swift */,
+				A31E2F707E2E817E5F4A403F /* Build */,
 			);
 			path = TravelPlaner;
+			sourceTree = "<group>";
+		};
+		8BF4E656D037C185FB0DC940 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				9472C0C9530FEE90D4C37230 /* NativeCore */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		A31E2F707E2E817E5F4A403F /* Build */ = {
+			isa = PBXGroup;
+			children = (
+				1EA093AA9B7CB3498D59A207 /* Debug.local.xcconfig.example */,
+				C49FF15E0411226AE540CF92 /* Debug.xcconfig */,
+				608755F90FBEBA09BAB34170 /* Release.xcconfig */,
+			);
+			path = Build;
 			sourceTree = "<group>";
 		};
 		D94EA67CD6FC0DF00C9382E4 = {
 			isa = PBXGroup;
 			children = (
+				48D8DFCFFA170CC18C5042C8 /* NativePreview */,
+				559F89D6A28AC49437AADD9A /* NativePreviewUITests */,
+				8BF4E656D037C185FB0DC940 /* Packages */,
 				7CAC77B52729137E546B56FB /* TravelPlaner */,
 				1D8D6732E585B9ECD653B3FC /* TravelPlanerUITests */,
 				3CD6EE0943E71D60697D2AB6 /* Products */,
@@ -103,6 +273,46 @@
 			productName = TravelPlanerUITests;
 			productReference = AA3DE89BDF2FD26F6EBD7FE3 /* TravelPlanerUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		4A2C951C4A363684DF16FE3D /* TripPlotNativePreviewUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8E120D32A9065462E109487D /* Build configuration list for PBXNativeTarget "TripPlotNativePreviewUITests" */;
+			buildPhases = (
+				C32CAC92DBCC3C808199C6D8 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				4392189BD0485D15DA7C0A91 /* PBXTargetDependency */,
+			);
+			name = TripPlotNativePreviewUITests;
+			packageProductDependencies = (
+			);
+			productName = TripPlotNativePreviewUITests;
+			productReference = EC4A58944E1D3990CF4F9623 /* TripPlotNativePreviewUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		B9A9861849BBBFC923E355CD /* TripPlotNativePreview */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1D16D6DAEF5371010B33A939 /* Build configuration list for PBXNativeTarget "TripPlotNativePreview" */;
+			buildPhases = (
+				2AB64EA6946347E246DB19AA /* Sources */,
+				96D3DDC6CB2499FDA45E3A79 /* Resources */,
+				1FA7B9F46565D141F3A0889F /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = TripPlotNativePreview;
+			packageProductDependencies = (
+				A4B0B567158C5C7DC9132BD8 /* NativeCore */,
+				C135D3B6953AD5F7C61EE4EE /* GoogleMaps */,
+				2555312DACF7E36F5E35C148 /* GooglePlaces */,
+			);
+			productName = TripPlotNativePreview;
+			productReference = A60B506F42A5E991EBA5C936 /* TripPlotNativePreview.app */;
+			productType = "com.apple.product-type.application";
 		};
 		D2C37761098216D472FAE15E /* TravelPlaner */ = {
 			isa = PBXNativeTarget;
@@ -135,6 +345,13 @@
 						DevelopmentTeam = BTT4JXSL86;
 						TestTargetID = D2C37761098216D472FAE15E;
 					};
+					4A2C951C4A363684DF16FE3D = {
+						DevelopmentTeam = BTT4JXSL86;
+						TestTargetID = B9A9861849BBBFC923E355CD;
+					};
+					B9A9861849BBBFC923E355CD = {
+						DevelopmentTeam = BTT4JXSL86;
+					};
 					D2C37761098216D472FAE15E = {
 						DevelopmentTeam = BTT4JXSL86;
 						ProvisioningStyle = Automatic;
@@ -150,11 +367,18 @@
 			);
 			mainGroup = D94EA67CD6FC0DF00C9382E4;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				9F6BAAAC02910BF2075CB8AA /* XCRemoteSwiftPackageReference "ios-maps-sdk" */,
+				67CE65F4C4F83FA15219BA47 /* XCRemoteSwiftPackageReference "ios-places-sdk" */,
+				337C88DC8798A441E70F2E35 /* XCLocalSwiftPackageReference "NativeCore" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 3CD6EE0943E71D60697D2AB6 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
+				B9A9861849BBBFC923E355CD /* TripPlotNativePreview */,
+				4A2C951C4A363684DF16FE3D /* TripPlotNativePreviewUITests */,
 				D2C37761098216D472FAE15E /* TravelPlaner */,
 				307ABC8F2D9062D0994E3E60 /* TravelPlanerUITests */,
 			);
@@ -162,11 +386,21 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		96D3DDC6CB2499FDA45E3A79 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DE77805AE38F0291002B3684 /* Assets.xcassets in Resources */,
+				FBCE33BA9E2DCF4D60EF035D /* NativeMaps.xcconfig.example in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		B9FD0CF341E830E4A8A8124B /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				2DB00C6EA62176E7AC744DA6 /* Assets.xcassets in Resources */,
+				6C5A6A030B94D5E2CA999473 /* Debug.local.xcconfig.example in Resources */,
 				9C18D912BE75A9140ABE575C /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -174,11 +408,53 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		2AB64EA6946347E246DB19AA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5319DC89EF7A6193DA6B1491 /* CurrentLocationClient.swift in Sources */,
+				FA244EA40AD374C4F9BCF97C /* ExpenseView.swift in Sources */,
+				64709D2B4AC16307A5644E13 /* GoogleMapSurface.swift in Sources */,
+				B49F78691765FBA8BCA5299F /* GooglePlacesClient.swift in Sources */,
+				B33672D56E5EB0311485BFDA /* ItineraryContent.swift in Sources */,
+				6089E07F7EEE5E0414CC6477 /* ItineraryView.swift in Sources */,
+				05FB19C5A3A80946D274E202 /* MapConfiguration.swift in Sources */,
+				B3162122C53A46032261EE4D /* NativeMapPane.swift in Sources */,
+				79894D345036A513E588A94A /* NativeRootView.swift in Sources */,
+				2C7521AB2383980927738EA3 /* NativeTripStore.swift in Sources */,
+				960DA5D8BA44DD394CB7CC4A /* PlaceDestinationView.swift in Sources */,
+				6C7C56B8B4D56064EEBA50C5 /* PlaceDetailView.swift in Sources */,
+				DD0F89CA7DC6A639B92150C9 /* PlaceEditorView.swift in Sources */,
+				9433B9F0C52186A0982867D0 /* PlaceSearchView.swift in Sources */,
+				92C00958C1DD8B772A54133E /* SavedPlacesView.swift in Sources */,
+				8ABD4C37215C8A92CDF7D80B /* TravelDetailsView.swift in Sources */,
+				3B5F9B95097C6CED3039781C /* TravelMemoryView.swift in Sources */,
+				DEE4A0F042A8DE315670B2C8 /* TravelPrepView.swift in Sources */,
+				3025A6FBB489A95FADA0F143 /* TripBackupFile.swift in Sources */,
+				81DFF4B8B34BAAFF8F666B0D /* TripBackupView.swift in Sources */,
+				15BE74CFB2E094246B6AAF5A /* TripEditorView.swift in Sources */,
+				3EDEB2B0770B0DBC31C8C55A /* TripListView.swift in Sources */,
+				E218AD2E7216AE0185352219 /* TripPlotNativePreviewApp.swift in Sources */,
+				BC712B4CFB79576EF44A1B5C /* TripWorkspaceView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		341103509F6EDC6B4CDE2F3E /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				0631862A7F2B44BEC15FF837 /* PersistenceUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C32CAC92DBCC3C808199C6D8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D3227F734B00173C32B93FC9 /* MemoryPrepUITests.swift in Sources */,
+				302626FBC7C1EDB6CDDA0B4A /* NativeTripUITests.swift in Sources */,
+				02E34861F6C034B3AC503B0D /* SavedPlaceUITests.swift in Sources */,
+				3D3ACE645E4701FB97DE75EB /* SplitWorkspaceUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -202,19 +478,26 @@
 			target = D2C37761098216D472FAE15E /* TravelPlaner */;
 			targetProxy = 45F730574CAAA98EEFA6CDDF /* PBXContainerItemProxy */;
 		};
+		4392189BD0485D15DA7C0A91 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B9A9861849BBBFC923E355CD /* TripPlotNativePreview */;
+			targetProxy = 30FB19D33DD3A23A645D71A1 /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		16F1A13BB369D133EE08CB51 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = C49FF15E0411226AE540CF92 /* Debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = TravelPlaner/Info.plist;
+				INFOPLIST_FILE = "TravelPlaner/Info-Debug.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = TripPlot;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.travel";
+				INFOPLIST_KEY_TripPlotWebURL = "$(TRIPPLOT_WEB_URL)";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -226,8 +509,27 @@
 			};
 			name = Debug;
 		};
+		270FFD01116DFAC7F6FACD93 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.travelplaner.app.nativepreview.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = TripPlotNativePreview;
+			};
+			name = Release;
+		};
 		2D76B68FA56A6ADA88F81C97 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 608755F90FBEBA09BAB34170 /* Release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
@@ -236,6 +538,7 @@
 				INFOPLIST_FILE = TravelPlaner/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = TripPlot;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.travel";
+				INFOPLIST_KEY_TripPlotWebURL = "$(TRIPPLOT_WEB_URL)";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -246,6 +549,45 @@
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
+		};
+		3EC158928DA1351DD15B8773 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = A69F742BA1D2AC6B4256A929 /* NativeMaps.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = NativePreview/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "TripPlot Native";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.travelplaner.app.nativepreview;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		80CC65BB1C6F1A6C0D8A295E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.travelplaner.app.nativepreview.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = TripPlotNativePreview;
+			};
+			name = Debug;
 		};
 		A7B72CD6FA729D7E4022EAE9 /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -406,9 +748,39 @@
 			};
 			name = Debug;
 		};
+		F2D5340FE1C8F759A57FA6E8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = A69F742BA1D2AC6B4256A929 /* NativeMaps.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = NativePreview/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "TripPlot Native";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.travelplaner.app.nativepreview;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		1D16D6DAEF5371010B33A939 /* Build configuration list for PBXNativeTarget "TripPlotNativePreview" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3EC158928DA1351DD15B8773 /* Debug */,
+				F2D5340FE1C8F759A57FA6E8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		2636A85CFD654B97C0917252 /* Build configuration list for PBXNativeTarget "TravelPlanerUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -427,6 +799,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
+		8E120D32A9065462E109487D /* Build configuration list for PBXNativeTarget "TripPlotNativePreviewUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				80CC65BB1C6F1A6C0D8A295E /* Debug */,
+				270FFD01116DFAC7F6FACD93 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		DF3652C47A699876D99A254C /* Build configuration list for PBXNativeTarget "TravelPlaner" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -437,6 +818,49 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		337C88DC8798A441E70F2E35 /* XCLocalSwiftPackageReference "NativeCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = NativeCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		67CE65F4C4F83FA15219BA47 /* XCRemoteSwiftPackageReference "ios-places-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/googlemaps/ios-places-sdk";
+			requirement = {
+				kind = exactVersion;
+				version = 10.15.0;
+			};
+		};
+		9F6BAAAC02910BF2075CB8AA /* XCRemoteSwiftPackageReference "ios-maps-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/googlemaps/ios-maps-sdk";
+			requirement = {
+				kind = exactVersion;
+				version = 10.15.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		2555312DACF7E36F5E35C148 /* GooglePlaces */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 67CE65F4C4F83FA15219BA47 /* XCRemoteSwiftPackageReference "ios-places-sdk" */;
+			productName = GooglePlaces;
+		};
+		A4B0B567158C5C7DC9132BD8 /* NativeCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NativeCore;
+		};
+		C135D3B6953AD5F7C61EE4EE /* GoogleMaps */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9F6BAAAC02910BF2075CB8AA /* XCRemoteSwiftPackageReference "ios-maps-sdk" */;
+			productName = GoogleMaps;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 23276F15B77F16B4BF4A227D /* Project object */;
 }

@@ -4869,7 +4869,7 @@ function App() {
                     <Wallet size={18} />
                   </button>
                   <button
-                    onClick={openTravelMemory}
+                    onClick={() => openTravelMemory()}
                     style={{ width: '40px', height: '40px', padding: 0, borderRadius: '12px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.2s', backgroundColor: viewMode === 'memory' ? '#0ea5e9' : '#f3f4f6', color: viewMode === 'memory' ? 'white' : '#64748b' }}
                     aria-label="여행 기록" title="여행 기록"
                   >
@@ -6385,7 +6385,7 @@ function App() {
 
                   {activeTrip && (
                     <>
-                      <button type="button" className="mobile-more-item" onClick={openItinerary}>
+                      <button type="button" className="mobile-more-item" onClick={() => openItinerary()}>
                         <span className="mobile-more-item-icon is-blue"><Calendar size={17} /></span>
                         <span className="mobile-more-item-copy">
                           <strong>내 일정</strong>
@@ -6401,7 +6401,7 @@ function App() {
                         </span>
                         <ChevronRight size={16} aria-hidden="true" />
                       </button>
-                      <button type="button" className="mobile-more-item" onClick={openTravelMemory}>
+                      <button type="button" className="mobile-more-item" onClick={() => openTravelMemory()}>
                         <span className="mobile-more-item-icon is-sky"><FileText size={17} /></span>
                         <span className="mobile-more-item-copy">
                           <strong>여행 기록</strong>

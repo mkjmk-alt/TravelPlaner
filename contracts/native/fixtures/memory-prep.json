@@ -1,0 +1,28 @@
+{
+  "id": "memory-prep-contract",
+  "name": "기록 계약 여행",
+  "country": "일본",
+  "startDate": "2026-10-10",
+  "endDate": "2026-10-12",
+  "createdAt": 1790000000000,
+  "updatedAt": 1790000000000,
+  "itinerary": [
+    { "day": 1, "items": [{ "id": "place-1", "displayName": "오사카성", "loc": "오사카", "lat": 34.6873, "lng": 135.5262 }] },
+    { "day": 2, "items": [] },
+    { "day": 3, "items": [] }
+  ],
+  "checklist": [
+    { "id": "passport", "label": "여권", "checked": true, "future": { "keep": true } },
+    { "id": 1, "label": "숫자 ID", "checked": false },
+    { "id": "1", "label": "문자 ID", "checked": false },
+    { "label": "레거시 항목", "checked": false }
+  ],
+  "travelDetails": { "departure": "인천", "arrival": "간사이", "flightNumber": "KE001", "stayName": "난바 호텔", "stayAddress": "오사카", "futureDetail": "keep" },
+  "journalEntries": [
+    { "id": "same-z", "date": "2026-10-11", "title": "두 번째", "body": "", "createdAt": 20, "updatedAt": 20, "place": { "day": 2, "id": "p2", "name": "도톤보리", "address": "오사카" } },
+    { "id": "undated", "date": "", "title": "메모", "body": "나중에 정리", "createdAt": 10, "updatedAt": 10, "imageDataUrl": "data:image/png;base64,AA==", "futureEntry": { "keep": true } },
+    { "id": "same-a", "date": "2026-10-11", "title": "첫 번째", "body": "", "createdAt": 20, "updatedAt": 20 },
+    { "id": "earlier", "date": "2026-10-10", "title": "도착", "body": "", "createdAt": 30, "updatedAt": 30 }
+  ],
+  "futureRoot": { "mustSurvive": true }
+}

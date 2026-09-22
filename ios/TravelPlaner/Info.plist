@@ -33,6 +33,8 @@
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>TripPlotWebURL</key>
+	<string>$(TRIPPLOT_WEB_URL)</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.travel</string>
 	<key>NSLocationWhenInUseUsageDescription</key>

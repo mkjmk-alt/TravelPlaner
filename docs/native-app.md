@@ -42,6 +42,38 @@ xcodebuild test -project ios/TravelPlaner.xcodeproj \
   CODE_SIGNING_ALLOWED=NO
 ```
 
+## WebView 주소 설정
+
+두 네이티브 앱은 같은 웹 코드를 사용하지만 WebView 시작 주소는 빌드 설정에서 주입합니다.
+
+- Debug는 운영 주소를 기본값으로 사용합니다.
+- iOS 로컬 실행은 `ios/TravelPlaner/Build/Debug.local.xcconfig.example`을 `Debug.local.xcconfig`으로 복사한 뒤 주소를 바꿉니다. 이 파일은 Git에서 무시됩니다.
+- Android 로컬 실행은 에뮬레이터에서 `android/`의 `-PtravelplanerDebugWebUrl=http://10.0.2.2:4173/`처럼 전달합니다. Gradle Debug `BuildConfig`와 Debug 전용 cleartext 예외에만 반영됩니다. 실제 기기에서는 같은 네트워크의 HTTPS 개발 주소를 사용합니다.
+- Release는 iOS `Release.xcconfig`와 Android `release` `BuildConfig`가 운영 주소를 직접 사용하므로 로컬 Debug 주소가 섞이지 않습니다.
+- HTTP 로컬 네트워킹 예외는 Debug 구성에만 있으며, Android 메인 Manifest와 Release에는 cleartext 차단이 유지됩니다.
+- WebView 내부 이동·메시지 브리지는 각 빌드의 주소와 origin을 함께 확인합니다. 주소를 바꾸면 해당 빌드에서만 내부 링크로 인정됩니다.
+
+URL에는 scheme과 host를 포함하고 query·fragment·인증 정보를 넣지 않습니다. 운영 빌드는 HTTPS 주소만 사용하며, 지도 키와 URL은 서로 다른 설정 값으로 관리합니다.
+
+## 오프라인 웹 셸 캐시
+
+Production 빌드는 Vite 해시 JS/CSS와 번들 자산 목록을 `shell-assets.json`으로 생성합니다. 서비스 워커는 이 목록을 버전별 셸 캐시에 사전 저장하고, 문서 요청만 캐시된 `index.html`로 복구합니다. JS·CSS·사진 요청이 실패할 때 HTML을 대신 반환하지 않으며, `/api/` 응답은 캐시하지 않습니다.
+
+첫 정상 실행 후 오프라인 콜드 스타트에서 실제 저장 일정이 열리는지 여부는 iOS·Android 기기 검증 항목으로 남아 있습니다. 지도 타일·장소 검색은 온라인 기능으로 안내하며, 이 캐시는 오프라인 지도 제공을 의미하지 않습니다.
+
+## 초기 복구 화면
+
+앱 설정 요청은 8초 제한 시간과 취소 가능한 `AbortController`로 감싸며, 설정 API가 오프라인이어도 빈 설정으로 앱 시작을 계속 시도합니다. 웹 앱 모듈을 불러오지 못하거나 초기 렌더링에서 예외가 발생하면 저장 데이터 삭제 없이 복구 화면을 표시합니다.
+
+- 네트워크 실패·연결 지연·앱 로드 오류를 구분해 안내합니다.
+- **다시 시도**는 현재 부팅 흐름을 재실행하고, **앱 다시 시작**은 페이지를 새로고침합니다.
+- 자동 `localStorage` 삭제나 여행 데이터 초기화 동작은 포함하지 않습니다.
+- iOS `WKWebView`와 Android `WebView`도 메인 프레임 로드가 실패하면 네트워크가 연결되어 있더라도 흰 화면 대신 복구 화면을 표시합니다. 네트워크 단절과 앱 서버 연결 실패를 별도 문구로 구분합니다.
+- 네이티브 오류 화면이 표시되어도 기기 저장소의 여행 데이터는 삭제하지 않습니다.
+- 실제 WKWebView·Android WebView에서 오프라인 force-stop/relaunch까지 통과해야 오프라인 콜드 스타트 완료로 판정합니다.
+
+2026년 9월 23일 실제 iOS Simulator에서 로컬 서버를 중단한 뒤 재실행했을 때 `NSURLErrorDomain -1004` 연결 실패가 확인되었습니다. 따라서 이번 단계에서는 서버 연결 실패 복구 화면을 보강했지만, 서비스 워커 캐시만으로 오프라인 콜드 스타트가 되는지는 아직 출시 수용 기준으로 승인하지 않았습니다. 정상 실행 후 캐시가 준비된 운영 빌드에서 iOS·Android 각각 비행기 모드 force-stop/relaunch를 다시 확인해야 합니다.
+
 ## iOS 설정
 
 1. `ios/TravelPlaner.xcodeproj`를 Xcode에서 엽니다.
@@ -69,14 +101,14 @@ iOS는 `ASWebAuthenticationSession`, Android는 기본 브라우저를 사용합
 
 ## 네이티브 WebView 보안 경계
 
-iOS와 Android WebView 안에는 HTTPS 운영 호스트(`travelplaner-545.pages.dev`)만 표시합니다. 다른 웹 주소는 시스템 브라우저나 해당 앱으로 넘기며, 알 수 없는 커스텀 스킴은 차단합니다.
+iOS와 Android Release WebView 안에는 HTTPS 운영 호스트(`travelplaner-545.pages.dev`)만 표시합니다. 다른 웹 주소는 시스템 브라우저나 해당 앱으로 넘기며, 알 수 없는 커스텀 스킴은 차단합니다. Debug에서 별도 주소를 지정하면 그 빌드의 지정 origin만 내부 주소로 인정합니다.
 
-- Android 네이티브 브리지는 모든 iframe에 노출되는 레거시 `addJavascriptInterface` 대신, 운영 origin과 메인 프레임만 허용하는 AndroidX WebKit 메시지 채널을 사용합니다.
+- Android 네이티브 브리지는 모든 iframe에 노출되는 레거시 `addJavascriptInterface` 대신, 빌드에 주입된 origin과 메인 프레임만 허용하는 AndroidX WebKit 메시지 채널을 사용합니다.
 - 인증 브리지는 운영 페이지에서 요청한 정확한 Supabase 인증 호스트만 엽니다.
 - 위치 권한, 파일 선택, 네이티브 파일 저장은 운영 페이지에서 시작한 요청만 처리합니다.
 - Android는 파일 URL 접근과 혼합 HTTP 콘텐츠를 차단하고 Safe Browsing을 활성화합니다.
 - Android WebView 원격 디버깅은 디버그 빌드에서만 활성화됩니다.
-- iOS 스크립트 메시지는 HTTPS, 운영 호스트, 기본 HTTPS 포트를 모두 확인합니다.
+- iOS 스크립트 메시지는 빌드에 주입된 scheme·host·port를 확인합니다.
 - 다운로드 파일명에서 경로 구분자와 제어 문자를 제거해 앱 임시 폴더 또는 사용자가 선택한 위치에만 저장합니다.
 
 `npm run native:security`는 Manifest, Info.plist와 양쪽 WebView 소스의 필수 보안 불변 조건을 검사합니다. 네이티브 릴리스 빌드 전에 반드시 실행합니다.

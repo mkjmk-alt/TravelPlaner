@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "TravelPlaner"
 include(":app")
+include(":nativepreview")

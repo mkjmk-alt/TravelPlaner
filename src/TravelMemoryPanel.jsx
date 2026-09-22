@@ -193,7 +193,7 @@ export default function TravelMemoryPanel({
           )) : <span>아직 일정이 없습니다.</span>}
         </div>
         {onOpenItinerary && (
-          <button type="button" className="travel-memory-link-button" onClick={onOpenItinerary}>
+          <button type="button" className="travel-memory-link-button" onClick={() => onOpenItinerary()}>
             일정 전체 보기 <ChevronRight size={14} aria-hidden="true" />
           </button>
         )}

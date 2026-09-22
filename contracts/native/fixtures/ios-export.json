@@ -1,0 +1,66 @@
+{
+  "budgetSettings" : {
+
+  },
+  "checklist" : [
+
+  ],
+  "country" : "",
+  "createdAt" : 0,
+  "endDate" : "2026-10-11",
+  "expenses" : [
+    {
+      "amount" : 500,
+      "id" : 42
+    }
+  ],
+  "futureRoot" : {
+    "keep" : [
+      true,
+      null,
+      "[quoted]"
+    ]
+  },
+  "id" : "import-1a1a9fa09ce9fc20acc4d162b1f33990942f27f3c32c753f7b9ba41e4d9d015b",
+  "itinerary" : [
+    {
+      "day" : 1,
+      "items" : [
+        {
+          "futurePhoto" : {
+            "raw" : "keep"
+          },
+          "id" : "import-1a1a9fa09ce9fc20acc4d162b1f33990942f27f3c32c753f7b9ba41e4d9d015b-day-1-item-0",
+          "lat" : 35.100000000000001,
+          "lng" : 139.09999999999999,
+          "name" : "도쿄",
+          "time" : "09:00"
+        }
+      ]
+    },
+    {
+      "day" : 2,
+      "items" : [
+
+      ]
+    }
+  ],
+  "journalEntries" : [
+
+  ],
+  "name" : "구형 여행",
+  "reminders" : {
+
+  },
+  "reserveItems" : [
+
+  ],
+  "settlementParticipants" : [
+
+  ],
+  "startDate" : "2026-10-10",
+  "travelDetails" : {
+
+  },
+  "updatedAt" : 0
+}

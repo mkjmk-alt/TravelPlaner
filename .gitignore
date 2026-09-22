@@ -34,11 +34,13 @@ scratch/
 
 # Native iOS
 ios/DerivedData/
+ios/NativeCore/.build/
 ios/**/xcuserdata/
 *.xcuserstate
 
 # Native Android
 android/.gradle/
+android/.kotlin/
 android/local.properties
 android/keystore.properties
 android/*.jks
@@ -47,3 +49,7 @@ android/**/build/
 
 # Supabase CLI cache
 supabase/.temp/
+# Native preview provider credentials: never reuse the web referrer key.
+ios/NativePreview/Map/NativeMaps.local.xcconfig
+ios/TravelPlaner/Build/Debug.local.xcconfig
+android/native-maps.properties
