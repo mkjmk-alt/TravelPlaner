@@ -1208,3 +1208,12 @@
 - 플랫폼별 안내: iOS는 실제 기기 또는 Simulator 설정에서 네트워크를 끈 뒤 `xcrun simctl terminate/launch`로 force-stop·relaunch를 수행하고, Android는 비행기 모드와 `adb shell am force-stop`/재실행을 사용한다. `com.travelplaner.app.nativepreview`는 서비스 워커가 아닌 Core Data/Room 저장소를 쓰므로 WebView 앱과 별도 판정한다.
 - 합격 기준: 흰 화면·크래시·데이터 초기화가 없고 저장 여행/일정이 복원되며, 온라인 복구 후 지도·검색 재시도가 가능해야 한다. 기존 실행에서는 로컬 preview 서버 중단 후 캐시 부팅이 되지 않아 이 검증이 아직 미통과 상태다.
 - 변경 내용: 제품 코드와 사용자 데이터는 변경하지 않았다.
+
+## 2026-09-23 — 앱 Git 푸시 및 웹 배포
+
+- ID: `K4pN7xR2La`
+- 요청: “일단 앱 깃 푸시 및 배포 해주세요”.
+- 검증: 웹 테스트 96/96, Vite production build, lint, native security, `git diff --check` 통과. staged secret scan에서 실제 지도 키·Supabase 비밀값은 발견되지 않았다.
+- Git: 현재 작업 트리의 웹·iOS·Android 네이티브 미리보기·계약 fixture·검증 문서를 커밋 `f574962` (`feat: add native preview and recovery updates`)로 묶어 `origin/main`에 푸시했다.
+- 배포: Cloudflare Pages 프로젝트 `travelplaner`에 `dist`를 직접 Production 배포했다. 배포 URL은 `https://3f3335ef.travelplaner-545.pages.dev`이며, 운영 주소 `https://travelplaner-545.pages.dev/`와 배포 URL에서 HTTP 200, `TripPlot | 여행 일정 플래너`, 최신 `travelplaner-shell-4daba6055335` manifest를 확인했다.
+- 범위: 이번 배포는 웹 운영 배포이며, iOS App Store·Android Play Store 업로드는 개발자 계정·서명·스토어 절차가 별도라 진행하지 않았다. 지도 키 입력과 사용자 데이터 초기화도 수행하지 않았다.
