@@ -109,3 +109,7 @@ export const getMobileRootPresentation = ({ rootTab, viewMode } = {}) => {
   }
   return { mapVisible: false, contentVisible: true, split: false };
 };
+
+export const shouldShowSearchBar = ({ isBottomNavigationViewport, mapVisible } = {}) => (
+  !isBottomNavigationViewport || Boolean(mapVisible)
+);

@@ -6,7 +6,7 @@ import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, 
 import { supabase } from './supabaseClient';
 import { getMapAvailability } from './mapAvailability';
 import { getBottomNavigationItems, getMobileViewModeSheetMode } from './mobileSidebar';
-import { createNavigationHistoryState, getDefaultNavigationState, getMobileRootPresentation, getNavigationStateFromHistory, getTabSelection, normalizeNavigationState } from './appNavigation';
+import { createNavigationHistoryState, getDefaultNavigationState, getMobileRootPresentation, getNavigationStateFromHistory, getTabSelection, normalizeNavigationState, shouldShowSearchBar } from './appNavigation';
 import { getClosestMobileSheetMode, getMobileSheetPosition, getMobileSheetSnapPoints } from './mobileSheet';
 import { DISPLAY_MODES, getFreeSplitPanePosition, getResponsiveDisplayMode, getSaveStatusPresentation, getSidebarFooterVariant, getSplitSaveStatusPlacement, getSplitViewGridRows, getSplitViewScrollContainer, getViewportSize } from './splitView';
 import { BRAND_NAME_EN, BRAND_NAME_KO } from './brand';
@@ -1467,6 +1467,10 @@ function App() {
   }, [isSplitView, mobileRootTab, viewMode]);
 
   const mobileRootPresentation = getMobileRootPresentation({ rootTab: mobileRootTab, viewMode });
+  const showSearchBar = shouldShowSearchBar({
+    isBottomNavigationViewport,
+    mapVisible: mobileRootPresentation.mapVisible
+  });
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchInput, setSearchInput] = useState('');
@@ -4646,7 +4650,8 @@ function App() {
       }}
     >
       
-      {/* GLOBAL SEARCH BAR */}
+      {/* MAP SEARCH BAR */}
+      {showSearchBar && (
       <div className="search-bar-container" style={{ 
         position: 'fixed', 
         top: '20px', 
@@ -4684,6 +4689,10 @@ function App() {
                   onKeyDown={(e) => {
                     if (e.key === "Escape") setPlaceSuggestions([]);
                     if (e.key === "Enter") { e.preventDefault(); setPlaceSuggestions([]); handleSearchSubmit(); }
+                  }}
+                  onBlur={() => {
+                    suggestionRequestRef.current += 1;
+                    setPlaceSuggestions([]);
                   }}
                   aria-label="장소 또는 주소 검색"
                   placeholder="어디로 떠나시나요?"
@@ -4735,6 +4744,7 @@ function App() {
            </button>
         </div>
       </div>
+      )}
 
       {/* SIDEBAR UI */}
       <aside 

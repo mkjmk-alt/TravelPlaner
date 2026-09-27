@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import * as appNavigation from '../src/appNavigation.js';
 
 import {
   APP_NAVIGATION_HISTORY_KEY,
@@ -92,4 +93,17 @@ test('uses map-only, itinerary-split, and content-only mobile roots', () => {
   assert.deepEqual(getMobileRootPresentation({ rootTab: 'favorites', viewMode: 'favorites' }), {
     mapVisible: false, contentVisible: true, split: false
   });
+});
+
+test('shows the search bar only when a bottom-navigation screen also shows the map', () => {
+  const cases = [
+    [{ isBottomNavigationViewport: true, mapVisible: true }, true],
+    [{ isBottomNavigationViewport: true, mapVisible: false }, false],
+    [{ isBottomNavigationViewport: false, mapVisible: true }, true],
+    [{ isBottomNavigationViewport: false, mapVisible: false }, true]
+  ];
+
+  for (const [viewport, expected] of cases) {
+    assert.equal(appNavigation.shouldShowSearchBar?.(viewport), expected);
+  }
 });
