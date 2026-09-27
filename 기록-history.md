@@ -1217,3 +1217,378 @@
 - Git: 현재 작업 트리의 웹·iOS·Android 네이티브 미리보기·계약 fixture·검증 문서를 커밋 `f574962` (`feat: add native preview and recovery updates`)로 묶어 `origin/main`에 푸시했다.
 - 배포: Cloudflare Pages 프로젝트 `travelplaner`에 `dist`를 직접 Production 배포했다. 배포 URL은 `https://3f3335ef.travelplaner-545.pages.dev`이며, 운영 주소 `https://travelplaner-545.pages.dev/`와 배포 URL에서 HTTP 200, `TripPlot | 여행 일정 플래너`, 최신 `travelplaner-shell-4daba6055335` manifest를 확인했다.
 - 범위: 이번 배포는 웹 운영 배포이며, iOS App Store·Android Play Store 업로드는 개발자 계정·서명·스토어 절차가 별도라 진행하지 않았다. 지도 키 입력과 사용자 데이터 초기화도 수행하지 않았다.
+
+## 2026-09-23 — Android 오프라인 콜드스타트 검증 다음 단계
+
+- ID: `W9kR2mV6Qa`
+- 요청: “다음 단계 진행”.
+- 진행: 배포된 운영 주소를 쓰는 Android API 36 에뮬레이터에서 서비스 워커 캐시 및 오프라인 force-stop/relaunch를 실제 확인했다. 온라인 사전 실행 때 운영 `sw.js`가 WebView를 제어했고, 해시 JS/CSS를 포함한 셸 URL 8개가 캐시에 저장됐다. 비행기 모드에서 앱을 강제 종료 후 다시 열자 `navigator.onLine=false`, 활성 service worker, 완료된 문서 로딩, 렌더된 앱 본문이 확인됐고 흰 화면이 아닌 TripPlot 오프라인 안내가 표시됐다. 네트워크 복구 후 재로드 시 온라인 상태와 본문 렌더링이 회복됐다.
+- 검증 한계: 에뮬레이터에 저장 일정이 없어서 일정 데이터 복원은 확인하지 못했다. 설치된 iOS Debug 앱 URL은 운영이 아닌 `http://127.0.0.1:4174/`였다. 이 주소로 로컬 production preview를 실행했지만 재시도 화면이 유지됐다. 로컬 재빌드 manifest(`4daba6055335`)와 실제 운영 manifest(`07970c908d41`)도 다르므로 iOS 결과를 운영 검증으로 인정하지 않았다. Simulator GUI 앱이 설치되지 않았고 `simctl`에 네트워크 차단 제어도 없어 iOS 오프라인 시험은 미완료다.
+- 수정: 제품 코드·앱 설정·사용자 데이터는 변경하지 않았다. 검사용 Vite preview를 시작했다가 종료했고, Android 네트워크를 다시 켰으며 iOS 앱은 저장소 초기화 없이 종료했다. 로컬 `dist`는 재빌드됐지만 git 추적 대상 변경은 아니다. 테스트 근거를 마스터 플랜과 SDD 진행 원장에 기록했다.
+- 답변: Android 앱 셸은 오프라인 콜드스타트 통과, 일정 데이터 복원과 iOS 검증은 미완료로 남겼다. 푸시·배포·지도 키 입력·결제는 진행하지 않았다.
+
+## 2026-09-23 — iOS Debug 앱 운영 주소 전환 설계
+
+- ID: `K8mR5vN2Qa`
+- 요청: “다음 단계 ios 로컬 주소를 바라보고 있는거도 실제 주소로”.
+- 확인: 설치된 iOS Simulator 앱의 `TripPlotWebURL`은 `http://127.0.0.1:4174/`이나, 현재 프로젝트의 `Debug.xcconfig`, `Release.xcconfig`, 유효 Debug 빌드 설정은 모두 `https://travelplaner-545.pages.dev/`을 가리킨다. 추적된 소스 설정은 이미 운영 주소이며 Simulator 설치본이 오래된 빌드다.
+- 제안: 설정 템플릿은 바꾸지 않고 현재 프로젝트 설정으로 iOS Debug 앱을 다시 빌드·설치한 뒤, 설치된 Info.plist 주소와 앱 실행을 검증한다. 앱 저장소 초기화, 웹 코드 배포, Git push는 하지 않는다. `Debug.local.xcconfig.example`은 필요할 때만 로컬 개발에 쓰는 예시로 유지한다.
+- 상태: 설계 승인 대기. 제품 코드·빌드·설치 변경은 아직 하지 않았다.
+
+## 2026-09-23 — iOS 앱 운영 주소 적용 및 시뮬레이터 검증
+
+- ID: `T5nV2qR8Lc`
+- 요청: “다음 단계 진행” (앞선 iOS Debug 앱의 localhost 주소를 실제 서비스 주소로 바꾸는 작업 승인).
+- 조치: Debug 소스 설정이 이미 운영 주소 `https://travelplaner-545.pages.dev/`를 사용함을 확인하고, 해당 설정으로 iOS Simulator용 앱을 재빌드해 기존 설치본 위에 업데이트 설치했다. 앱 데이터 초기화나 삭제는 하지 않았다.
+- 검증: 빌드 성공. 설치된 앱의 `TripPlotWebURL`이 `https://travelplaner-545.pages.dev/`임을 확인했고, 운영 주소 HTTP 200 및 Simulator에서 앱 화면이 정상 렌더링되는 것을 확인했다. 앱은 `com.travelplaner.app`으로 실행 중이다.
+- 변경 범위: 제품 코드/빌드 설정 변경 없음. 기록 파일만 갱신했다. Git push와 웹 배포는 수행하지 않았으며, 서브에이전트도 사용하지 않았다.
+
+## 2026-09-23 — iOS 시뮬레이터 주요 메뉴 화면 캡처
+
+- ID: `R7mK2vQ9Xa`
+- 요청: “ios 시뮬레이터에서 앱 실행후 각 메뉴별로 사진좀 찍어줘”.
+- 진행: 부팅된 iPhone Duo / iOS 27.1 시뮬레이터에서 앱을 열고 UI 자동화로 하단 주요 메뉴 `내 여행`, `지도`, `저장`, `더보기`를 각각 눌러 스크린샷을 캡처했다. XCTest UI 캡처 1건 통과(실패 0). 앱은 `내 여행` 화면으로 돌아와 실행 중이다.
+- 캡처 파일: `/tmp/TripPlotMenuShots-R7mK2vQ9Xa-delivery/6520F327-B8DF-4927-9CCD-CDFC5E758C18.png` (내 여행), `/tmp/TripPlotMenuShots-R7mK2vQ9Xa-delivery/2F8B45E4-3832-41B0-94B9-3AB74D2A1C47.png` (지도), `/tmp/TripPlotMenuShots-R7mK2vQ9Xa-delivery/E42086B8-ACAD-4931-A4FD-BE954846E9F6.png` (저장), `/tmp/TripPlotMenuShots-R7mK2vQ9Xa-delivery/0992354F-72F4-4565-8014-3BA73A6A30FB.png` (더보기).
+- 변경 범위: 캡처를 위해 추가했던 임시 UI 테스트 코드는 제거했다. 앱 사용자 데이터와 제품 코드는 변경하지 않았다. 영구적인 변경은 이 기록뿐이다.
+
+## 2026-09-23 — 네이티브 iOS 앱 메뉴 확인 및 캡처
+
+- ID: `N4qT8bR2Xa`
+- 요청: “네이티브 앱도 확인해줘”.
+- 확인: 웹뷰 앱과 별도인 SwiftUI `TripPlotNativePreview` 타깃을 iPhone Duo / iOS 27.1 시뮬레이터에서 실행했다. 하단 탭 `내 여행`, `지도`, `저장`, `지출`, `더보기`를 모두 눌러 확인했고, UI 테스트에서 화면에 웹뷰가 없으며 5개 탭 탐색이 가능한 것을 확인했다(1개 테스트 통과, 실패 0). 앱은 `내 여행` 화면으로 돌아와 실행 중이다.
+- 지도 제한: `NativeMaps.xcconfig`의 지도 키 값이 비어 있어 지도 탭은 실제 지도가 아닌 “네이티브 지도 키가 필요합니다” 안내 화면을 표시한다. 키 입력을 보류한 이전 요청에 맞춰 키는 수정하지 않았다.
+- 캡처: `/tmp/TripPlotNativeMenuQA-N4qT8bR2Xa/native-my-trips.png`, `native-map.png`, `native-saved-places.png`, `native-expenses.png`, `native-more.png`.
+- 변경 범위: 화면 캡처용 임시 UI 테스트 코드를 제거했다. 여행 데이터는 변경하지 않았고, 기록 파일 외 제품 코드 변경이나 배포는 없다.
+
+## 2026-09-23 — 네이티브 앱 내 여행 일지 선택 UX 제안
+
+- ID: `B8mR4tQ2Vx`
+- 요청: “네이티브앱에서 내여행 메뉴에서 원하는 여행 일지를 선택할 수 있게 해줘”.
+- 확인: 네이티브 `내 여행` 탭은 `native.activeTrip`이 설정되어 있으면 해당 여행 상세 화면을 먼저 열고, 목록은 뒤로 가야 보인다. 상세 화면에는 현재 다른 여행으로 바로 전환하는 선택 컨트롤이 없다. 여행 목록의 카드 탐색과 지도/지출 등에서 공유하는 `activeTrip` 상태는 이미 존재한다.
+- 제안: 상세 화면 상단 툴바에 `여행 선택` 메뉴를 추가해 저장된 여행 일지들을 표시하고, 선택 시 해당 일지 상세 화면으로 바로 전환하면서 공유 `activeTrip`도 갱신한다. 여행 데이터·스키마와 데스크톱/웹 UI는 변경하지 않는다. UI 테스트에서 여행 2개 중 전환 후 상세 제목 및 공유 선택값을 확인한다.
+- 상태: 설계 승인 대기. 제품 코드 및 테스트 코드는 아직 변경하지 않았다.
+- 답변: 목록으로 되돌아가는 절차 없이 상세 화면에서 여행을 직접 바꾸는 안을 안내하고 사용자 승인을 요청했다.
+
+## 2026-09-23 — Android 네이티브 여행 선택 메뉴 구현
+
+- ID: `d95yL98INb`
+- 요청: “다음 단계 진행”. 앞서 승인된 네이티브 내 여행 선택 UX의 Android 적용 단계로 진행했다.
+- 수정 내용: Android Compose 여행 상세 화면에 저장된 여행 일지 선택 드롭다운을 추가했다. 선택한 일지로 상세 화면을 바꾸고, 지도 화면이 공유하는 활성 여행도 함께 갱신한다. 지도 선택 버튼에는 UI 테스트 식별자를 추가했다. 변경 파일은 `android/nativepreview/src/main/java/com/travelplaner/nativepreview/ui/TripPlotApp.kt`, `PlaceSearchScreen.kt`, `android/nativepreview/src/androidTest/java/com/travelplaner/nativepreview/NativePreviewUiTest.kt`다.
+- 검증: Android API 36 에뮬레이터에서 여행 상세 전환 및 지도 활성 여행 공유를 확인하는 집중 UI 테스트가 최종 재실행에서 통과했다. Unit test, APK assemble, lint도 통과했다. 전체 UI 회귀는 기록 편집 테스트와 시스템 문서 선택기 테스트 두 건이 실패했다. 기록 편집 테스트는 이 변경의 화면을 이용하지 않아 별도 재현됐고, 문서 선택기 결과 콜백은 시스템 테스트 환경에서 실패했다. 집중 UI 테스트도 에뮬레이터 실행 중 간헐적 시간 초과가 한 번 발생해 재실행 후 통과했으므로 UI 회귀 전체를 완전 통과로 간주하지 않는다.
+- 환경 한계: 설치된 Android 에뮬레이터는 API 36이다. API 26 시스템 이미지가 없어 API 26 검증은 진행하지 않았다.
+- 최종 답변: Android 네이티브 내 여행 상세에 여행 선택 메뉴를 구현해, 선택한 여행으로 상세 화면을 전환하고 지도에서 공유하는 활성 여행도 갱신하도록 했다. APK 빌드, Unit test, lint 및 집중 UI 테스트는 통과했다. 전체 UI 회귀에는 기존 기록 편집과 시스템 파일 선택기 테스트 실패가 남아 있고, 집중 UI 테스트도 간헐적 타임아웃 후 재실행 통과라 회귀 전체가 깨끗하다고 보지는 않는다. API 26 검증은 이미지 부재로 미실행이다. Git push와 배포는 요청 범위가 아니어서 하지 않았다.
+
+## 2026-09-23 — Android 여행 기록 UI 회귀 테스트 안정화
+
+- ID: `7mQ2dN8xKa`
+- 요청: “다음단계 진행”. 직전 Android 네이티브 여행 선택 기능 후속 단계로, 전체 UI 회귀에서 드러난 여행 기록 편집/삭제 테스트를 재현하고 안정화했다.
+- 원인: 여행 기록은 폼 아래 `LazyColumn` 항목이라 화면 밖 행은 Compose 테스트 트리에 아직 생성되지 않는다. 저장은 실제 성공했지만 테스트가 화면 밖 `memory-row-0`의 즉시 존재를 기다려 실패했다.
+- 수정 내용: 여행 기록 목록에 `memory-list` 테스트 태그를 추가하고 테스트에서 대상 기록 행까지 목록을 스크롤한 뒤 수정/삭제를 검증하도록 했다. 여행 생성 대기 시간 초과 시 실패 원인 추적을 위한 의미 트리 로그도 추가했다. 사용자에게 보이는 동작이나 여행 저장 로직은 변경하지 않았다.
+- 검증: `MemoryPrepUiTest.memoryRecordCanEditAndConfirmDelete` 집중 실행 통과. `:nativepreview:testDebugUnitTest`, `assembleDebug`, `lintDebug` 통과. 전체 연결 UI 테스트는 30개 중 26개 통과, 4개 실패(시스템 문서 선택기, 지출 정산 진입, 탭/재생성 초안 복원, 저장 장소에서 일정 추가 버튼 탐색)로 아직 전체 회귀 통과가 아니다. 해당 4건은 이번 기록 화면 변경과 직접 관련 없는 별도 화면 테스트지만 원인 해결은 남아 있다.
+- 변경 파일: `android/nativepreview/src/main/java/com/travelplaner/nativepreview/ui/TravelMemoryScreen.kt`, `android/nativepreview/src/androidTest/java/com/travelplaner/nativepreview/MemoryPrepUiTest.kt`, 이 기록 파일.
+- 최종 답변: 여행 기록 편집/삭제 회귀 테스트가 목록 스크롤을 고려하도록 수정했고 집중 테스트와 Unit test/APK 빌드/lint는 통과했다. 전체 Android UI 테스트에는 다른 메뉴 관련 실패 4건이 남아 있다. Git push·배포는 하지 않았다.
+
+## 2026-09-23 — Android 시스템 문서 선택기 UI 테스트 안정화
+
+- ID: `K7mQ2xP9aL`
+- 요청: “다음 단계 진행”. 직전 native-app 안정화 작업에 이어 Android 백업 가져오기/내보내기 UI 테스트가 시스템 문서 선택기에서 실패하는 원인을 찾아 안정화했다.
+- 원인: Android 16 DocumentsUI에서 동일한 제공자 이름이 최근 항목/루트 탐색기 등 여러 접근성 노드로 노출됐다. 테스트는 뒤쪽 바로가기 행을 선택하고 있었고, 기존 좌표 탭은 루트 드로어의 구분선에 닿아 파일 목록으로 이동하지 못했다. 내보내기 여행 선택도 긴 목록의 화면 밖 항목을 스크롤 없이 찾아 실패했다.
+- 수정 내용: 문서 선택기 테스트가 일치하는 제공자 노드 중 루트 드로어의 하단 행을 찾아 아이콘을 누르고, 드로어가 닫힌 것을 확인하도록 조정했다. 내보내기 여행 선택 LazyColumn에 테스트 태그를 추가하고 UI 테스트에서 대상 여행까지 스크롤한 뒤 선택하도록 했다. 사용자 데이터/백업 동작은 변경하지 않았다.
+- 검증: `realDocumentPickerPreviewCancelAndRepeatImport` 집중 Android UI 테스트 통과. `:nativepreview:testDebugUnitTest`, `assembleDebug`, `lintDebug` 통과. 전체 연결 UI 테스트는 30개 중 25개 통과, 5개 실패: `moreChildRoutesReturnToMore`, `memoryDraftRestoresAfterLeavingAndReentering`, `manualPlaceDraftMoveAndRecreate`, `systemBackReturnsFromTripEditorPlaceEditorAndBackup`, `systemBackClosesDestinationWithoutLeavingSavedTab`. 따라서 전체 UI 회귀는 미통과이며 위 실패는 다음 안정화 대상으로 남긴다.
+- 환경: Android API 36 에뮬레이터를 종료했다. Git push·배포는 요청 범위가 아니어서 수행하지 않았다.
+- 최종 답변: 문서 선택기/백업 내보내기 UI 테스트는 집중 실행에서 통과했다. 단위 테스트, APK 빌드, lint도 통과했지만 전체 UI 회귀에는 다른 화면 관련 실패 5개가 남아 있다. 에뮬레이터는 종료했고 Git push·배포는 하지 않았다.
+
+## 2026-09-24 — 여행 기록 초안 저장/복원 경합 수정
+
+- ID: `Q8vL3nR6aT`
+- 요청: “다음 단계 진행”. 직전 전체 Android UI 회귀에서 실패한 여행 기록 초안 복원 테스트를 다음 안정화 항목으로 선택했다.
+- 원인: 초안 복원 중에는 자동저장 `LaunchedEffect`가 입력값 저장을 건너뛰는데, 복원 완료(`restoringDraft=false`)가 effect 키에 포함되지 않아 입력 중 복원이 끝나도 저장 effect가 다시 실행되지 않았다. 에뮬레이터 앱 저장소에서 새 여행의 초안 파일이 생성되지 않는 것을 확인했다.
+- 수정 내용: `TravelMemoryScreen.kt`에서 `restoringDraft`를 자동저장 effect의 key에 추가해 복원 완료 후 입력값을 저장하도록 했다. UI 테스트는 고정 `Thread.sleep` 대신 실제 `MemoryDraftStore`에 값이 기록됐는지 기다린 후 화면을 나갔다가 돌아와 복원을 확인하도록 바꿨다.
+- 검증: `memoryDraftRestoresAfterLeavingAndReentering` 단독 통과. 전체 Android 검증 명령에서 Unit test, `assembleDebug`, `lintDebug` 통과. 연결 UI 테스트는 30개 중 27개 통과, 3개 실패: `landscapeEditorCanScrollAndSave`(15초 대기 시간 초과), `expenseEditorPersistsAndSettlementOpens`(15초 대기 시간 초과), `systemBackClosesSavedPlaceDetailWithoutLeavingSavedTab`(“일정에 추가” 노드 탐색 실패). 초안 저장/복원 테스트는 전체 실행에서도 통과했으며 UI 전체 회귀는 아직 미통과다.
+- 환경: Android API 36 에뮬레이터를 종료했다. Git push·배포는 요청 범위가 아니어서 하지 않았다.
+- 최종 답변: 여행 기록 초안의 복원 완료 시 저장 effect가 재실행되지 않던 경합을 수정했고, 집중 테스트 및 전체 실행에서 초안 테스트 통과를 확인했다. Unit test·APK 빌드·lint도 통과했다. 전체 UI 테스트에는 다른 3개 실패가 남았으며 push·배포는 하지 않았다.
+
+## 2026-09-24 — Android 네이티브 전체 UI 회귀 안정화
+
+- ID: `R5cM9tK2vA`
+- 요청: “다음 단계 진행”. Android 네이티브 앱 UI 회귀 테스트의 다음 안정화 단계를 이어서 수행했다. 서브에이전트는 사용하지 않았다.
+- 원인 및 수정: 테스트 실행마다 저장된 마지막 화면 경로가 달라지던 점을 막기 위해 테스트 전용 navigation rule에서 시작 경로만 `trips/list`로 초기화했다(여행/장소 데이터는 지우지 않음). 여행·저장 장소·여행 기록 폼은 키보드/화면 스크롤에 맞춰 저장 CTA를 조작하고, 화면 전환 후 실제 목록/상세 노드가 나타나는지 기다리도록 했다. 여행 기록 편집/삭제는 LazyColumn 행 액션까지 스크롤하고 수정된 제목 텍스트를 확인하도록 정리했다. 제품 동작 코드는 이번 단계에서 변경하지 않았다.
+- 검증: Android API 36 에뮬레이터의 연결 UI 테스트 30개 전체 통과. `:nativepreview:testDebugUnitTest`, `:nativepreview:assembleDebug`, `:nativepreview:lintDebug` 성공. `git diff --check` 통과.
+- 최종 답변: Android 네이티브 UI 테스트 상태 초기화와 키보드·스크롤·비동기 화면 전환 대기를 안정화했다. 30개 전체 UI 테스트, 단위 테스트, APK 빌드, Lint가 통과했다. Git push와 배포는 요청 범위가 아니어서 진행하지 않았다.
+
+## 2026-09-24 — 모바일 UI 회귀 검증 이어서 진행
+
+- ID: `H8nQ4vL2cR`
+- 사용자 요청: “다음 단계 진행”.
+- 수정 내용: iPadOS에서 floating tab item이 일반 `TabBar` 계층으로 탐색되지 않는 점을 확인하고, `ios/NativePreviewUITests/SplitWorkspaceUITests.swift` 테스트 선택자에 SF Symbol 접근성 ID fallback을 추가했다. 계획 문서와 SDD 진행 기록에 기기별 검증 결과 및 남은 검증을 기록했다. 제품 UI 동작은 변경하지 않았다.
+- 검증: iPhone 17e에서 가로 편집 스크롤/저장 및 분할 복원/재실행 UI 테스트 2/2 통과. iPad mini에서 분할 복원/재실행 1/1 통과. Android API 36 에뮬레이터에서 편집 스크롤/저장 및 분할 핸들 테스트 2/2 통과. `git diff --check` 통과.
+- 남은 점: 실제 기기의 안전영역·키보드 inset, 저장 상태 시각 확인, VoiceOver/TalkBack 및 뒤로가기 검증은 아직 남아 있어 모바일 화면 안정화 단계 전체를 완료로 처리하지 않았다.
+- 최종 답변: iPhone·iPad·Android 가상 기기에서 총 5개 집중 UI 검증이 통과했고, iPad 탭 접근성 차이에 맞춰 테스트만 보완했다. 남은 실제 기기 접근성/인셋 검증을 계속 진행해야 한다. Git push와 배포는 하지 않았다.
+
+## 2026-09-24 — 일정 스크롤/분할 비율 검증
+
+- ID: `T9bK3mQ7vP`
+- 사용자 요청: “다음 단계 진행”. 모바일 화면·스크롤·앱 조작 안정화 계획의 다음 검증 항목을 진행했다.
+- 수정 내용: `ios/NativePreviewUITests/SplitWorkspaceUITests.swift`에 iOS 일정 목록 스크롤 UI 테스트를 추가했다. 14개 일정을 만든 뒤 첫 행부터 마지막 행까지 스크롤하고 분할 비율이 50%로 유지되는지 확인한다. 접근성 목록 프레임이 하단 탭바 밑까지 확장되어 있음을 확인해 테스트 드래그를 실제 표시 영역 안에 제한했다. 계획 체크리스트와 SDD 진행 기록을 갱신했다. 제품 UI 동작은 변경하지 않았다.
+- 검증: iPhone 17e·iOS 26.5에서 `testItineraryListScrollDoesNotResizeSplit` 1/1 통과. Android API 36 대응 테스트는 직전 집중 실행에서 1/1 통과했다. `git diff --check` 통과. Push·배포는 하지 않았다.
+- 최종 답변: iPhone 시뮬레이터에서 일정 목록이 실제 스크롤되고, 첫 행부터 마지막 행까지 이동해도 지도/일정 분할 비율이 50%로 유지됨을 확인했다. 하단 탭바와 겹치던 테스트 입력 좌표만 보정했으며 실제 UI 코드는 변경하지 않았다. 실기기 안전영역·키보드·접근성 검증은 계속 남아 있다.
+
+## 2026-09-24 — 다음 모바일 단계 및 네이티브 변경 확인
+
+- ID: `B6tR9mK2xQ`
+- 사용자 요청: “다음단계 진행 네이티브앱은 수정하고 있는지도 확인해줘”.
+- 수정 내용: 계획상 다음인 작은 화면 네이티브 점검을 진행하고 SwiftUI/Compose 실제 소스의 변경 여부를 확인했다. 현재 작업 트리에 iOS `TripListView.swift`, `PlaceSearchView.swift`, Android `TripPlotApp.kt`, `PlaceSearchScreen.kt`, `TravelMemoryScreen.kt`, `TripBackupScreen.kt`의 네이티브 UI 변경이 있으며 UI 테스트 변경만 있는 상태가 아님을 확인했다. 이번 요청에서 제품 소스 변경은 없고 계획·진행 기록만 갱신했다.
+- 검증: iPhone 17e iOS 26.5 네이티브 여행 선택 테스트 1/1 통과. Android API 36에서 여행 선택과 분할 목록 스크롤 테스트 2/2 통과. iPad mini 세로 분할 테스트는 앱 대신 홈 화면에 머물고 테스트 프로세스가 시작되지 않아 5분 후 중단했으며 통과로 처리하지 않았다. 이전 별도 iPad 통과 결과는 계획 기록에 보존했다.
+- 최종 답변: 네이티브 앱 소스가 실제로 수정 중임을 SwiftUI/Compose diff로 확인했고, iPhone과 Android 네이티브 테스트는 통과했다. 이번 요청에서는 앱 동작 소스를 추가 수정하지 않았고, iPad 자동화 진입 실패 때문에 작은 화면 점검 항목 전체는 열어 두었다. Git push·배포는 하지 않았다.
+
+## 2026-09-24 — 네이티브 앱 지도 연결 상태 확인
+
+- ID: `D7kP4mR8cQ`
+- 사용자 요청: “이거 네이티브앱에 지도 연결해야하지?”
+- 수정 내용: iOS·Android 네이티브 지도 화면, Google Maps/Places SDK 설정, 로컬 키 파일 존재 여부를 읽기 전용으로 확인했다. 앱 소스나 키 설정은 변경하지 않았다.
+- 확인 결과: 양 플랫폼에 Google Maps/Places 연동 코드와 키 주입 경로가 준비되어 있으나 iOS `NativeMaps.local.xcconfig`와 Android `native-maps.properties`가 모두 없어 실제 지도는 아직 표시되지 않는다. 키 입력 및 실제 지도 검증은 기존 요청대로 보류 상태다.
+- 최종 답변: 네이티브 지도 연결은 필요하며 기본 연동은 이미 구현되어 있다. 제한된 키를 각 플랫폼 로컬 설정에 넣은 뒤 지도 타일·검색·현재 위치·저장 장소 마커를 검증해야 한다. 이번에는 코드·키 변경, 커밋·푸시·배포를 하지 않았다.
+
+## 2026-09-24 — 네이티브 지도 키 입력 준비
+
+- ID: `k9R4vT2mQ7`
+- 사용자 요청: “키 입력과 검증 하려고여”.
+- 수정 내용: 로컬 키가 없는 것을 확인한 뒤 사용자가 직접 입력할 수 있도록 `ios/NativePreview/Map/NativeMaps.local.xcconfig`와 `android/native-maps.properties`를 빈 값으로 준비했다. 두 파일 모두 `.gitignore`에 의해 제외됨을 확인했다. 지도 키 값을 받거나 출력하지 않았고, 제품 코드·키 값은 변경하지 않았다.
+- 검증: 두 로컬 설정 파일이 Git 추적 대상에서 제외된 것을 확인했고 `git diff --check`를 실행했다. 실제 지도 검증은 키 입력 전이라 아직 수행하지 않았다.
+- 최종 답변: 키를 채팅에 붙이지 말고 각 로컬 파일의 `TRIPPLOT_MAPS_API_KEY` 빈 값을 채운 뒤 알려 달라고 안내한다. 준비가 되면 iOS·Android 네이티브 빌드와 지도·검색·현재 위치·저장 장소 마커를 검증한다.
+
+## 2026-09-24 — 웹 지도 키 재사용 가능 여부 안내
+
+- ID: `F8q2N6vR3k`
+- 사용자 요청: “현제 웹에 사용중인 키와 동일한거 사용하면 되는거지?”
+- 확인: 웹은 `VITE_GOOGLE_MAPS_API_KEY`를 Cloudflare 런타임 설정에서 읽고, 네이티브 iOS·Android는 별도 로컬 `TRIPPLOT_MAPS_API_KEY` 설정을 사용한다. 현재 키 값과 Cloud Console 제한은 노출하거나 확인하지 않았다.
+- 수정 내용: 제품 코드와 설정 키 값은 변경하지 않았다. Google 공식 보안 안내를 확인해 웹/Android/iOS별 앱 제한 및 API 제한을 분리해야 함을 설명했다.
+- 최종 답변: 같은 Google Cloud 프로젝트에 키를 별도로 생성해 사용해도 되지만, 동일한 키를 웹과 네이티브에서 공유하는 것은 권장하지 않는다. 웹 키는 웹사이트(referrer) 제한, Android 키는 패키지·서명 SHA-1 제한, iOS 키는 bundle ID 제한을 사용한다. 준비된 로컬 설정 파일에는 플랫폼별 네이티브 키를 각자 입력한 뒤 실제 지도 검증을 진행한다.
+
+## 2026-09-24 — 브라우저로 네이티브 지도 키 생성 요청
+
+- ID: `J3bQ8nW5cT`
+- 사용자 요청: “아 그럼 안드로이드 따로 아이폰 앱 따로 해야겟네? 직접 [@브라우저](plugin://browser@openai-bundled) 이용하여 키 생성해서 입력해줘”.
+- 확인: 현재 사용 가능한 도구 목록에 Browser 제어 도구가 없었고, 설치 가능한 후보에도 Browser가 없어 Google Cloud 계정에 접근하거나 키를 만들 수 없었다.
+- 수정 내용: 코드, 로컬 키 설정, Google Cloud 프로젝트를 변경하지 않았다. 키 값이나 계정 정보를 요청·출력하지 않았다.
+- 최종 답변: 이 세션에는 요청한 Browser 플러그인이 연결되어 있지 않아 Google Cloud에서 Android/iOS 키 생성 및 로컬 입력을 직접 진행할 수 없다고 안내한다. 로컬의 무시 처리된 키 설정 파일은 빈 상태로 유지한다.
+
+## 2026-09-24 — 컴퓨터 제어로 지도 키 생성 요청
+
+- ID: `Q6mJ3pV8aR`
+- 사용자 요청: “[@컴퓨터](plugin://computer-use@openai-bundled) 직접 해줘 나 잘 못하겠어”.
+- 확인: `ALL_TOOLS`에서 컴퓨터/브라우저 제어 도구가 없고, 설치 후보에도 `computer-use` 플러그인이 없었다. 대체 가능한 로컬 `gcloud` CLI도 사용할 수 없었다.
+- 수정 내용: Google Cloud 계정·프로젝트, 앱 키 파일은 변경하지 않았다. 키 값 입력이나 노출도 하지 않았다.
+- 최종 답변: 현재 세션에 컴퓨터 제어 플러그인이 제공되지 않고 대체 CLI도 없어 직접 키 생성·입력을 할 수 없다고 설명하고, 해당 도구가 연결된 세션에서 이어갈 수 있음을 안내한다.
+
+## 2026-09-24 — Computer Use 활성화 상태 원인 확인
+
+- ID: `T4vQ8mL2sP`
+- 사용자 요청: “엥 컴퓨트 유즈 왜 안되어있지”.
+- 확인 및 수정: 후속 확인으로 `~/.codex/config.toml`의 `computer-use`, `unified-computer-use`, `browser` 항목이 모두 활성화되어 있고, 로컬 Computer Use 클라이언트도 설치·실행 중임을 확인했다. 반면 이 대화에서 모델에 제공된 도구 목록에는 컴퓨터/브라우저 제어 도구가 없다. 앞서 설치되지 않았다고 판단한 답변은 잘못된 해석이어서 정정한다. 제품 코드와 키 설정은 변경하지 않았다.
+- 최종 답변: 플러그인 설정 자체는 켜져 있으며, 문제는 현재 대화 런타임에 도구가 전달되지 않은 것으로 보인다. 공식 안내도 플러그인 기능은 지원 표면별로 다를 수 있다고 설명하므로, 앱/새 대화에서 도구가 로드되는지 재확인하도록 안내한다.
+
+## 2026-09-24 — 플러그인 설정이 켜져 있다는 사용자 확인
+
+- ID: `H6nR3kV9cW`
+- 사용자 요청: “설정은 다 되어 있는거 같은데”.
+- 수정 내용: 사용자 관찰에 맞춰 설정을 다시 확인하고, Computer Use 설정 활성·클라이언트 실행 상태와 현재 스레드 도구 목록 부재를 구분했다. 추가 파일/설정은 변경하지 않았다.
+- 최종 답변: 사용자의 판단이 맞으며 플러그인 설정은 활성화되어 있다. 현재 스레드에 도구 정의가 노출되지 않은 연결/로드 문제로 보이고, 새 대화 또는 앱 재시작 후 재확인하는 것이 다음 단계다.
+
+## 2026-09-24 — Computer Use 연결 활성화 방법 안내
+
+- ID: `M5rK2vQ8nC`
+- 사용자 요청: “흠 그러면 어떻게 할지를 확인해서 쭉 설명해주면 내가 그거 따라서 할게”.
+- 확인: 플러그인 활성화와 별개로 `~/.codex/config.toml`의 `[mcp_servers.computer-use]` 항목이 `enabled = false`로 설정되어 있었다. 이 값이 실제 도구 연결을 비활성화한 원인으로 판단했다. OpenAI 공식 MCP 안내에서 설정 앱의 MCP servers 화면에서 활성화 상태를 확인하고 서버를 재시작할 수 있으며, 설정 파일의 `enabled = false`는 서버를 비활성화한다고 확인했다.
+- 수정 내용: 설정 파일이나 프로젝트 코드는 변경하지 않았다. 사용자 요청에 따라 직접 변경하지 않고 설정 화면에서 켜는 방법과 TextEdit으로 해당 항목만 수정하는 대체 절차를 정리했다. 이 기록만 누적 추가했다.
+- 최종 답변: 원인은 플러그인 토글이 아니라 실제 MCP 서버가 꺼져 있는 설정이다. ChatGPT 설정의 MCP servers에서 `computer-use`를 켜고 재시작한 뒤 앱을 완전히 종료·재실행하고 새 Codex 대화에서 화면 확인만 요청해 검증한다. 설정 화면에서 찾을 수 없으면 `~/.codex/config.toml`의 `[mcp_servers.computer-use]` 아래에 있는 `enabled = false` 한 줄만 `true`로 바꾸고 저장한 뒤 재시작한다. 다른 `enabled` 항목은 변경하지 않도록 안내한다.
+
+## 2026-09-25 — Computer Use 연결 설정 완료 확인
+
+- ID: `C8mP5xR2nV`
+- 사용자 요청: “했어”.
+- 확인: 사용자가 안내한 설정을 완료했다고 알렸다. 현재 대화의 도구 목록에는 Computer Use 도구가 나타나지 않아 실제 연결 동작은 이 스레드에서 확인할 수 없다.
+- 수정 내용: 프로젝트 코드와 사용자 설정은 변경하지 않았다. 새 대화에서 화면 확인만 하는 안전한 테스트를 안내한다. 이 기록만 누적 추가했다.
+- 최종 답변: 설정 완료를 확인하고, ChatGPT 앱을 완전히 종료 후 재실행했는지 확인하도록 안내한다. 같은 프로젝트에서 새 Codex 대화를 열고 “Computer Use로 현재 화면만 확인하고 아무것도 클릭하지 마”라고 요청해 테스트한다. 권한 창이 뜨면 필요한 화면 기록/손쉬운 사용 권한을 허용하고, 도구가 나타나지 않으면 MCP servers 화면에서 computer-use가 켜져 있고 재시작되었는지 재확인한다.
+
+## 2026-09-27 — Computer Use 테스트 진행 요청
+
+- ID: `F2nL8cQ5vM`
+- 사용자 요청: “진행햐줘봐”.
+- 확인: 현재 대화의 사용 가능 도구 목록에는 Computer Use 제어 도구가 없고, 음성 대화에서만 쓸 수 있는 화면 캡처 도구만 확인된다. 따라서 새 대화에서 도구 연결을 검증해야 하며 이 스레드에서는 실제 화면 조작을 할 수 없다.
+- 수정 내용: 앱 설정이나 프로젝트 코드는 변경하지 않았다. 도구 목록을 읽기 전용으로 확인하고, 진행 불가 사유와 새 대화에서의 테스트 방법을 안내한다. 이 기록만 누적 추가했다.
+- 최종 답변: 이 대화에는 Computer Use가 아직 연결되지 않아 직접 화면을 확인할 수 없다. ChatGPT 앱을 완전히 종료·재실행하고 같은 프로젝트에서 새 Codex 대화를 연 뒤 “Computer Use로 현재 화면만 확인하고 아무것도 클릭하지 마”라고 요청해 연결을 시험한다. 도구가 보이지 않으면 MCP servers의 `computer-use` 활성화/재시작을 재확인한다.
+
+## 2026-09-27 — 네이티브 첫 화면 여행 목록 디자인 개선
+
+- ID: `D4nQ7pV2kM`
+- 사용자 요청: “그러면 다른거 먼저 하자 첫 화면에서 여행을 선택해야하는데 현재는 선택하는 여행 목록들이 너무 디자인이 별로야 우선 현재 디자인을 확인하고 다른 여행 앱들은 어떤 방식으로 구현되어있는지 검색한 후에 비슷하게 구현해줘”.
+- 확인: iOS·Android 네이티브 첫 화면의 기존 여행 목록과 시뮬레이터 표시를 확인했다. TripIt, Wanderlog, Polarsteps의 공식 자료에서 가까운 여행 우선 노출, 과거 여행 구분, 시각적인 대표 여행 카드 등의 패턴을 참고했다.
+- 수정 내용: iOS `TripListView.swift`와 Android `TripPlotApp.kt`의 여행 목록을 현재/가장 가까운 여행의 강조 카드와 다른 여행·지난 여행의 간결한 카드로 재구성했다. 여행 만들기와 기존 여행 선택 동작을 유지했다. iOS에서 저장된 여행 선택이 더는 유효하지 않을 때 목록으로 돌아오는 처리도 추가했다. 다른 기존 작업 파일의 변경은 유지했다.
+- 검증: iOS 시뮬레이터용 Xcode 빌드와 Android 오프라인 Gradle `assembleDebug` 빌드가 통과했다. 양쪽 시뮬레이터에서 새 목록을 확인했고 Android에서는 대표 여행을 눌러 상세 화면으로 이동하는 것도 확인했다. `git diff --check` 통과. Git 푸시나 배포는 요청되지 않아 진행하지 않았다.
+- 최종 답변: 네이티브 iOS·Android 첫 화면의 여행 목록을 대표 여행 카드, 다른 여행, 지난 여행 구조로 정리했다. TripIt·Wanderlog 등의 여행 목록 패턴을 참고했으며, 양쪽 앱 빌드와 시뮬레이터 표시를 확인했다. Git 푸시와 배포는 수행하지 않았다.
+
+## 2026-09-27 — iPhone·Android 전체 UI 비율 통일 범위 확인
+
+- ID: `J8aM3qT6pR`
+- 사용자 요청: “좋습니다. 전체 비율을 안드로이드의 비율과 동일하게 아이폰 앱의 전체 ui를 변경해주세요. 두 앱이 동일하게 보이면 좋겠습니다.”
+- 확인: iPhone 프로젝트에는 SwiftUI 네이티브 미리보기 `TripPlotNativePreview`와 WebView 기반 출시용 `TravelPlaner` 앱이 별도 타깃으로 존재한다. Android 네이티브 미리보기와 iOS 미리보기의 화면 밀도·색상·탭바·공통 여백이 다르고, 전체 UI 통일은 다수 화면에 걸친 설계 작업이다.
+- 수정 내용: 제품 코드는 수정하지 않았다. 두 iPhone 타깃 중 어느 범위를 Android 네이티브 UI에 맞출지 먼저 확인한다. 이 요청의 기록만 누적 추가했다.
+- 최종 답변: Android 네이티브 앱에 맞출 iPhone 대상이 지난번 여행 목록을 수정한 SwiftUI 네이티브 미리보기인지, 출시용 WebView 앱까지 포함하는지 확인을 요청한다. 범위가 확정되면 공통 비율 설계를 제시한 뒤 화면별 적용을 진행한다.
+
+## 2026-09-27 — SwiftUI 앱 전체 UI 통일 대상 확정 및 설계 제안
+
+- ID: `L7bQ4mN9xP`
+- 사용자 요청: “swiftUI 앱 대상입니다.”
+- 확인: 대상은 `TripPlotNativePreview`의 SwiftUI 화면 전체이며, WebView 출시용 `TravelPlaner` 타깃은 제외한다. Android 네이티브 앱은 녹색 계열 테마, 20~24dp 기본 여백, 카드와 Material 하단 메뉴를 사용한다. SwiftUI 앱에는 보라색 여행 카드와 시스템 List/Form/TabView가 혼재한다.
+- 수정 내용: 제품 코드는 수정하지 않았다. Android의 화면 계층·비율·색상·카드를 SwiftUI 공통 스타일로 옮기되 iPhone 안전 영역과 네이티브 조작을 유지하는 설계를 제안한다. 이 기록만 누적 추가했다.
+- 최종 답변: SwiftUI 네이티브 앱만 대상으로 Android와 시각적으로 일치시키는 방향을 제안한다. 공통 색상·간격·서체·카드·하단 메뉴를 먼저 맞추고 여행·지도·저장·지출·더보기 및 하위 화면에 적용한다. 기능과 데이터는 유지하고 iOS 안전 영역/접근성은 보존한다. 이 설계를 확인받은 뒤 상세 적용을 진행한다.
+
+## 2026-09-27 — SwiftUI·Android 시각적 통일 설계 승인 후 문서화
+
+- ID: `P6dV9kR2mQ`
+- 사용자 요청: “넵”. 이전 대화에서 제시한 SwiftUI 앱 전체를 Android 기준으로 시각적으로 통일하는 설계 방향을 승인했다.
+- 확인: Android 네이티브 앱의 색상·여백·카드·하단 메뉴와 SwiftUI 현재 화면 구조를 대조했다. 출시용 WebView 앱과 Android 소스 변경은 범위 밖이다.
+- 수정 내용: `docs/superpowers/specs/2026-09-27-swiftui-android-visual-parity-design.md`에 대상, 디자인 토큰, 화면별 적용 범위, 기존 동작·데이터 보존, 접근성과 검증 기준을 기록했다. 문서만 커밋 `41eb078`으로 저장했고 제품 코드는 변경하지 않았다. 다른 작업 중인 파일은 그대로 유지했다. 이 기록을 누적 추가했다.
+- 최종 답변: 승인된 방향을 설계 문서로 작성하고 별도 커밋했다. 문서를 확인한 뒤 수정할 점 또는 진행 승인을 알려달라고 요청한다. 현재는 제품 UI 변경 전 단계다.
+
+## 2026-09-27 — SwiftUI 전체 UI 통일 구현 계획 작성
+
+- ID: `Q8mV2sL7pN`
+- 사용자 요청: “진행해주세요”. Android 기준 SwiftUI 시각적 통일 설계 문서를 확인하고 진행을 요청했다.
+- 확인: 기존 iOS 네이티브 UI 테스트와 SwiftUI 화면 파일, Android 기준 스타일, 사용 가능한 iPhone 시뮬레이터를 확인했다. 미커밋 사용자 변경이 여러 파일에 있어 이를 보존하는 순서로 계획했다.
+- 수정 내용: `docs/superpowers/plans/2026-09-27-swiftui-android-visual-parity.md`에 공통 테마/하단 메뉴, 여행·일정, 지도·저장, 지출·더보기, 최종 검증의 다섯 작업과 각 테스트 절차를 작성했다. 제품 코드는 아직 수정하지 않았고 다른 변경은 유지했다. 이 기록만 누적 추가했다.
+- 최종 답변: 구현 계획 문서를 작성했다. 이전 요청에 따라 서브에이전트 없이 직접 구현하는 방식으로 진행할 예정이며, 계획이 의도에 맞는지 검토를 요청한다.
+
+## 2026-09-27 — SwiftUI와 Android 네이티브 UI 통일 구현 승인
+
+- ID: `T3mR8qL5vN`
+- 사용자 요청: “넵 맞습니다.” Android 기준 SwiftUI 네이티브 앱 전체 UI 통일 계획을 승인했다.
+- 수정 내용: `TripPlotNativePreview` 전용 공통 테마와 다섯 탭 하단 메뉴를 만들고 여행 목록·상세·일정·지도·저장 장소·지출·더보기 및 하위 화면의 색상, 여백, 카드, 버튼 비율을 Android 기준으로 조정했다. 해당 화면의 UI 테스트를 추가했으며, 기존 Android·웹·서버 파일의 사용자 변경은 유지했다.
+- 검증: iPhone 17 Pro UI 테스트 17개, NativeCore 테스트 64개, iOS 시뮬레이터 빌드와 `git diff --check`가 통과했다. iPhone 17e 다크 모드와 큰 글자 화면도 확인했다.
+- 최종 답변: SwiftUI 네이티브 앱의 주요 화면을 Android와 같은 디자인 체계로 맞췄고, 기존 여행·장소·지출 흐름을 검증했다. Git 푸시·배포는 진행하지 않았다.
+
+## 2026-09-27 — SwiftUI UI 통일 작업 이어서 마무리
+
+- ID: `K7pM2xR9cQ`
+- 사용자 요청: “이어서 진행”.
+- 수정 내용: 전체 회귀 검사에서 발견한 세 문제를 해결했다. 좁은 가로 화면의 지도·일정은 좌우 분할로 전환해 일정 목록 높이를 확보했다. 여행 기록 저장 뒤 키보드를 닫고 저장 목록으로 이동하며, 기록 편집 저장은 상단에서 누를 수 있게 했다. 카드형 지출 내역에는 직접 보이는 삭제 버튼을 추가했다. 최종 대표 화면을 Android 기준과 비교했다.
+- 검증: iPhone 17 Pro 전체 UI 테스트 17개, NativeCore 테스트 64개, iOS 시뮬레이터 빌드, `git diff --check`가 모두 통과했다. 작은 iPhone의 다크 모드·큰 글자 표시도 확인했다.
+- 최종 답변: SwiftUI 네이티브 앱의 Android 기준 화면 통일과 회귀 수정이 완료됐다. 두 플랫폼은 상태 표시줄·시스템 글꼴·안전 영역 차이 때문에 픽셀 단위로 완전히 동일하지는 않다. 지도 키가 없어 실제 지도 렌더링 검증은 남아 있다. Git 푸시·배포는 요청 범위가 아니어서 하지 않았다.
+
+## 2026-09-27 — Xcode에서 SwiftUI 앱 실행 방법 안내
+
+- ID: `N6vK3pR8aQ`
+- 사용자 요청: “이거 엑스코드에서 켜서 시뮬레이터로 확인하려고 하는데 방법 단계별로 알려줘 그대로 진행해락[”.
+- 확인: 프로젝트 위치는 `/Users/kkid_monj/Documents/Codex/GitHub/mkjmk-alt/TravelPlaner/ios/TravelPlaner.xcodeproj`이고, SwiftUI 미리보기 실행 스킴은 `TripPlotNativePreview`다. 사용 가능한 대상은 iPhone 17 Pro와 iPhone 17e 시뮬레이터다. `TravelPlaner`라는 별도 스킴은 출시용 WebView 앱이다.
+- 수정 내용: 소스 코드는 변경하지 않았다. 프로젝트 경로, 실행 스킴, 시뮬레이터 목록을 읽기 전용으로 확인해 Xcode 실행 단계를 안내한다.
+- 최종 답변: Xcode에서 `ios/TravelPlaner.xcodeproj`를 열고 스킴 `TripPlotNativePreview`, 실행 대상을 iPhone 17 Pro 또는 iPhone 17e로 선택한 뒤 Run(▶︎)/⌘R을 누르는 순서를 안내한다. 지도 키가 아직 없으면 지도가 준비 중 화면으로 보일 수 있다고 설명한다.
+
+## 2026-09-27 — Xcode 설치 서명 충돌 진단
+
+- ID: `X9bD4mQ7rP`
+- 사용자 요청: “‘트리블리’을(를) 설치할 수 없음” 오류와 application-identifier entitlement 불일치 메시지를 공유했다.
+- 확인: 오류 이벤트는 실제 iPhone(iPhone15,3, `iphoneos`)을 대상으로 했고, 설치 시도 산출물은 `TravelPlaner.app` / `com.travelplaner.app`이다. 현재 서명 팀 BTT4JXSL86과 기기에 설치된 앱의 팀 P3QCXGPNU9가 다르다. SwiftUI 실행 스킴 `TripPlotNativePreview`는 별도 번들 ID `com.travelplaner.app.nativepreview`를 쓴다.
+- 수정 내용: 코드는 수정하지 않았다. 실제 iPhone에 설치된 앱 삭제를 권하지 않고, 시뮬레이터와 SwiftUI 스킴을 정확히 선택하는 절차를 안내한다.
+- 최종 답변: Xcode에서 `TripPlotNativePreview` 스킴과 `iPhone 17 Pro (iOS Simulator)` 실행 대상을 고르고 ⌘R을 누르도록 안내한다. 오류의 원인은 실제 기기의 기존 앱 서명 팀과 현재 빌드 팀의 불일치이며, 기존 앱을 지우면 로컬 여행 데이터가 삭제될 수 있음을 알린다.
+
+## 2026-09-27 — Xcode 실행 스킴 변경 방법 안내
+
+- ID: `B6qT8mV2xR`
+- 사용자 요청: “실행 스킴을 어떻게 바꿔야할지 모르겟는디”.
+- 확인: 실행해야 할 SwiftUI 스킴은 `TripPlotNativePreview`이며 Xcode 메뉴 `Product > Scheme`에 공유 스킴으로 존재한다. 시뮬레이터는 실행 대상 메뉴에서 별도로 선택한다.
+- 수정 내용: 코드는 수정하지 않았다. Xcode 메뉴바를 이용한 스킴·시뮬레이터 변경 순서를 안내한다.
+- 최종 답변: `Product > Scheme > TripPlotNativePreview` 선택 후 `Product > Destination`에서 `iPhone 17 Pro` 시뮬레이터를 고르고 ⌘R로 실행하는 단계를 알려준다.
+
+## 2026-09-27 — 실제 iPhone 실행 선택 이유 설명
+
+- ID: `R4mC8vN2qL`
+- 사용자 요청: “왜 실제 연결된 아이폰은 고르지마??”.
+- 수정 내용: 프로젝트 코드는 변경하지 않았다. 앞선 설치 오류에서 확인한 서명 팀 충돌과 사용자가 원한 시뮬레이터 실행을 구분해 설명한다.
+- 최종 답변: 실제 iPhone 사용 자체가 금지된 것이 아니라, 현재 설치된 앱(P3QCXGPNU9)과 빌드(BTT4JXSL86)의 서명 팀이 달라 업데이트가 거절된 것이 원인이라고 설명한다. 시뮬레이터는 이번 확인 목적에 맞아 권한/기존 앱 충돌 없이 실행되며, 실기기 테스트는 서명 팀을 맞추거나 별도 번들 ID 앱으로 진행할 수 있다고 안내한다. 기존 앱 삭제는 로컬 데이터가 없어질 수 있어 피하도록 알린다.
+
+## 2026-09-27 — 실제 iPhone에서 SwiftUI 앱 실행 방법 안내
+
+- ID: `A8rT3mK6vQ`
+- 사용자 요청: “실제 아이폰에서 앱 확인해보고 싶은데 방법은 어떻게 해야해”.
+- 수정 내용: 앱 코드와 Xcode 설정은 변경하지 않았다. 기존 설치 앱의 서명/저장 데이터를 보존하면서 별도 번들 ID를 쓰는 `TripPlotNativePreview` 스킴을 실제 iPhone에 실행하는 절차를 정리했다.
+- 최종 답변: iPhone 연결·잠금 해제·컴퓨터 신뢰 및 개발자 모드 확인 후 Xcode에서 `TripPlotNativePreview` 스킴과 실제 iPhone을 선택하고, 해당 타깃의 Automatically manage signing과 개발 팀을 확인한 뒤 ⌘R로 실행하도록 안내한다. 번들 ID `com.travelplaner.app.nativepreview`를 유지하면 기존 `com.travelplaner.app`과 별도 설치되며, 앞서 오류가 났던 `TravelPlaner` 스킴은 기존 앱과 팀 서명 충돌이 있으니 선택하지 말라고 안내한다. 실행 후 신뢰 확인이 나오면 설정에서 개발자 앱을 신뢰하도록 덧붙인다. Apple의 [실기기 실행/서명 안내](https://developer.apple.com/documentation/xcode/running-your-app-on-simulated-or-physical-devices)와 [개발자 모드 안내](https://developer.apple.com/documentation/xcode/enabling-developer-mode-on-a-device)를 참고 링크로 제공한다.
+
+## 2026-09-27 — 한국 App Store 배포 지역 문의 답변
+
+- ID: `K4mQ8bV2nR`
+- 사용자 요청: “그리고 애플 계정이 한국계정이랑 미국 계정이 있는데, 한국계정이면 한국앱스토어에 배포할 수 있는거지?”
+- 수정 내용: 프로젝트 코드와 계정 설정은 변경하지 않았다. Apple 공식 App Store Connect 배포 지역 안내를 확인했다.
+- 최종 답변: 가능하다고 답한다. 개발자 계정의 국가/지역과 앱의 App Store 배포 지역은 별개이며, App Store Connect의 Pricing and Availability > App Availability에서 한국을 선택하거나 전 세계 배포를 선택할 수 있다. 미국 계정으로 등록된 개발자 멤버십이어도 한국을 배포 지역으로 설정할 수 있고, 앱 심사 통과 및 필요한 계약·세금·정산 정보 설정이 별도로 필요하다고 설명한다. 참고: [앱의 App Store 이용 가능 지역 관리](https://developer.apple.com/help/app-store-connect/manage-your-apps-availability/manage-availability-for-your-app-on-the-app-store).
+
+## 2026-09-27 — 한국/미국 Apple 계정 중 개발자 계정 선택 조언
+
+- ID: `D9wR4cN7kM`
+- 사용자 요청: “그럼 우선 한국 계정으로 배포하는게 낫겠네?”
+- 수정 내용: 프로젝트와 Apple 계정은 변경하지 않았다. Apple의 개발자 등록, App Store 판매자 표시, 정산 및 한국 세금정보 공식 문서를 확인했다.
+- 최종 답변: 한국에서 본인 또는 한국 사업체로 운영하고 한국 명의의 세금·정산 정보를 사용할 계획이면 한국 계정으로 개발자 멤버십을 운영하는 편이 자연스럽다고 권하되, 한국 App Store 배포만을 위해 한국 계정이 필수인 것은 아니라고 구분한다. 이미 앱 레코드/멤버십이 한 개발자 팀에 연결돼 있다면 그 팀을 유지하는 것을 우선 권하고, 본 프로젝트에서 기존 설치 앱 서명 팀 `P3QCXGPNU9`와 현재 Xcode 서명 팀 `BTT4JXSL86`가 달랐던 점을 들어 먼저 어느 팀이 실제 App Store Connect 앱과 연결돼 있는지 확인하라고 한다. 개인 등록 시 법적 개인 이름이 판매자명으로 표시되고, 조직 등록은 법인명 및 D‑U‑N‑S 확인이 필요하다고 설명한다. 유료 판매로 Apple에서 정산받을 경우 계정 기반 지역 세금 양식·은행 정보를 추가로 준비해야 한다고 안내한다. 참고: [Apple 개발자 프로그램 등록](https://developer.apple.com/programs/enroll/), [한국 개발자 세금 정보](https://developer.apple.com/help/app-store-connect/manage-tax-information/provide-tax-information), [은행 계좌 등록](https://developer.apple.com/help/app-store-connect/manage-banking-information/enter-banking-information).
+
+## 2026-09-27 — 실제 iPhone 설치·실행 시도 및 무료 프로파일 한도 확인
+
+- ID: `Z5nQ2dR8mL`
+- 사용자 요청: “실제 아이폰에서 작동해볼 수 있도록 해주세요”.
+- 확인: 실제 iPhone 14 Pro Max(UDID `00008120-00167CAE0C00C01E`)가 페어링되어 있고 개발자 모드가 켜져 있다. `TripPlotNativePreview` 실기기 Debug 빌드는 성공했으며 bundle ID는 `com.travelplaner.app.nativepreview`, signing team은 `BTT4JXSL86`이다. 최초 무선 설치 요청은 timeout됐으나 재시도에서 정확한 원인은 이 기기의 무료 개발자 프로파일 설치 한도(3개) 초과임이 확인됐다. 기존 설치 앱은 `com.travelplaner.app` 및 `app.yeongcha.leave`, `app.yeongcha.leave.nativeacceptance`이고 미리보기 bundle ID는 설치되지 않은 상태다.
+- 수정 내용: 코드와 기기 내 앱은 변경/삭제하지 않았다. 요청된 SwiftUI 앱을 별도 bundle ID로 서명·빌드하고 설치를 시도했으나 무료 개발자 프로파일 한도에 의해 차단됐다. 기존 앱 및 데이터 보호를 위해 임의 삭제하지 않았다.
+- 최종 답변: 빌드/서명은 성공했지만 iPhone 설치는 무료 개발자 프로파일 앱 한도 초과로 차단됐다고 알린다. 계속하려면 사용자가 직접 무료 개발자 서명 앱 하나를 제거해 슬롯을 비우거나 해당 팀의 유료 Apple Developer Program 멤버십을 활성화해야 한다. 어떤 기존 앱을 지울지 Codex가 임의로 결정하지 않으며, 트리블리 앱의 데이터 보호를 위해 삭제하지 않았다고 설명한다. 선택을 받은 후 미리보기 앱을 설치하고 실행할 수 있다.
+
+## 2026-09-27 — 기존 트리블리 앱을 네이티브 빌드로 교체
+
+- ID: `T6pN2xR9cA`
+- 사용자 요청: “기존의 트리블리 앱 교체해주세요”.
+- 수정 내용: 사용자가 교체 대상으로 지정한 기기의 `com.travelplaner.app` 앱만 제거하고, SwiftUI `TripPlotNativePreview` 타깃을 같은 번들 ID 및 표시 이름 `TripPlot`으로 빌드해 iPhone에 설치했다. 다른 두 무료 프로파일 앱은 변경하지 않았다. 프로젝트 소스 설정은 바꾸지 않았으며, 빌드 시 번들 ID와 표시 이름만 커맨드라인에서 덮어썼다.
+- 확인/검증: 빌드 성공, 서명 무결성 통과, 프로비저닝 프로파일의 Team ID와 application identifier 일치, 기기 UDID 포함. `devicectl`에서 새 `TripPlot` 앱이 `com.travelplaner.app`으로 설치된 것을 확인했다. 실행 시 iOS가 개발자 프로파일/신뢰 확인을 요구해 `SBMainWorkspace`가 실행을 거부했으며, 앱 코드를 실행하는 단계는 미완료다.
+- 최종 답변: 기존 트리블리 앱을 새 SwiftUI 앱으로 교체 설치했으나 iPhone에서 개발자 앱 신뢰 승인이 필요해 아직 실행되지 않았다고 설명한다. 사용자가 iPhone의 설정에서 개발자 앱을 신뢰한 후 알려주면 원격으로 다시 실행하고 확인할 수 있도록 안내한다. 교체 과정에서 기존 앱 데이터가 삭제됐으며, 계정 동기화나 기기 백업이 없는 로컬 데이터는 복구되지 않을 수 있음을 알린다.
+
+## 2026-09-27 — 실제 iPhone에서 교체 앱 실행 확인
+
+- ID: `G7kP2vM9cQ`
+- 사용자 요청: “네 했습니다.” (iPhone에서 개발자 앱 신뢰를 허용했다는 확인)
+- 수정 내용: 앱 코드나 프로젝트 설정은 변경하지 않았다. iPhone 14 Pro Max에서 `com.travelplaner.app`을 실행했다.
+- 확인/검증: `devicectl`이 앱 실행 성공을 보고했고, 프로세스 목록에서 `TripPlotNativePreview.app` 실행 프로세스를 확인했다. 기기 화면 캡처에서도 TripPlot 시작 화면과 하단 메뉴가 표시됨을 확인했다.
+- 최종 답변: 신뢰 승인 후 실제 iPhone에서 TripPlot 실행에 성공했고 화면 표시까지 확인했다고 알린다.
+
+## 2026-09-27 — 네이티브 앱에 웹 색상 테마 적용 가능성 확인
+
+- ID: `V8mK4qR2dL`
+- 사용자 요청: “좋아 현재의 틀을 그대로 유지한 채로 웹페이지의 색상 테마를 적용할 수 있는지 확인해줘”
+- 수정 내용: 앱 소스와 UI는 수정하지 않았다. 웹 CSS/React 인라인 색상, SwiftUI 테마와 화면, Android Material 테마를 읽기 전용으로 비교했다.
+- 확인: 기존 화면 배치와 색상을 분리해 네이티브 테마 토큰만 조정하는 방식이 가능하다. SwiftUI는 `NativePreviewTheme`, Android는 `lightColors`/`darkColors`가 중심이다. 웹은 보라(`#8b5cf6` 계열)와 파랑(`#2563eb`)을 주요 강조색으로 사용하고, 현금·정산 등 기능 색상(초록/주황/빨강)도 있다. 웹 색상은 중앙 토큰으로 통합돼 있지 않아 모든 화면의 완전한 일치를 원하면 별도 색상 매핑과 하드코딩된 일부 색상 점검이 필요하다. 네이티브는 현재 시스템 다크 모드를 따르며 웹 스타일은 사실상 라이트 중심이라 다크 모드 대응 여부는 구현 전에 결정할 사항이다.
+- 최종 답변: 현재 틀을 유지하면서 웹 테마 색상을 입히는 것은 가능하다고 안내한다. 색상 역할을 토큰으로 매핑하고, 지출 상태색과 지도 강조색은 의미를 살려 유지하며, 라이트/다크 모드 정책을 선택하면 된다고 제안한다. 이번 요청은 가능성 확인이므로 구현하지 않았다고 명시한다.
+
+## 2026-09-27 — 네이티브 앱에 웹 색상 테마 적용
+
+- ID: `Q6rM8vN3cT`
+- 사용자 요청: “넵 해주세요” (현재 화면 틀은 유지하고 네이티브 앱에 웹페이지의 색상 테마를 적용)
+- 수정 내용: SwiftUI 공통 테마와 Android Compose 라이트/다크 팔레트를 웹의 보라색 브랜드 강조색, 흰색·슬레이트 표면 색상에 맞췄다. 지도 검색·선택 액션은 파란색을 유지했고, 여행 대표 카드 그라데이션도 웹 브랜드 계열로 조정했다. 화면 배치와 레이아웃은 변경하지 않았다. 실제 렌더링 색을 확인하는 iOS·Android UI 회귀 테스트를 추가했다.
+- 확인/검증: iOS 시뮬레이터 UI 테스트 2개 통과(브랜드 색상과 탭 이동·안전 영역), Android 에뮬레이터 탭/여행 전환 테스트 통과 및 별도 테마 UI 테스트와 다크 모드 검증 통과. 양 플랫폼 앱을 실행해 화면도 확인했다.
+- 최종 답변: 웹페이지의 보라색 브랜드와 밝은 중립 색상을 iOS·Android 네이티브 앱에 적용했고, 지도 액션은 파란색으로 구분했다. 라이트/다크 모드를 모두 지원하며 기존 화면 구조는 유지했다. UI 테스트가 양쪽에서 통과했다고 알린다.
+
+## 2026-09-27 — 웹 지도 화면에만 검색창 표시 가능 여부 확인
+
+- ID: `K9bL4sW2mC`
+- 사용자 요청: “웹에서 검색바를 지도가 나오는 곳에만 나오게 가능할까?”
+- 수정 내용: 기능 코드는 수정하지 않았다. `src/App.jsx`의 전역 검색바 렌더링 위치와 `mobileRootPresentation.mapVisible`의 화면별 표시 상태를 확인했다.
+- 확인: 가능하다. 모바일/세로 태블릿에서는 `mobileRootPresentation.mapVisible` 조건을 이용해 지도 탭과 지도가 함께 보이는 분할 화면에만 검색바를 렌더링하고, 저장·더보기·지출 등 지도 없는 화면에서는 숨길 수 있다. 데스크탑은 지도가 사이드바 옆에 계속 보이므로 검색창을 유지하는 구성이 자연스럽다. 검색 입력 상태는 상위 `App`에 보관되므로 UI를 숨겨도 탭 이동으로 값이 초기화되지 않는다.
+- 최종 답변: 가능하다고 설명하고, 모바일/세로 태블릿은 실제 지도 표시 여부를 기준으로 검색창을 노출하며 데스크탑은 지도와 함께 유지하는 방향을 제안한다. 이번 요청에서는 구현하지 않았다고 알린다.
+
+## 2026-09-27 — 웹 검색창을 지도 노출 화면으로 한정
+
+- ID: `M7cR2vL9pA`
+- 사용자 요청: “넵 그렇게 해주세요” (모바일·세로 태블릿은 지도 영역에서만 검색창 표시, 데스크탑에서는 지도와 함께 유지)
+- 수정 내용: `src/appNavigation.js`에 화면 크기 모드와 지도 표시 상태를 기반으로 검색창 노출을 결정하는 함수를 추가했다. `src/App.jsx`에서 해당 조건으로 전역 검색창을 렌더링하도록 변경했다. 지도 없는 메뉴로 이동할 때 입력창 blur에서 자동완성 제안과 대기 중 요청을 정리하며 검색어 값은 유지된다. `tests/app-navigation.test.mjs`에 모바일 지도/비지도 및 데스크탑 표시 조건 테스트를 추가했다.
+- 확인/검증: 신규 테스트를 먼저 실행해 조건 함수가 없어 실패하는 것을 확인한 뒤 구현 후 통과했다. `npm test` 97개 통과, `npm run lint` 통과, `npm run build` 통과(기존 번들 크기 경고만 표시).
+- 최종 답변: 모바일·세로 태블릿에서는 실제 지도가 표시되는 지도 탭과 지도/일정 분할 화면에서만 검색창이 나오고, 저장·더보기·지출 등 지도 없는 메뉴에서는 숨는다고 안내한다. 데스크탑은 지도가 사이드바 옆에 계속 표시되므로 검색창을 유지한다고 안내한다. 이번 요청에서는 깃 푸시나 배포를 진행하지 않았다.
+
+## 2026-09-27 — 웹 검색창 변경 Git 푸시 및 Cloudflare Pages 배포
+
+- ID: `ISD6pVafO3`
+- 사용자 요청: “깃 푸시 및 배포”
+- 수정 내용: 지도 표시 상태에 따라 모바일/세로 태블릿의 검색창을 노출하는 웹 변경(`src/App.jsx`, `src/appNavigation.js`, `tests/app-navigation.test.mjs`)을 `main`에 반영했다. 기존에 로컬 `main`에 있던 parity 계획 문서 커밋도 함께 원격에 포함됐다. 작업 중인 네이티브 앱 소스 변경은 이번 웹 배포에 포함하지 않고 로컬 작업 트리에 보존했다.
+- Git/배포 확인: `git push origin main` 성공. 최종 원격 커밋은 `3959ae903476686b6de36b663c660cd6f529f1e9` (`fix: show mobile search only with map`). Cloudflare Pages의 `https://travelplaner-545.pages.dev/`가 HTTP 200을 반환하고 새 앱 번들(`App-DrUHU65l.js`)을 참조하는 것을 확인했다. 프로덕션 번들에서도 지도 표시 조건 아래 검색창을 렌더링하는 코드를 확인했다.
+- 검증: `npm test` 97개 통과, `npm run lint`, `npm run build`, `npm run native:security` 통과. Android 계측 테스트 31개 통과. iOS UI 테스트는 18개 중 15개 통과, 3개 실패(파일 가져오기 및 여행 목록 UI assertion 2건, 시뮬레이터의 `MarketPulseWidgets` 크래시 영향 1건)하여 네이티브 변경은 배포에서 제외했다.
+- 최종 답변: 웹 검색창 변경은 GitHub `main`에 푸시되고 Cloudflare Pages에 배포됐다고 알린다. 배포 주소와 커밋을 안내하며, 웹 검증은 통과했고 네이티브 UI 테스트 실패 때문에 네이티브 미커밋 변경은 그대로 보존해 이번 배포에서 제외했다고 설명한다.
