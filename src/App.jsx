@@ -6,11 +6,12 @@ import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, 
 import { supabase } from './supabaseClient';
 import { getMapAvailability } from './mapAvailability';
 import { getBottomNavigationItems, getMobileViewModeSheetMode } from './mobileSidebar';
-import { createNavigationHistoryState, getDefaultNavigationState, getMobileRootPresentation, getNavigationStateFromHistory, getTabSelection, normalizeNavigationState, shouldShowSearchBar } from './appNavigation';
+import { createNavigationHistoryState, getDefaultNavigationState, getMemoryPlaceNavigationSelection, getMobileRootPresentation, getNavigationStateFromHistory, getPlaceCoordinates, getTabSelection, getTripSubviewNavigationSelection, normalizeNavigationState, shouldShowMobileContextBar, shouldShowMobileMoreTripShortcuts, shouldShowSearchBar } from './appNavigation';
 import { getClosestMobileSheetMode, getMobileSheetPosition, getMobileSheetSnapPoints } from './mobileSheet';
 import { DISPLAY_MODES, getFreeSplitPanePosition, getResponsiveDisplayMode, getSaveStatusPresentation, getSidebarFooterVariant, getSplitSaveStatusPlacement, getSplitViewGridRows, getSplitViewScrollContainer, getViewportSize } from './splitView';
 import { BRAND_NAME_EN, BRAND_NAME_KO } from './brand';
 import TravelMemoryPanel from './TravelMemoryPanel';
+import TripRequiredEmptyState from './TripRequiredEmptyState';
 import { getJournalEntries, getTravelDetails } from './travelMemory';
 import { calculateSettlement, normalizeExpenseParticipants, normalizeSettlementParticipants } from './expenseSettlement';
 import { createCashWallet, getCashWalletCreationCurrency, removeCashWalletState } from './cashWallets';
@@ -1388,36 +1389,42 @@ function App() {
     if (windowSize.width < 768) setSheetMode('full');
   };
   const openTravelMemory = (tripId = activeTripId) => {
+    const selection = getTripSubviewNavigationSelection({
+      viewMode: 'memory',
+      activeTripId: tripId,
+      isBottomNavigationViewport
+    });
+    if (!selection) return;
     setIsMobileHeaderHidden(false);
-    setMobileRootTab('trips');
-    setViewMode('memory');
+    setMobileRootTab(selection.rootTab);
+    setViewMode(selection.viewMode);
     if (tripId) setActiveTripId(tripId);
-    updateTabSnapshot('trips', { viewMode: 'memory', activeTripId: tripId || null });
+    updateTabSnapshot(selection.rootTab, { viewMode: selection.viewMode, activeTripId: selection.activeTripId });
     if (windowSize.width < 768) setSheetMode('full');
   };
   const openMemoryPlace = (place) => {
-    const lat = Number(place?.lat);
-    const lng = Number(place?.lng);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    const coordinates = getPlaceCoordinates(place?.lat, place?.lng);
+    if (!coordinates) return;
 
     const mapPlace = {
       ...place,
       name: place.name || '일정 장소',
       displayName: place.name || '일정 장소',
       loc: place.address || '',
-      lat,
-      lng,
+      ...coordinates,
       emoji: place.emoji || '📍'
     };
     setSelectedPlace(mapPlace);
-    if (isBottomNavigationViewport) {
-      setMobileRootTab('map');
-      setViewMode('trips');
-      updateTabSnapshot('map', { viewMode: 'trips', activeTripId });
-      setSidebarOpen(false);
+    const mobileSelection = getMemoryPlaceNavigationSelection(isBottomNavigationViewport);
+    if (mobileSelection) {
+      setMobileRootTab(mobileSelection.rootTab);
+      setViewMode(mobileSelection.viewMode);
+      updateTabSnapshot(mobileSelection.rootTab, { viewMode: mobileSelection.viewMode, activeTripId });
+      setSidebarOpen(mobileSelection.showSidebar);
+      if (windowSize.width < 768) setSheetMode('full');
     }
     if (map) {
-      map.panTo({ lat, lng });
+      map.panTo(coordinates);
       map.setZoom(16);
     }
   };
@@ -1445,8 +1452,8 @@ function App() {
     setViewMode(selection.viewMode);
     if (selection.rootTab === 'trips' && selection.activeTripId) setActiveTripId(selection.activeTripId);
     updateTabSnapshot(selection.rootTab, { viewMode: selection.viewMode, activeTripId: nextActiveTripId });
-    setSidebarOpen(selection.rootTab !== 'map');
-    if (windowSize.width < 768 && selection.rootTab !== 'map') setSheetMode('full');
+    setSidebarOpen(true);
+    if (windowSize.width < 768) setSheetMode('full');
   };
 
   const handleSidebarScroll = (e) => {
@@ -2303,15 +2310,21 @@ function App() {
   };
 
   const openBudget = () => {
+    const selection = getTripSubviewNavigationSelection({
+      viewMode: 'budget',
+      activeTripId,
+      isBottomNavigationViewport
+    });
+    if (!selection) return;
     setIsMobileHeaderHidden(false);
-    setMobileRootTab('trips');
+    setMobileRootTab(selection.rootTab);
     setExpenseInput(current => ({
       ...current,
       day: getTodayExpenseDay(activeTrip),
       time: editingExpenseId ? current.time : getCurrentTimeInputValue()
     }));
-    setViewMode('budget');
-    updateTabSnapshot('trips', { viewMode: 'budget', activeTripId });
+    setViewMode(selection.viewMode);
+    updateTabSnapshot(selection.rootTab, { viewMode: selection.viewMode, activeTripId: selection.activeTripId });
   };
 
   const requestNotificationPermission = async () => {
@@ -4637,7 +4650,7 @@ function App() {
 
   return (
     <div
-      className={`app-container ${!sidebarOpen ? 'sidebar-closed' : ''} ${isReadOnlyTrip ? 'read-only-view' : ''} ${isSplitView ? 'split-view-mode' : ''} ${isBottomNavigationViewport && mobileRootTab === 'map' ? 'mobile-map-root' : ''}`}
+      className={`app-container ${!sidebarOpen ? 'sidebar-closed' : ''} ${isReadOnlyTrip ? 'read-only-view' : ''} ${isSplitView ? 'split-view-mode' : ''}`}
       style={{
         height: `${windowSize.height}px`,
         ...(isSplitView ? {
@@ -4947,7 +4960,7 @@ function App() {
               div::-webkit-scrollbar { display: none; }
             `}</style>
 
-            {isBottomNavigationViewport && ['itinerary', 'budget', 'memory'].includes(viewMode) && (
+            {shouldShowMobileContextBar({ isBottomNavigationViewport, viewMode }) && (
               <div className="mobile-context-bar">
                 <button
                   type="button"
@@ -5842,19 +5855,24 @@ function App() {
             )}
 
             {/* --- TRAVEL MEMORY MODE --- */}
-            {viewMode === 'memory' && activeTrip && (
-              <TravelMemoryPanel
-                key={activeTrip.id}
-                trip={activeTrip}
-                readOnly={isReadOnlyTrip}
-                onUpdateTrip={updateActiveTrip}
-                onOpenItinerary={openItinerary}
-                onOpenPlace={openMemoryPlace}
-              />
+            {viewMode === 'memory' && (
+              activeTrip ? (
+                <TravelMemoryPanel
+                  key={activeTrip.id}
+                  trip={activeTrip}
+                  readOnly={isReadOnlyTrip}
+                  onUpdateTrip={updateActiveTrip}
+                  onOpenItinerary={openItinerary}
+                  onOpenPlace={openMemoryPlace}
+                />
+              ) : (
+                <TripRequiredEmptyState viewMode="memory" onGoToTrips={() => handleBottomNavigationSelect('trips')} />
+              )
             )}
 
             {/* --- BUDGET MODE --- */}
             {viewMode === 'budget' && (
+              activeTrip ? (
               <>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '24px' }}>
                   <h2 className="menu-section-title">예산 및 지출</h2>
@@ -6373,6 +6391,9 @@ function App() {
                 </div>
                 </>)}
               </>
+              ) : (
+                <TripRequiredEmptyState viewMode="budget" onGoToTrips={() => handleBottomNavigationSelect('trips')} />
+              )
             )}
 
             {/* --- MORE MODE --- */}
@@ -6403,22 +6424,26 @@ function App() {
                         </span>
                         <ChevronRight size={16} aria-hidden="true" />
                       </button>
-                      <button type="button" className="mobile-more-item" onClick={openBudget}>
-                        <span className="mobile-more-item-icon is-green"><Wallet size={17} /></span>
-                        <span className="mobile-more-item-copy">
-                          <strong>예산·지출</strong>
-                          <small>지출을 기록하고 동행자별 정산을 확인합니다.</small>
-                        </span>
-                        <ChevronRight size={16} aria-hidden="true" />
-                      </button>
-                      <button type="button" className="mobile-more-item" onClick={() => openTravelMemory()}>
-                        <span className="mobile-more-item-icon is-sky"><FileText size={17} /></span>
-                        <span className="mobile-more-item-copy">
-                          <strong>여행 기록</strong>
-                          <small>여행 중 남긴 사진과 메모를 모아봅니다.</small>
-                        </span>
-                        <ChevronRight size={16} aria-hidden="true" />
-                      </button>
+                      {shouldShowMobileMoreTripShortcuts({ isBottomNavigationViewport }) && (
+                        <>
+                          <button type="button" className="mobile-more-item" onClick={openBudget}>
+                            <span className="mobile-more-item-icon is-green"><Wallet size={17} /></span>
+                            <span className="mobile-more-item-copy">
+                              <strong>예산·지출</strong>
+                              <small>지출을 기록하고 동행자별 정산을 확인합니다.</small>
+                            </span>
+                            <ChevronRight size={16} aria-hidden="true" />
+                          </button>
+                          <button type="button" className="mobile-more-item" onClick={() => openTravelMemory()}>
+                            <span className="mobile-more-item-icon is-sky"><FileText size={17} /></span>
+                            <span className="mobile-more-item-copy">
+                              <strong>여행 기록</strong>
+                              <small>여행 중 남긴 사진과 메모를 모아봅니다.</small>
+                            </span>
+                            <ChevronRight size={16} aria-hidden="true" />
+                          </button>
+                        </>
+                      )}
                       <button type="button" className="mobile-more-item" onClick={() => exportTripBackupAsJson(activeTrip)}>
                         <span className="mobile-more-item-icon is-slate"><Download size={17} /></span>
                         <span className="mobile-more-item-copy">
@@ -6490,10 +6515,12 @@ function App() {
               const isActive = mobileRootTab === item.key;
               const Icon = item.key === 'trips'
                 ? Plane
-                : item.key === 'map'
-                ? MapPin
                 : item.key === 'favorites'
                 ? Heart
+                : item.key === 'budget'
+                ? Wallet
+                : item.key === 'memory'
+                ? FileText
                 : Menu;
               return (
                 <button

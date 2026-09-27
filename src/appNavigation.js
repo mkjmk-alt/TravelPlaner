@@ -177,6 +177,37 @@ export const getTripRequiredPresentation = (viewMode) => {
   return null;
 };
 
+export const getTripSubviewNavigationSelection = ({ viewMode, activeTripId, isBottomNavigationViewport } = {}) => {
+  if (!['budget', 'memory'].includes(viewMode)) return null;
+  return {
+    rootTab: isBottomNavigationViewport ? viewMode : 'trips',
+    viewMode,
+    activeTripId: activeTripId ?? null
+  };
+};
+
+export const getPlaceCoordinates = (lat, lng) => {
+  if (lat === null || lat === undefined || lat === '' || lng === null || lng === undefined || lng === '') return null;
+  const latitude = Number(lat);
+  const longitude = Number(lng);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  return { lat: latitude, lng: longitude };
+};
+
+export const getMemoryPlaceNavigationSelection = (isBottomNavigationViewport) => (
+  isBottomNavigationViewport
+    ? { rootTab: 'trips', viewMode: 'trips', showSidebar: true }
+    : null
+);
+
+export const shouldShowMobileContextBar = ({ isBottomNavigationViewport, viewMode } = {}) => (
+  Boolean(isBottomNavigationViewport && viewMode === 'itinerary')
+);
+
+export const shouldShowMobileMoreTripShortcuts = ({ isBottomNavigationViewport } = {}) => (
+  !isBottomNavigationViewport
+);
+
 export const shouldShowSearchBar = ({ isBottomNavigationViewport, mapVisible } = {}) => (
   !isBottomNavigationViewport || Boolean(mapVisible)
 );

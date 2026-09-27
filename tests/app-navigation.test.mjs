@@ -10,7 +10,12 @@ import {
   createNavigationHistoryState,
   normalizeNavigationState,
   getMobileRootPresentation,
-  getTripRequiredPresentation
+  getTripRequiredPresentation,
+  getTripSubviewNavigationSelection,
+  getPlaceCoordinates,
+  getMemoryPlaceNavigationSelection,
+  shouldShowMobileContextBar,
+  shouldShowMobileMoreTripShortcuts
 } from '../src/appNavigation.js';
 
 test('provides a stable start state with five independent tab snapshots', () => {
@@ -184,6 +189,41 @@ test('provides a trip-required message and trips action for budget and memory', 
     actionLabel: '내 여행으로 이동'
   });
   assert.equal(getTripRequiredPresentation('trips'), null);
+});
+
+test('opens budget and memory as root tabs only in bottom-navigation viewports', () => {
+  assert.deepEqual(getTripSubviewNavigationSelection({
+    viewMode: 'budget', activeTripId: 'trip-1', isBottomNavigationViewport: true
+  }), { rootTab: 'budget', viewMode: 'budget', activeTripId: 'trip-1' });
+  assert.deepEqual(getTripSubviewNavigationSelection({
+    viewMode: 'memory', activeTripId: null, isBottomNavigationViewport: true
+  }), { rootTab: 'memory', viewMode: 'memory', activeTripId: null });
+  assert.deepEqual(getTripSubviewNavigationSelection({
+    viewMode: 'budget', activeTripId: 'trip-1', isBottomNavigationViewport: false
+  }), { rootTab: 'trips', viewMode: 'budget', activeTripId: 'trip-1' });
+  assert.equal(getTripSubviewNavigationSelection({
+    viewMode: 'favorites', activeTripId: 'trip-1', isBottomNavigationViewport: true
+  }), null);
+});
+
+test('rejects unusable place coordinates and returns a trips-split destination for mobile', () => {
+  assert.deepEqual(getPlaceCoordinates('35.6812', '139.7671'), { lat: 35.6812, lng: 139.7671 });
+  assert.equal(getPlaceCoordinates('', 139.7671), null);
+  assert.equal(getPlaceCoordinates(null, 139.7671), null);
+  assert.equal(getPlaceCoordinates('north', 139.7671), null);
+  assert.deepEqual(getMemoryPlaceNavigationSelection(true), {
+    rootTab: 'trips', viewMode: 'trips', showSidebar: true
+  });
+  assert.equal(getMemoryPlaceNavigationSelection(false), null);
+});
+
+test('shows mobile context and duplicate more shortcuts only where appropriate', () => {
+  assert.equal(shouldShowMobileContextBar({ isBottomNavigationViewport: true, viewMode: 'itinerary' }), true);
+  assert.equal(shouldShowMobileContextBar({ isBottomNavigationViewport: true, viewMode: 'budget' }), false);
+  assert.equal(shouldShowMobileContextBar({ isBottomNavigationViewport: true, viewMode: 'memory' }), false);
+  assert.equal(shouldShowMobileContextBar({ isBottomNavigationViewport: false, viewMode: 'itinerary' }), false);
+  assert.equal(shouldShowMobileMoreTripShortcuts({ isBottomNavigationViewport: true }), false);
+  assert.equal(shouldShowMobileMoreTripShortcuts({ isBottomNavigationViewport: false }), true);
 });
 
 test('shows the search bar only when a bottom-navigation screen also shows the map', () => {
