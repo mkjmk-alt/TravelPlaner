@@ -118,21 +118,22 @@ export const normalizeNavigationState = (state, availableTripIds = []) => {
   };
 };
 
-export const getTabSelection = ({ currentRootTab, key, tabSnapshots } = {}) => {
+export const getTabSelection = ({ currentRootTab, key, tabSnapshots, activeTripId } = {}) => {
   const rootTab = ROOT_TABS.includes(key) ? key : 'trips';
   const snapshot = tabSnapshots?.[rootTab];
+  const selectedTripId = activeTripId ?? snapshot?.activeTripId ?? null;
   if (currentRootTab === rootTab) {
     return {
       rootTab,
       viewMode: getDefaultViewMode(rootTab),
-      activeTripId: snapshot?.activeTripId ?? null
+      activeTripId: selectedTripId
     };
   }
 
   return {
     rootTab,
     viewMode: snapshot?.viewMode || getDefaultViewMode(rootTab),
-    activeTripId: snapshot?.activeTripId ?? null
+    activeTripId: selectedTripId
   };
 };
 
@@ -142,14 +143,15 @@ export const createNavigationHistoryState = (state) => ({
   tabSnapshots: state?.tabSnapshots || createDefaultSnapshots()
 });
 
-export const getNavigationStateFromHistory = (historyState) => {
+export const getNavigationStateFromHistory = (historyState, availableTripIds) => {
   if (!historyState?.[APP_NAVIGATION_HISTORY_KEY]) return null;
-  return {
+  const state = {
     rootTab: historyState.rootTab,
     viewMode: historyState.viewMode,
     activeTripId: historyState.activeTripId ?? null,
     tabSnapshots: historyState.tabSnapshots || createDefaultSnapshots()
   };
+  return availableTripIds === undefined ? state : normalizeNavigationState(state, availableTripIds);
 };
 
 export const getMobileRootPresentation = ({ rootTab, viewMode } = {}) => {

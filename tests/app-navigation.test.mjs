@@ -53,6 +53,20 @@ test('restores a tab snapshot and resets the selected tab to its root', () => {
   });
 });
 
+test('uses the current trip when a destination tab has a stale trip snapshot', () => {
+  const snapshots = {
+    trips: { viewMode: 'itinerary', activeTripId: 'trip-current' },
+    favorites: { viewMode: 'favorites', activeTripId: 'trip-current' },
+    budget: { viewMode: 'budget', activeTripId: 'trip-old' },
+    memory: { viewMode: 'memory', activeTripId: 'trip-old' },
+    more: { viewMode: 'more', activeTripId: 'trip-current' }
+  };
+
+  assert.deepEqual(getTabSelection({
+    currentRootTab: 'trips', key: 'budget', tabSnapshots: snapshots, activeTripId: 'trip-current'
+  }), { rootTab: 'budget', viewMode: 'budget', activeTripId: 'trip-current' });
+});
+
 test('keeps the memory root but clears a deleted trip so its empty state can render', () => {
   const state = {
     rootTab: 'memory',
@@ -155,6 +169,24 @@ test('round-trips five-root app navigation through browser history state', () =>
     tabSnapshots: { map: { viewMode: 'trips', activeTripId: 'trip-1' } }
   });
   assert.equal(normalizeNavigationState(getNavigationStateFromHistory(legacyHistory), ['trip-1']).rootTab, 'trips');
+  assert.deepEqual(getNavigationStateFromHistory(legacyHistory, ['trip-1']), {
+    rootTab: 'trips',
+    viewMode: 'trips',
+    activeTripId: 'trip-1',
+    tabSnapshots: {
+      trips: { viewMode: 'trips', activeTripId: 'trip-1' },
+      favorites: { viewMode: 'favorites', activeTripId: null },
+      budget: { viewMode: 'budget', activeTripId: null },
+      memory: { viewMode: 'memory', activeTripId: null },
+      more: { viewMode: 'more', activeTripId: null }
+    }
+  });
+
+  const readOnlyHistory = createNavigationHistoryState({
+    rootTab: 'trips', viewMode: 'itinerary', activeTripId: 'readonly-share-1',
+    tabSnapshots: { trips: { viewMode: 'itinerary', activeTripId: 'readonly-share-1' } }
+  });
+  assert.equal(getNavigationStateFromHistory(readOnlyHistory, ['readonly-share-1']).activeTripId, 'readonly-share-1');
 });
 
 test('uses the trips split for maps and content-only roots for every other tab', () => {
@@ -227,14 +259,20 @@ test('shows mobile context and duplicate more shortcuts only where appropriate',
 });
 
 test('shows the search bar only when a bottom-navigation screen also shows the map', () => {
-  const cases = [
-    [{ isBottomNavigationViewport: true, mapVisible: true }, true],
-    [{ isBottomNavigationViewport: true, mapVisible: false }, false],
-    [{ isBottomNavigationViewport: false, mapVisible: true }, true],
-    [{ isBottomNavigationViewport: false, mapVisible: false }, true]
+  const mobileCases = [
+    ['trips', 'trips', true],
+    ['trips', 'itinerary', true],
+    ['favorites', 'favorites', false],
+    ['budget', 'budget', false],
+    ['memory', 'memory', false],
+    ['more', 'more', false]
   ];
 
-  for (const [viewport, expected] of cases) {
-    assert.equal(appNavigation.shouldShowSearchBar?.(viewport), expected);
+  for (const [rootTab, viewMode, expected] of mobileCases) {
+    const { mapVisible } = appNavigation.getMobileRootPresentation({ rootTab, viewMode });
+    assert.equal(appNavigation.shouldShowSearchBar({ isBottomNavigationViewport: true, mapVisible }), expected);
   }
+
+  assert.equal(appNavigation.shouldShowSearchBar({ isBottomNavigationViewport: false, mapVisible: true }), true);
+  assert.equal(appNavigation.shouldShowSearchBar({ isBottomNavigationViewport: false, mapVisible: false }), true);
 });

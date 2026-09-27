@@ -1444,14 +1444,14 @@ function App() {
     const selection = getTabSelection({
       currentRootTab: mobileRootTab,
       key,
-      tabSnapshots
+      tabSnapshots,
+      activeTripId
     });
-    const nextActiveTripId = selection.activeTripId || activeTripId || null;
     setIsMobileHeaderHidden(false);
     setMobileRootTab(selection.rootTab);
     setViewMode(selection.viewMode);
-    if (selection.rootTab === 'trips' && selection.activeTripId) setActiveTripId(selection.activeTripId);
-    updateTabSnapshot(selection.rootTab, { viewMode: selection.viewMode, activeTripId: nextActiveTripId });
+    if (selection.activeTripId !== activeTripId) setActiveTripId(selection.activeTripId);
+    updateTabSnapshot(selection.rootTab, { viewMode: selection.viewMode, activeTripId: selection.activeTripId });
     setSidebarOpen(true);
     if (windowSize.width < 768) setSheetMode('full');
   };
@@ -1972,7 +1972,9 @@ function App() {
 
   useEffect(() => {
     const restoreNavigationFromHistory = (event) => {
-      const nextState = getNavigationStateFromHistory(event.state);
+      const availableTripIds = (trips || []).map(trip => trip.id);
+      if (readOnlySharedTrip?.sharedId) availableTripIds.push(`readonly-${readOnlySharedTrip.sharedId}`);
+      const nextState = getNavigationStateFromHistory(event.state, availableTripIds);
       if (!nextState) return;
 
       skipNavigationHistoryPushRef.current = true;
@@ -1981,12 +1983,12 @@ function App() {
       setActiveTripId(nextState.activeTripId);
       setTabSnapshots(nextState.tabSnapshots);
       setIsMobileHeaderHidden(false);
-      if (window.innerWidth < 768) setSheetMode(nextState.rootTab === 'map' ? 'collapsed' : 'full');
+      if (window.innerWidth < 768) setSheetMode('full');
     };
 
     window.addEventListener('popstate', restoreNavigationFromHistory);
     return () => window.removeEventListener('popstate', restoreNavigationFromHistory);
-  }, []);
+  }, [readOnlySharedTrip, trips]);
 
   // Also clear a test trip that may still be held by an already-open local page.
   useEffect(() => {
