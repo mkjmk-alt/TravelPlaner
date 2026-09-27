@@ -7,33 +7,34 @@ import {
   getMobileViewModeSheetMode
 } from '../src/mobileSidebar.js';
 
-test('provides the four primary destinations in a stable order', () => {
+test('provides the five primary destinations in a stable order', () => {
   assert.deepEqual(
     getBottomNavigationItems(),
     [
       { key: 'trips', label: '내 여행' },
-      { key: 'map', label: '지도' },
       { key: 'favorites', label: '저장' },
+      { key: 'budget', label: '예산·지출' },
+      { key: 'memory', label: '여행 기록' },
       { key: 'more', label: '더보기' }
     ]
   );
 });
 
 test('maps bottom navigation selections to the correct root screen behavior', () => {
+  const selections = [
+    ['trips', { rootTab: 'trips', viewMode: 'trips', showSidebar: true }],
+    ['favorites', { rootTab: 'favorites', viewMode: 'favorites', showSidebar: true }],
+    ['budget', { rootTab: 'budget', viewMode: 'budget', showSidebar: true }],
+    ['memory', { rootTab: 'memory', viewMode: 'memory', showSidebar: true }],
+    ['more', { rootTab: 'more', viewMode: 'more', showSidebar: true }]
+  ];
+
+  for (const [key, expected] of selections) {
+    assert.deepEqual(getBottomNavigationSelection(key), expected);
+  }
+
   assert.deepEqual(getBottomNavigationSelection('map'), {
-    rootTab: 'map',
-    viewMode: 'trips',
-    showSidebar: false
-  });
-  assert.deepEqual(getBottomNavigationSelection('favorites'), {
-    rootTab: 'favorites',
-    viewMode: 'favorites',
-    showSidebar: true
-  });
-  assert.deepEqual(getBottomNavigationSelection('more'), {
-    rootTab: 'more',
-    viewMode: 'more',
-    showSidebar: true
+    rootTab: 'trips', viewMode: 'trips', showSidebar: true
   });
   assert.deepEqual(getBottomNavigationSelection('unknown'), {
     rootTab: 'trips',
