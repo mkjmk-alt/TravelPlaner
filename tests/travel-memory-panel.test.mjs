@@ -36,5 +36,6 @@ test('organizes saved memories as a day-filtered chronological timeline', () => 
 
 test('passes a map focus callback into the travel memory panel', () => {
   assert.match(appSource, /onOpenPlace=\{openMemoryPlace\}/);
-  assert.match(appSource, /map\.panTo\(coordinates\)/);
+  assert.match(appSource, /setPendingMemoryMapFocus\(coordinates\)/);
+  assert.match(appSource, /runOrQueueMapCameraAction\(mapRef, pendingMapCameraActionRef, \(activeMap\) => \{\s*activeMap\.panTo\(pendingMemoryMapFocus\);\s*activeMap\.setZoom\(16\);/);
 });

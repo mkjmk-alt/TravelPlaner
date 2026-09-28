@@ -185,6 +185,56 @@ body {
   animation: spin 1s linear infinite;
 }
 
+.map-pane-loading-state,
+.map-pane-error-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  box-sizing: border-box;
+  background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 52%, #ecfdf5 100%);
+  color: #64748b;
+  text-align: center;
+}
+
+.map-pane-error-state > svg {
+  color: #94a3b8;
+}
+
+.map-pane-error-state strong {
+  color: #334155;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.map-pane-error-state p {
+  max-width: 340px;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.map-pane-error-state button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 4px;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 12px;
+  background: #2563eb;
+  color: #fff;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
 @media (max-width: 768px) {
   .sidebar-container {
     top: auto;
@@ -230,15 +280,124 @@ body {
 
 .sidebar-header {
   touch-action: none;
+  container-name: trip-header;
+  container-type: inline-size;
 }
 
 .sidebar-brand-auth-row {
-  gap: 12px;
+  display: grid;
+  grid-template-areas: "brand auth";
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px 10px;
+  margin-bottom: 20px;
+}
+
+.sidebar-brand-auth-row--with-actions {
+  grid-template-areas: "brand auth" "actions actions";
 }
 
 .sidebar-brand-copy {
-  flex: 1 1 auto;
+  grid-area: brand;
+}
+
+.sidebar-auth-actions {
+  grid-area: auth;
+  justify-self: end;
   min-width: 0;
+}
+
+.trip-home-actions {
+  grid-area: actions;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.trip-home-action {
+  min-width: 0;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 10px;
+  border: 1px solid;
+  border-radius: 13px;
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+  transition: filter 0.2s, transform 0.2s;
+}
+
+.trip-home-action:hover {
+  filter: brightness(0.98);
+}
+
+.trip-home-action:active {
+  transform: scale(0.98);
+}
+
+.trip-home-action:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.trip-home-action--primary {
+  grid-column: 1 / -1;
+  color: white;
+  background: #8b5cf6;
+  border-color: #8b5cf6;
+  box-shadow: 0 6px 12px -5px rgba(139, 92, 246, 0.42);
+}
+
+.trip-home-action--ai {
+  color: #4f46e5;
+  background: #f5f7ff;
+  border-color: #e0e7ff;
+}
+
+.trip-home-action--join {
+  color: #059669;
+  background: #f0fdf4;
+  border-color: #dcfce7;
+}
+
+.trip-home-action--install {
+  color: #2563eb;
+  background: #eff6ff;
+  border-color: #dbeafe;
+}
+
+@container trip-header (min-width: 900px) {
+  .sidebar-brand-auth-row--with-actions {
+    grid-template-areas: "brand actions auth";
+    grid-template-columns: minmax(150px, 0.9fr) minmax(0, 2fr) auto;
+    column-gap: 18px;
+  }
+
+  .trip-home-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .trip-home-action {
+    flex: 1 1 auto;
+    min-height: 42px;
+    padding: 7px 10px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .trip-home-action--primary {
+    flex: 1.25 1 auto;
+    box-shadow: 0 4px 8px -5px rgba(139, 92, 246, 0.4);
+  }
 }
 
 /* Alternate layout: map and itinerary become actual grid rows instead of an
@@ -553,42 +712,6 @@ body {
   font-weight: 800;
 }
 
-.trip-action-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-auto-rows: minmax(64px, auto);
-  gap: 10px;
-}
-
-.trip-action-button {
-  min-width: 0;
-  min-height: 64px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 10px 8px;
-  border: 1px solid;
-  border-radius: 16px;
-  font-size: 13px;
-  font-weight: 800;
-  line-height: 1.25;
-  text-align: center;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-@media (max-width: 390px) {
-  .trip-action-grid {
-    gap: 8px;
-  }
-
-  .trip-action-button {
-    min-height: 58px;
-    padding: 9px 7px;
-    font-size: 12px;
-  }
-}
 
 /* Expense entry form */
 .expense-form-row {
@@ -2445,7 +2568,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
 @media (max-width: 768px) {
   .sidebar-header {
-    max-height: 300px;
+    max-height: 360px;
     overflow: hidden;
     transition: max-height 0.25s ease, padding 0.25s ease, opacity 0.2s ease, border-color 0.2s ease;
   }
