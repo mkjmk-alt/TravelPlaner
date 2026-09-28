@@ -161,7 +161,20 @@ export const getMobileRootPresentation = ({ rootTab, viewMode } = {}) => {
   return { mapVisible: false, contentVisible: true, split: false };
 };
 
-export const getTripRequiredPresentation = (viewMode) => {
+export const getTripRequiredPresentation = (viewMode, { isReadOnlyTrip = false } = {}) => {
+  if (viewMode === 'place') {
+    return isReadOnlyTrip
+      ? {
+          title: '공유된 여행은 조회 전용이에요.',
+          message: '장소를 일정에 추가하려면 내 여행에서 편집 가능한 여행을 선택해주세요.',
+          actionLabel: null
+        }
+      : {
+          title: '여행을 선택하면 일정에 추가할 수 있어요.',
+          message: '내 여행에서 여행을 선택하거나 새로 만든 뒤 장소를 다시 열어주세요.',
+          actionLabel: '내 여행으로 이동'
+        };
+  }
   if (viewMode === 'budget') {
     return {
       title: '예산·지출',

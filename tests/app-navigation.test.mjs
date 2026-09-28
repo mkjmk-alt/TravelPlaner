@@ -223,6 +223,22 @@ test('provides a trip-required message and trips action for budget and memory', 
   assert.equal(getTripRequiredPresentation('trips'), null);
 });
 
+test('explains that a trip is required before adding a selected place to the itinerary', () => {
+  assert.deepEqual(getTripRequiredPresentation('place'), {
+    title: '여행을 선택하면 일정에 추가할 수 있어요.',
+    message: '내 여행에서 여행을 선택하거나 새로 만든 뒤 장소를 다시 열어주세요.',
+    actionLabel: '내 여행으로 이동'
+  });
+});
+
+test('explains why a place cannot be added from a read-only shared trip', () => {
+  assert.deepEqual(getTripRequiredPresentation('place', { isReadOnlyTrip: true }), {
+    title: '공유된 여행은 조회 전용이에요.',
+    message: '장소를 일정에 추가하려면 내 여행에서 편집 가능한 여행을 선택해주세요.',
+    actionLabel: null
+  });
+});
+
 test('opens budget and memory as root tabs only in bottom-navigation viewports', () => {
   assert.deepEqual(getTripSubviewNavigationSelection({
     viewMode: 'budget', activeTripId: 'trip-1', isBottomNavigationViewport: true

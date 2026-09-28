@@ -4157,6 +4157,7 @@ function App() {
   const expenseCurrencyQuickValue = expenseQuickCurrencyCodes.includes(selectedExpenseCurrency) ? selectedExpenseCurrency : '';
   const expenseCurrencyAdditionalValue = expenseCurrencyAdditionalChoices.includes(selectedExpenseCurrency) ? selectedExpenseCurrency : '';
   const useFloatingPlacePanel = true;
+  const canAddSelectedPlaceToItinerary = Boolean(activeTripId && !isReadOnlyTrip);
   const selectedPlaceOpeningHours = getOpeningHours(selectedPlace);
   const selectedPlaceBusinessStatus = getBusinessStatusLabel(selectedPlace?.businessStatus);
 
@@ -7084,9 +7085,9 @@ function App() {
       </div>
 
       {selectedPlace && (
-        <div className="mobile-place-add-overlay" role="dialog" aria-modal="true" aria-label="장소를 일정에 추가">
+        <div className="mobile-place-add-overlay" role="dialog" aria-modal="true" aria-label={canAddSelectedPlaceToItinerary ? '장소를 일정에 추가' : '장소 정보 및 여행 안내'}>
           <div
-            className="mobile-place-add-panel"
+            className={`mobile-place-add-panel${canAddSelectedPlaceToItinerary ? ' is-editable' : ' is-guidance'}`}
             onPointerDown={(event) => event.stopPropagation()}
             onTouchMove={(event) => event.stopPropagation()}
           >
@@ -7131,14 +7132,32 @@ function App() {
                     type="button"
                     className="mobile-place-add-close"
                     onClick={() => setSelectedPlace(null)}
-                    aria-label="장소 추가 창 닫기"
+                    aria-label="장소 정보 창 닫기"
                   >
                     <X size={18} />
                   </button>
                 </div>
               </div>
 
-              {activeTripId && !isReadOnlyTrip && (
+              {!canAddSelectedPlaceToItinerary && (
+                <TripRequiredEmptyState
+                  viewMode="place"
+                  isReadOnlyTrip={isReadOnlyTrip}
+                  compact
+                  onGoToTrips={() => {
+                    setSelectedPlace(null);
+                    setIsMobileHeaderHidden(false);
+                    setActiveTripId(null);
+                    setMobileRootTab('trips');
+                    setViewMode('trips');
+                    updateTabSnapshot('trips', { viewMode: 'trips', activeTripId: null });
+                    setSidebarOpen(true);
+                    if (windowSize.width < 768) setSheetMode('full');
+                  }}
+                />
+              )}
+
+              {canAddSelectedPlaceToItinerary && (
                 <div style={{ backgroundColor: '#f8fafc', padding: '12px', borderRadius: '14px', border: '1px solid #f1f5f9' }}>
                   <div style={{ fontSize: '10px', fontWeight: '900', color: '#64748b', marginBottom: '8px' }}>일차 선택</div>
                   <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', overflowX: 'auto', paddingBottom: '2px' }}>
@@ -7200,7 +7219,7 @@ function App() {
                 </div>
               )}
             </div>
-            {activeTripId && !isReadOnlyTrip && (
+            {canAddSelectedPlaceToItinerary && (
               <button
                 type="button"
                 className="mobile-place-add-button"

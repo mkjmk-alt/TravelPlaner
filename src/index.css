@@ -3094,6 +3094,38 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   }
 }
 
+.mobile-place-add-panel.is-guidance {
+  height: auto;
+  min-height: 0;
+  max-height: calc(100dvh - 48px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+}
+
+.mobile-place-add-panel.is-guidance .mobile-place-add-content {
+  flex: 0 1 auto;
+}
+
+.mobile-place-add-panel.is-editable {
+  height: auto;
+  min-height: 0;
+  max-height: calc(100dvh - 48px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+}
+
+.mobile-place-add-panel.is-editable .mobile-place-add-content {
+  flex: 0 1 auto;
+}
+
+@media (max-width: 768px) {
+  .mobile-place-add-panel.is-guidance {
+    bottom: auto;
+    max-height: calc(100dvh - 210px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
+
+  .mobile-place-add-panel.is-editable {
+    bottom: auto;
+    max-height: calc(100dvh - 210px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
+}
+
 /* Travel Mapmory-inspired trip memory surface. Keep it inside the existing
    sidebar scroll region so classic and split layouts share the same behavior. */
 .travel-memory-panel {
@@ -3881,6 +3913,52 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   background: #6d28d9;
   outline: 2px solid #c4b5fd;
   outline-offset: 2px;
+}
+
+.trip-required-empty-state.is-compact {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px 10px;
+  width: 100%;
+  margin: 0 0 8px;
+  padding: 12px;
+  border-color: #dbeafe;
+  border-radius: 14px;
+  background: #f8fbff;
+  box-shadow: none;
+}
+
+.trip-required-empty-state.is-compact .trip-required-empty-state-icon {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.trip-required-empty-state.is-compact h2 {
+  grid-column: 2;
+  margin: 0;
+  color: #1e3a8a;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.trip-required-empty-state.is-compact p {
+  grid-column: 2;
+  margin: 0;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.trip-required-empty-state.is-compact button {
+  grid-column: 1 / -1;
+  width: 100%;
+  margin-top: 4px;
 }
 
 @media (max-width: 1024px) {
