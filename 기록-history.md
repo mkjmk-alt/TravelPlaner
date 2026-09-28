@@ -1752,3 +1752,30 @@
 - Git/배포 확인: 커밋 `0fbfa09a981acf7ba2402a74ef81c139f385aa19`까지 `main`에 푸시됐다(앞선 로컬 계획 문서 커밋 `e84e17c` 포함). `https://travelplaner-545.pages.dev/`가 HTTP 200을 반환하고, 배포된 앱 청크가 지연 지도 청크 `MapPane-tr5YUk-Y.js`를 참조하며 해당 파일도 HTTP 200으로 제공되는 것을 확인했다.
 - 검증: `npm test` 118개 통과, `npm run build` 통과(App 457.18 kB, 지도 170.47 kB), 변경 웹 JS ESLint 및 `npm run native:security`, `git diff --check` 통과. 전체 `npm run lint`는 `.worktrees`와 생성된 `dist`까지 검사해 생성/의존성 코드에서 715건을 보고했으므로 저장소 전체 lint 성공으로 간주하지 않는다.
 - 최종 답변: 웹 변경을 GitHub `main`에 푸시하고 Cloudflare Pages 프로덕션 배포를 확인했다고 알린다. 배포 주소, 커밋, 테스트·빌드 검증을 안내하며 iOS·Android 로컬 변경은 보존했고 이번 푸시에 포함하지 않았다고 알린다.
+
+## 2026-09-28 — TripPlot 홈 액션을 브랜드 옆으로 더 가깝게 배치 요청
+
+- ID: `ziCenMQGor`
+- 사용자 요청: “여기서 아예 tripplot의 오른쪽 옆으로 옮겨서 그 아랫쪽으로 공간이 넓어져서 여행 리스트들을 더 잘 볼 수 있게 해줘”
+- 조사 내용: `src/index.css`에서 헤더 컨테이너 폭이 900px 이상일 때에만 브랜드·액션·인증 버튼을 한 줄로 배치하며, 그보다 좁으면 액션 그룹이 별도 행을 차지하는 것을 확인했다. `src/App.jsx`에서 여행 리스트는 헤더 뒤에 렌더링되어 액션 행 높이만큼 아래로 밀린다.
+- 제안한 수정 방향: 데스크톱·태블릿에서 액션 그룹이 TripPlot 오른쪽 한 줄에 들어가도록 컨테이너 기준을 약 700px로 낮추고 버튼을 조밀하게 만든다. 매우 좁은 휴대폰 화면은 글자 겹침 방지를 위해 현재의 줄바꿈을 유지한다. 구현 전 사용자 확인을 요청했다.
+- 수정 내용: 제품 코드는 수정하지 않았다. 사용자가 반응형 배치 기준을 확인하면 이어서 구현한다.
+- 최종 답변: 현재 900px breakpoint 때문에 좁은 사이드바에서 버튼이 다음 줄로 내려가는 점을 설명하고, 데스크톱·태블릿은 TripPlot 옆 한 줄, 좁은 모바일은 줄바꿈을 유지하는 설계를 제안해 진행 여부를 묻는다.
+
+## 2026-09-28 — TripPlot 홈 액션 배치 반응형 개선
+
+- ID: `KDMeM5epI6`
+- 사용자 요청: “넵 그렇게 해주세요” (TripPlot 오른쪽에 주요 액션을 배치하고, 모바일 좁은 화면에서는 겹치지 않도록 줄바꿈 유지)
+- 수정 내용: `src/index.css`의 한 줄 배치 컨테이너 기준을 900px에서 700px로 낮췄다. 그 폭에서 버튼 간격·높이·패딩·글자 크기를 조금 줄이고 액션 그룹에 줄바꿈을 허용해 선택적 앱 설치 버튼도 넘치지 않게 했다. 700px 미만의 기존 모바일 그리드 배치는 유지했다. `tests/trip-home-actions.test.mjs`에 새 폭과 좁은 화면 fallback 검증을 반영했다.
+- 확인/검증: 먼저 기존 900px 기준에서 새 700px 회귀 테스트가 실패하는 것을 확인한 후 구현했다. 변경된 테스트 4/4 및 전체 `npm test` 118/118 통과, `npm run build`, 변경 JS 파일 ESLint, `git diff --check` 통과.
+- Git/배포: 요청 범위에 푸시·배포는 없어서 진행하지 않았다. iOS·Android의 기존 로컬 수정은 그대로 보존했다.
+- 최종 답변: 데스크톱·태블릿에서 700px 이상의 헤더 폭이면 액션 버튼이 TripPlot 옆 한 줄로 배치되고, 좁은 모바일에서는 겹치지 않게 줄바꿈을 유지한다고 안내한다. 테스트·빌드 결과와 미배포 상태를 알린다.
+
+## 2026-09-28 — TripPlot 홈 액션 반응형 변경 Git 푸시 및 배포
+
+- ID: `uY10458aBB`
+- 사용자 요청: “깃 푸시 및 배포”
+- 수정 내용: 앞서 구현한 TripPlot 홈 액션 반응형 변경(`src/index.css`, `tests/trip-home-actions.test.mjs`)을 `style: tighten trip home header layout` 커밋으로 푸시했다. iOS·Android의 미커밋 변경은 이번 푸시에 포함하지 않았다.
+- Git/배포 확인: 기능 커밋 `ad9f99b`가 GitHub `main`에 푸시됐고, Cloudflare Pages 사이트가 HTTP 200을 반환했다. 배포 CSS `/assets/index-D4HeXGSD.css`에서 minified `@container trip-header (width>=700px)` 규칙을 확인했다.
+- 검증: 전체 테스트 118/118 통과, `npm run build` 통과, 변경 테스트 파일 ESLint 통과, `git diff --check` 통과.
+- 최종 답변: TripPlot 홈 액션 변경을 GitHub에 푸시하고 Cloudflare Pages에 배포했으며, 프로덕션 CSS의 700px 기준을 확인했다고 안내한다. 커밋과 검증 결과를 알린다.
