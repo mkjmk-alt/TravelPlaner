@@ -88,7 +88,7 @@ test('places the shortcut group in the header and leaves the trip list without d
   assert.match(appSource.slice(tripHeading, tripList), /<\/h2>\s*<\/div>\s*$/);
 });
 
-test('keeps the actions in the brand row when that header has room and wraps them on narrow headers', () => {
+test('places actions beside TripPlot at 700px while preserving the narrow-header fallback', () => {
   const stylesheet = postcss.parse(fs.readFileSync(path.join(projectRoot, 'src/index.css'), 'utf8'));
   const rootRule = (selector) => stylesheet.nodes.find(node => node.type === 'rule' && node.selector === selector);
   const declaration = (rule, property) => rule?.nodes.find(node => node.prop === property)?.value;
@@ -101,7 +101,7 @@ test('keeps the actions in the brand row when that header has room and wraps the
   let wideActionButton;
 
   stylesheet.walkAtRules('container', container => {
-    if (container.params !== 'trip-header (min-width: 900px)') return;
+    if (container.params !== 'trip-header (min-width: 700px)') return;
     container.walkRules(rule => {
       if (rule.selector === '.sidebar-brand-auth-row--with-actions') wideBrandRow = rule;
       if (rule.selector === '.trip-home-actions') wideActions = rule;
@@ -115,5 +115,7 @@ test('keeps the actions in the brand row when that header has room and wraps the
   assert.equal(declaration(primary, 'grid-column'), '1 / -1');
   assert.match(declaration(wideBrandRow, 'grid-template-areas'), /"brand actions auth"/);
   assert.equal(declaration(wideActions, 'display'), 'flex');
-  assert.equal(declaration(wideActionButton, 'min-height'), '42px');
+  assert.equal(declaration(wideActions, 'flex-wrap'), 'wrap');
+  assert.equal(declaration(wideActionButton, 'min-height'), '38px');
+  assert.equal(declaration(wideActionButton, 'padding'), '6px 8px');
 });

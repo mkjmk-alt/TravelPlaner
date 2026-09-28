@@ -372,7 +372,7 @@ body {
   border-color: #dbeafe;
 }
 
-@container trip-header (min-width: 900px) {
+@container trip-header (min-width: 700px) {
   .sidebar-brand-auth-row--with-actions {
     grid-template-areas: "brand actions auth";
     grid-template-columns: minmax(150px, 0.9fr) minmax(0, 2fr) auto;
@@ -381,16 +381,17 @@ body {
 
   .trip-home-actions {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: 6px;
   }
 
   .trip-home-action {
     flex: 1 1 auto;
-    min-height: 42px;
-    padding: 7px 10px;
-    font-size: 11px;
+    min-height: 38px;
+    padding: 6px 8px;
+    font-size: 10px;
     white-space: nowrap;
   }
 
