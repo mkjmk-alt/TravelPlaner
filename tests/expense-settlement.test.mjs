@@ -1,16 +1,42 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import {
+import * as settlement from '../src/expenseSettlement.js';
+
+const {
   calculateSettlement,
+  createExpensePayerSelection,
+  getNextExpensePayerIndex,
   normalizeExpenseParticipants,
   normalizeSettlementParticipants
-} from '../src/expenseSettlement.js';
+} = settlement;
 
 test('keeps the owner as the default settlement participant', () => {
   assert.deepEqual(normalizeSettlementParticipants([]), [
     { id: 'self', name: '나' }
   ]);
+});
+
+test('selecting a payer also includes them in shared participants exactly once', () => {
+  assert.equal(typeof settlement.createExpensePayerSelection, 'function');
+  assert.deepEqual(createExpensePayerSelection('jisu', ['self']), {
+    payerId: 'jisu',
+    participantIds: ['self', 'jisu']
+  });
+  assert.deepEqual(createExpensePayerSelection('jisu', ['self', 'jisu']), {
+    payerId: 'jisu',
+    participantIds: ['self', 'jisu']
+  });
+});
+
+test('moves payer selection with arrow keys and Home/End, wrapping at list edges', () => {
+  assert.equal(typeof settlement.getNextExpensePayerIndex, 'function');
+  assert.equal(getNextExpensePayerIndex(0, 'ArrowDown', 3), 1);
+  assert.equal(getNextExpensePayerIndex(2, 'ArrowDown', 3), 0);
+  assert.equal(getNextExpensePayerIndex(0, 'ArrowUp', 3), 2);
+  assert.equal(getNextExpensePayerIndex(1, 'Home', 3), 0);
+  assert.equal(getNextExpensePayerIndex(1, 'End', 3), 2);
+  assert.equal(getNextExpensePayerIndex(0, 'ArrowDown', 0), -1);
 });
 
 test('treats an older expense without split metadata as a personal expense', () => {

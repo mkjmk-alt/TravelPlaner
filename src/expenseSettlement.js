@@ -23,6 +23,30 @@ export const normalizeSettlementParticipants = (participants = []) => {
   return normalized;
 };
 
+export const createExpensePayerSelection = (payerId, participantIds = []) => {
+  const safePayerId = String(payerId || '').trim() || DEFAULT_SETTLEMENT_PARTICIPANT.id;
+  const sourceIds = Array.isArray(participantIds) ? participantIds : [];
+  const uniqueIds = Array.from(new Set(sourceIds
+    .map(id => String(id || '').trim())
+    .filter(Boolean)));
+  if (!uniqueIds.includes(safePayerId)) uniqueIds.push(safePayerId);
+  return { payerId: safePayerId, participantIds: uniqueIds };
+};
+
+export const getNextExpensePayerIndex = (currentIndex, key, optionCount) => {
+  const count = Math.max(0, Math.floor(Number(optionCount) || 0));
+  if (count === 0) return -1;
+
+  const current = Number.isInteger(currentIndex) && currentIndex >= 0 && currentIndex < count
+    ? currentIndex
+    : -1;
+  if (key === 'Home') return 0;
+  if (key === 'End') return count - 1;
+  if (key === 'ArrowDown') return current < 0 ? 0 : (current + 1) % count;
+  if (key === 'ArrowUp') return current < 0 ? count - 1 : (current - 1 + count) % count;
+  return current;
+};
+
 export const normalizeExpenseParticipants = (expense = {}, participants = []) => {
   const normalizedParticipants = normalizeSettlementParticipants(participants);
   const knownIds = new Set(normalizedParticipants.map(person => person.id));

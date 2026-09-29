@@ -1,5 +1,5 @@
 // Build Version: v1.2.2-build-trigger-fix
-import React, { lazy, Suspense, useState, useRef, useEffect, useMemo } from 'react';
+import React, { lazy, Suspense, useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronUp, ChevronDown, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Clock, Upload, Clipboard, LocateFixed, Download, Bell, FileText, Mail, Lock, Eye, EyeOff, WifiOff, Link2, LockKeyhole } from 'lucide-react';
 import { supabase } from './supabaseClient';
@@ -14,7 +14,7 @@ import TravelMemoryPanel from './TravelMemoryPanel';
 import TripRequiredEmptyState from './TripRequiredEmptyState';
 import TripHomeActions from './TripHomeActions';
 import { getJournalEntries, getTravelDetails } from './travelMemory';
-import { calculateSettlement, normalizeExpenseParticipants, normalizeSettlementParticipants } from './expenseSettlement';
+import { calculateSettlement, createExpensePayerSelection, getNextExpensePayerIndex, normalizeExpenseParticipants, normalizeSettlementParticipants } from './expenseSettlement';
 import { createCashWallet, getCashWalletCreationCurrency, removeCashWalletState } from './cashWallets';
 import './index.css';
 
@@ -1021,6 +1021,186 @@ const ExpenseCurrencyPicker = ({ value, options, onChange, placeholder = '추가
   );
 };
 
+export const ExpensePayerSelectMenu = ({
+  id,
+  labelId,
+  ariaLabel,
+  options,
+  selectedId,
+  activeIndex,
+  onSelect,
+  onActiveIndexChange,
+  optionRefs,
+  style
+}) => (
+  <div
+    id={`${id}-listbox`}
+    className="expense-payer-select-popover"
+    role="listbox"
+    aria-label={ariaLabel}
+    aria-labelledby={labelId}
+    style={style}
+  >
+    {options.map((person, index) => (
+      <button
+        key={`expense-payer-option-${person.id}`}
+        id={`${id}-option-${index}`}
+        ref={element => { optionRefs.current[index] = element; }}
+        type="button"
+        className={`expense-payer-select-option${person.id === selectedId ? ' is-selected' : ''}${index === activeIndex ? ' is-active' : ''}`}
+        role="option"
+        aria-selected={person.id === selectedId}
+        tabIndex={-1}
+        onMouseEnter={() => onActiveIndexChange(index)}
+        onClick={() => onSelect(person.id)}
+      >
+        <span>{person.name}</span>
+        {person.id === selectedId && <Check size={16} aria-hidden="true" />}
+      </button>
+    ))}
+  </div>
+);
+
+export const ExpensePayerSelect = ({ id, labelId, ariaLabel, options, value, onChange, className = '' }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const [menuPosition, setMenuPosition] = useState(null);
+  const triggerRef = useRef(null);
+  const menuRef = useRef(null);
+  const optionRefs = useRef([]);
+  const selectedIndex = Math.max(0, options.findIndex(person => person.id === value));
+  const selectedPerson = options[selectedIndex];
+
+  const updateMenuPosition = useCallback(() => {
+    const trigger = triggerRef.current;
+    if (!trigger || typeof window === 'undefined') return;
+    const rect = trigger.getBoundingClientRect();
+    const spaceBelow = Math.max(0, window.innerHeight - rect.bottom - 10);
+    const spaceAbove = Math.max(0, rect.top - 10);
+    const estimatedHeight = Math.min(320, (options.length * 44) + 16);
+    const openAbove = spaceBelow < estimatedHeight && spaceAbove > spaceBelow;
+    const availableHeight = openAbove ? spaceAbove : spaceBelow;
+    const width = Math.min(rect.width, window.innerWidth - 16);
+    const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
+    setMenuPosition({
+      left,
+      width,
+      top: openAbove ? undefined : rect.bottom + 6,
+      bottom: openAbove ? window.innerHeight - rect.top + 6 : undefined,
+      maxHeight: Math.max(80, Math.min(320, availableHeight))
+    });
+  }, [options.length]);
+
+  const openMenu = (initialIndex = selectedIndex) => {
+    updateMenuPosition();
+    setActiveIndex(initialIndex);
+    setIsOpen(true);
+  };
+
+  const closeMenu = (restoreFocus = false) => {
+    setIsOpen(false);
+    setMenuPosition(null);
+    if (restoreFocus) triggerRef.current?.focus();
+  };
+
+  const selectOption = (nextId) => {
+    onChange(nextId);
+    closeMenu(true);
+  };
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    updateMenuPosition();
+    const handleOutsidePointer = (event) => {
+      if (!triggerRef.current?.contains(event.target) && !menuRef.current?.contains(event.target)) closeMenu();
+    };
+    const handleViewportChange = () => updateMenuPosition();
+    document.addEventListener('pointerdown', handleOutsidePointer);
+    window.addEventListener('resize', handleViewportChange);
+    window.addEventListener('scroll', handleViewportChange, true);
+    return () => {
+      document.removeEventListener('pointerdown', handleOutsidePointer);
+      window.removeEventListener('resize', handleViewportChange);
+      window.removeEventListener('scroll', handleViewportChange, true);
+    };
+  }, [isOpen, updateMenuPosition]);
+
+  useEffect(() => {
+    if (!isOpen || activeIndex < 0) return;
+    optionRefs.current[activeIndex]?.scrollIntoView?.({ block: 'nearest' });
+  }, [activeIndex, isOpen]);
+
+  const handleKeyDown = (event) => {
+    if (event.key === 'Escape' && isOpen) {
+      event.preventDefault();
+      closeMenu(true);
+      return;
+    }
+    if (event.key === 'Tab' && isOpen) {
+      closeMenu();
+      return;
+    }
+    if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+      event.preventDefault();
+      if (!isOpen) {
+        openMenu(getNextExpensePayerIndex(-1, event.key, options.length));
+      } else {
+        setActiveIndex(current => getNextExpensePayerIndex(current, event.key, options.length));
+      }
+      return;
+    }
+    if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
+      event.preventDefault();
+      if (!isOpen) {
+        openMenu();
+      } else if (activeIndex >= 0 && options[activeIndex]) {
+        selectOption(options[activeIndex].id);
+      }
+    }
+  };
+
+  return (
+    <>
+      <div className={`expense-payer-select${className ? ` ${className}` : ''}${isOpen ? ' is-open' : ''}`}>
+        <button
+          ref={triggerRef}
+          id={id}
+          type="button"
+          className="expense-payer-select-trigger"
+          role="combobox"
+          aria-labelledby={`${labelId} ${id}-value`}
+          aria-expanded={isOpen}
+          aria-haspopup="listbox"
+          aria-controls={`${id}-listbox`}
+          aria-activedescendant={isOpen && activeIndex >= 0 ? `${id}-option-${activeIndex}` : undefined}
+          onClick={() => (isOpen ? closeMenu() : openMenu())}
+          onKeyDown={handleKeyDown}
+        >
+          <span id={`${id}-value`}>{selectedPerson?.name || '지출자 선택'}</span>
+          <ChevronDown size={16} aria-hidden="true" />
+        </button>
+      </div>
+      {isOpen && menuPosition && createPortal(
+        <div ref={menuRef}>
+          <ExpensePayerSelectMenu
+            id={id}
+            labelId={labelId}
+            ariaLabel={ariaLabel}
+            options={options}
+            selectedId={selectedPerson?.id}
+            activeIndex={activeIndex}
+            onSelect={selectOption}
+            onActiveIndexChange={setActiveIndex}
+            optionRefs={optionRefs}
+            style={menuPosition}
+          />
+        </div>,
+        document.body
+      )}
+    </>
+  );
+};
+
 const ExpenseSplitFields = ({ participants, payerId, participantIds, onChange, compact = false }) => {
   const safeParticipants = normalizeSettlementParticipants(participants);
   const selectedIds = Array.isArray(participantIds) && participantIds.length > 0
@@ -1028,10 +1208,7 @@ const ExpenseSplitFields = ({ participants, payerId, participantIds, onChange, c
     : ['self'];
   const safePayerId = safeParticipants.some(person => person.id === payerId) ? payerId : 'self';
   const selectPayer = (nextPayerId) => {
-    onChange({
-      payerId: nextPayerId,
-      participantIds: selectedIds.includes(nextPayerId) ? selectedIds : [...selectedIds, nextPayerId]
-    });
+    onChange(createExpensePayerSelection(nextPayerId, selectedIds));
   };
   const toggleParticipant = (participantId) => {
     const nextIds = selectedIds.includes(participantId)
@@ -1047,16 +1224,15 @@ const ExpenseSplitFields = ({ participants, payerId, participantIds, onChange, c
   return (
     <div className={`expense-split-fields${compact ? ' is-compact' : ''}`}>
       <div className="expense-split-payer-field">
-        <label className="expense-form-label" htmlFor={compact ? 'expense-edit-payer-select' : 'expense-payer-select'}>지출자</label>
-        <select
+        <label id={compact ? 'expense-edit-payer-label' : 'expense-payer-label'} className="expense-form-label" htmlFor={compact ? 'expense-edit-payer-select' : 'expense-payer-select'}>지출자</label>
+        <ExpensePayerSelect
           id={compact ? 'expense-edit-payer-select' : 'expense-payer-select'}
-          className="expense-form-control"
+          labelId={compact ? 'expense-edit-payer-label' : 'expense-payer-label'}
+          ariaLabel="누가 결제했는지 선택"
+          options={safeParticipants}
           value={safePayerId}
-          onChange={event => selectPayer(event.target.value)}
-          aria-label="누가 결제했는지 선택"
-        >
-          {safeParticipants.map(person => <option key={`expense-payer-${person.id}`} value={person.id}>{person.name}</option>)}
-        </select>
+          onChange={selectPayer}
+        />
       </div>
       <div className="expense-split-participants-field">
         <div className="expense-form-label">함께 사용한 사람 <span className="expense-split-count">{selectedIds.length}명</span></div>
