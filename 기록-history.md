@@ -1900,3 +1900,5 @@
 - 수정 내용: `src/TripHomeActions.jsx`, `src/index.css`, `tests/trip-home-actions.test.mjs`와 이 기록만 배포 커밋에 포함하고, 진행 중인 iOS·Android 및 기타 문서 변경은 보존한다.
 - 검증: 푸시 전 전체 테스트 129개 통과, `npm run build`, 관련 ESLint, `git diff --check` 통과. 배포 뒤 운영 페이지 반영 여부를 확인한다.
 - 최종 답변: GitHub 푸시와 운영 웹 배포의 실제 결과, 커밋 및 반영 여부를 안내한다.
+- 결과 확인: 커밋 `575296a`가 GitHub `main`에 올라갔고, 해당 커밋의 `Cloudflare Pages` 체크가 `success`로 완료됐다. 운영 URL이 HTTP 200을 반환했으며, 제공된 JavaScript/CSS 청크에서 모바일 축약 라벨과 새 헤더 그리드 규칙을 확인했다. 기존 iOS·Android 변경은 미포함 상태로 보존했다.
+- 최종 답변: 모바일 헤더 변경을 GitHub `main`에 푸시하고 Cloudflare Pages 운영 배포까지 확인했으며, 커밋 `575296a`를 안내한다.
