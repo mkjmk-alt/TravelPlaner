@@ -3990,6 +3990,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   outline: none;
 }
 
+.mobile-more-item--danger:hover,
+.mobile-more-item--danger:focus-visible {
+  border-color: #fda4af;
+  background: #fff8f8;
+}
+
 .mobile-more-item:active {
   transform: scale(0.99);
 }
@@ -4031,6 +4037,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   color: #64748b;
 }
 
+.mobile-more-item-icon.is-danger {
+  background: #fff1f2;
+  color: #e11d48;
+}
+
 .mobile-more-item-copy {
   min-width: 0;
   flex: 1;
@@ -4042,6 +4053,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   color: #1e293b;
   font-size: 13px;
   font-weight: 900;
+}
+
+.mobile-more-item--danger .mobile-more-item-copy strong {
+  color: #be123c;
 }
 
 .mobile-more-item-copy small {

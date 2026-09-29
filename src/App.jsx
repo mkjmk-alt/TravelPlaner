@@ -10,6 +10,7 @@ import { flushPendingMapCameraAction, runOrQueueMapCameraAction, shouldRenderMap
 import MapPaneErrorBoundary from './MapPaneErrorBoundary';
 import { DISPLAY_MODES, getFreeSplitPanePosition, getResponsiveDisplayMode, getSaveStatusPresentation, getSidebarFooterVariant, getSplitSaveStatusPlacement, getSplitViewGridRows, getSplitViewScrollContainer, getViewportSize } from './splitView';
 import { BRAND_NAME_EN, BRAND_NAME_KO } from './brand';
+import AccountMoreActions from './AccountMoreActions';
 import TravelMemoryPanel from './TravelMemoryPanel';
 import TripRequiredEmptyState from './TripRequiredEmptyState';
 import TripHomeActions from './TripHomeActions';
@@ -4923,7 +4924,6 @@ function App() {
                 {session ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                     <button onClick={() => supabase.auth.signOut()} style={{ background: '#f3f4f6', border: 'none', color: '#6b7280', fontWeight: '800', fontSize: '10px', cursor: 'pointer', padding: '8px 10px', borderRadius: '10px' }}>로그아웃</button>
-                    <button type="button" onClick={requestAccountDeletion} style={{ background: '#fff1f2', border: '1px solid #fecdd3', color: '#be123c', fontWeight: '900', fontSize: '9px', cursor: 'pointer', padding: '7px 9px', borderRadius: '10px' }}>계정 삭제</button>
                   </div>
                 ) : (
                   <button onClick={() => openAuthModal('login')} style={{ background: 'white', border: '1px solid #e5e7eb', color: '#4b5563', padding: '8px 12px', borderRadius: '10px', fontWeight: '800', fontSize: '10px', cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -6484,14 +6484,12 @@ function App() {
                 </div>
 
                 <div className="mobile-more-list">
-                  <button type="button" className="mobile-more-item" onClick={() => (session ? supabase.auth.signOut() : openAuthModal('login'))}>
-                    <span className="mobile-more-item-icon"><Lock size={17} /></span>
-                    <span className="mobile-more-item-copy">
-                      <strong>{session ? '로그아웃' : '로그인 / 회원가입'}</strong>
-                      <small>{session ? '현재 계정에서 로그아웃합니다.' : '여러 기기에서 여행을 이어갈 수 있어요.'}</small>
-                    </span>
-                    <ChevronRight size={16} aria-hidden="true" />
-                  </button>
+                  <AccountMoreActions
+                    session={session}
+                    onSignOut={() => supabase.auth.signOut()}
+                    onLogin={() => openAuthModal('login')}
+                    onDeleteAccount={requestAccountDeletion}
+                  />
 
                   {activeTrip && (
                     <>
