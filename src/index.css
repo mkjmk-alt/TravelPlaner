@@ -314,7 +314,7 @@ body {
 .trip-home-actions {
   grid-area: actions;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   align-self: center;
   gap: 6px;
   min-width: 0;
@@ -393,7 +393,8 @@ body {
 
 @container trip-header (max-width: 380px) {
   .sidebar-brand-auth-row--with-actions {
-    column-gap: 8px;
+    grid-template-columns: minmax(106px, 0.85fr) minmax(0, 1.5fr);
+    column-gap: 6px;
   }
 
   .sidebar-auth-actions > div {
@@ -406,19 +407,16 @@ body {
   }
 
   .trip-home-actions {
-    gap: 5px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
   }
 
   .trip-home-action {
-    min-height: 34px;
-    gap: 3px;
-    padding: 5px 3px;
-    font-size: 9px;
-  }
-
-  .trip-home-action svg {
-    width: 13px;
-    height: 13px;
+    min-height: 32px;
+    gap: 0;
+    padding: 4px 2px;
+    font-size: 8px;
+    white-space: nowrap;
   }
 }
 
@@ -2762,15 +2760,21 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     margin-bottom: 10px;
   }
 
+  .trip-home-actions {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 5px;
+  }
+
   .trip-home-action {
     min-height: 34px;
-    padding: 4px 5px;
-    font-size: 10px;
+    gap: 0;
+    padding: 4px 3px;
+    font-size: 9px;
+    white-space: nowrap;
   }
 
   .trip-home-action svg {
-    width: 15px;
-    height: 15px;
+    display: none;
   }
 
   .sidebar-header.mobile-header-hidden {

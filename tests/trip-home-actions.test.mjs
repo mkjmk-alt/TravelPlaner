@@ -139,6 +139,7 @@ test('places actions beside TripPlot at 700px while preserving the narrow-header
   let wideFullLabel;
   let wideCompactLabel;
   let narrowBrandRow;
+  let narrowActions;
   let narrowActionButton;
 
   stylesheet.walkAtRules('container', container => {
@@ -154,6 +155,7 @@ test('places actions beside TripPlot at 700px while preserving the narrow-header
     if (container.params === 'trip-header (max-width: 380px)') {
       container.walkRules(rule => {
         if (rule.selector === '.sidebar-brand-auth-row--with-actions') narrowBrandRow = rule;
+        if (rule.selector === '.trip-home-actions') narrowActions = rule;
         if (rule.selector === '.trip-home-action') narrowActionButton = rule;
       });
     }
@@ -163,6 +165,7 @@ test('places actions beside TripPlot at 700px while preserving the narrow-header
   assert.match(declaration(brandRow, 'grid-template-areas'), /"brand actions"/);
   assert.match(declaration(brandRow, 'grid-template-columns'), /minmax\(92px, 0\.85fr\)\s+minmax\(0, 1\.5fr\)/);
   assert.equal(declaration(actions, 'display'), 'grid');
+  assert.equal(declaration(actions, 'grid-template-columns'), 'repeat(4, minmax(0, 1fr))');
   assert.equal(declaration(primary, 'grid-column'), undefined);
   assert.equal(declaration(mobileFullLabel, 'display'), 'none');
   assert.equal(declaration(mobileCompactLabel, 'display'), 'inline');
@@ -175,21 +178,27 @@ test('places actions beside TripPlot at 700px while preserving the narrow-header
   assert.equal(declaration(wideFullLabel, 'display'), undefined);
   assert.equal(declaration(wideCompactLabel, 'display'), undefined);
   assert.ok(narrowBrandRow, 'very narrow screens have an additional compact-header fallback');
-  assert.equal(declaration(narrowActionButton, 'font-size'), '9px');
+  assert.equal(declaration(narrowActions, 'grid-template-columns'), 'repeat(4, minmax(0, 1fr))');
+  assert.equal(declaration(narrowActionButton, 'font-size'), '8px');
+  assert.equal(declaration(narrowActionButton, 'padding'), '4px 2px');
 });
 
 test('compacts the mobile trip header while preserving the wide layout', () => {
   const stylesheet = postcss.parse(fs.readFileSync(path.join(projectRoot, 'src/index.css'), 'utf8'));
   let mobileHeader;
   let mobileBrandRow;
+  let mobileActions;
   let mobileActionButton;
+  let mobileActionIcon;
 
   stylesheet.walkAtRules('media', mediaRule => {
     if (mediaRule.params !== '(max-width: 768px)') return;
     mediaRule.walkRules(rule => {
       if (rule.selector === '.sidebar-header') mobileHeader = rule;
       if (rule.selector === '.sidebar-brand-auth-row') mobileBrandRow = rule;
+      if (rule.selector === '.trip-home-actions') mobileActions = rule;
       if (rule.selector === '.trip-home-action') mobileActionButton = rule;
+      if (rule.selector === '.trip-home-action svg') mobileActionIcon = rule;
     });
   });
 
@@ -199,4 +208,6 @@ test('compacts the mobile trip header while preserving the wide layout', () => {
   assert.equal(declaration(mobileBrandRow, 'margin-bottom')?.value, '10px');
   assert.equal(declaration(mobileBrandRow, 'row-gap')?.value, '6px');
   assert.equal(declaration(mobileActionButton, 'min-height')?.value, '34px');
+  assert.equal(declaration(mobileActions, 'grid-template-columns')?.value, 'repeat(4, minmax(0, 1fr))');
+  assert.equal(declaration(mobileActionIcon, 'display')?.value, 'none');
 });
