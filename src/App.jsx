@@ -4904,7 +4904,7 @@ function App() {
           onScroll={splitViewScrollContainer === 'sidebar' ? handleSidebarScroll : undefined}
         >
           {/* Header */}
-          <div className={"sidebar-header " + (isMobileHeaderHidden ? "mobile-header-hidden" : "")} style={{ padding: '24px 32px', borderBottom: '1px solid #f3f4f6', backgroundColor: 'white', userSelect: 'none' }}>
+          <div className={"sidebar-header " + (isMobileHeaderHidden ? "mobile-header-hidden" : "")} style={{ padding: viewMode === 'trips' ? '14px 32px' : '24px 32px', borderBottom: '1px solid #f3f4f6', backgroundColor: 'white', userSelect: 'none' }}>
             {/* Row 1: Logo & Auth */}
             <div className={`sidebar-brand-auth-row${viewMode === 'trips' ? ' sidebar-brand-auth-row--with-actions' : ''}`}>
               <div className="sidebar-brand-copy">
@@ -4916,11 +4916,14 @@ function App() {
                   onCreateNewTrip={createNewTrip}
                   onCreateAiPlan={() => setShowPasteModal(true)}
                   onJoinTrip={openJoinTripModal}
+                  session={session}
+                  onSignOut={() => supabase.auth.signOut()}
+                  onLogin={() => openAuthModal('login')}
                   deferredInstallPrompt={deferredInstallPrompt}
                   onInstallApp={installPwa}
                 />
               )}
-              <div className="sidebar-auth-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {viewMode !== 'trips' && <div className="sidebar-auth-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 {session ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                     <button onClick={() => supabase.auth.signOut()} style={{ background: '#f3f4f6', border: 'none', color: '#6b7280', fontWeight: '800', fontSize: '10px', cursor: 'pointer', padding: '8px 10px', borderRadius: '10px' }}>로그아웃</button>
@@ -4931,7 +4934,7 @@ function App() {
                     로그인 / 회원가입
                   </button>
                 )}
-              </div>
+              </div>}
             </div>
 
             {!isOnline && (

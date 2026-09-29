@@ -1,13 +1,18 @@
 import React from 'react';
-import { Clipboard, Download, PlusCircle, Users } from 'lucide-react';
+import { Clipboard, Download, LogIn, LogOut, PlusCircle, Users } from 'lucide-react';
 
 export default function TripHomeActions({
   onCreateNewTrip,
   onCreateAiPlan,
   onJoinTrip,
+  session,
+  onSignOut,
+  onLogin,
   deferredInstallPrompt,
   onInstallApp
 }) {
+  const isSignedIn = Boolean(session);
+
   return (
     <div className="trip-home-actions" role="group" aria-label="여행 바로가기">
       <button
@@ -39,6 +44,16 @@ export default function TripHomeActions({
         <Users size={18} aria-hidden="true" />
         <span className="trip-home-action-label-full">참여하기</span>
         <span className="trip-home-action-label-compact">참여</span>
+      </button>
+      <button
+        type="button"
+        onClick={isSignedIn ? onSignOut : onLogin}
+        className="trip-home-action trip-home-action--auth"
+        aria-label={isSignedIn ? '로그아웃' : '로그인 / 회원가입'}
+      >
+        {isSignedIn ? <LogOut size={18} aria-hidden="true" /> : <LogIn size={18} aria-hidden="true" />}
+        <span className="trip-home-action-label-full">{isSignedIn ? '로그아웃' : '로그인 / 회원가입'}</span>
+        <span className="trip-home-action-label-compact">{isSignedIn ? '로그아웃' : '로그인'}</span>
       </button>
       {deferredInstallPrompt && (
         <button

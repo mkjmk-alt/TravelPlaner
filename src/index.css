@@ -294,10 +294,11 @@ body {
 }
 
 .sidebar-brand-auth-row--with-actions {
-  grid-template-areas: "brand auth" "brand actions";
-  grid-template-columns: minmax(92px, 1fr) minmax(0, 1.35fr);
+  grid-template-areas: "brand actions";
+  grid-template-columns: minmax(92px, 0.85fr) minmax(0, 1.5fr);
   align-items: center;
   gap: 8px 10px;
+  margin-bottom: 10px;
 }
 
 .sidebar-brand-copy {
@@ -314,14 +315,14 @@ body {
   grid-area: actions;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-self: start;
+  align-self: center;
   gap: 6px;
   min-width: 0;
 }
 
 .trip-home-action {
   min-width: 0;
-  min-height: 40px;
+  min-height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -359,7 +360,6 @@ body {
 }
 
 .trip-home-action--primary {
-  grid-column: 1 / -1;
   color: white;
   background: #8b5cf6;
   border-color: #8b5cf6;
@@ -376,6 +376,12 @@ body {
   color: #059669;
   background: #f0fdf4;
   border-color: #dcfce7;
+}
+
+.trip-home-action--auth {
+  color: #64748b;
+  background: #f8fafc;
+  border-color: #e2e8f0;
 }
 
 .trip-home-action--install {
@@ -404,51 +410,40 @@ body {
   }
 
   .trip-home-action {
-    min-height: 36px;
-    gap: 4px;
-    padding: 6px 4px;
+    min-height: 34px;
+    gap: 3px;
+    padding: 5px 3px;
     font-size: 9px;
   }
 
   .trip-home-action svg {
-    width: 14px;
-    height: 14px;
+    width: 13px;
+    height: 13px;
   }
 }
 
 @container trip-header (min-width: 700px) {
   .sidebar-brand-auth-row--with-actions {
-    grid-template-areas: "brand actions auth";
-    grid-template-columns: minmax(150px, 0.9fr) minmax(0, 2fr) auto;
+    grid-template-areas: "brand actions";
+    grid-template-columns: minmax(150px, 0.9fr) minmax(0, 2fr);
     column-gap: 18px;
   }
 
   .trip-home-actions {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     align-items: center;
-    justify-content: center;
     gap: 6px;
   }
 
   .trip-home-action {
-    flex: 1 1 auto;
-    min-height: 38px;
-    padding: 6px 8px;
+    min-height: 36px;
+    padding: 5px 6px;
     font-size: 10px;
     white-space: nowrap;
   }
 
-  .trip-home-action-label-full {
-    display: inline;
-  }
-
-  .trip-home-action-label-compact {
-    display: none;
-  }
-
   .trip-home-action--primary {
-    flex: 1.25 1 auto;
     box-shadow: 0 4px 8px -5px rgba(139, 92, 246, 0.4);
   }
 }

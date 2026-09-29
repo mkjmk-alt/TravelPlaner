@@ -44,38 +44,68 @@ const findButtons = (node) => {
   return React.Children.toArray(node.props.children).flatMap(findButtons);
 };
 
-test('renders the three trip actions in order and preserves their callbacks', () => {
+test('renders four equal-grid actions in order and preserves their callbacks', () => {
   assert.ok(TripHomeActions, `TripHomeActions must load: ${componentLoadError?.message || 'missing export'}`);
   const calls = [];
   const props = {
+    session: { user: { id: 'user-1' } },
     onCreateNewTrip: () => calls.push('new-trip'),
     onCreateAiPlan: () => calls.push('ai-plan'),
-    onJoinTrip: () => calls.push('join-trip')
+    onJoinTrip: () => calls.push('join-trip'),
+    onSignOut: () => calls.push('sign-out'),
+    onLogin: () => calls.push('login')
   };
   const element = TripHomeActions(props);
   const markup = renderToStaticMarkup(React.createElement(TripHomeActions, props));
   const buttons = findButtons(element);
 
   assert.match(markup, /role="group"/);
-  assert.deepEqual(buttons.map(button => button.props['aria-label']), ['새 여행 계획하기', 'AI로 일정 만들기', '참여하기']);
+  assert.deepEqual(buttons.map(button => button.props['aria-label']), ['새 여행 계획하기', 'AI로 일정 만들기', '참여하기', '로그아웃']);
   assert.deepEqual(buttons.map(button => React.Children.toArray(button.props.children).filter(child => React.isValidElement(child) && child.type === 'span').map(child => textContent(child))), [
     ['새 여행 계획하기', '새 여행'],
     ['AI로 일정 만들기', 'AI 일정'],
-    ['참여하기', '참여']
+    ['참여하기', '참여'],
+    ['로그아웃', '로그아웃']
   ]);
   buttons.forEach(button => button.props.onClick());
-  assert.deepEqual(calls, ['new-trip', 'ai-plan', 'join-trip']);
+  assert.deepEqual(calls, ['new-trip', 'ai-plan', 'join-trip', 'sign-out']);
+});
+
+test('uses the fourth grid action for login when no session exists', () => {
+  assert.ok(TripHomeActions, `TripHomeActions must load: ${componentLoadError?.message || 'missing export'}`);
+  const calls = [];
+  const buttons = findButtons(TripHomeActions({
+    session: null,
+    onCreateNewTrip: () => {},
+    onCreateAiPlan: () => {},
+    onJoinTrip: () => {},
+    onSignOut: () => calls.push('sign-out'),
+    onLogin: () => calls.push('login')
+  }));
+
+  assert.equal(buttons.length, 4);
+  assert.equal(buttons[3].props['aria-label'], '로그인 / 회원가입');
+  buttons[3].props.onClick();
+  assert.deepEqual(calls, ['login']);
 });
 
 test('shows the install action only when the browser install prompt is available', () => {
   assert.ok(TripHomeActions, `TripHomeActions must load: ${componentLoadError?.message || 'missing export'}`);
-  const onInstallApp = () => {};
-  const withoutPrompt = findButtons(TripHomeActions({ onInstallApp }));
-  const withPrompt = findButtons(TripHomeActions({ deferredInstallPrompt: {}, onInstallApp }));
+  const props = {
+    session: { user: { id: 'user-1' } },
+    onCreateNewTrip: () => {},
+    onCreateAiPlan: () => {},
+    onJoinTrip: () => {},
+    onSignOut: () => {},
+    onLogin: () => {},
+    onInstallApp: () => {}
+  };
+  const withoutPrompt = findButtons(TripHomeActions(props));
+  const withPrompt = findButtons(TripHomeActions({ ...props, deferredInstallPrompt: {} }));
 
-  assert.equal(withoutPrompt.length, 3);
-  assert.equal(withPrompt.length, 4);
-  assert.match(textContent(withPrompt[3]), /앱으로 설치/);
+  assert.equal(withoutPrompt.length, 4);
+  assert.equal(withPrompt.length, 5);
+  assert.match(textContent(withPrompt[4]), /앱으로 설치/);
 });
 
 test('places the shortcut group in the header and leaves the trip list without duplicate actions', () => {
@@ -130,19 +160,20 @@ test('places actions beside TripPlot at 700px while preserving the narrow-header
   });
 
   assert.equal(containerType, 'inline-size');
-  assert.match(declaration(brandRow, 'grid-template-areas'), /"brand auth"\s+"brand actions"/);
-  assert.match(declaration(brandRow, 'grid-template-columns'), /minmax\(92px, 1fr\)\s+minmax\(0, 1\.35fr\)/);
+  assert.match(declaration(brandRow, 'grid-template-areas'), /"brand actions"/);
+  assert.match(declaration(brandRow, 'grid-template-columns'), /minmax\(92px, 0\.85fr\)\s+minmax\(0, 1\.5fr\)/);
   assert.equal(declaration(actions, 'display'), 'grid');
-  assert.equal(declaration(primary, 'grid-column'), '1 / -1');
+  assert.equal(declaration(primary, 'grid-column'), undefined);
   assert.equal(declaration(mobileFullLabel, 'display'), 'none');
   assert.equal(declaration(mobileCompactLabel, 'display'), 'inline');
-  assert.match(declaration(wideBrandRow, 'grid-template-areas'), /"brand actions auth"/);
-  assert.equal(declaration(wideActions, 'display'), 'flex');
-  assert.equal(declaration(wideActions, 'flex-wrap'), 'wrap');
-  assert.equal(declaration(wideActionButton, 'min-height'), '38px');
-  assert.equal(declaration(wideActionButton, 'padding'), '6px 8px');
-  assert.equal(declaration(wideFullLabel, 'display'), 'inline');
-  assert.equal(declaration(wideCompactLabel, 'display'), 'none');
+  assert.match(declaration(wideBrandRow, 'grid-template-areas'), /"brand actions"/);
+  assert.equal(declaration(wideActions, 'display'), 'grid');
+  assert.equal(declaration(wideActions, 'grid-template-columns'), 'repeat(4, minmax(0, 1fr))');
+  assert.equal(declaration(wideActions, 'gap'), '6px');
+  assert.equal(declaration(wideActionButton, 'min-height'), '36px');
+  assert.equal(declaration(wideActionButton, 'padding'), '5px 6px');
+  assert.equal(declaration(wideFullLabel, 'display'), undefined);
+  assert.equal(declaration(wideCompactLabel, 'display'), undefined);
   assert.ok(narrowBrandRow, 'very narrow screens have an additional compact-header fallback');
   assert.equal(declaration(narrowActionButton, 'font-size'), '9px');
 });
