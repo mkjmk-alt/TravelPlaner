@@ -2047,6 +2047,6 @@
 
 - ID: `qT7nK4cR9m`
 - 사용자 요청: “깃 푸시 및 배포”
-- 수정 내용: 모바일 헤더 네 버튼 1×4 배치와 회귀 테스트, 이 기록만 선별해 `main`에 푸시하고 Cloudflare Pages 운영 배포를 확인한다. 작업 중인 네이티브 앱 파일은 제외한다.
-- 검증: 푸시 전에 전체 테스트 136개, 프로덕션 빌드, 테스트 파일 ESLint, `git diff --check` 통과. 배포 후 운영 URL 및 Pages 배포 상태를 확인한다.
-- 최종 답변: Git 푸시 커밋과 Cloudflare Pages 운영 배포 상태, 테스트 결과를 안내한다.
+- 수정 내용: 모바일 헤더 네 버튼 1×4 배치와 회귀 테스트, 이 기록만 선별해 커밋 `3a8b1a5`로 `main`에 푸시했다. 작업 중인 네이티브 앱 파일은 제외했다.
+- 검증: 전체 테스트 136개, 프로덕션 빌드, 테스트 파일 ESLint, `git diff --check` 통과. Cloudflare Pages에서 Production/main 소스 `3a8b1a5` 배포가 Active이며 배포 주소 `https://2661edab.travelplaner-545.pages.dev`를 확인했다. 운영 주소는 HTTP 200을 반환하고 새 JS/CSS 파일을 제공하며, 배포 CSS에서 모바일 4열 규칙을 확인했다.
+- 최종 답변: 커밋 `3a8b1a5`의 Git 푸시와 Cloudflare Pages 운영 반영을 알리고, 테스트·빌드 결과 및 네이티브 파일 제외를 안내한다.
