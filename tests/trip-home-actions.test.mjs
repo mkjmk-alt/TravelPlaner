@@ -146,3 +146,26 @@ test('places actions beside TripPlot at 700px while preserving the narrow-header
   assert.ok(narrowBrandRow, 'very narrow screens have an additional compact-header fallback');
   assert.equal(declaration(narrowActionButton, 'font-size'), '9px');
 });
+
+test('compacts the mobile trip header while preserving the wide layout', () => {
+  const stylesheet = postcss.parse(fs.readFileSync(path.join(projectRoot, 'src/index.css'), 'utf8'));
+  let mobileHeader;
+  let mobileBrandRow;
+  let mobileActionButton;
+
+  stylesheet.walkAtRules('media', mediaRule => {
+    if (mediaRule.params !== '(max-width: 768px)') return;
+    mediaRule.walkRules(rule => {
+      if (rule.selector === '.sidebar-header') mobileHeader = rule;
+      if (rule.selector === '.sidebar-brand-auth-row') mobileBrandRow = rule;
+      if (rule.selector === '.trip-home-action') mobileActionButton = rule;
+    });
+  });
+
+  const declaration = (rule, property) => rule?.nodes.find(node => node.type === 'decl' && node.prop === property);
+  assert.equal(declaration(mobileHeader, 'padding')?.value, '12px 20px');
+  assert.equal(declaration(mobileHeader, 'padding')?.important, true);
+  assert.equal(declaration(mobileBrandRow, 'margin-bottom')?.value, '10px');
+  assert.equal(declaration(mobileBrandRow, 'row-gap')?.value, '6px');
+  assert.equal(declaration(mobileActionButton, 'min-height')?.value, '34px');
+});

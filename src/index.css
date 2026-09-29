@@ -2757,8 +2757,25 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 @media (max-width: 768px) {
   .sidebar-header {
     max-height: 360px;
+    padding: 12px 20px !important;
     overflow: hidden;
     transition: max-height 0.25s ease, padding 0.25s ease, opacity 0.2s ease, border-color 0.2s ease;
+  }
+
+  .sidebar-brand-auth-row {
+    row-gap: 6px;
+    margin-bottom: 10px;
+  }
+
+  .trip-home-action {
+    min-height: 34px;
+    padding: 4px 5px;
+    font-size: 10px;
+  }
+
+  .trip-home-action svg {
+    width: 15px;
+    height: 15px;
   }
 
   .sidebar-header.mobile-header-hidden {
