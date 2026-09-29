@@ -57,7 +57,12 @@ test('renders the three trip actions in order and preserves their callbacks', ()
   const buttons = findButtons(element);
 
   assert.match(markup, /role="group"/);
-  assert.deepEqual(buttons.map(textContent), ['새 여행 계획하기', 'AI로 일정 만들기', '참여하기']);
+  assert.deepEqual(buttons.map(button => button.props['aria-label']), ['새 여행 계획하기', 'AI로 일정 만들기', '참여하기']);
+  assert.deepEqual(buttons.map(button => React.Children.toArray(button.props.children).filter(child => React.isValidElement(child) && child.type === 'span').map(child => textContent(child))), [
+    ['새 여행 계획하기', '새 여행'],
+    ['AI로 일정 만들기', 'AI 일정'],
+    ['참여하기', '참여']
+  ]);
   buttons.forEach(button => button.props.onClick());
   assert.deepEqual(calls, ['new-trip', 'ai-plan', 'join-trip']);
 });
@@ -96,26 +101,48 @@ test('places actions beside TripPlot at 700px while preserving the narrow-header
   const brandRow = rootRule('.sidebar-brand-auth-row--with-actions');
   const actions = rootRule('.trip-home-actions');
   const primary = rootRule('.trip-home-action--primary');
+  const mobileFullLabel = rootRule('.trip-home-action-label-full');
+  const mobileCompactLabel = rootRule('.trip-home-action-label-compact');
   let wideBrandRow;
   let wideActions;
   let wideActionButton;
+  let wideFullLabel;
+  let wideCompactLabel;
+  let narrowBrandRow;
+  let narrowActionButton;
 
   stylesheet.walkAtRules('container', container => {
-    if (container.params !== 'trip-header (min-width: 700px)') return;
-    container.walkRules(rule => {
-      if (rule.selector === '.sidebar-brand-auth-row--with-actions') wideBrandRow = rule;
-      if (rule.selector === '.trip-home-actions') wideActions = rule;
-      if (rule.selector === '.trip-home-action') wideActionButton = rule;
-    });
+    if (container.params === 'trip-header (min-width: 700px)') {
+      container.walkRules(rule => {
+        if (rule.selector === '.sidebar-brand-auth-row--with-actions') wideBrandRow = rule;
+        if (rule.selector === '.trip-home-actions') wideActions = rule;
+        if (rule.selector === '.trip-home-action') wideActionButton = rule;
+        if (rule.selector === '.trip-home-action-label-full') wideFullLabel = rule;
+        if (rule.selector === '.trip-home-action-label-compact') wideCompactLabel = rule;
+      });
+    }
+    if (container.params === 'trip-header (max-width: 380px)') {
+      container.walkRules(rule => {
+        if (rule.selector === '.sidebar-brand-auth-row--with-actions') narrowBrandRow = rule;
+        if (rule.selector === '.trip-home-action') narrowActionButton = rule;
+      });
+    }
   });
 
   assert.equal(containerType, 'inline-size');
-  assert.match(declaration(brandRow, 'grid-template-areas'), /"brand auth"\s+"actions actions"/);
+  assert.match(declaration(brandRow, 'grid-template-areas'), /"brand auth"\s+"brand actions"/);
+  assert.match(declaration(brandRow, 'grid-template-columns'), /minmax\(92px, 1fr\)\s+minmax\(0, 1\.35fr\)/);
   assert.equal(declaration(actions, 'display'), 'grid');
   assert.equal(declaration(primary, 'grid-column'), '1 / -1');
+  assert.equal(declaration(mobileFullLabel, 'display'), 'none');
+  assert.equal(declaration(mobileCompactLabel, 'display'), 'inline');
   assert.match(declaration(wideBrandRow, 'grid-template-areas'), /"brand actions auth"/);
   assert.equal(declaration(wideActions, 'display'), 'flex');
   assert.equal(declaration(wideActions, 'flex-wrap'), 'wrap');
   assert.equal(declaration(wideActionButton, 'min-height'), '38px');
   assert.equal(declaration(wideActionButton, 'padding'), '6px 8px');
+  assert.equal(declaration(wideFullLabel, 'display'), 'inline');
+  assert.equal(declaration(wideCompactLabel, 'display'), 'none');
+  assert.ok(narrowBrandRow, 'very narrow screens have an additional compact-header fallback');
+  assert.equal(declaration(narrowActionButton, 'font-size'), '9px');
 });
