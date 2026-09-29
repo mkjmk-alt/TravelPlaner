@@ -775,7 +775,7 @@ const PremiumTimeInput = ({ value, onChange, label }) => {
 
 const TIME_PERIOD_OPTIONS = ['AM', 'PM'];
 
-const ScrollTimeInput = ({ value, onChange, label, compact = false }) => {
+export const ScrollTimeInput = ({ value, onChange, label, compact = false, variant = 'default' }) => {
   const timeValue = value && value.includes(':') ? value : '09:00';
   const [rawHour, rawMinute] = timeValue.split(':').map(Number);
   const hour24 = Number.isFinite(rawHour) ? Math.min(Math.max(rawHour, 0), 23) : 9;
@@ -861,7 +861,7 @@ const ScrollTimeInput = ({ value, onChange, label, compact = false }) => {
                 if (type === 'hour') emitTime(period, item, minute);
                 if (type === 'minute') emitTime(period, hour12, item);
               }}
-              style={{ display: 'block', width: '100%', height: `${ITEM_HEIGHT}px`, padding: 0, border: 'none', backgroundColor: item === selectedValue ? '#2563eb' : 'transparent', color: item === selectedValue ? 'white' : '#64748b', fontSize: item === selectedValue ? '18px' : '15px', fontWeight: item === selectedValue ? '900' : '700', fontVariantNumeric: 'tabular-nums', scrollSnapAlign: 'center', cursor: 'pointer' }}
+              style={{ display: 'block', width: '100%', height: `${ITEM_HEIGHT}px`, padding: 0, border: 'none', backgroundColor: item === selectedValue ? 'var(--time-picker-accent)' : 'transparent', color: item === selectedValue ? 'white' : '#64748b', fontSize: item === selectedValue ? '18px' : '15px', fontWeight: item === selectedValue ? '900' : '700', fontVariantNumeric: 'tabular-nums', scrollSnapAlign: 'center', cursor: 'pointer' }}
             >
               {formatItem(item)}
             </button>
@@ -872,7 +872,7 @@ const ScrollTimeInput = ({ value, onChange, label, compact = false }) => {
   );
 
   return (
-    <div className="expense-time-picker" ref={pickerRef} style={{ position: 'relative', width: '100%', minWidth: 0, marginBottom: compact ? 0 : (window.innerWidth < 768 ? '8px' : '20px') }}>
+    <div className={`expense-time-picker${variant === 'expense' ? ' expense-time-picker--expense' : ''}`} ref={pickerRef} style={{ position: 'relative', width: '100%', minWidth: 0, marginBottom: compact ? 0 : (window.innerWidth < 768 ? '8px' : '20px') }}>
       {label && <div className="expense-form-label" style={{ marginBottom: compact ? '6px' : '8px' }}>{label}</div>}
       <button
         type="button"
@@ -881,7 +881,7 @@ const ScrollTimeInput = ({ value, onChange, label, compact = false }) => {
         aria-label={`${label || '시간'} ${period === 'AM' ? '오전' : '오후'} ${String(hour12).padStart(2, '0')}:${String(minute).padStart(2, '0')}`}
         aria-expanded={isOpen}
         aria-haspopup="dialog"
-        style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', minHeight: compact ? '42px' : '50px', padding: compact ? '10px 12px' : '12px 14px', border: `1px solid ${isOpen ? '#2563eb' : '#e2e8f0'}`, borderRadius: '12px', backgroundColor: 'white', color: '#1f2937', fontFamily: 'inherit', fontSize: compact ? '12px' : '14px', fontWeight: '800', cursor: 'pointer', textAlign: 'left', boxShadow: isOpen ? '0 0 0 3px rgba(37, 99, 235, 0.12)' : 'none' }}
+        style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', minHeight: compact ? '42px' : '50px', padding: compact ? '10px 12px' : '12px 14px', border: `1px solid ${isOpen ? 'var(--time-picker-active-border)' : '#e2e8f0'}`, borderRadius: '12px', backgroundColor: 'white', color: '#1f2937', fontFamily: 'inherit', fontSize: compact ? '12px' : '14px', fontWeight: '800', cursor: 'pointer', textAlign: 'left', boxShadow: isOpen ? 'var(--time-picker-active-ring)' : 'none' }}
       >
         <Clock size={compact ? 14 : 17} color="#64748b" aria-hidden="true" />
         <span style={{ flex: 1 }}>{period === 'AM' ? '오전' : '오후'} {String(hour12).padStart(2, '0')}:{String(minute).padStart(2, '0')}</span>
@@ -889,8 +889,8 @@ const ScrollTimeInput = ({ value, onChange, label, compact = false }) => {
       </button>
 
       {isOpen && (
-        <div className="expense-time-picker-popover" role="dialog" aria-label="소비 시간 선택" style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, zIndex: 60, width: '100%', maxWidth: '100%', boxSizing: 'border-box', padding: '8px', border: '1px solid #dbe3ef', borderRadius: '18px', backgroundColor: 'white', boxShadow: '0 18px 40px rgba(15, 23, 42, 0.2)' }}>
-          <div className="expense-time-picker-wheels" style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0, padding: '4px', borderRadius: '15px', backgroundColor: '#eef4ff' }}>
+        <div className="expense-time-picker-popover" role="dialog" aria-label="소비 시간 선택" style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, zIndex: 60, width: '100%', maxWidth: '100%', boxSizing: 'border-box', padding: '8px', border: '1px solid var(--time-picker-popover-border)', borderRadius: '18px', backgroundColor: 'white', boxShadow: 'var(--time-picker-popover-shadow)' }}>
+          <div className="expense-time-picker-wheels" style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0, padding: '4px', borderRadius: '15px', backgroundColor: 'var(--time-picker-wheel-background)' }}>
             {renderScrollColumn(TIME_PERIOD_OPTIONS, period, periodRef, 'period', item => item === 'AM' ? '오전' : '오후')}
             <span style={{ color: '#94a3b8', fontSize: '18px', fontWeight: '900' }}>·</span>
             {renderScrollColumn(hours, hour12, hourRef, 'hour')}
@@ -900,8 +900,8 @@ const ScrollTimeInput = ({ value, onChange, label, compact = false }) => {
           <div className="expense-time-picker-actions" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.5fr) repeat(2, minmax(32px, 0.65fr)) minmax(0, 1fr)', gap: '4px', marginTop: '8px' }}>
             <button type="button" onClick={setNow} style={{ minWidth: 0, padding: '8px 4px', border: 'none', borderRadius: '9px', backgroundColor: '#f1f5f9', color: '#64748b', fontSize: '10px', fontWeight: '900', cursor: 'pointer', whiteSpace: 'nowrap' }}>현재 시간</button>
             <button type="button" onClick={() => adjustMinutes(-30)} style={{ minWidth: 0, padding: '8px 4px', border: 'none', borderRadius: '9px', backgroundColor: '#f1f5f9', color: '#64748b', fontSize: '10px', fontWeight: '900', cursor: 'pointer' }}>-30</button>
-            <button type="button" onClick={() => adjustMinutes(30)} style={{ minWidth: 0, padding: '8px 4px', border: 'none', borderRadius: '9px', backgroundColor: '#eff6ff', color: '#2563eb', fontSize: '10px', fontWeight: '900', cursor: 'pointer' }}>+30</button>
-            <button type="button" onClick={() => setIsOpen(false)} style={{ minWidth: 0, padding: '8px 4px', border: 'none', borderRadius: '9px', backgroundColor: '#2563eb', color: 'white', fontSize: '10px', fontWeight: '900', cursor: 'pointer' }}>완료</button>
+            <button type="button" onClick={() => adjustMinutes(30)} style={{ minWidth: 0, padding: '8px 4px', border: 'none', borderRadius: '9px', backgroundColor: 'var(--time-picker-accent-soft)', color: 'var(--time-picker-accent)', fontSize: '10px', fontWeight: '900', cursor: 'pointer' }}>+30</button>
+            <button type="button" onClick={() => setIsOpen(false)} style={{ minWidth: 0, padding: '8px 4px', border: 'none', borderRadius: '9px', backgroundColor: 'var(--time-picker-accent)', color: 'white', fontSize: '10px', fontWeight: '900', cursor: 'pointer' }}>완료</button>
           </div>
         </div>
       )}
@@ -6104,6 +6104,7 @@ function App() {
                         onChange={(newTime) => setExpenseInput(current => ({ ...current, time: newTime }))}
                         label="소비 시간"
                         compact
+                        variant="expense"
                       />
                     </div>
                   </div>
@@ -7673,6 +7674,7 @@ function App() {
               value={expenseInput.time}
               onChange={(newTime) => setExpenseInput(current => ({ ...current, time: newTime }))}
               label="소비 시간"
+              variant="expense"
             />
 
             <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>

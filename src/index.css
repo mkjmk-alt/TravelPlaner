@@ -2345,6 +2345,31 @@ body {
   font-size: 11px !important;
 }
 
+.expense-time-picker {
+  --time-picker-accent: #2563eb;
+  --time-picker-accent-soft: #eff6ff;
+  --time-picker-active-border: #2563eb;
+  --time-picker-active-ring: 0 0 0 3px rgba(37, 99, 235, .12);
+  --time-picker-popover-border: #dbe3ef;
+  --time-picker-popover-shadow: 0 18px 40px rgba(15, 23, 42, .2);
+  --time-picker-wheel-background: #eef4ff;
+}
+
+.expense-time-picker--expense {
+  --time-picker-accent: #0f766e;
+  --time-picker-accent-soft: #ccfbf1;
+  --time-picker-active-border: #14b8a6;
+  --time-picker-active-ring: 0 0 0 3px rgba(20, 184, 166, .14);
+  --time-picker-popover-border: #99f6e4;
+  --time-picker-popover-shadow: 0 18px 40px rgba(15, 118, 110, .16);
+  --time-picker-wheel-background: #f0fdf9;
+}
+
+.expense-time-picker--expense .expense-time-picker-trigger:focus-visible {
+  outline: 2px solid #14b8a6;
+  outline-offset: 2px;
+}
+
 .expense-time-picker-trigger {
   color: #475569 !important;
   font-size: 12px !important;
