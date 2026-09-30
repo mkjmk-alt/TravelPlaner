@@ -2083,3 +2083,9 @@
 - 수정 내용: 웹 일정 지도 경로 설정(직선·실제 길, 자동차·도보), 하단 메뉴별 선택 색상, 관련 테스트와 안내 문서 및 기록을 선별해 main에 푸시하고 Cloudflare Pages 운영 배포를 진행한다. 기존 iOS·Android 및 네이티브 계획 변경은 제외해 보존한다.
 - 검증: 전체 테스트 148개 통과, 프로덕션 빌드 통과, 변경 파일 ESLint와 git diff --check 통과. 실제 Google Routes API 호출 검증은 아직 진행 전이다.
 - 최종 답변: 푸시와 운영 배포 결과 확인 후 아래에 누적 기록한다.
+
+### 배포 결과 — `Oo2jEi189D`
+
+- 수정 내용: 웹 변경 커밋 `2ed3183`을 origin/main에 푸시했다. Cloudflare Pages의 실제 프로젝트 이름은 `travelplaner`이며, Production/main 배포 `68739164-1df4-48ed-9823-353c09447b2a`가 Active인 것을 확인했다. 배포 주소는 `https://68739164.travelplaner-545.pages.dev`이다.
+- 검증: 운영 주소 `https://travelplaner-545.pages.dev/`의 HTTP 200 및 신규 CSS를 확인했다. 배포 CSS에 경로 설정과 하단 메뉴별 색상 규칙이 포함되며, 새 MapPane 파일에 직선 연결·실제 길 선택, 경로 모듈에 computeRoutes 구현이 포함됨을 확인했다. 네이티브 변경은 미커밋 상태로 그대로 보존했다. 실제 Google 경로 응답 검증은 미실시다.
+- 최종 답변: “깃 푸시와 웹 배포 완료했습니다. 경로 설정과 하단 메뉴별 색상이 반영됐습니다. 테스트 148개·빌드 통과. 실제 길찾기 API 연결 검증은 아직 남아 있습니다.”
