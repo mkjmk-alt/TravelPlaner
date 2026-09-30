@@ -1,7 +1,7 @@
 // Build Version: v1.2.2-build-trigger-fix
 import React, { lazy, Suspense, useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronUp, ChevronDown, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Clock, Upload, Clipboard, LocateFixed, Download, Bell, FileText, Mail, Lock, Eye, EyeOff, WifiOff, Link2, LockKeyhole } from 'lucide-react';
+import { Heart, Search, Calendar, MapPin, Navigation, Star, PlusCircle, Trash2, AlertCircle, Wallet, ChevronRight, ChevronUp, ChevronDown, Plane, Menu, X, Compass, Plus, Edit2, Share2, Users, Copy, Check, Clock, Upload, Clipboard, LocateFixed, Download, Bell, FileText, Mail, Lock, Eye, EyeOff, WifiOff, Link2, LockKeyhole, Route } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { getBottomNavigationItems, getMobileViewModeSheetMode } from './mobileSidebar';
 import { createNavigationHistoryState, getDefaultNavigationState, getMemoryPlaceNavigationSelection, getMobileRootPresentation, getNavigationStateFromHistory, getPlaceCoordinates, getTabSelection, getTripSubviewNavigationSelection, normalizeNavigationState, shouldShowMobileContextBar, shouldShowMobileMoreTripShortcuts, shouldShowSearchBar } from './appNavigation';
@@ -18,10 +18,12 @@ import { getJournalEntries, getTravelDetails } from './travelMemory';
 import { calculateSettlement, createExpensePayerSelection, getNextExpensePayerIndex, normalizeExpenseParticipants, normalizeSettlementParticipants } from './expenseSettlement';
 import { createCashWallet, getCashWalletCreationCurrency, removeCashWalletState } from './cashWallets';
 import { normalizeRouteSettings, ROUTE_SETTINGS_STORAGE_KEY } from './itineraryRoutes';
+import { createNearbyOrderPreview, applyNearbyOrderPreview, sortDayItems, moveDayItem } from './itineraryOrder';
 import './index.css';
 
 // --- CONFIGURATION ---
 const LazyMapPane = lazy(() => import('./MapPane.jsx'));
+const LazyNearbyOrderPreview = lazy(() => import('./NearbyOrderPreview.jsx'));
 
 const readStoredJson = (key, fallback) => {
   try {
@@ -1618,6 +1620,7 @@ function App() {
   const [selectedItineraryItems, setSelectedItineraryItems] = useState([]);
   const [bulkMoveTargetDay, setBulkMoveTargetDay] = useState(1);
   const [undoStack, setUndoStack] = useState([]);
+  const [nearbyOrderPreview, setNearbyOrderPreview] = useState(null);
   const [readOnlySharedTrip, setReadOnlySharedTrip] = useState(null);
   const [sharedViewError, setSharedViewError] = useState('');
   const [isOnline, setIsOnline] = useState(() => typeof navigator === 'undefined' ? true : navigator.onLine);
@@ -3005,6 +3008,18 @@ function App() {
   };
 
   const saveItinerary = (newItinerary) => updateActiveTrip({ itinerary: newItinerary });
+  const previewNearbyOrder = (dayPlan) => {
+    if (!activeTripId || isReadOnlyTrip) return;
+    setActiveDay(parseDay(dayPlan.day));
+    setNearbyOrderPreview({ ...createNearbyOrderPreview(dayPlan), tripId: activeTripId });
+  };
+  const applyNearbyOrder = () => {
+    if (!nearbyOrderPreview || nearbyOrderPreview.tripId !== activeTripId || isReadOnlyTrip) return;
+    const nextItinerary = applyNearbyOrderPreview(itinerary, nearbyOrderPreview);
+    if (!nextItinerary) return;
+    setNearbyOrderPreview(null);
+    saveItinerary(nextItinerary);
+  };
   const saveBudgetSettings = (newSettings) => updateActiveTrip({ budgetSettings: newSettings });
   const saveExpenses = (newExpenses) => updateActiveTrip({ expenses: newExpenses });
   const saveSettlementParticipants = (nextParticipants) => updateActiveTrip({
@@ -3571,10 +3586,10 @@ function App() {
         }
       }
 
-      newItinerary[dayIndex].items = [
+      newItinerary[dayIndex].items = sortDayItems(newItinerary[dayIndex], [
         ...newItinerary[dayIndex].items,
         { ...place, id: makeEntityId(), emoji: itineraryEmoji || place.emoji || '📍', displayName, time: finalTime }
-      ].sort((a, b) => (a.time || '00:00').localeCompare(b.time || '00:00'));
+      ]);
     } else {
       newItinerary.push({ 
         day: targetDay, 
@@ -3607,8 +3622,7 @@ function App() {
 
     const nextItinerary = (itinerary || []).map(dayPlan => {
       if (parseDay(dayPlan.day) !== targetDay) return dayPlan;
-      const items = [...(dayPlan.items || []), { ...reserveItem, time: reserveItem.time || '09:00' }]
-        .sort((a, b) => (a.time || '00:00').localeCompare(b.time || '00:00'));
+      const items = sortDayItems(dayPlan, [...(dayPlan.items || []), { ...reserveItem, time: reserveItem.time || '09:00' }]);
       return { ...dayPlan, items };
     });
 
@@ -3764,12 +3778,6 @@ function App() {
     const itemUpdates = { ...updates };
     delete itemUpdates.day;
 
-    const sortItems = (items) => [...items].sort((a, b) => {
-      if (!a.time) return 1;
-      if (!b.time) return -1;
-      return a.time.localeCompare(b.time);
-    });
-
     const nextTrips = (trips || []).map(t => {
       if (t.id !== activeTripId) return t;
       const sourceDay = (t.itinerary || []).find(day => parseDay(day.day) === sourceDayNum);
@@ -3782,13 +3790,13 @@ function App() {
           return { ...day, items: day.items.filter(item => item.id !== itemId) };
         }
         if (dayNum === sourceDayNum && dayNum === destinationDayNum) {
-          return { ...day, items: sortItems(day.items.map(item => item.id === itemId ? updatedItem : item)) };
+          return { ...day, items: sortDayItems(day, day.items.map(item => item.id === itemId ? updatedItem : item), { missingTime: '23:59' }) };
         }
         if (dayNum === sourceDayNum) {
           return { ...day, items: day.items.filter(item => item.id !== itemId) };
         }
         if (dayNum === destinationDayNum) {
-          return { ...day, items: sortItems([...day.items, updatedItem]) };
+          return { ...day, items: sortDayItems(day, [...day.items, updatedItem], { missingTime: '23:59' }) };
         }
         return day;
       });
@@ -3807,22 +3815,7 @@ function App() {
       if (t.id === activeTripId) {
         const newItin = (t.itinerary || []).map(day => {
           if (parseDay(day.day) === targetDayNum) {
-            const items = [...day.items];
-            const index = items.findIndex(it => it.id === itemId);
-            if (index === -1) return day;
-            const newIndex = direction === 'up' ? index - 1 : index + 1;
-            if (newIndex >= 0 && newIndex < items.length) {
-              const itemA = { ...items[index] };
-              const itemB = { ...items[newIndex] };
-              const timeA = itemA.time;
-              const timeB = itemB.time;
-              itemA.time = timeB;
-              itemB.time = timeA;
-              items[index] = itemB;
-              items[newIndex] = itemA;
-              items.sort((a, b) => (a.time || '00:00').localeCompare(b.time || '00:00'));
-            }
-            return { ...day, items };
+            return moveDayItem(day, itemId, direction);
           }
           return day;
         });
@@ -3861,7 +3854,7 @@ function App() {
       : itineraryWithoutSelected.map(dayPlan => parseDay(dayPlan.day) === targetDay
       ? {
         ...dayPlan,
-        items: [...dayPlan.items, ...movingItems].sort((a, b) => (a.time || '23:59').localeCompare(b.time || '23:59'))
+        items: sortDayItems(dayPlan, [...dayPlan.items, ...movingItems], { missingTime: '23:59' })
       }
       : dayPlan);
     if (movingItems.length === 0) return;
@@ -5592,6 +5585,7 @@ function App() {
                       tabIndex={0}
                       aria-label={`${dayPlan?.day}일차 선택`}
                       onKeyDown={(event) => {
+                        if (event.target !== event.currentTarget) return;
                         if ((event.key === 'Enter' || event.key === ' ') && dayPlan?.day) {
                           event.preventDefault();
                           setActiveDay(parseDay(dayPlan.day));
@@ -5631,7 +5625,14 @@ function App() {
                           </p>
                         </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div className="itinerary-day-header-actions">
+                        {!isReadOnlyTrip && <button
+                          type="button"
+                          className="itinerary-nearby-sort-button read-only-hide"
+                          aria-label={`${dayPlan?.day}일차 가까운 순 정렬`}
+                          title="첫 장소를 유지하고 가까운 순으로 정렬하기"
+                          onClick={event => { event.stopPropagation(); previewNearbyOrder(dayPlan); }}
+                        ><Route size={14} aria-hidden="true" />가까운 순 정렬</button>}
                         <span style={{ fontSize: '11px', fontWeight: '900', color: parseDay(activeDay) === parseDay(dayPlan?.day) ? '#3b82f6' : '#9ca3af', backgroundColor: parseDay(activeDay) === parseDay(dayPlan?.day) ? '#dbeafe' : '#f3f4f6', padding: '4px 10px', borderRadius: '8px' }}>
                           {(dayPlan?.items || []).length} 장소
                         </span>
@@ -5648,6 +5649,7 @@ function App() {
                       </div>
                     </div>
 
+                    {dayPlan.orderMode === 'distance' && <p className="itinerary-distance-order-note" role="status">거리 정렬 순서를 유지하고 있습니다. 도착 시간은 변경되지 않았으니 확인해주세요. 새 장소는 마지막에 추가됩니다.</p>}
                     {getDayConflictWarnings(dayPlan).length > 0 && <div className="itinerary-conflict-warning" role="status" style={{ margin: '12px 24px 0', padding: '10px 12px', borderRadius: '12px', background: '#fff7ed', color: '#c2410c', fontSize: '11px', fontWeight: '800' }}>시간·이동 확인: {getDayConflictWarnings(dayPlan)[0]}{getDayConflictWarnings(dayPlan).length > 1 ? ` 외 ${getDayConflictWarnings(dayPlan).length - 1}건` : ''}</div>}
 
                     {/* Day Items List */}
@@ -7687,6 +7689,16 @@ function App() {
         @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>
+      {nearbyOrderPreview && nearbyOrderPreview.tripId === activeTripId && !isReadOnlyTrip && viewMode === 'itinerary' && (
+        <Suspense fallback={null}>
+          <LazyNearbyOrderPreview
+            preview={nearbyOrderPreview}
+            blockedReason={itinerary.some(day => JSON.stringify(day) === nearbyOrderPreview.daySnapshot) ? '' : '일정이 변경되었습니다. 미리보기를 닫고 다시 정렬해주세요.'}
+            onApply={applyNearbyOrder}
+            onCancel={() => setNearbyOrderPreview(null)}
+          />
+        </Suspense>
+      )}
       {/* Custom Modal (Success/Error) */}
       {showCustomModal && (
         <div role="dialog" aria-modal="true" aria-label={modalConfig.title || '알림'} style={{
