@@ -1,10 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { GoogleMap, useJsApiLoader, OverlayViewF, InfoWindow, Polyline } from '@react-google-maps/api';
-import { AlertCircle, Clock, Heart, LocateFixed, MapPin, Menu, Navigation, PlusCircle } from 'lucide-react';
+import { AlertCircle, Clock, Heart, LocateFixed, MapPin, Menu, PlusCircle } from 'lucide-react';
 import { getMapAvailability } from './mapAvailability';
 import { buildItineraryRouteGroups, getRoutePoint, normalizeRouteSettings } from './itineraryRoutes';
-import useItineraryRoadRoutes from './useItineraryRoadRoutes';
-import MapRouteSettings from './MapRouteSettings';
+import MapSnapshotControl from './MapSnapshotControl';
 
 const HK_CENTER = { lat: 22.2891, lng: 114.1924 };
 const MAP_LIBRARIES = ['places'];
@@ -74,6 +73,7 @@ const mapOptions = {
   // Keep this object stable so React updates do not reset a user's pan/zoom.
   center: HK_CENTER,
   zoom: 3,
+  renderingType: 'RASTER',
   disableDefaultUI: true,
   zoomControl: false,
   gestureHandling: 'greedy',
@@ -95,7 +95,7 @@ const mapOptions = {
 export default function MapPane({ mapData = {}, mapView = {}, actions = {}, formComponents = {} }) {
   const { favorites = [], userLocation, activeDay, itinerary = [], reserveItems = [], searchResult, dayColors = [] } = mapData;
   const { showFullRoute = false, selectedPlace, useFloatingPlacePanel = false, selectedPlaceBusinessStatus = '', selectedPlaceOpeningHours = [], windowWidth = 1024, sidebarOpen = true, activeTripId, isReadOnlyTrip = false, itineraryDisplayName = '', itineraryEmoji = '📍', itineraryTime = '' } = mapView;
-  const { onMapLoad, onMapUnmount, onMapClick, onSelectedPlaceChange, onToggleFullRoute, onMyLocation, onOpenSidebar, onToggleFavorite, isFavorite, onActiveDayChange, onItineraryDisplayNameChange, onItineraryEmojiChange, onItineraryTimeChange, onAddToItinerary } = actions;
+  const { onMapLoad, onMapUnmount, onMapClick, onSelectedPlaceChange, onMyLocation, onOpenSidebar, onToggleFavorite, isFavorite, onActiveDayChange, onItineraryDisplayNameChange, onItineraryEmojiChange, onItineraryTimeChange, onAddToItinerary } = actions;
   const { ItineraryEmojiPicker, PremiumTimeInput } = formComponents;
   const parseDay = (day) => parseInt(String(day).replace(/[^0-9]/g, '')) || 0;
   const runtimeConfig = typeof window !== 'undefined' ? window.__TRAVELPLANER_CONFIG__ || {} : {};
@@ -110,34 +110,28 @@ export default function MapPane({ mapData = {}, mapView = {}, actions = {}, form
   const mapAvailability = getMapAvailability({ apiKey, isLoaded, loadError });
   const routeSettings = normalizeRouteSettings(mapView.routeSettings);
   const routeGroups = useMemo(() => buildItineraryRouteGroups({ itinerary, activeDay, showFullRoute }), [itinerary, activeDay, showFullRoute]);
-  const roadRoutes = useItineraryRoadRoutes({ groups: routeGroups, settings: routeSettings, isReady: mapAvailability.mapAvailable });
+  const roadRoutes = mapView.roadRoutes || { segments: [], status: 'idle' };
   const displayedRoutes = routeSettings.mode === 'road'
     ? roadRoutes.segments
     : routeGroups.filter(group => group.points.length > 1).map(group => ({ ...group, path: group.points }));
   const routeColor = group => group.kind === 'bridge' ? '#94a3b8' : showFullRoute ? dayColors[group.colorIndex % dayColors.length] || '#3b82f6' : '#3b82f6';
+  const snapshotMapRef = useRef(null);
+  const hasSnapshotPlaces = routeGroups.some(group => group.points.length > 0)
+    || (!showFullRoute && activeDay === 'reserve' && reserveItems.some(item => getRoutePoint(item)));
 
   return (
     mapAvailability.mapAvailable ? (
           <>
         {/* MAP CONTROLS (TOP-RIGHT) */}
         <div className="map-controls-group">
-          <MapRouteSettings settings={routeSettings} onChange={actions.onRouteSettingsChange} routeState={roadRoutes} isReserve={!showFullRoute && activeDay === 'reserve'} />
-          {/* Full Route Toggle */}
-          <button
-            onClick={onToggleFullRoute}
-            style={{
-              width: '56px', height: '56px',
-              backgroundColor: showFullRoute ? '#4f46e5' : 'white',
-              borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
-              cursor: 'pointer', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: showFullRoute ? 'white' : '#4f46e5',
-              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-            }}
-            aria-label={showFullRoute ? "일차별 경로 보기" : "전체 경로 보기"} title={showFullRoute ? "일차별 경로 보기" : "전체 경로 보기"}
-          >
-            <Navigation size={24} style={{ transform: showFullRoute ? 'rotate(45deg)' : 'none', transition: 'transform 0.3s' }} />
-          </button>
-
+          <MapSnapshotControl
+            mapRef={snapshotMapRef}
+            enabled={hasSnapshotPlaces}
+            routeLoading={routeSettings.mode === 'road' && roadRoutes.status === 'loading'}
+            tripName={mapView.tripName}
+            routeLabel={showFullRoute ? '전체 일정' : activeDay === 'reserve' ? '예비 목록' : `${parseDay(activeDay)}일차`}
+            onSave={actions.onSaveMapImage}
+          />
           {/* My Location Button */}
           <button
             onClick={onMyLocation}
@@ -166,8 +160,8 @@ export default function MapPane({ mapData = {}, mapView = {}, actions = {}, form
 
         <GoogleMap
           mapContainerStyle={{ width: '100%', height: '100%' }}
-          onLoad={onMapLoad}
-          onUnmount={onMapUnmount}
+          onLoad={loadedMap => { snapshotMapRef.current = loadedMap; onMapLoad?.(loadedMap); }}
+          onUnmount={() => { snapshotMapRef.current = null; onMapUnmount?.(); }}
           options={mapOptions}
           onClick={onMapClick}
         >

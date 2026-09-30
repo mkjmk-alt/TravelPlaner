@@ -17,8 +17,11 @@ import TripHomeActions from './TripHomeActions';
 import { getJournalEntries, getTravelDetails } from './travelMemory';
 import { calculateSettlement, createExpensePayerSelection, getNextExpensePayerIndex, normalizeExpenseParticipants, normalizeSettlementParticipants } from './expenseSettlement';
 import { createCashWallet, getCashWalletCreationCurrency, removeCashWalletState } from './cashWallets';
-import { normalizeRouteSettings, ROUTE_SETTINGS_STORAGE_KEY } from './itineraryRoutes';
+import { buildItineraryRouteGroups, normalizeRouteSettings, ROUTE_SETTINGS_STORAGE_KEY } from './itineraryRoutes';
+import useItineraryRoadRoutes from './useItineraryRoadRoutes';
+import ItineraryRouteSettings from './MapRouteSettings';
 import { createNearbyOrderPreview, applyNearbyOrderPreview, sortDayItems, moveDayItem } from './itineraryOrder';
+import { ITINERARY_ICON_OPTIONS, getItineraryItemCategory, withItineraryIcon } from './itineraryCategories';
 import './index.css';
 
 // --- CONFIGURATION ---
@@ -1262,20 +1265,19 @@ const ExpenseSplitFields = ({ participants, payerId, participantIds, onChange, c
   );
 };
 
-const ITINERARY_EMOJI_OPTIONS = ['📍', '✈️', '🏨', '🍽️', '☕', '🏖️', '🛍️', '🚗', '🎫', '📸', '🌅', '🏛️', '🎉', '🧳'];
-
 const ItineraryEmojiPicker = ({ value, onChange }) => (
   <div style={{ marginBottom: '12px' }}>
     <div style={{ fontSize: '9px', fontWeight: '900', color: '#64748b', marginBottom: '6px' }}>
       일정 아이콘
     </div>
     <div role="radiogroup" aria-label="일정 아이콘 선택" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-      {ITINERARY_EMOJI_OPTIONS.map((emoji) => (
+      {ITINERARY_ICON_OPTIONS.map(({ emoji, label }) => (
         <button
           key={emoji}
           type="button"
           role="radio"
           aria-label={`${emoji} 아이콘`}
+          title={label}
           aria-checked={value === emoji}
           onClick={() => onChange(emoji)}
           style={{ width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, border: `1px solid ${value === emoji ? '#2563eb' : '#e2e8f0'}`, borderRadius: '10px', backgroundColor: value === emoji ? '#eff6ff' : 'white', boxShadow: value === emoji ? '0 0 0 2px rgba(37, 99, 235, 0.12)' : 'none', fontSize: '18px', cursor: 'pointer', transition: 'all 0.15s' }}
@@ -1284,6 +1286,10 @@ const ItineraryEmojiPicker = ({ value, onChange }) => (
         </button>
       ))}
     </div>
+    <p role="status" style={{ margin: '6px 0 0', color: '#64748b', fontSize: '10px', lineHeight: 1.5 }}>
+      카테고리: <strong>{ITINERARY_ICON_OPTIONS.find(option => option.category === getItineraryItemCategory({ emoji: value }))?.label || '기타'}</strong> · 일정에 자동 저장됩니다.
+      {getItineraryItemCategory({ emoji: value }) === 'meal' && ' 식사는 가까운 순 정렬에서 기존 시간에 고정됩니다.'}
+    </p>
   </div>
 );
 
@@ -2346,6 +2352,12 @@ function App() {
     : (trips || []).find(t => String(t.id) === String(activeTripId));
   const itinerary = useMemo(() => activeTrip?.itinerary || [], [activeTrip]);
   const reserveItems = useMemo(() => activeTrip?.reserveItems || [], [activeTrip]);
+  const mapRouteGroups = useMemo(() => buildItineraryRouteGroups({ itinerary, activeDay, showFullRoute }), [itinerary, activeDay, showFullRoute]);
+  const mapRoadRoutes = useItineraryRoadRoutes({
+    groups: mapRouteGroups,
+    settings: mapRouteSettings,
+    isReady: Boolean(map) && shouldRenderMapPane({ isBottomNavigationViewport, mapVisible: mobileRootPresentation.mapVisible })
+  });
   const budgetSettings = activeTrip?.budgetSettings || { limitKRW: 1000000, travelCurrency: 'USD', exchangeRates: {}, categoryBudgets: {} };
   const expenses = useMemo(() => activeTrip?.expenses || [], [activeTrip]);
   const settlementParticipants = useMemo(() => normalizeSettlementParticipants(activeTrip?.settlementParticipants), [activeTrip]);
@@ -3546,12 +3558,12 @@ function App() {
   const addToItinerary = (place) => {
     const targetDay = parseDay(activeDay);
     const displayName = itineraryDisplayName.trim() || place.displayName || place.name || '장소 이름 정보 없음';
+    const itineraryPlace = withItineraryIcon(place, itineraryEmoji || place.emoji || '📍');
 
     if (activeDay === 'reserve') {
       const reserveItem = {
-        ...place,
+        ...itineraryPlace,
         id: makeEntityId(),
-        emoji: itineraryEmoji || place.emoji || '📍',
         displayName,
         time: itineraryTime || ''
       };
@@ -3588,12 +3600,12 @@ function App() {
 
       newItinerary[dayIndex].items = sortDayItems(newItinerary[dayIndex], [
         ...newItinerary[dayIndex].items,
-        { ...place, id: makeEntityId(), emoji: itineraryEmoji || place.emoji || '📍', displayName, time: finalTime }
+        { ...itineraryPlace, id: makeEntityId(), displayName, time: finalTime }
       ]);
     } else {
       newItinerary.push({ 
         day: targetDay, 
-        items: [{ ...place, id: makeEntityId(), emoji: itineraryEmoji || place.emoji || '📍', displayName, time: itineraryTime || '09:00' }]
+        items: [{ ...itineraryPlace, id: makeEntityId(), displayName, time: itineraryTime || '09:00' }]
       });
     }
     saveItinerary(newItinerary);
@@ -5369,8 +5381,10 @@ function App() {
             {/* --- ITINERARY MODE --- */}
             {viewMode === 'itinerary' && (
               <>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, marginBottom: '24px' }}>
-                  <h2 className="menu-section-title" style={{ flex: '0 0 auto', whiteSpace: 'nowrap' }}>내 일정</h2>
+                <div className="itinerary-section-header">
+                  <ItineraryRouteSettings settings={mapRouteSettings} onChange={handleMapRouteSettingsChange}
+                    routeState={mapRoadRoutes} showFullRoute={showFullRoute} onShowFullRouteChange={setShowFullRoute}
+                    isReserve={!showFullRoute && activeDay === 'reserve'} hasSelectedDay={Boolean(activeDay)} isMobile={isBottomNavigationViewport} />
                   <div style={{ 
                     flex: '1 1 auto',
                     minWidth: 0,
@@ -7202,8 +7216,9 @@ function App() {
             <Suspense fallback={<div className="map-pane-loading-state" role="status" aria-label="지도 화면 불러오는 중"><div className="map-unavailable-spinner" aria-hidden="true" /></div>}>
               <LazyMapPane
                 mapData={{ favorites, userLocation, activeDay, itinerary, reserveItems, searchResult, dayColors }}
-                mapView={{ showFullRoute, routeSettings: mapRouteSettings, selectedPlace, useFloatingPlacePanel, selectedPlaceBusinessStatus, selectedPlaceOpeningHours, windowWidth: windowSize.width, sidebarOpen, activeTripId, isReadOnlyTrip, itineraryDisplayName, itineraryEmoji, itineraryTime }}
+                mapView={{ showFullRoute, routeSettings: mapRouteSettings, roadRoutes: mapRoadRoutes, selectedPlace, useFloatingPlacePanel, selectedPlaceBusinessStatus, selectedPlaceOpeningHours, windowWidth: windowSize.width, sidebarOpen, activeTripId, tripName: activeTrip?.name, isReadOnlyTrip, itineraryDisplayName, itineraryEmoji, itineraryTime }}
                 actions={{
+                  onSaveMapImage: saveBlobAsFile,
                   onMapLoad: (loadedMap) => {
                     flushPendingMapCameraAction(loadedMap, mapRef, pendingMapCameraActionRef);
                     setMap(loadedMap);
@@ -7211,8 +7226,6 @@ function App() {
                   onMapUnmount: () => { mapRef.current = null; setMap(null); },
                   onMapClick,
                   onSelectedPlaceChange: setSelectedPlace,
-                  onToggleFullRoute: () => setShowFullRoute(current => !current),
-                  onRouteSettingsChange: handleMapRouteSettingsChange,
                   onMyLocation: handleMyLocation,
                   onOpenSidebar: () => setSidebarOpen(true),
                   onToggleFavorite: toggleFavorite,

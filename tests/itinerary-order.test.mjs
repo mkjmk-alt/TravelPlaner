@@ -19,7 +19,7 @@ test('starts at the first place and chooses the nearest unvisited place from eac
   const preview = api().createNearbyOrderPreview(day);
   assert.deepEqual(ids(preview.items), ['start', 'near', 'middle', 'far']);
   assert.equal(preview.changed, true);
-  assert.equal(preview.items[1].time, '11:00');
+  assert.deepEqual(preview.items.map(item => item.time), ['09:00', '10:00', '11:00', '12:00']);
   assert.equal(preview.items[3].memo, 'far memo');
   assert.equal(JSON.stringify(day), original, 'Preview must not mutate the saved day');
   assert.ok(Math.abs(preview.beforeMeters - 667170) < 100);
@@ -94,8 +94,8 @@ test('preserves the chosen order after time edits and appended places but leaves
   assert.deepEqual(ids(items), ['a', 'b', 'new']);
 });
 
-test('allows manual adjustment after distance sorting without swapping arrival times', () => {
-  const items = [place('a', 0, '09:00'), place('b', 1, '11:00'), place('c', 2, '10:00')];
+test('keeps the existing time slots when manually adjusting a distance-sorted day', () => {
+  const items = [place('a', 0, '09:00'), place('b', 1, '10:00'), place('c', 2, '11:00')];
   const day = { day: 1, orderMode: 'distance', items };
   const next = api().moveDayItem(day, 'c', 'up');
   assert.deepEqual(ids(next.items), ['a', 'c', 'b']);
@@ -106,4 +106,45 @@ test('allows manual adjustment after distance sorting without swapping arrival t
   const legacy = api().moveDayItem({ day: 2, items: [place('a', 0, '09:00'), place('b', 1, '10:00')] }, 'b', 'up');
   assert.deepEqual(ids(legacy.items), ['b', 'a']);
   assert.deepEqual(legacy.items.map(item => item.time), ['09:00', '10:00']);
+});
+
+test('pins meals at their saved times and sorts places separately before and after each meal', () => {
+  const lunch = { ...place('lunch', 10, '12:00'), category: 'meal', reservationNumber: 'booking-123' };
+  const dinner = { ...place('dinner', 20, '18:00'), emoji: '🍽️' };
+  const day = { day: 1, items: [
+    place('start', 0, '09:00'), place('far-before', 3, '10:00'), place('near-before', 1, '11:00'), lunch,
+    place('far-after', 13, '13:00'), place('near-after', 11, '14:00'), dinner,
+    place('far-evening', 23, '19:00'), place('near-evening', 21, '20:00')
+  ] };
+  const snapshot = JSON.stringify(day);
+  const preview = api().createNearbyOrderPreview(day);
+  assert.deepEqual(ids(preview.items), ['start', 'near-before', 'far-before', 'lunch', 'near-after', 'far-after', 'dinner', 'near-evening', 'far-evening']);
+  assert.deepEqual(preview.items.map(item => item.time), ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '18:00', '19:00', '20:00']);
+  assert.equal(preview.items[3], lunch);
+  assert.equal(preview.items[6], dinner);
+  assert.equal(preview.mealCount, 2);
+  assert.equal(JSON.stringify(day), snapshot);
+});
+
+test('restores chronological slots in days scrambled by a previous sort without inventing times', () => {
+  const lunch = { ...place('lunch', 2, '12:00'), emoji: '🍽️' };
+  const day = { day: 1, orderMode: 'distance', items: [
+    place('start', 0, '09:00'), lunch, place('near', 1, '11:00'), place('far', 3, '10:00'), place('after', 4, '13:00')
+  ] };
+  const preview = api().createNearbyOrderPreview(day);
+  assert.deepEqual(ids(preview.items), ['start', 'near', 'far', 'lunch', 'after']);
+  assert.deepEqual(preview.items.map(item => item.time), ['09:00', '10:00', '11:00', '12:00', '13:00']);
+  assert.equal(preview.items[3], lunch);
+  assert.deepEqual(preview.originalIndices, [0, 2, 3, 1, 4]);
+});
+
+test('pins a meal with no coordinates and preserves blank time slots and reservation details', () => {
+  const lunch = { id: 'lunch', name: '식사 예약', category: 'food', time: '12:00' };
+  const blank = { ...place('near', 1), reservationUrl: 'https://example.com/booking', memo: 'bring ticket' };
+  const day = { day: 1, items: [place('start', 0, '09:00'), blank, place('far', 3, '11:00'), lunch, place('after', 4, '13:00')] };
+  const preview = api().createNearbyOrderPreview(day);
+  assert.equal(preview.items[3], lunch);
+  assert.deepEqual(preview.items.map(item => item.time), ['09:00', undefined, '11:00', '12:00', '13:00']);
+  assert.equal(preview.mealCount, 1);
+  assert.equal(preview.items.find(item => item.id === 'near').reservationUrl, 'https://example.com/booking');
 });

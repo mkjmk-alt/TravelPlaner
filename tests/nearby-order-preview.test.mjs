@@ -21,7 +21,7 @@ const preview = () => createNearbyOrderPreview({ day: 1, items: [
   { id: 'b', name: '식당', lat: 0, lng: 1, time: '11:00' }
 ] });
 
-test('shows the proposed sequence with untouched times and applies only after explicit confirmation', () => {
+test('shows reassigned places in the existing time slots and applies only after explicit confirmation', () => {
   assert.ok(Content, 'The preview UI must exist');
   const calls = [];
   const props = { preview: preview(), onApply: () => calls.push('apply'), onCancel: () => calls.push('cancel') };
@@ -29,6 +29,7 @@ test('shows the proposed sequence with untouched times and applies only after ex
   const order = markup.indexOf('호텔') < markup.indexOf('식당') && markup.indexOf('식당') < markup.indexOf('관광지');
   assert.ok(order, 'The visible preview must show the new order');
   assert.match(markup, /11:00/);
+  assert.match(markup, /식당[\s\S]*?기존 3번째 → 2번째[\s\S]*?10:00/);
   assert.match(markup, /도착 시간/);
   assert.match(markup, /직선/);
   assert.deepEqual(calls, [], 'Rendering the preview must not save it');
@@ -36,6 +37,18 @@ test('shows the proposed sequence with untouched times and applies only after ex
   controls.find(button => button.props['data-action'] === 'apply').props.onClick();
   controls.find(button => button.props['data-action'] === 'cancel').props.onClick();
   assert.deepEqual(calls, ['apply', 'cancel']);
+});
+
+test('shows fixed meals with their saved time and explains the meal-aware ordering', () => {
+  assert.ok(Content, 'The preview UI must exist');
+  const mealPreview = createNearbyOrderPreview({ day: 1, items: [
+    { id: 'start', name: '호텔', lat: 0, lng: 0, time: '09:00' },
+    { id: 'far', name: '먼 관광지', lat: 0, lng: 3, time: '10:00' },
+    { id: 'near', name: '가까운 관광지', lat: 0, lng: 1, time: '11:00' },
+    { id: 'meal', name: '점심 식당', lat: 0, lng: 2, emoji: '🍽️', time: '12:00' }
+  ] });
+  const markup = renderToStaticMarkup(React.createElement(Content, { preview: mealPreview, onApply: () => {}, onCancel: () => {} }));
+  assert.match(markup, /점심 식당[\s\S]*?식사 고정[\s\S]*?12:00/);
 });
 
 test('blocks confirmation when the day changed while reviewing the preview', () => {
