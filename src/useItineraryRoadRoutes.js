@@ -40,6 +40,8 @@ export default function useItineraryRoadRoutes({ groups, settings, isReady }) {
     error: current?.error || null,
     status: !requestKey || !isReady ? 'idle' : !current ? 'loading' : current.error ? 'error' : 'ready',
     total,
+    requestKey,
+    retry,
     onRetry: () => setRetry(value => value + 1)
   };
 }

@@ -2867,6 +2867,14 @@ body {
   cursor: pointer;
 }
 
+.map-route-feedback-actions .map-route-feedback-confirm {
+  margin-left: auto;
+  border-color: #bfdbfe;
+  background: #2563eb;
+  color: #fff;
+  font-weight: 800;
+}
+
 .map-route-warnings {
   max-height: 110px;
   overflow-y: auto;

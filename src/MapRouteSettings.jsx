@@ -34,7 +34,7 @@ export function MapRouteOptions({ settings, onChange }) {
   );
 }
 
-function RouteFeedback({ routeState, settings, onChange, isReserve }) {
+function RouteFeedback({ routeState, settings, onChange, isReserve, showConfirm = false, onConfirm }) {
   if (settings.mode !== 'road') return null;
   const { status, total, failures, warnings, error, onRetry } = routeState;
   const message = status === 'loading'
@@ -54,6 +54,12 @@ function RouteFeedback({ routeState, settings, onChange, isReserve }) {
         <div className="map-route-feedback-actions">
           <button type="button" onClick={onRetry}>다시 시도</button>
           <button type="button" onClick={() => onChange({ ...settings, mode: 'straight' })}>직선 연결</button>
+          {showConfirm && <button type="button" className="map-route-feedback-confirm" onClick={onConfirm}>확인</button>}
+        </div>
+      )}
+      {showConfirm && !(error || failures.length > 0) && (
+        <div className="map-route-feedback-actions">
+          <button type="button" className="map-route-feedback-confirm" onClick={onConfirm}>확인</button>
         </div>
       )}
     </div>
@@ -62,8 +68,24 @@ function RouteFeedback({ routeState, settings, onChange, isReserve }) {
 
 export default function MapRouteSettings({ settings, onChange, routeState, isReserve }) {
   const [open, setOpen] = useState(false);
+  const [dismissedFeedbackKey, setDismissedFeedbackKey] = useState(null);
   const containerRef = useRef(null);
   const triggerRef = useRef(null);
+  const feedbackKey = JSON.stringify({
+    requestKey: routeState.requestKey,
+    retry: routeState.retry,
+    status: routeState.status,
+    total: routeState.total,
+    failures: routeState.failures,
+    warnings: routeState.warnings,
+    error: Boolean(routeState.error),
+    mode: settings.mode,
+    travelMode: settings.travelMode,
+    isReserve
+  });
+  useEffect(() => {
+    setDismissedFeedbackKey(current => current === feedbackKey ? current : null);
+  }, [feedbackKey]);
   useEffect(() => {
     if (!open) return;
     const onPointerDown = event => {
@@ -107,9 +129,16 @@ export default function MapRouteSettings({ settings, onChange, routeState, isRes
           <p className="map-route-settings-note">저장한 일정 순서대로 화살표를 표시합니다.</p>
           <RouteFeedback routeState={routeState} settings={settings} onChange={onChange} isReserve={isReserve} />
         </section>
-      ) : needsFeedback ? (
+      ) : needsFeedback && dismissedFeedbackKey !== feedbackKey ? (
         <div className="map-route-feedback">
-          <RouteFeedback routeState={routeState} settings={settings} onChange={onChange} isReserve={isReserve} />
+          <RouteFeedback
+            routeState={routeState}
+            settings={settings}
+            onChange={onChange}
+            isReserve={isReserve}
+            showConfirm
+            onConfirm={() => setDismissedFeedbackKey(feedbackKey)}
+          />
         </div>
       ) : null}
     </div>
