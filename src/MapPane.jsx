@@ -2,6 +2,9 @@ import React, { useMemo } from 'react';
 import { GoogleMap, useJsApiLoader, OverlayViewF, InfoWindow, Polyline } from '@react-google-maps/api';
 import { AlertCircle, Clock, Heart, LocateFixed, MapPin, Menu, Navigation, PlusCircle } from 'lucide-react';
 import { getMapAvailability } from './mapAvailability';
+import { buildItineraryRouteGroups, getRoutePoint, normalizeRouteSettings } from './itineraryRoutes';
+import useItineraryRoadRoutes from './useItineraryRoadRoutes';
+import MapRouteSettings from './MapRouteSettings';
 
 const HK_CENTER = { lat: 22.2891, lng: 114.1924 };
 const MAP_LIBRARIES = ['places'];
@@ -90,7 +93,7 @@ const mapOptions = {
 };
 
 export default function MapPane({ mapData = {}, mapView = {}, actions = {}, formComponents = {} }) {
-  const { favorites = [], userLocation, polylinePath = [], activeDay, itinerary = [], reserveItems = [], searchResult, fullTripPaths = [], interDayPaths = [], dayColors = [] } = mapData;
+  const { favorites = [], userLocation, activeDay, itinerary = [], reserveItems = [], searchResult, dayColors = [] } = mapData;
   const { showFullRoute = false, selectedPlace, useFloatingPlacePanel = false, selectedPlaceBusinessStatus = '', selectedPlaceOpeningHours = [], windowWidth = 1024, sidebarOpen = true, activeTripId, isReadOnlyTrip = false, itineraryDisplayName = '', itineraryEmoji = '📍', itineraryTime = '' } = mapView;
   const { onMapLoad, onMapUnmount, onMapClick, onSelectedPlaceChange, onToggleFullRoute, onMyLocation, onOpenSidebar, onToggleFavorite, isFavorite, onActiveDayChange, onItineraryDisplayNameChange, onItineraryEmojiChange, onItineraryTimeChange, onAddToItinerary } = actions;
   const { ItineraryEmojiPicker, PremiumTimeInput } = formComponents;
@@ -105,12 +108,20 @@ export default function MapPane({ mapData = {}, mapView = {}, actions = {}, form
     region: 'KR'
   });
   const mapAvailability = getMapAvailability({ apiKey, isLoaded, loadError });
+  const routeSettings = normalizeRouteSettings(mapView.routeSettings);
+  const routeGroups = useMemo(() => buildItineraryRouteGroups({ itinerary, activeDay, showFullRoute }), [itinerary, activeDay, showFullRoute]);
+  const roadRoutes = useItineraryRoadRoutes({ groups: routeGroups, settings: routeSettings, isReady: mapAvailability.mapAvailable });
+  const displayedRoutes = routeSettings.mode === 'road'
+    ? roadRoutes.segments
+    : routeGroups.filter(group => group.points.length > 1).map(group => ({ ...group, path: group.points }));
+  const routeColor = group => group.kind === 'bridge' ? '#94a3b8' : showFullRoute ? dayColors[group.colorIndex % dayColors.length] || '#3b82f6' : '#3b82f6';
 
   return (
     mapAvailability.mapAvailable ? (
           <>
         {/* MAP CONTROLS (TOP-RIGHT) */}
         <div className="map-controls-group">
+          <MapRouteSettings settings={routeSettings} onChange={actions.onRouteSettingsChange} routeState={roadRoutes} isReserve={!showFullRoute && activeDay === 'reserve'} />
           {/* Full Route Toggle */}
           <button
             onClick={onToggleFullRoute}
@@ -199,71 +210,36 @@ export default function MapPane({ mapData = {}, mapView = {}, actions = {}, form
             />
           )}
 
-          {/* Route Path (Polyline) */}
-          {window.google && !showFullRoute && polylinePath.length > 0 && (
-            <Polyline
-              key={`route-polyline-${activeDay}`}
-              path={polylinePath}
-              options={{
-                strokeColor: '#3b82f6',
-                strokeOpacity: 0.8,
-                strokeWeight: 4,
-                icons: [{ icon: { path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW, scale: 3, fillOpacity: 1, strokeColor: '#3b82f6' }, offset: '50%', repeat: '100px' }],
-              }}
-            />
-          )}
-
-          {/* --- FULL TRIP ROUTE RENDERING --- */}
-          {window.google && showFullRoute && (
-            <>
-              {/* 1. Inter-day Connections (Dashed) */}
-              {interDayPaths.map((path, idx) => (
+          {/* Both modes share the same itinerary order and day colors. */}
+          {window.google && displayedRoutes.map(segment => (
                 <Polyline
-                  key={`inter-day-${idx}`}
-                  path={path}
+                  key={`${routeSettings.mode}-${segment.id}`}
+                  path={segment.path}
                   options={{
-                    strokeColor: '#94a3b8',
-                    strokeOpacity: 0.4,
-                    strokeWeight: 2,
-                    icons: [{
-                      icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.6, scale: 3 },
-                      offset: '0',
-                      repeat: '15px'
-                    }],
-                  }}
-                />
-              ))}
-
-              {/* 2. Daily Routes (Solid with Arrows) */}
-              {fullTripPaths.map((path, idx) => (
-                <Polyline
-                  key={`full-route-day-${idx}`}
-                  path={path}
-                  options={{
-                    strokeColor: dayColors[idx % dayColors.length],
-                    strokeOpacity: 0.8,
-                    strokeWeight: 5,
-                    icons: [{
+                    strokeColor: routeColor(segment),
+                    strokeOpacity: segment.kind === 'bridge' ? 0.25 : 0.85,
+                    strokeWeight: segment.kind === 'bridge' ? 2 : showFullRoute ? 5 : 4,
+                    icons: [...(segment.kind === 'bridge' ? [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.6, scale: 3 }, offset: '0', repeat: '15px' }] : []), {
                       icon: {
                         path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
                         scale: 3,
                         fillOpacity: 1,
-                        strokeColor: dayColors[idx % dayColors.length]
+                        fillColor: routeColor(segment),
+                        strokeColor: routeColor(segment)
                       },
-                      offset: '50%',
+                      offset: '10%',
                       repeat: '100px'
                     }],
                   }}
                 />
-              ))}
+          ))}
 
-              {/* 3. Day Markers (Labels for the start of each day) */}
-              {fullTripPaths.map((path, idx) => (
+          {window.google && showFullRoute && routeGroups.filter(group => group.kind === 'day').map(group => (
                 <CustomMapMarker
-                  key={`day-label-${idx}`}
-                  position={path[0]}
+                  key={`day-label-${group.id}`}
+                  position={group.points[0]}
                   label={{
-                    text: `${idx + 1}일차`,
+                    text: `${group.day}일차`,
                     color: 'white',
                     fontSize: '12px',
                     fontWeight: '900'
@@ -271,17 +247,15 @@ export default function MapPane({ mapData = {}, mapView = {}, actions = {}, form
                   icon={{
                     url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
                       <svg width="60" height="30" viewBox="0 0 60 30" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <rect width="60" height="24" rx="12" fill="${dayColors[idx % dayColors.length]}" />
-                        <path d="M30 30L26 24H34L30 30Z" fill="${dayColors[idx % dayColors.length]}" />
+                        <rect width="60" height="24" rx="12" fill="${routeColor(group)}" />
+                        <path d="M30 30L26 24H34L30 30Z" fill="${routeColor(group)}" />
                       </svg>
                     `)}`,
                     scaledSize: new window.google.maps.Size(60, 30),
                     anchor: new window.google.maps.Point(30, 30)
                   }}
                 />
-              ))}
-            </>
-          )}
+          ))}
 
           {/* Itinerary Markers */}
           {!showFullRoute && (
@@ -290,7 +264,7 @@ export default function MapPane({ mapData = {}, mapView = {}, actions = {}, form
                 const targetDay = parseDay(activeDay);
                 const dayPlan = (itinerary || []).find(d => parseDay(d.day) === targetDay);
                 return (dayPlan?.items || [])
-                  .filter(item => item.lat && item.lng)
+                  .filter(item => getRoutePoint(item))
                   .map((item, idx) => (
                   <CustomMapMarker
                     key={`itin-mark-${activeDay}-${item.id}`}

@@ -17,6 +17,7 @@ import TripHomeActions from './TripHomeActions';
 import { getJournalEntries, getTravelDetails } from './travelMemory';
 import { calculateSettlement, createExpensePayerSelection, getNextExpensePayerIndex, normalizeExpenseParticipants, normalizeSettlementParticipants } from './expenseSettlement';
 import { createCashWallet, getCashWalletCreationCurrency, removeCashWalletState } from './cashWallets';
+import { normalizeRouteSettings, ROUTE_SETTINGS_STORAGE_KEY } from './itineraryRoutes';
 import './index.css';
 
 // --- CONFIGURATION ---
@@ -1593,6 +1594,12 @@ function App() {
   const [showPasteModal, setShowPasteModal] = useState(false);
   const [pasteText, setPasteText] = useState('');
   const [showFullRoute, setShowFullRoute] = useState(false);
+  const [mapRouteSettings, setMapRouteSettings] = useState(() => normalizeRouteSettings(readStoredJson(ROUTE_SETTINGS_STORAGE_KEY, null)));
+  const handleMapRouteSettingsChange = useCallback(nextSettings => {
+    const normalized = normalizeRouteSettings(nextSettings);
+    setMapRouteSettings(normalized);
+    writeStoredJson(ROUTE_SETTINGS_STORAGE_KEY, normalized);
+  }, []);
   const [userLocation, setUserLocation] = useState(null);
   const [showOnboarding, setShowOnboarding] = useState(() => !readStoredJson(ONBOARDING_STORAGE_KEY, false));
   const [onboardingStep, setOnboardingStep] = useState(0);
@@ -2547,42 +2554,6 @@ function App() {
     });
     return groups;
   }, [favorites]);
-
-  const polylinePath = useMemo(() => {
-    const targetDay = parseDay(activeDay);
-    const dayPlan = itinerary.find(d => parseDay(d.day) === targetDay);
-    if (!dayPlan || (dayPlan.items || []).length < 2) return [];
-    
-    return (dayPlan.items || [])
-      .filter(item => item.lat && item.lng)
-      .map(item => ({ 
-        lat: Number(item.lat), 
-        lng: Number(item.lng) 
-      }));
-  }, [itinerary, activeDay]);
-
-
-
-  const fullTripPaths = (itinerary || []).map(day => (day.items || [])
-    .filter(item => item.lat && item.lng)
-    .map(item => ({ lat: Number(item.lat), lng: Number(item.lng) }))
-  ).filter(path => path.length > 0);
-
-  const interDayPaths = useMemo(() => {
-    if (fullTripPaths.length < 2) return [];
-    const bridges = [];
-    for (let i = 0; i < fullTripPaths.length - 1; i++) {
-      const currentDay = fullTripPaths[i];
-      const nextDay = fullTripPaths[i + 1];
-      if (currentDay.length > 0 && nextDay.length > 0) {
-        bridges.push([
-          currentDay[currentDay.length - 1],
-          nextDay[0]
-        ]);
-      }
-    }
-    return bridges;
-  }, [fullTripPaths]);
 
   const toggleCountry = (country) => {
     setExpandedCountries(prev => ({
@@ -6607,6 +6578,7 @@ function App() {
                   key={`mobile-bottom-nav-${item.key}`}
                   type="button"
                   className={`mobile-bottom-navigation-item${isActive ? ' is-active' : ''}`}
+                  data-tab-key={item.key}
                   onClick={() => handleBottomNavigationSelect(item.key)}
                   aria-current={isActive ? 'page' : undefined}
                 >
@@ -7227,8 +7199,8 @@ function App() {
           <MapPaneErrorBoundary onRetry={() => window.location.reload()}>
             <Suspense fallback={<div className="map-pane-loading-state" role="status" aria-label="지도 화면 불러오는 중"><div className="map-unavailable-spinner" aria-hidden="true" /></div>}>
               <LazyMapPane
-                mapData={{ favorites, userLocation, polylinePath, activeDay, itinerary, reserveItems, searchResult, fullTripPaths, interDayPaths, dayColors }}
-                mapView={{ showFullRoute, selectedPlace, useFloatingPlacePanel, selectedPlaceBusinessStatus, selectedPlaceOpeningHours, windowWidth: windowSize.width, sidebarOpen, activeTripId, isReadOnlyTrip, itineraryDisplayName, itineraryEmoji, itineraryTime }}
+                mapData={{ favorites, userLocation, activeDay, itinerary, reserveItems, searchResult, dayColors }}
+                mapView={{ showFullRoute, routeSettings: mapRouteSettings, selectedPlace, useFloatingPlacePanel, selectedPlaceBusinessStatus, selectedPlaceOpeningHours, windowWidth: windowSize.width, sidebarOpen, activeTripId, isReadOnlyTrip, itineraryDisplayName, itineraryEmoji, itineraryTime }}
                 actions={{
                   onMapLoad: (loadedMap) => {
                     flushPendingMapCameraAction(loadedMap, mapRef, pendingMapCameraActionRef);
@@ -7238,6 +7210,7 @@ function App() {
                   onMapClick,
                   onSelectedPlaceChange: setSelectedPlace,
                   onToggleFullRoute: () => setShowFullRoute(current => !current),
+                  onRouteSettingsChange: handleMapRouteSettingsChange,
                   onMyLocation: handleMyLocation,
                   onOpenSidebar: () => setSidebarOpen(true),
                   onToggleFavorite: toggleFavorite,

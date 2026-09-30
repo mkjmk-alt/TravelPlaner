@@ -80,6 +80,41 @@ test('keeps the five-column mobile bar touchable and inside the device safe area
   assert.equal(declaration(itemRule, 'min-height'), '48px');
 });
 
+test('uses each destination theme for the selected bottom-navigation item', () => {
+  const projectRoot = path.resolve(new URL('..', import.meta.url).pathname);
+  const appSource = fs.readFileSync(path.join(projectRoot, 'src/App.jsx'), 'utf8');
+  const stylesheet = postcss.parse(fs.readFileSync(path.join(projectRoot, 'src/index.css'), 'utf8'));
+  const expectedThemes = {
+    trips: { color: '#6d28d9', background: '#f5f3ff' },
+    favorites: { color: '#e11d48', background: '#fff1f2' },
+    budget: { color: '#0f766e', background: '#f0fdfa' },
+    memory: { color: '#0284c7', background: '#f0f9ff' },
+    more: { color: '#475569', background: '#f1f5f9' }
+  };
+  const declarationsBySelector = new Map();
+
+  stylesheet.walkRules(rule => {
+    const declaration = property => rule.nodes.find(node => node.prop === property)?.value;
+    declarationsBySelector.set(rule.selector, {
+      color: declaration('color'),
+      background: declaration('background')
+    });
+  });
+
+  const navigationStart = appSource.indexOf('<nav className="mobile-bottom-navigation"');
+  const navigationEnd = appSource.indexOf('</nav>', navigationStart);
+  const navigationSource = appSource.slice(navigationStart, navigationEnd);
+  assert.ok(navigationSource.includes('data-tab-key={item.key}'), 'each item should expose its destination key to CSS');
+  for (const [key, theme] of Object.entries(expectedThemes)) {
+    const selector = `.mobile-bottom-navigation-item.is-active[data-tab-key="${key}"]`;
+    assert.deepEqual(
+      declarationsBySelector.get(selector),
+      theme,
+      `${key} should use its own selected color and soft background`
+    );
+  }
+});
+
 test('reduces bottom-navigation label sizing on very narrow phones', () => {
   const projectRoot = path.resolve(new URL('..', import.meta.url).pathname);
   const stylesheet = postcss.parse(fs.readFileSync(path.join(projectRoot, 'src/index.css'), 'utf8'));
