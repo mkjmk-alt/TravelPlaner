@@ -142,9 +142,9 @@ export default function ItineraryRouteSettings({ settings, onChange, routeState,
     travelMode: settings.travelMode,
     isReserve
   });
-  const needsFeedback = settings.mode === 'road' && (
+  const needsFeedback = Boolean(settings.mode === 'road' && (
     routeState.status === 'loading' || routeState.error || routeState.failures.length || routeState.warnings.length
-  );
+  ));
   return (
     <div className="itinerary-route-heading">
       <div className="itinerary-route-title-row">

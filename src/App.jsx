@@ -1294,6 +1294,13 @@ const ItineraryEmojiPicker = ({ value, onChange }) => (
 );
 
 
+const SOFT_KEYBOARD_VIEWPORT_DELTA = 120;
+
+const isSoftKeyboardVisible = () => Boolean(
+  window.visualViewport &&
+  window.innerHeight - window.visualViewport.height > SOFT_KEYBOARD_VIEWPORT_DELTA
+);
+
 function App() {
   const parseDay = (day) => parseInt(String(day).replace(/[^0-9]/g, '')) || 0;
 
@@ -1319,6 +1326,7 @@ function App() {
     innerHeight: window.innerHeight,
     visualViewport: window.visualViewport
   }));
+  const [isSoftKeyboardOpen, setIsSoftKeyboardOpen] = useState(isSoftKeyboardVisible);
 
   useEffect(() => {
     const handleResize = () => {
@@ -1327,6 +1335,7 @@ function App() {
         innerHeight: window.innerHeight,
         visualViewport: window.visualViewport
       }));
+      setIsSoftKeyboardOpen(isSoftKeyboardVisible());
     };
     window.addEventListener('resize', handleResize);
     window.visualViewport?.addEventListener('resize', handleResize);
@@ -6576,7 +6585,7 @@ function App() {
         )}
         </aside>
 
-        {isBottomNavigationViewport && (
+        {isBottomNavigationViewport && !isSoftKeyboardOpen && (
           <nav className="mobile-bottom-navigation" aria-label="주요 메뉴">
             {bottomNavigationItems.map((item) => {
               const isActive = mobileRootTab === item.key;
