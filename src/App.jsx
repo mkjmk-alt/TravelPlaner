@@ -2906,7 +2906,7 @@ function App() {
         document.execCommand('copy');
         document.body.removeChild(textArea);
       }
-      setModalConfig({ type: 'success', title: '예시 형식 복사 완료', message: '복사한 JSON 예시를 원하는 AI 도구에 전달해 여행 일정으로 바꿔 달라고 요청해 보세요.' });
+      setModalConfig({ type: 'success', title: '예시 형식 복사 완료', message: '복사한 JSON 예시를 현재 구독 중인 LLM의 대화창에 붙여넣고 여행 일정 작성을 요청하세요. 작성된 JSON을 이 창에 가져오면 여행 일정으로 저장할 수 있습니다.' });
       setShowCustomModal(true);
     } catch (error) {
       console.error('LLM template copy failed:', error);
