@@ -14,6 +14,7 @@ import AccountMoreActions from './AccountMoreActions';
 import TravelMemoryPanel from './TravelMemoryPanel';
 import TripRequiredEmptyState from './TripRequiredEmptyState';
 import TripHomeActions from './TripHomeActions';
+import AiItineraryImportDialog from './AiItineraryImportDialog';
 import { getJournalEntries, getTravelDetails } from './travelMemory';
 import { calculateSettlement, createExpensePayerSelection, getNextExpensePayerIndex, normalizeExpenseParticipants, normalizeSettlementParticipants } from './expenseSettlement';
 import { createCashWallet, getCashWalletCreationCurrency, removeCashWalletState } from './cashWallets';
@@ -7767,99 +7768,16 @@ function App() {
 
       {/* JSON Paste Modal */}
       {showPasteModal && (
-        <div role="dialog" aria-modal="true" aria-label="AI 일정 가져오기" style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(8px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 3000, padding: '20px', animation: 'fadeIn 0.2s ease-out'
-        }}>
-          <div style={{
-            backgroundColor: 'white', borderRadius: '32px', width: '100%', maxWidth: '480px',
-            padding: '32px 24px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-            animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-            maxHeight: 'calc(100vh - 40px)',
-            overflowY: 'auto'
-          }}>
-            <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#0f172a', margin: '0 0 8px 0' }}>AI로 일정 만들기</h3>
-            <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 16px 0', lineHeight: 1.5 }}>AI가 작성한 일정 JSON을 붙여넣거나, 직접 작성한 JSON을 불러와 여행 일정으로 저장하세요.</p>
-
-            <div style={{ padding: '16px', marginBottom: '16px', borderRadius: '18px', backgroundColor: '#eff6ff', border: '1px solid #dbeafe' }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '10px' }}>
-                <div>
-                  <strong style={{ display: 'block', color: '#1e40af', fontSize: '13px', marginBottom: '4px' }}>LLM용 예시 형식</strong>
-                  <span style={{ display: 'block', color: '#64748b', fontSize: '11px', lineHeight: 1.5 }}>예시를 복사해 AI 도구에 전달하면 같은 형식으로 일정을 만들 수 있어요.</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={copyImportTemplate}
-                  aria-label="LLM 일정 JSON 예시 복사"
-                  title="LLM 일정 JSON 예시 복사"
-                  style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '9px 10px', border: 'none', borderRadius: '10px', backgroundColor: '#2563eb', color: 'white', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}
-                >
-                  <Copy size={13} /> 예시 복사
-                </button>
-              </div>
-              <pre style={{ maxHeight: '120px', overflow: 'auto', margin: 0, padding: '10px', borderRadius: '10px', backgroundColor: 'rgba(255,255,255,0.8)', color: '#334155', fontSize: '10px', lineHeight: 1.45, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{LLM_IMPORT_TEMPLATE}</pre>
-            </div>
-
-            <div style={{ padding: '14px 16px', marginBottom: '18px', borderRadius: '16px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
-              <strong style={{ display: 'block', color: '#334155', fontSize: '12px', marginBottom: '8px' }}>사용 방법</strong>
-              <ol style={{ margin: 0, paddingLeft: '18px', color: '#64748b', fontSize: '11px', lineHeight: 1.65 }}>
-                <li>위의 <b>예시 복사</b>를 눌러 JSON 형식을 복사합니다.</li>
-                <li>LLM에 여행지, 날짜, 장소, 방문 시간을 알려주고 JSON 형식으로 작성해 달라고 요청합니다.</li>
-                <li>LLM의 답변에서 JSON 코드만 복사해 아래 입력창에 붙여넣습니다.</li>
-                <li>설명 문장이 아닌 <b>JSON만</b> 반환해 달라고 요청하면 가장 정확합니다.</li>
-              </ol>
-              <p style={{ margin: '9px 0 0', color: '#2563eb', fontSize: '11px', lineHeight: 1.5 }}>추천 문장: “아래 JSON 형식을 유지하고, 내 여행 일정에 맞는 값만 바꿔서 JSON 코드만 반환해줘.”</p>
-            </div>
-            
-            <textarea 
-              value={pasteText}
-              onChange={(e) => setPasteText(e.target.value)}
-              aria-label="일정 JSON 붙여넣기"
-              placeholder='{"name": "여행 제목", "itinerary": [{"day": 1, "items": []}]}'
-              style={{
-                width: '100%', height: '200px', padding: '16px', border: '1px solid #e2e8f0',
-                borderRadius: '16px', fontSize: '13px', fontFamily: 'monospace',
-                outline: 'none', resize: 'none', marginBottom: '24px', boxSizing: 'border-box',
-                backgroundColor: '#f8fafc'
-              }}
-            />
-
-            <button
-              type="button"
-              onClick={() => { setShowPasteModal(false); setPasteText(''); handleUploadJson(); }}
-              style={{ width: '100%', marginBottom: '12px', padding: '12px', border: '1px solid #e2e8f0', borderRadius: '12px', backgroundColor: 'white', color: '#64748b', fontSize: '12px', fontWeight: '800', cursor: 'pointer' }}
-            >
-              <Upload size={14} style={{ verticalAlign: 'middle', marginRight: '5px' }} /> JSON 파일로 가져오기
-            </button>
-
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button 
-                type="button"
-                aria-label="AI 일정 가져오기 창 닫기"
-                onClick={() => { setShowPasteModal(false); setPasteText(''); }}
-                style={{
-                  flex: 1, backgroundColor: '#f1f5f9', color: '#64748b', border: 'none',
-                  padding: '16px', borderRadius: '16px', fontWeight: '800', fontSize: '15px',
-                  cursor: 'pointer'
-                }}
-              >
-                취소
-              </button>
-              <button 
-                onClick={handlePasteImport}
-                style={{
-                  flex: 2, backgroundColor: '#2563eb', color: 'white', border: 'none',
-                  padding: '16px', borderRadius: '16px', fontWeight: '800', fontSize: '15px',
-                  cursor: 'pointer'
-                }}
-              >
-                일정 가져오기
-              </button>
-            </div>
-          </div>
-        </div>
+        <AiItineraryImportDialog
+          value={pasteText}
+          onChange={setPasteText}
+          template={LLM_IMPORT_TEMPLATE}
+          onCopyTemplate={copyImportTemplate}
+          onImport={handlePasteImport}
+          onFileImport={() => { setShowPasteModal(false); setPasteText(''); handleUploadJson(); }}
+          onClose={() => { setShowPasteModal(false); setPasteText(''); }}
+          isActive={!showCustomModal}
+        />
       )}
     </div>
   );
