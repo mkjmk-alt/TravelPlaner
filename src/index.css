@@ -499,8 +499,13 @@ body {
   font-weight: 850;
   line-height: 1.2;
   text-align: center;
+  white-space: nowrap;
   cursor: pointer;
   transition: filter 0.2s, transform 0.2s;
+}
+
+.trip-home-action svg {
+  flex-shrink: 0;
 }
 
 .trip-home-action-label-full {
@@ -554,6 +559,25 @@ body {
   color: #2563eb;
   background: #eff6ff;
   border-color: #dbeafe;
+}
+
+/* Give the shortcuts the brand's unused space in desktop sidebars. */
+@container trip-header (min-width: 381px) and (max-width: 699px) {
+  .sidebar-brand-auth-row--with-actions {
+    grid-template-columns: minmax(106px, max-content) minmax(0, 1fr);
+  }
+
+  .trip-home-action {
+    gap: 4px;
+    padding-inline: 4px;
+  }
+}
+
+/* Keep readable one-line labels instead of squeezing icons beside them. */
+@container trip-header (max-width: 450px) {
+  .trip-home-action svg {
+    display: none;
+  }
 }
 
 @container trip-header (max-width: 380px) {
@@ -2199,6 +2223,28 @@ body {
   font-size: 12px;
   font-weight: 700;
   outline: none;
+}
+
+.expense-day-native-select-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.expense-day-native-select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 40px;
+  font-size: 13px !important;
+  line-height: 1.4;
+}
+
+.expense-day-native-select-arrow {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  color: #64748b;
+  pointer-events: none;
 }
 
 .expense-choice-group {

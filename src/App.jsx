@@ -6071,15 +6071,18 @@ function App() {
                           scrollable
                         />
                       ) : (
-                        <select
-                          id="expense-day-select"
-                          className="expense-form-control"
-                          value={expenseInput.day}
-                          onChange={e => setExpenseInput({ ...expenseInput, day: e.target.value })}
-                          aria-label="지출 사용 일차"
-                        >
-                          {expenseDayChoices.map(day => <option key={`opt-day-${day.value}`} value={day.value}>{day.label}</option>)}
-                        </select>
+                        <div className="expense-day-native-select-wrap">
+                          <select
+                            id="expense-day-select"
+                            className="expense-form-control expense-day-native-select"
+                            value={expenseInput.day}
+                            onChange={e => setExpenseInput({ ...expenseInput, day: e.target.value })}
+                            aria-label="지출 사용 일차"
+                          >
+                            {expenseDayChoices.map(day => <option key={`opt-day-${day.value}`} value={day.value}>{day.label}</option>)}
+                          </select>
+                          <ChevronDown className="expense-day-native-select-arrow" size={16} aria-hidden="true" />
+                        </div>
                       )}
                     </div>
                   </div>
