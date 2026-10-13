@@ -1,0 +1,14 @@
+{
+  "user_id": "test-account-001",
+  "record_type": "trip",
+  "record_id": "trip-string-id-001",
+  "payload": {
+    "id": "trip-string-id-001",
+    "name": "도쿄 여행",
+    "itinerary": [{ "day": 1, "items": [{ "id": "stop-a", "futureField": { "kept": true } }] }],
+    "futureTopLevelField": ["preserve", 7]
+  },
+  "revision": 0,
+  "updated_at": "2026-10-13T00:00:00Z",
+  "deleted_at": null
+}

@@ -22,18 +22,46 @@ enum TripStoreModel {
         model.entities += [saved]
         return model
     }
-    private static func entity(_ name: String, fields: [(String, NSAttributeType)], unique: String) -> NSEntityDescription {
+    static var sync: NSManagedObjectModel {
+        let model = current
+        for name in ["TripRecord", "SavedPlaceRecord"] {
+            guard let existing = model.entitiesByName[name] else { continue }
+            let owner = NSAttributeDescription()
+            owner.name = "ownerUserID"
+            owner.attributeType = .stringAttributeType
+            owner.isOptional = true
+            existing.properties.append(owner)
+        }
+        model.entitiesByName["SavedPlaceRecord"]?.uniquenessConstraints = [["id"], ["ownerUserID", "sourceKey"]]
+        model.entities += [
+            entity("SyncOutboxRecord", fields: [("operationID", .stringAttributeType), ("userID", .stringAttributeType),
+                ("recordType", .stringAttributeType), ("recordID", .stringAttributeType),
+                ("expectedRevision", .integer64AttributeType), ("body", .binaryDataAttributeType), ("createdAt", .doubleAttributeType)], unique: "operationID"),
+            entity("SyncRecordStateRecord", fields: [("userID", .stringAttributeType), ("recordType", .stringAttributeType),
+                ("recordID", .stringAttributeType), ("revision", .integer64AttributeType), ("record", .binaryDataAttributeType),
+                ("updatedAt", .doubleAttributeType), ("deletedAt", .doubleAttributeType)], unique: "userID",
+                optional: ["deletedAt"], constraints: [["userID", "recordType", "recordID"]]),
+            entity("SyncConflictRecord", fields: [("conflictID", .stringAttributeType), ("operationID", .stringAttributeType),
+                ("userID", .stringAttributeType), ("operation", .binaryDataAttributeType),
+                ("serverRecord", .binaryDataAttributeType), ("createdAt", .doubleAttributeType)], unique: "conflictID",
+                constraints: [["conflictID"], ["operationID"]])
+        ]
+        return model
+    }
+    private static func entity(_ name: String, fields: [(String, NSAttributeType)], unique: String,
+                               optional: Set<String> = [], constraints: [[String]]? = nil) -> NSEntityDescription {
         let entity = NSEntityDescription(); entity.name = name; entity.managedObjectClassName = "NSManagedObject"
         entity.properties = fields.map { name, type in
-            let field = NSAttributeDescription(); field.name = name; field.attributeType = type; field.isOptional = false; return field
+            let field = NSAttributeDescription(); field.name = name; field.attributeType = type
+            field.isOptional = optional.contains(name); return field
         }
-        entity.uniquenessConstraints = [[unique]]; return entity
+        entity.uniquenessConstraints = constraints ?? [[unique]]; return entity
     }
     static func migrateIfNeeded(at url: URL) throws {
         guard FileManager.default.fileExists(atPath: url.path) else { return }
         let metadata = try NSPersistentStoreCoordinator.metadataForPersistentStore(ofType: NSSQLiteStoreType, at: url, options: nil)
-        if current.isConfiguration(withName: nil, compatibleWithStoreMetadata: metadata) { return }
-        guard let source = [original, stage2].first(where: { $0.isConfiguration(withName: nil, compatibleWithStoreMetadata: metadata) }) else { throw TripError.invalidDocument }
+        if sync.isConfiguration(withName: nil, compatibleWithStoreMetadata: metadata) { return }
+        guard let source = [current, stage2, original].first(where: { $0.isConfiguration(withName: nil, compatibleWithStoreMetadata: metadata) }) else { throw TripError.invalidDocument }
         let recoveryBase = URL(fileURLWithPath: url.path + ".pre-import.sqlite")
         let recovery = FileManager.default.fileExists(atPath: recoveryBase.path) ? URL(fileURLWithPath: url.path + ".\(UUID().uuidString).pre-import.sqlite") : recoveryBase
         let destination = URL(fileURLWithPath: url.path + ".\(UUID().uuidString).migration.sqlite")
@@ -42,17 +70,19 @@ enum TripStoreModel {
         try coordinator.replacePersistentStore(at: recovery, destinationOptions: nil, withPersistentStoreFrom: url, sourceOptions: nil, ofType: NSSQLiteStoreType)
         let entities = source.entities.compactMap(\.name)
         let before = try payloads(at: recovery, model: source, entities: entities)
-        let mapping = try NSMappingModel.inferredMappingModel(forSourceModel: source, destinationModel: current)
-        let manager = NSMigrationManager(sourceModel: source, destinationModel: current)
+        let destinationModel = sync
+        let mapping = try NSMappingModel.inferredMappingModel(forSourceModel: source, destinationModel: destinationModel)
+        let manager = NSMigrationManager(sourceModel: source, destinationModel: destinationModel)
         try manager.migrateStore(from: recovery, sourceType: NSSQLiteStoreType, options: nil, with: mapping, toDestinationURL: destination, destinationType: NSSQLiteStoreType, destinationOptions: nil)
-        guard try payloads(at: destination, model: current, entities: entities) == before else { throw TripError.invalidDocument }
-        let replacer = NSPersistentStoreCoordinator(managedObjectModel: current)
+        guard try payloads(at: destination, model: destinationModel, entities: entities, attributesFrom: source) == before else { throw TripError.invalidDocument }
+        let replacer = NSPersistentStoreCoordinator(managedObjectModel: destinationModel)
         try replacer.replacePersistentStore(at: url, destinationOptions: nil, withPersistentStoreFrom: destination, sourceOptions: nil, ofType: NSSQLiteStoreType)
-        guard try payloads(at: url, model: current, entities: entities) == before else { throw TripError.invalidDocument }
+        guard try payloads(at: url, model: destinationModel, entities: entities, attributesFrom: source) == before else { throw TripError.invalidDocument }
         try? replacer.destroyPersistentStore(at: destination, ofType: NSSQLiteStoreType, options: nil)
         // recovery intentionally remains private and recoverable after a successful migration.
     }
-    private static func payloads(at url: URL, model: NSManagedObjectModel, entities: [String]) throws -> [String: NSDictionary] {
+    private static func payloads(at url: URL, model: NSManagedObjectModel, entities: [String],
+                                 attributesFrom sourceModel: NSManagedObjectModel? = nil) throws -> [String: NSDictionary] {
         let coordinator = NSPersistentStoreCoordinator(managedObjectModel: model)
         let store = try coordinator.addPersistentStore(ofType: NSSQLiteStoreType, configurationName: nil, at: url, options: [NSReadOnlyPersistentStoreOption: true])
         defer { try? coordinator.remove(store) }
@@ -66,7 +96,8 @@ enum TripStoreModel {
                     let key = entity + ":" + id
                     guard result[key] == nil else { throw TripError.invalidDocument }
                     // Includes exact binary payload/sourceBytes/history and scalar metadata.
-                    result[key] = row.dictionaryWithValues(forKeys: Array(row.entity.attributesByName.keys)) as NSDictionary
+                    let attributeEntity = sourceModel?.entitiesByName[entity] ?? row.entity
+                    result[key] = row.dictionaryWithValues(forKeys: Array(attributeEntity.attributesByName.keys)) as NSDictionary
                 }
             }
             return result

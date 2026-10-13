@@ -79,6 +79,51 @@ final class SavedPlaceRepositoryTests: XCTestCase {
         _ = try repo.savePlace(selection:.init(reference:.unlocated),draft:.init(name:"이전 이후"),id:UUID().uuidString)
         XCTAssertEqual(try TripRepository(url:url).listSavedPlaces().count,1)
     }
+    func testCurrentStoreMigrationPreservesTripPlaceAndReceiptBytes() throws {
+        let url = try storeURL()
+        let tripBytes = try contractBytes("map-places.json")
+        let placeBytes = try jsonValue(["id": "place-current", "name": "저장 장소", "future": ["kept", 7]])
+        let sourceBytes = try jsonValue(["source": "receipt", "unknown": true])
+        let previousTargets = try jsonValue(["old-trip-id"])
+        let coordinator = NSPersistentStoreCoordinator(managedObjectModel: TripStoreModel.current)
+        let store = try coordinator.addPersistentStore(ofType: NSSQLiteStoreType, configurationName: nil, at: url, options: nil)
+        let context = NSManagedObjectContext(concurrencyType: .privateQueueConcurrencyType)
+        context.persistentStoreCoordinator = coordinator
+        try context.performAndWait {
+            let trip = try TripDocument(data: tripBytes)
+            let tripRow = NSEntityDescription.insertNewObject(forEntityName: "TripRecord", into: context)
+            tripRow.setValue(trip.id, forKey: "id")
+            tripRow.setValue(try trip.encoded(), forKey: "payload")
+            tripRow.setValue(trip.updatedAt, forKey: "updatedAt")
+
+            let receipt = NSEntityDescription.insertNewObject(forEntityName: "ImportReceipt", into: context)
+            receipt.setValue("source-current", forKey: "sourceHash")
+            receipt.setValue(sourceBytes, forKey: "sourceBytes")
+            receipt.setValue(trip.id, forKey: "targetID")
+            receipt.setValue(previousTargets, forKey: "previousTargetIDs")
+            receipt.setValue(456.0, forKey: "importedAt")
+
+            let place = NSEntityDescription.insertNewObject(forEntityName: "SavedPlaceRecord", into: context)
+            place.setValue("place-current", forKey: "id")
+            place.setValue("manual:place-current", forKey: "sourceKey")
+            place.setValue(placeBytes, forKey: "payload")
+            place.setValue(123.0, forKey: "createdAt")
+            place.setValue(456.0, forKey: "updatedAt")
+            try context.save()
+        }
+        try coordinator.remove(store)
+
+        let repo = try TripRepository(url: url)
+        XCTAssertEqual(try repo.list().first?.encoded(), try TripDocument(data: tripBytes).encoded())
+        XCTAssertEqual(try repo.receiptSource(hash: "source-current"), sourceBytes)
+        XCTAssertEqual(try repo.previousImportTargets(hash: "source-current"), ["old-trip-id"])
+        let place = try XCTUnwrap(repo.listSavedPlaces().first)
+        XCTAssertEqual(place.id, "place-current")
+        let futureValues = try XCTUnwrap(place.payload["future"] as? [Any])
+        XCTAssertEqual(futureValues.first as? String, "kept")
+        XCTAssertEqual((futureValues.last as? NSNumber)?.intValue, 7)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path + ".pre-import.sqlite"))
+    }
     func testFailedDatabaseWriteRollsBackOnlyNewPlace() throws {
         let url=try storeURL(), repo=try TripRepository(url:url), trip=try TripDocument(data:contractBytes("map-places.json"))
         try repo.save(trip)
