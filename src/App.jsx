@@ -23,6 +23,11 @@ import useItineraryRoadRoutes from './useItineraryRoadRoutes';
 import ItineraryRouteSettings from './MapRouteSettings';
 import { createNearbyOrderPreview, applyNearbyOrderPreview, sortDayItems, moveDayItem } from './itineraryOrder';
 import { ITINERARY_ICON_OPTIONS, getItineraryItemCategory, withItineraryIcon } from './itineraryCategories';
+import { createSyncV2Repository } from './sync/syncV2Repository.js';
+import { IndexedDBQueueStore } from './sync/indexedDBQueueStore.js';
+import { LOCAL_SYNC_BACKUP_PREFIX, LOCAL_SYNC_SAVED_PLACES_KEY, LOCAL_SYNC_TRIPS_KEY, LEGACY_SAVED_PLACES_KEY, LEGACY_TRIPS_KEY, SYNC_MIGRATION_COMPLETED_PREFIX } from './sync/localSyncStorage.js';
+import { hashLegacySnapshot } from './sync/legacyUserStateImporter.js';
+import SyncMigrationDialog from './components/SyncMigrationDialog.jsx';
 import './index.css';
 
 // --- CONFIGURATION ---
@@ -1307,6 +1312,9 @@ function App() {
 
   // --- GLOBAL UI & AUTH STATE ---
   const [session, setSession] = useState(null);
+  const syncRepositoryRef = useRef(null);
+  const syncRecordsRef = useRef(new Map());
+  const syncReadyUserRef = useRef('');
   const [authResolved, setAuthResolved] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState('login');
@@ -1623,6 +1631,8 @@ function App() {
   const [onboardingStep, setOnboardingStep] = useState(0);
   const [mergeNotice, setMergeNotice] = useState(null);
   const [syncConflictNotice, setSyncConflictNotice] = useState(null);
+  const [syncMigration, setSyncMigration] = useState(null);
+  const [isSyncMigrationBusy, setIsSyncMigrationBusy] = useState(false);
   const [notificationPermission, setNotificationPermission] = useState(() => (
     typeof Notification === 'undefined' ? 'unsupported' : Notification.permission
   ));
@@ -1653,6 +1663,16 @@ function App() {
     }
     setSyncConflictNotice(null);
   };
+
+  const getSyncV2Repository = useCallback(() => {
+    if (!syncRepositoryRef.current) {
+      syncRepositoryRef.current = createSyncV2Repository({
+        supabase,
+        queueStore: new IndexedDBQueueStore()
+      });
+    }
+    return syncRepositoryRef.current;
+  }, []);
 
   const handleMyLocation = () => {
     if (!navigator.geolocation) {
@@ -1701,7 +1721,7 @@ function App() {
 
   // --- DATA STATE ---
   const [favorites, setFavorites] = useState(() => {
-    const savedFavorites = readStoredJson("world_pro_fav_v1", []);
+    const savedFavorites = readStoredJson(LOCAL_SYNC_SAVED_PLACES_KEY, readStoredJson(LEGACY_SAVED_PLACES_KEY, []));
     return Array.isArray(savedFavorites) ? savedFavorites : [];
   });
 
@@ -1712,12 +1732,12 @@ function App() {
   });
 
   const [trips, setTrips] = useState(() => {
-    const savedTrips = readStoredJson("world_pro_trips_v1", null);
+    const savedTrips = readStoredJson(LOCAL_SYNC_TRIPS_KEY, readStoredJson(LEGACY_TRIPS_KEY, null));
     if (Array.isArray(savedTrips)) {
       // Remove local-only test trips when the app starts. Real trips are kept intact.
       const cleanedTrips = savedTrips.filter(trip => !trip.localOnly);
       if (cleanedTrips.length !== savedTrips.length) {
-        writeStoredJson("world_pro_trips_v1", cleanedTrips);
+        writeStoredJson(LOCAL_SYNC_TRIPS_KEY, cleanedTrips);
       }
       return cleanedTrips.map(trip => ({
         ...trip,
@@ -1754,7 +1774,7 @@ function App() {
         createdAt: Date.now(),
         updatedAt: Date.now()
       };
-      writeStoredJson("world_pro_trips_v1", [migratedTrip]);
+      writeStoredJson(LOCAL_SYNC_TRIPS_KEY, [migratedTrip]);
       return [migratedTrip];
     }
     return [];
@@ -2100,7 +2120,7 @@ function App() {
     if (cleanedTrips.length === (trips || []).length) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setTrips(cleanedTrips);
-    writeStoredJson("world_pro_trips_v1", cleanedTrips);
+    writeStoredJson(LOCAL_SYNC_TRIPS_KEY, cleanedTrips);
   }, [trips]);
   
   // Auth listener
@@ -2159,132 +2179,201 @@ function App() {
     setItineraryEmoji(selectedPlace?.emoji || '📍');
   }, [selectedPlace]);
 
-  // Cloud Sync Initialization
+  const hydrateSyncRecords = useCallback((userID, records) => {
+    const recordMap = new Map(records.map(record => [`${record.type}:${record.recordID}`, record]));
+    syncRecordsRef.current = recordMap;
+    const activeRecords = records.filter(record => !record.deletedAt && record.payload && typeof record.payload === 'object');
+    const localTripsByID = new Map(
+      (readStoredJson(LOCAL_SYNC_TRIPS_KEY, []) || [])
+        .filter(trip => trip?.id !== undefined && trip?.id !== null)
+        .map(trip => [String(trip.id), trip])
+    );
+    const nextTrips = activeRecords
+      .filter(record => record.type === 'trip' && !record.payload.localOnly)
+      .map(record => ({
+        ...preserveLocalShareMetadata(record.payload, localTripsByID.get(String(record.recordID))),
+        updatedAt: getTripUpdatedAt(record.payload),
+        reserveItems: Array.isArray(record.payload.reserveItems) ? record.payload.reserveItems : [],
+        checklist: Array.isArray(record.payload.checklist) ? record.payload.checklist : getDefaultChecklist(),
+        travelDetails: getTravelDetails(record.payload),
+        journalEntries: getJournalEntries(record.payload),
+        settlementParticipants: normalizeSettlementParticipants(record.payload.settlementParticipants),
+        expenses: Array.isArray(record.payload.expenses) ? record.payload.expenses.map(expense => ({
+          ...expense,
+          category: expense.category || 'other',
+          memo: expense.memo || ''
+        })) : []
+      }));
+    const nextFavorites = activeRecords
+      .filter(record => record.type === 'savedPlace')
+      .map(record => record.payload);
+
+    setTrips(nextTrips);
+    setFavorites(nextFavorites);
+    writeStoredJson(LOCAL_SYNC_TRIPS_KEY, nextTrips);
+    writeStoredJson(LOCAL_SYNC_SAVED_PLACES_KEY, nextFavorites);
+    syncReadyUserRef.current = userID;
+    setSyncStatus('saved');
+  }, []);
+
+  // Cloud Sync Initialization: read legacy rows only; v1 is never written by this client.
   useEffect(() => {
-    async function initCloudDB() {
-      if (!session) {
-        setIsLoadingDB(false);
-        setSyncStatus("saved");
-        return;
-      }
-      setSyncConflictNotice(null);
-      setSyncStatus("saving");
-      try {
-        const { data, error } = await supabase.from('user_state').select('*').eq('user_id', session.user.id);
-        if (error) throw error;
-        
-        let cloudTrips = null;
-        let cloudFavs = null;
-        let mergedTripCount = 0;
-        let mergedFavoriteCount = 0;
-        
-        if (data && data.length > 0) {
-          const tripsRow = data.find(r => r.key === 'world_pro_trips_v1');
-          if (tripsRow) cloudTrips = tripsRow.value;
-          
-          const favsRow = data.find(r => r.key === 'world_pro_fav_v1');
-          if (favsRow) cloudFavs = favsRow.value;
-        }
-
-        const localTestTrips = (trips || []).filter(trip => trip.localOnly);
-        const localRegularTrips = (trips || []).filter(trip => !trip.localOnly);
-
-        if (!cloudTrips && localRegularTrips.length > 0) {
-          const { error: localTripSyncError } = await supabase.from("user_state").upsert({ user_id: session.user.id, key: "world_pro_trips_v1", value: localRegularTrips.map(getPrivateCloudTrip) }, { onConflict: "user_id,key" });
-          if (localTripSyncError) throw localTripSyncError;
-        } else if (cloudTrips) {
-          const cloudTripList = (Array.isArray(cloudTrips) ? cloudTrips : []).filter(trip => !trip.localOnly);
-          const cloudById = new Map(cloudTripList.map(trip => [String(trip.id), trip]));
-          const localById = new Map(localRegularTrips.map(trip => [String(trip.id), trip]));
-          const mergedTrips = [];
-          let localWins = 0;
-          let remoteWins = 0;
-          let conflictCount = 0;
-          const conflictEntries = [];
-
-          cloudTripList.forEach(cloudTrip => {
-            const localTrip = localById.get(String(cloudTrip.id));
-            if (!localTrip) {
-              mergedTrips.push(cloudTrip);
-              return;
-            }
-            if (areTripsEqual(localTrip, cloudTrip)) {
-              mergedTrips.push(localTrip);
-              return;
-            }
-
-            conflictCount += 1;
-            conflictEntries.push({
-              id: String(localTrip.id),
-              local: getComparableTrip(localTrip),
-              remote: getComparableTrip(cloudTrip)
-            });
-            if (getTripUpdatedAt(localTrip) > getTripUpdatedAt(cloudTrip)) {
-              mergedTrips.push(localTrip);
-              localWins += 1;
-            } else {
-              mergedTrips.push(preserveLocalShareMetadata(cloudTrip, localTrip));
-              remoteWins += 1;
-            }
-          });
-
-          const localOnlyTrips = localRegularTrips.filter(localTrip => !cloudById.has(String(localTrip.id)));
-          mergedTrips.push(...localOnlyTrips);
-          mergedTrips.push(...localTestTrips);
-          setTrips(mergedTrips);
-          writeStoredJson("world_pro_trips_v1", mergedTrips);
-          mergedTripCount = localOnlyTrips.length;
-          if (conflictEntries.length > 0) {
-            const conflictSignature = conflictEntries
-              .sort((left, right) => left.id.localeCompare(right.id))
-              .map(entry => JSON.stringify(entry))
-              .join('|');
-            const dismissedSignature = readStoredJson(
-              `${SYNC_CONFLICT_DISMISSED_STORAGE_PREFIX}_${session.user.id}`,
-              ''
-            );
-            if (dismissedSignature !== conflictSignature) {
-              setSyncConflictNotice({ conflicts: conflictCount, localWins, remoteWins, signature: conflictSignature });
-            }
-          }
-          if (localOnlyTrips.length > 0 || localWins > 0) {
-            const { error: mergeTripError } = await supabase.from("user_state").upsert({ user_id: session.user.id, key: "world_pro_trips_v1", value: mergedTrips.filter(trip => !trip.localOnly).map(getPrivateCloudTrip) }, { onConflict: "user_id,key" });
-            if (mergeTripError) throw mergeTripError;
-          }
-        }
-
-        if (!cloudFavs && (favorites || []).length > 0) {
-          const { error: localFavSyncError } = await supabase.from("user_state").upsert({ user_id: session.user.id, key: "world_pro_fav_v1", value: favorites || [] }, { onConflict: "user_id,key" });
-          if (localFavSyncError) throw localFavSyncError;
-        } else if (cloudFavs) {
-          const cloudFavList = Array.isArray(cloudFavs) ? cloudFavs : [];
-          const localOnlyFavs = (favorites || []).filter(localFav =>
-            !cloudFavList.some(cloudFav => (cloudFav.name || cloudFav.loc) === (localFav.name || localFav.loc))
-          );
-          const mergedFavs = [...cloudFavList, ...localOnlyFavs];
-          setFavorites(mergedFavs);
-          writeStoredJson("world_pro_fav_v1", mergedFavs);
-          mergedFavoriteCount = localOnlyFavs.length;
-          if (localOnlyFavs.length > 0) {
-            const { error: mergeFavError } = await supabase.from("user_state").upsert({ user_id: session.user.id, key: "world_pro_fav_v1", value: mergedFavs }, { onConflict: "user_id,key" });
-            if (mergeFavError) throw mergeFavError;
-          }
-        }
-        if (mergedTripCount > 0 || mergedFavoriteCount > 0) {
-          setMergeNotice({ trips: mergedTripCount, favorites: mergedFavoriteCount });
-        }
-        setSyncStatus("saved");
-      } catch (err) {
-        console.error("Supabase sync failed:", err);
-        setSyncStatus("error");
-      } finally {
-        setIsLoadingDB(false);
-      }
+    let cancelled = false;
+    const userID = session?.user?.id;
+    syncReadyUserRef.current = '';
+    if (!userID) {
+      syncRecordsRef.current = new Map();
+      setSyncMigration(null);
+      setIsLoadingDB(false);
+      setSyncStatus('saved');
+      return () => { cancelled = true; };
     }
+
+    setSyncConflictNotice(null);
+    setSyncMigration(null);
+    setSyncStatus('saving');
+    setIsLoadingDB(true);
+
+    const initCloudDB = async () => {
+      try {
+        const repository = getSyncV2Repository();
+        const pendingResults = await repository.resumePendingOperations(userID);
+        const pendingConflicts = pendingResults.filter(({ result }) => result.status === 'conflict');
+        const [{ data: legacyData, error: legacyError }, remoteRecords] = await Promise.all([
+          supabase.from('user_state').select('*').eq('user_id', userID),
+          repository.listAllRecords(userID)
+        ]);
+        if (legacyError) throw legacyError;
+        if (cancelled) return;
+
+        const localTrips = readStoredJson(LOCAL_SYNC_TRIPS_KEY, readStoredJson(LEGACY_TRIPS_KEY, trips || []));
+        const localFavorites = readStoredJson(LOCAL_SYNC_SAVED_PLACES_KEY, readStoredJson(LEGACY_SAVED_PLACES_KEY, favorites || []));
+        const localRows = [
+          { key: LEGACY_TRIPS_KEY, value: (Array.isArray(localTrips) ? localTrips : []).filter(trip => !trip?.localOnly).map(getPrivateCloudTrip) },
+          { key: LEGACY_SAVED_PLACES_KEY, value: Array.isArray(localFavorites) ? localFavorites : [] }
+        ];
+        const legacyCloudRows = (legacyData || []).filter(row => [LEGACY_TRIPS_KEY, LEGACY_SAVED_PLACES_KEY].includes(row.key));
+        const legacyDeviceSnapshotRows = [
+          { key: LEGACY_TRIPS_KEY, value: readStoredJson(LEGACY_TRIPS_KEY, []) },
+          { key: LEGACY_SAVED_PLACES_KEY, value: readStoredJson(LEGACY_SAVED_PLACES_KEY, []) }
+        ];
+        const legacyFingerprint = await hashLegacySnapshot([...legacyCloudRows, ...legacyDeviceSnapshotRows]);
+        const migrationMarker = readStoredJson(`${SYNC_MIGRATION_COMPLETED_PREFIX}${userID}`, null);
+        const legacyRowsChanged = !migrationMarker?.completed || migrationMarker.legacyFingerprint !== legacyFingerprint;
+        const legacyRowsForImport = legacyRowsChanged ? legacyCloudRows : [];
+        const importRows = [...legacyRowsForImport, ...localRows];
+        const preview = await repository.previewLegacyRows(userID, [...legacyRowsForImport, ...localRows]);
+        pendingConflicts.forEach(({ operation, result }) => {
+          const key = `${operation.type}:${operation.recordID}`;
+          if (preview.conflicts.some(conflict => `${conflict.local.type}:${conflict.local.recordID}` === key)) return;
+          preview.conflicts.push({
+            local: { type: operation.type, recordID: operation.recordID, payload: operation.payload },
+            remote: result.record,
+            pendingOperation: true
+          });
+        });
+        if (cancelled) return;
+
+        const countRows = (rows) => {
+          const values = new Map((rows || []).map(row => [row.key, Array.isArray(row.value) ? row.value : []]));
+          return {
+            trips: (values.get(LEGACY_TRIPS_KEY) || []).filter(item => !item?.localOnly).length,
+            savedPlaces: (values.get(LEGACY_SAVED_PLACES_KEY) || []).length
+          };
+        };
+        const activeRemote = remoteRecords.filter(record => !record.deletedAt);
+        const remoteCounts = {
+          trips: activeRemote.filter(record => record.type === 'trip').length,
+          savedPlaces: activeRemote.filter(record => record.type === 'savedPlace').length
+        };
+        const needsDecision = preview.importable.length > 0 || preview.conflicts.length > 0 || preview.invalidEntries.length > 0;
+
+        if (needsDecision) {
+          syncRecordsRef.current = new Map(remoteRecords.map(record => [`${record.type}:${record.recordID}`, record]));
+          setSyncMigration({
+            userID,
+            rows: importRows,
+            legacyFingerprint,
+            preview,
+            remoteRecords,
+            localRows,
+            legacyCloudRows,
+            localCounts: countRows(localRows),
+            legacyCloudCounts: countRows(legacyCloudRows),
+            remoteCounts
+          });
+          setSyncStatus('local-only');
+        } else {
+          writeStoredJson(`${SYNC_MIGRATION_COMPLETED_PREFIX}${userID}`, {
+            completed: true,
+            legacyFingerprint
+          });
+          hydrateSyncRecords(userID, remoteRecords);
+        }
+      } catch (error) {
+        if (cancelled) return;
+        console.error('Supabase v2 sync initialization failed:', error);
+        setSyncStatus('error');
+      } finally {
+        if (!cancelled) setIsLoadingDB(false);
+      }
+    };
+
     initCloudDB();
-  // Cloud initialization intentionally runs only when authentication changes.
+    return () => { cancelled = true; };
+  // Read the device snapshot only when the authenticated account changes.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
+
+  // Pull account changes made by the native app when this web page becomes
+  // visible again. Pending web edits are flushed first and are never replaced
+  // while they are still queued or in conflict.
+  useEffect(() => {
+    const userID = session?.user?.id;
+    if (!userID || isLoadingDB || syncMigration || syncReadyUserRef.current !== userID) return;
+
+    let cancelled = false;
+    let refreshing = false;
+    const refreshAccountRecords = async () => {
+      if (cancelled || refreshing || !navigator.onLine || document.visibilityState === 'hidden') return;
+      refreshing = true;
+      try {
+        const repository = getSyncV2Repository();
+        const pendingResults = await repository.resumePendingOperations(userID);
+        const pendingConflict = pendingResults.find(({ result }) => result.status === 'conflict');
+        if (pendingConflict) {
+          setSyncConflictNotice({
+            conflicts: 1,
+            signature: `v2:${pendingConflict.operation.type}:${pendingConflict.operation.recordID}:${pendingConflict.result.record?.revision || 0}`,
+            kind: 'revision'
+          });
+          setSyncStatus('error');
+          return;
+        }
+        if ((await repository.listPendingOperations(userID)).length > 0) return;
+
+        const remoteRecords = await repository.listAllRecords(userID);
+        if (cancelled || syncReadyUserRef.current !== userID) return;
+        if ((await repository.listPendingOperations(userID)).length > 0) return;
+        hydrateSyncRecords(userID, remoteRecords);
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Could not refresh account records from the native app:', error);
+          setSyncStatus('error');
+        }
+      } finally {
+        refreshing = false;
+      }
+    };
+
+    window.addEventListener('focus', refreshAccountRecords);
+    document.addEventListener('visibilitychange', refreshAccountRecords);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', refreshAccountRecords);
+      document.removeEventListener('visibilitychange', refreshAccountRecords);
+    };
+  }, [session?.user?.id, hydrateSyncRecords, isLoadingDB, syncMigration]);
 
   // Shared trips use the same-origin Pages Function so the database table can
   // stay private. Polling preserves collaboration without exposing Realtime.
@@ -2322,7 +2411,7 @@ function App() {
             changed = true;
             return preserveLocalShareMetadata(remoteTrip, trip);
           });
-          if (changed) writeStoredJson('world_pro_trips_v1', nextTrips);
+          if (changed) writeStoredJson(LOCAL_SYNC_TRIPS_KEY, nextTrips);
           return changed ? nextTrips : previousTrips;
         });
       } finally {
@@ -2595,11 +2684,217 @@ function App() {
     }));
   };
 
+  const preserveLocalSyncSnapshot = (migration) => {
+    const tripSnapshot = localStorage.getItem(LOCAL_SYNC_TRIPS_KEY);
+    const placeSnapshot = localStorage.getItem(LOCAL_SYNC_SAVED_PLACES_KEY);
+    if (!tripSnapshot && !placeSnapshot) return true;
+    return writeStoredJson(`${LOCAL_SYNC_BACKUP_PREFIX}${migration.userID}_${Date.now()}`, {
+      savedAt: new Date().toISOString(),
+      tripsRaw: tripSnapshot,
+      savedPlacesRaw: placeSnapshot
+    });
+  };
+
+  const handleImportSafeSyncData = async () => {
+    if (!syncMigration) return;
+    setIsSyncMigrationBusy(true);
+    try {
+      if (!preserveLocalSyncSnapshot(syncMigration)) throw new Error('기기 데이터 백업 공간이 부족합니다. 저장 공간을 확보한 뒤 다시 시도해주세요.');
+      const repository = getSyncV2Repository();
+      const result = await repository.importLegacyRows(syncMigration.userID, syncMigration.rows);
+      await repository.discardPendingOperations(
+        syncMigration.userID,
+        (syncMigration.preview?.conflicts || []).map(conflict => `${conflict.local.type}:${conflict.local.recordID}`)
+      );
+      const remoteRecords = await repository.listAllRecords(syncMigration.userID);
+      if (!writeStoredJson(`${SYNC_MIGRATION_COMPLETED_PREFIX}${syncMigration.userID}`, {
+        completed: true,
+        legacyFingerprint: syncMigration.legacyFingerprint
+      })) {
+        throw new Error('이 기기에 이전 완료 상태를 저장하지 못했습니다. 저장 공간을 확인해주세요.');
+      }
+      hydrateSyncRecords(syncMigration.userID, remoteRecords);
+      setSyncMigration(null);
+      const importedTrips = result.imported.filter(record => record.type === 'trip').length;
+      const importedPlaces = result.imported.filter(record => record.type === 'savedPlace').length;
+      if (importedTrips > 0 || importedPlaces > 0) setMergeNotice({ trips: importedTrips, favorites: importedPlaces });
+      if (result.conflicts.length > 0 || result.duplicates.some(item => !item.identical)) {
+        setSyncConflictNotice({
+          conflicts: result.conflicts.length || result.duplicates.filter(item => !item.identical).length,
+          signature: `migration:${syncMigration.userID}:${Date.now()}`,
+          kind: 'migration'
+        });
+      }
+    } catch (error) {
+      console.error('Legacy sync import failed:', error);
+      setSyncMigration(current => current ? { ...current, error: error.message || '가져오기를 완료하지 못했습니다.' } : current);
+      setSyncStatus('error');
+    } finally {
+      setIsSyncMigrationBusy(false);
+    }
+  };
+
+  const handleUseDeviceSyncData = async () => {
+    if (!syncMigration) return;
+    setIsSyncMigrationBusy(true);
+    try {
+      if (!preserveLocalSyncSnapshot(syncMigration)) throw new Error('기기 데이터 백업 공간이 부족합니다. 저장 공간을 확보한 뒤 다시 시도해주세요.');
+      const conflictChoices = Object.fromEntries(
+        (syncMigration.preview?.conflicts || []).map(conflict => [
+          `${conflict.local.type}:${conflict.local.recordID}`,
+          'local'
+        ])
+      );
+      const repository = getSyncV2Repository();
+      await repository.discardPendingOperations(syncMigration.userID, Object.keys(conflictChoices));
+      const result = await repository.importLegacyRows(syncMigration.userID, syncMigration.rows, { conflictChoices });
+      if (result.conflicts.length > 0) {
+        const [remoteRecords, preview] = await Promise.all([
+          repository.listAllRecords(syncMigration.userID),
+          repository.previewLegacyRows(syncMigration.userID, syncMigration.rows)
+        ]);
+        setSyncMigration(current => current ? { ...current, remoteRecords, preview, error: '다른 기기에서 동시에 수정했습니다. 최신 상태를 확인하고 다시 선택해주세요.' } : current);
+        return;
+      }
+      const remoteRecords = await repository.listAllRecords(syncMigration.userID);
+      if (!writeStoredJson(`${SYNC_MIGRATION_COMPLETED_PREFIX}${syncMigration.userID}`, {
+        completed: true,
+        legacyFingerprint: syncMigration.legacyFingerprint
+      })) {
+        throw new Error('이 기기에 이전 완료 상태를 저장하지 못했습니다. 저장 공간을 확인해주세요.');
+      }
+      hydrateSyncRecords(syncMigration.userID, remoteRecords);
+      setSyncMigration(null);
+      const importedTrips = result.imported.filter(record => record.type === 'trip').length;
+      const importedPlaces = result.imported.filter(record => record.type === 'savedPlace').length;
+      if (importedTrips > 0 || importedPlaces > 0) setMergeNotice({ trips: importedTrips, favorites: importedPlaces });
+    } catch (error) {
+      console.error('Device sync data selection failed:', error);
+      setSyncMigration(current => current ? { ...current, error: error.message || '기기 자료를 반영하지 못했습니다.' } : current);
+      setSyncStatus('error');
+    } finally {
+      setIsSyncMigrationBusy(false);
+    }
+  };
+
+  const handleUseCloudSyncData = async () => {
+    if (!syncMigration) return;
+    setIsSyncMigrationBusy(true);
+    try {
+      if (!preserveLocalSyncSnapshot(syncMigration)) throw new Error('기기 데이터 백업 공간이 부족합니다. 저장 공간을 확보한 뒤 다시 시도해주세요.');
+      const repository = getSyncV2Repository();
+      await repository.discardPendingOperations(syncMigration.userID);
+      const remoteRecords = await repository.listAllRecords(syncMigration.userID);
+      if (!writeStoredJson(`${SYNC_MIGRATION_COMPLETED_PREFIX}${syncMigration.userID}`, {
+        completed: true,
+        legacyFingerprint: syncMigration.legacyFingerprint
+      })) {
+        throw new Error('이 기기에 이전 완료 상태를 저장하지 못했습니다. 저장 공간을 확인해주세요.');
+      }
+      hydrateSyncRecords(syncMigration.userID, remoteRecords);
+      setSyncMigration(null);
+    } catch (error) {
+      console.error('Could not load account sync records:', error);
+      setSyncMigration(current => current ? { ...current, error: error.message || '계정 자료를 불러오지 못했습니다.' } : current);
+      setSyncStatus('error');
+    } finally {
+      setIsSyncMigrationBusy(false);
+    }
+  };
+
+  const handleDeferSyncMigration = () => {
+    syncReadyUserRef.current = '';
+    setSyncMigration(null);
+    setSyncStatus(session?.user?.id ? 'local-only' : 'saved');
+  };
+
+  const syncUserRecordCollection = async (type, items, userID) => {
+    if (!userID || syncReadyUserRef.current !== userID) return true;
+    if (!isOnline) {
+      setSyncStatus('offline');
+      return false;
+    }
+
+    const keyFor = (recordID) => `${type}:${recordID}`;
+    const validItems = (items || []).filter(item => type !== 'trip' || !item?.localOnly);
+    const nextByID = new Map();
+    validItems.forEach((item) => {
+      if (item?.id !== undefined && item?.id !== null && String(item.id).trim()) {
+        nextByID.set(String(item.id), type === 'trip' ? getPrivateCloudTrip(item) : item);
+      }
+    });
+
+    try {
+      const repository = getSyncV2Repository();
+      const pendingResults = await repository.resumePendingOperations(userID);
+      const pendingConflict = pendingResults.find(({ result }) => result.status === 'conflict');
+      if (pendingConflict) {
+        setSyncConflictNotice({
+          conflicts: 1,
+          signature: `v2:${pendingConflict.operation.type}:${pendingConflict.operation.recordID}:${pendingConflict.result.record?.revision || 0}`,
+          kind: 'revision'
+        });
+        setSyncStatus('error');
+        return false;
+      }
+      const latestRecords = await repository.listAllRecords(userID);
+      syncRecordsRef.current = new Map(latestRecords.map(record => [`${record.type}:${record.recordID}`, record]));
+      for (const [recordID, payload] of nextByID) {
+        const key = keyFor(recordID);
+        const current = syncRecordsRef.current.get(key);
+        if (current && !current.deletedAt && JSON.stringify(sortSyncValue(current.payload)) === JSON.stringify(sortSyncValue(payload))) continue;
+        const result = await repository.applyOperation({
+          userID,
+          type,
+          recordID,
+          expectedRevision: current?.revision || 0,
+          operationID: makeEntityId(),
+          payload,
+          deletedAt: null
+        });
+        if (result.status === 'conflict') {
+          setSyncConflictNotice({ conflicts: 1, signature: `v2:${type}:${recordID}:${result.record?.revision || 0}`, kind: 'revision' });
+          setSyncStatus('error');
+          return false;
+        }
+        if (result.record) syncRecordsRef.current.set(key, result.record);
+      }
+
+      const previousRecords = [...syncRecordsRef.current.entries()]
+        .filter(([key, record]) => key.startsWith(`${type}:`) && record.userID === userID && !record.deletedAt);
+      for (const [key, current] of previousRecords) {
+        if (nextByID.has(current.recordID)) continue;
+        const result = await repository.applyOperation({
+          userID,
+          type,
+          recordID: current.recordID,
+          expectedRevision: current.revision,
+          operationID: makeEntityId(),
+          payload: null,
+          deletedAt: new Date().toISOString()
+        });
+        if (result.status === 'conflict') {
+          setSyncConflictNotice({ conflicts: 1, signature: `v2:${type}:${current.recordID}:${result.record?.revision || 0}`, kind: 'revision' });
+          setSyncStatus('error');
+          return false;
+        }
+        if (result.record) syncRecordsRef.current.set(key, result.record);
+      }
+      return true;
+    } catch (error) {
+      console.error('V2 data sync failed:', error);
+      setSyncStatus('error');
+      return false;
+    }
+  };
+
   const syncFavoritesToCloud = async (newFavs) => {
     setSyncStatus('saving');
-    const safeFavs = newFavs || [];
+    const safeFavs = (newFavs || []).map(favorite => (
+      favorite?.id ? favorite : { ...favorite, id: makeEntityId() }
+    ));
     setFavorites(safeFavs);
-    if (!writeStoredJson("world_pro_fav_v1", safeFavs)) {
+    if (!writeStoredJson(LOCAL_SYNC_SAVED_PLACES_KEY, safeFavs)) {
       setSyncStatus("error");
       return;
     }
@@ -2609,20 +2904,12 @@ function App() {
       return;
     }
     
-    if (session?.user?.id) {
-      try {
-        const { error } = await supabase
-          .from('user_state')
-          .upsert(
-            { user_id: session.user.id, key: 'world_pro_fav_v1', value: safeFavs },
-            { onConflict: 'user_id,key' }
-          );
-        if (error) throw error;
-      } catch (err) {
-        console.error("Favorites cloud sync failed:", err);
-        setSyncStatus('error');
-        return;
-      }
+    if (session?.user?.id && syncReadyUserRef.current === session.user.id) {
+      const synced = await syncUserRecordCollection('savedPlace', safeFavs, session.user.id);
+      if (!synced) return;
+    } else if (session?.user?.id) {
+      setSyncStatus('local-only');
+      return;
     }
     setSyncStatus('saved');
   };
@@ -2651,7 +2938,7 @@ function App() {
   const syncTripsToCloud = async (newTrips) => {
     setSyncStatus('saving');
     setTrips(newTrips);
-    if (!writeStoredJson("world_pro_trips_v1", newTrips)) {
+    if (!writeStoredJson(LOCAL_SYNC_TRIPS_KEY, newTrips)) {
       setSyncStatus("error");
       return;
     }
@@ -2663,31 +2950,25 @@ function App() {
     
     const cloudTrips = (newTrips || []).filter(trip => !trip.localOnly);
 
-    // 1. Sync regular trips to private user_state. Local-only test data stays in localStorage only.
-    if (session?.user?.id) {
-      try {
-        const { error } = await supabase
-          .from('user_state')
-          .upsert(
-            { user_id: session.user.id, key: 'world_pro_trips_v1', value: cloudTrips.map(getPrivateCloudTrip) },
-            { onConflict: 'user_id,key' }
-          );
-        if (error) throw error;
-      } catch (err) {
-        console.error("Cloud sync failed:", err);
-        setSyncStatus('error');
-        return;
-      }
+    const userID = session?.user?.id;
+    if (userID && syncReadyUserRef.current === userID) {
+      const synced = await syncUserRecordCollection('trip', cloudTrips, userID);
+      if (!synced) return;
+    } else if (userID) {
+      setSyncStatus('local-only');
+      return;
     }
 
     // 2. Sync individual shared trips through the server-only sharing API.
-    for (const trip of cloudTrips) {
+    for (const trip of syncReadyUserRef.current === userID ? cloudTrips : []) {
       if (trip.sharedId) {
         try {
           await requestSharedTripApi({
             method: 'PATCH',
             id: trip.sharedId,
-            tripData: getShareableTrip(trip)
+            tripData: getShareableTrip(trip),
+            accessToken: session?.access_token || '',
+            managementToken: trip.sharedManagementToken || ''
           });
         } catch (err) {
           console.error("Shared trip update failed:", err);
@@ -2698,6 +2979,15 @@ function App() {
     }
     setSyncStatus('saved');
   };
+
+  useEffect(() => {
+    const userID = session?.user?.id;
+    if (!isOnline || !userID || syncReadyUserRef.current !== userID) return;
+    void syncTripsToCloud(trips);
+    void syncFavoritesToCloud(favorites);
+  // Retry local snapshots after a network transition; the V2 repository compares revisions before writing.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOnline, session?.user?.id]);
 
   const getSharedTripLink = (sharedId) => (
     typeof window === 'undefined'
@@ -6624,10 +6914,25 @@ function App() {
             <span className="sync-conflict-banner-icon" aria-hidden="true"><AlertCircle size={16} /></span>
             <span className="sync-conflict-banner-content">
               <strong>기기 간 변경사항 동기화</strong>
-              <span>여행 데이터 {syncConflictNotice.conflicts}건을 최신 변경 기준으로 정리했습니다.</span>
+              <span>{syncConflictNotice.kind === 'revision'
+                ? `다른 기기에서 먼저 수정한 자료 ${syncConflictNotice.conflicts}건이 있어요. 이 기기의 변경사항은 재시도 대기열에 보존했습니다.`
+                : syncConflictNotice.kind === 'migration'
+                  ? `기존 자료 ${syncConflictNotice.conflicts}건은 서로 달라 자동으로 덮지 않았습니다. 원본은 유지되어 있어요.`
+                  : `여행 데이터 ${syncConflictNotice.conflicts}건을 최신 변경 기준으로 정리했습니다.`}</span>
             </span>
             <button type="button" onClick={dismissSyncConflictNotice}>확인</button>
           </div>
+        )}
+
+        {syncMigration && (
+          <SyncMigrationDialog
+            summary={syncMigration}
+            busy={isSyncMigrationBusy}
+            onImportSafe={handleImportSafeSyncData}
+            onUseDevice={handleUseDeviceSyncData}
+            onUseCloud={handleUseCloudSyncData}
+            onLater={handleDeferSyncMigration}
+          />
         )}
 
       {/* Share Toast Notification */}
