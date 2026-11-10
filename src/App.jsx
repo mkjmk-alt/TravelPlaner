@@ -27,6 +27,7 @@ import { createSyncV2Repository } from './sync/syncV2Repository.js';
 import { IndexedDBQueueStore } from './sync/indexedDBQueueStore.js';
 import { LOCAL_SYNC_BACKUP_PREFIX, LOCAL_SYNC_SAVED_PLACES_KEY, LOCAL_SYNC_TRIPS_KEY, LEGACY_SAVED_PLACES_KEY, LEGACY_TRIPS_KEY, SYNC_MIGRATION_COMPLETED_PREFIX } from './sync/localSyncStorage.js';
 import { hashLegacySnapshot } from './sync/legacyUserStateImporter.js';
+import { planCollectionChanges, syncRecordsUnchanged } from './sync/collectionChanges.js';
 import SyncMigrationDialog from './components/SyncMigrationDialog.jsx';
 import './index.css';
 
@@ -582,6 +583,7 @@ const getSafeExternalUrl = (value) => {
 };
 
 const getTripUpdatedAt = (trip) => Number(trip?.updatedAt || trip?.createdAt || 0);
+const copySyncValue = (value) => JSON.parse(JSON.stringify(value));
 
 const sortSyncValue = (value) => {
   if (Array.isArray(value)) return value.map(sortSyncValue);
@@ -1315,6 +1317,9 @@ function App() {
   const syncRepositoryRef = useRef(null);
   const syncRecordsRef = useRef(new Map());
   const syncReadyUserRef = useRef('');
+  const syncBaselineRef = useRef(new Map());
+  const syncWorkRef = useRef({ queue: Promise.resolve(), active: 0, version: 0, blocked: false, generation: { trip: 0, savedPlace: 0 }, dirty: { trip: false, savedPlace: false } });
+  const [syncInitAttempt, setSyncInitAttempt] = useState(0);
   const [authResolved, setAuthResolved] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState('login');
@@ -2204,9 +2209,24 @@ function App() {
           memo: expense.memo || ''
         })) : []
       }));
+    const remoteTripIDs = new Set(nextTrips.map(trip => String(trip.id)));
+    for (const trip of localTripsByID.values()) {
+      if (trip?.localOnly && !remoteTripIDs.has(String(trip.id))) nextTrips.push(trip);
+    }
     const nextFavorites = activeRecords
       .filter(record => record.type === 'savedPlace')
       .map(record => record.payload);
+
+    const displayed = new Map([
+      ...nextTrips.filter(trip => !trip.localOnly).map(trip => [`trip:${trip.id}`, copySyncValue(getPrivateCloudTrip(trip))]),
+      ...nextFavorites.map(place => [`savedPlace:${place.id}`, copySyncValue(place)])
+    ]);
+    syncBaselineRef.current = new Map(records.map(record => {
+      const key = `${record.type}:${record.recordID}`;
+      return [key, { record, payload: displayed.get(key) ?? null }];
+    }));
+    syncWorkRef.current.dirty = { trip: false, savedPlace: false };
+    syncWorkRef.current.blocked = false;
 
     setTrips(nextTrips);
     setFavorites(nextFavorites);
@@ -2223,6 +2243,7 @@ function App() {
     syncReadyUserRef.current = '';
     if (!userID) {
       syncRecordsRef.current = new Map();
+      syncBaselineRef.current = new Map();
       setSyncMigration(null);
       setIsLoadingDB(false);
       setSyncStatus('saved');
@@ -2233,9 +2254,12 @@ function App() {
     setSyncMigration(null);
     setSyncStatus('saving');
     setIsLoadingDB(true);
+    const initialMutationVersion = syncWorkRef.current.version;
 
     const initCloudDB = async () => {
       try {
+        await syncWorkRef.current.queue;
+        if (cancelled) return;
         const repository = getSyncV2Repository();
         const pendingResults = await repository.resumePendingOperations(userID);
         const pendingConflicts = pendingResults.filter(({ result }) => result.status === 'conflict');
@@ -2273,6 +2297,10 @@ function App() {
           });
         });
         if (cancelled) return;
+        if (syncWorkRef.current.version !== initialMutationVersion) {
+          setSyncInitAttempt(attempt => attempt + 1);
+          return;
+        }
 
         const countRows = (rows) => {
           const values = new Map((rows || []).map(row => [row.key, Array.isArray(row.value) ? row.value : []]));
@@ -2323,7 +2351,7 @@ function App() {
     return () => { cancelled = true; };
   // Read the device snapshot only when the authenticated account changes.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]);
+  }, [session?.user?.id, syncInitAttempt]);
 
   // Pull account changes made by the native app when this web page becomes
   // visible again. Pending web edits are flushed first and are never replaced
@@ -2335,26 +2363,19 @@ function App() {
     let cancelled = false;
     let refreshing = false;
     const refreshAccountRecords = async () => {
-      if (cancelled || refreshing || !navigator.onLine || document.visibilityState === 'hidden') return;
+      const work = syncWorkRef.current;
+      if (cancelled || refreshing || !navigator.onLine || document.visibilityState === 'hidden' || work.active || work.dirty.trip || work.dirty.savedPlace) return;
+      const version = work.version;
       refreshing = true;
       try {
         const repository = getSyncV2Repository();
-        const pendingResults = await repository.resumePendingOperations(userID);
-        const pendingConflict = pendingResults.find(({ result }) => result.status === 'conflict');
-        if (pendingConflict) {
-          setSyncConflictNotice({
-            conflicts: 1,
-            signature: `v2:${pendingConflict.operation.type}:${pendingConflict.operation.recordID}:${pendingConflict.result.record?.revision || 0}`,
-            kind: 'revision'
-          });
-          setSyncStatus('error');
-          return;
-        }
         if ((await repository.listPendingOperations(userID)).length > 0) return;
 
         const remoteRecords = await repository.listAllRecords(userID);
-        if (cancelled || syncReadyUserRef.current !== userID) return;
+        if (cancelled || syncReadyUserRef.current !== userID || work.version !== version || work.active || work.dirty.trip || work.dirty.savedPlace) return;
         if ((await repository.listPendingOperations(userID)).length > 0) return;
+        if (cancelled || syncReadyUserRef.current !== userID || work.version !== version || work.active || work.dirty.trip || work.dirty.savedPlace) return;
+        if (syncRecordsUnchanged(syncRecordsRef.current, remoteRecords)) return;
         hydrateSyncRecords(userID, remoteRecords);
       } catch (error) {
         if (!cancelled) {
@@ -2368,12 +2389,14 @@ function App() {
 
     window.addEventListener('focus', refreshAccountRecords);
     document.addEventListener('visibilitychange', refreshAccountRecords);
+    const timer = window.setInterval(refreshAccountRecords, 10000);
     return () => {
       cancelled = true;
+      window.clearInterval(timer);
       window.removeEventListener('focus', refreshAccountRecords);
       document.removeEventListener('visibilitychange', refreshAccountRecords);
     };
-  }, [session?.user?.id, hydrateSyncRecords, isLoadingDB, syncMigration]);
+  }, [session?.user?.id, hydrateSyncRecords, getSyncV2Repository, isLoadingDB, syncMigration]);
 
   // Shared trips use the same-origin Pages Function so the database table can
   // stay private. Polling preserves collaboration without exposing Realtime.
@@ -2808,87 +2831,92 @@ function App() {
     setSyncStatus(session?.user?.id ? 'local-only' : 'saved');
   };
 
-  const syncUserRecordCollection = async (type, items, userID) => {
+  const markSyncMutation = (type) => {
+    const work = syncWorkRef.current;
+    work.version += 1;
+    work.generation[type] += 1;
+    work.dirty[type] = true;
+    return work.generation[type];
+  };
+
+  const syncUserRecordCollection = async (type, items, userID, generation) => {
     if (!userID || syncReadyUserRef.current !== userID) return true;
     if (!isOnline) {
       setSyncStatus('offline');
       return false;
     }
 
-    const keyFor = (recordID) => `${type}:${recordID}`;
     const validItems = (items || []).filter(item => type !== 'trip' || !item?.localOnly);
-    const nextByID = new Map();
-    validItems.forEach((item) => {
-      if (item?.id !== undefined && item?.id !== null && String(item.id).trim()) {
-        nextByID.set(String(item.id), type === 'trip' ? getPrivateCloudTrip(item) : item);
-      }
-    });
-
-    try {
-      const repository = getSyncV2Repository();
-      const pendingResults = await repository.resumePendingOperations(userID);
-      const pendingConflict = pendingResults.find(({ result }) => result.status === 'conflict');
-      if (pendingConflict) {
-        setSyncConflictNotice({
-          conflicts: 1,
-          signature: `v2:${pendingConflict.operation.type}:${pendingConflict.operation.recordID}:${pendingConflict.result.record?.revision || 0}`,
-          kind: 'revision'
-        });
+    const nextItems = validItems
+      .filter(item => item?.id !== undefined && item?.id !== null && String(item.id).trim())
+      .map(item => copySyncValue(type === 'trip' ? getPrivateCloudTrip(item) : item));
+    const work = syncWorkRef.current;
+    work.active += 1;
+    const execute = async () => {
+      try {
+        if (syncReadyUserRef.current !== userID) return false;
+        const repository = getSyncV2Repository();
+        const pendingResults = await repository.resumePendingOperations(userID);
+        if (syncReadyUserRef.current !== userID) return false;
+        const pendingConflict = pendingResults.find(({ result }) => result.status === 'conflict');
+        if (pendingConflict) {
+          work.blocked = true;
+          setSyncConflictNotice({
+            conflicts: 1,
+            signature: `v2:${pendingConflict.operation.type}:${pendingConflict.operation.recordID}:${pendingConflict.result.record?.revision || 0}`,
+            kind: 'revision'
+          });
+          setSyncStatus('error');
+          return false;
+        }
+        for (const { operation, result } of pendingResults) {
+          if (result.record && ['applied', 'replayed'].includes(result.status)) {
+            const key = `${operation.type}:${operation.recordID}`;
+            syncRecordsRef.current.set(key, result.record);
+            syncBaselineRef.current.set(key, { record: result.record, payload: operation.deletedAt ? null : operation.payload });
+          }
+        }
+        const changes = planCollectionChanges(type, userID, syncBaselineRef.current, nextItems);
+        for (const change of changes) {
+          if (syncReadyUserRef.current !== userID) return false;
+          const result = await repository.applyOperation({
+            userID,
+            type,
+            recordID: change.recordID,
+            expectedRevision: change.expectedRevision,
+            operationID: makeEntityId(),
+            payload: change.payload,
+            deletedAt: change.deleted ? new Date().toISOString() : null
+          });
+          if (syncReadyUserRef.current !== userID) return false;
+          if (result.status === 'conflict') {
+            work.blocked = true;
+            setSyncConflictNotice({ conflicts: 1, signature: `v2:${type}:${change.recordID}:${result.record?.revision || 0}`, kind: 'revision' });
+            setSyncStatus('error');
+            return false;
+          }
+          if (result.record) {
+            const key = `${type}:${change.recordID}`;
+            syncRecordsRef.current.set(key, result.record);
+            syncBaselineRef.current.set(key, { record: result.record, payload: change.payload });
+          }
+        }
+        if (work.generation[type] === generation) work.dirty[type] = false;
+        return true;
+      } catch (error) {
+        console.error('V2 data sync failed:', error);
         setSyncStatus('error');
         return false;
       }
-      const latestRecords = await repository.listAllRecords(userID);
-      syncRecordsRef.current = new Map(latestRecords.map(record => [`${record.type}:${record.recordID}`, record]));
-      for (const [recordID, payload] of nextByID) {
-        const key = keyFor(recordID);
-        const current = syncRecordsRef.current.get(key);
-        if (current && !current.deletedAt && JSON.stringify(sortSyncValue(current.payload)) === JSON.stringify(sortSyncValue(payload))) continue;
-        const result = await repository.applyOperation({
-          userID,
-          type,
-          recordID,
-          expectedRevision: current?.revision || 0,
-          operationID: makeEntityId(),
-          payload,
-          deletedAt: null
-        });
-        if (result.status === 'conflict') {
-          setSyncConflictNotice({ conflicts: 1, signature: `v2:${type}:${recordID}:${result.record?.revision || 0}`, kind: 'revision' });
-          setSyncStatus('error');
-          return false;
-        }
-        if (result.record) syncRecordsRef.current.set(key, result.record);
-      }
-
-      const previousRecords = [...syncRecordsRef.current.entries()]
-        .filter(([key, record]) => key.startsWith(`${type}:`) && record.userID === userID && !record.deletedAt);
-      for (const [key, current] of previousRecords) {
-        if (nextByID.has(current.recordID)) continue;
-        const result = await repository.applyOperation({
-          userID,
-          type,
-          recordID: current.recordID,
-          expectedRevision: current.revision,
-          operationID: makeEntityId(),
-          payload: null,
-          deletedAt: new Date().toISOString()
-        });
-        if (result.status === 'conflict') {
-          setSyncConflictNotice({ conflicts: 1, signature: `v2:${type}:${current.recordID}:${result.record?.revision || 0}`, kind: 'revision' });
-          setSyncStatus('error');
-          return false;
-        }
-        if (result.record) syncRecordsRef.current.set(key, result.record);
-      }
-      return true;
-    } catch (error) {
-      console.error('V2 data sync failed:', error);
-      setSyncStatus('error');
-      return false;
-    }
+    };
+    const queued = work.queue.then(execute, execute);
+    work.queue = queued;
+    try { return await queued; }
+    finally { work.active -= 1; }
   };
 
   const syncFavoritesToCloud = async (newFavs) => {
+    const generation = markSyncMutation('savedPlace');
     setSyncStatus('saving');
     const safeFavs = (newFavs || []).map(favorite => (
       favorite?.id ? favorite : { ...favorite, id: makeEntityId() }
@@ -2905,7 +2933,7 @@ function App() {
     }
     
     if (session?.user?.id && syncReadyUserRef.current === session.user.id) {
-      const synced = await syncUserRecordCollection('savedPlace', safeFavs, session.user.id);
+      const synced = await syncUserRecordCollection('savedPlace', safeFavs, session.user.id, generation);
       if (!synced) return;
     } else if (session?.user?.id) {
       setSyncStatus('local-only');
@@ -2936,6 +2964,7 @@ function App() {
   };
 
   const syncTripsToCloud = async (newTrips) => {
+    const generation = markSyncMutation('trip');
     setSyncStatus('saving');
     setTrips(newTrips);
     if (!writeStoredJson(LOCAL_SYNC_TRIPS_KEY, newTrips)) {
@@ -2952,7 +2981,7 @@ function App() {
 
     const userID = session?.user?.id;
     if (userID && syncReadyUserRef.current === userID) {
-      const synced = await syncUserRecordCollection('trip', cloudTrips, userID);
+      const synced = await syncUserRecordCollection('trip', cloudTrips, userID, generation);
       if (!synced) return;
     } else if (userID) {
       setSyncStatus('local-only');
@@ -2988,6 +3017,22 @@ function App() {
   // Retry local snapshots after a network transition; the V2 repository compares revisions before writing.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOnline, session?.user?.id]);
+
+  // Retry transient failures while online. A revision conflict needs an
+  // explicit resolution instead of repeated automatic writes.
+  useEffect(() => {
+    const userID = session?.user?.id;
+    if (!isOnline || !userID || isLoadingDB || syncMigration || syncReadyUserRef.current !== userID) return;
+    const timer = window.setInterval(() => {
+      const work = syncWorkRef.current;
+      if (work.active || work.blocked || document.visibilityState === 'hidden') return;
+      if (work.dirty.trip) void syncTripsToCloud(trips);
+      if (work.dirty.savedPlace) void syncFavoritesToCloud(favorites);
+    }, 10000);
+    return () => window.clearInterval(timer);
+  // Retry the most recent rendered snapshots, not an older closure.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOnline, session?.user?.id, isLoadingDB, syncMigration, trips, favorites]);
 
   const getSharedTripLink = (sharedId) => (
     typeof window === 'undefined'
@@ -6920,6 +6965,9 @@ function App() {
                   ? `기존 자료 ${syncConflictNotice.conflicts}건은 서로 달라 자동으로 덮지 않았습니다. 원본은 유지되어 있어요.`
                   : `여행 데이터 ${syncConflictNotice.conflicts}건을 최신 변경 기준으로 정리했습니다.`}</span>
             </span>
+            {syncConflictNotice.kind === 'revision' && (
+              <button type="button" onClick={() => setSyncInitAttempt(attempt => attempt + 1)}>충돌 해결</button>
+            )}
             <button type="button" onClick={dismissSyncConflictNotice}>확인</button>
           </div>
         )}
