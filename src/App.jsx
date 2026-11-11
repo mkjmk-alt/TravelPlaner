@@ -22,6 +22,7 @@ import { buildItineraryRouteGroups, normalizeRouteSettings, ROUTE_SETTINGS_STORA
 import useItineraryRoadRoutes from './useItineraryRoadRoutes';
 import ItineraryRouteSettings from './MapRouteSettings';
 import { createNearbyOrderPreview, applyNearbyOrderPreview, sortDayItems, moveDayItem } from './itineraryOrder';
+import { getLodgings, lodgingForDate, tripDayDate } from './lodging';
 import { ITINERARY_ICON_OPTIONS, getItineraryItemCategory, withItineraryIcon } from './itineraryCategories';
 import { createSyncV2Repository } from './sync/syncV2Repository.js';
 import { IndexedDBQueueStore } from './sync/indexedDBQueueStore.js';
@@ -3623,6 +3624,7 @@ function App() {
             id: newId,
             name: data.name || "업로드한 여행",
             country: data.country || "",
+            ...(Object.hasOwn(data, "lodgings") ? { lodgings: data.lodgings } : {}),
             startDate: data.startDate || new Date().toISOString().split('T')[0],
             endDate: data.endDate || new Date().toISOString().split('T')[0],
             itinerary: (data.itinerary || []).map((day, idx) => ({
@@ -3697,6 +3699,7 @@ function App() {
         id: newId,
         name: data.name || "붙여넣은 여행",
         country: data.country || "",
+        ...(Object.hasOwn(data, "lodgings") ? { lodgings: data.lodgings } : {}),
         startDate: data.startDate || new Date().toISOString().split('T')[0],
         endDate: data.endDate || new Date().toISOString().split('T')[0],
         itinerary: (data.itinerary || []).map((day, idx) => ({
@@ -6009,6 +6012,12 @@ function App() {
                     </div>
 
                     {dayPlan.orderMode === 'distance' && <p className="itinerary-distance-order-note" role="status">거리 정렬 순서를 유지하고 있습니다. 도착 시간은 변경되지 않았으니 확인해주세요. 새 장소는 마지막에 추가됩니다.</p>}
+                    {lodgingForDate(getLodgings(activeTrip), tripDayDate(activeTrip?.startDate, parseDay(dayPlan?.day))).map(({ lodging, checkIn, checkOut, overnight }) => (
+                      <div className="lodging-day-summary" key={`lodging-${lodging.id}`}>
+                        🏨 {lodging.name} · {[checkOut && '체크아웃', checkIn && '체크인', overnight && '숙박'].filter(Boolean).join(' · ')}
+                        {lodging.address && <span> · {lodging.address}</span>}
+                      </div>
+                    ))}
                     {getDayConflictWarnings(dayPlan).length > 0 && <div className="itinerary-conflict-warning" role="status" style={{ margin: '12px 24px 0', padding: '10px 12px', borderRadius: '12px', background: '#fff7ed', color: '#c2410c', fontSize: '11px', fontWeight: '800' }}>시간·이동 확인: {getDayConflictWarnings(dayPlan)[0]}{getDayConflictWarnings(dayPlan).length > 1 ? ` 외 ${getDayConflictWarnings(dayPlan).length - 1}건` : ''}</div>}
 
                     {/* Day Items List */}
@@ -6274,6 +6283,7 @@ function App() {
                   key={activeTrip.id}
                   trip={activeTrip}
                   readOnly={isReadOnlyTrip}
+                  savedPlaces={favorites}
                   onUpdateTrip={updateActiveTrip}
                   onOpenItinerary={openItinerary}
                   onOpenPlace={openMemoryPlace}

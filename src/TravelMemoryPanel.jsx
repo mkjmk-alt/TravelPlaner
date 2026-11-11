@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import LodgingManager from './LodgingManager';
 import { Calendar, Camera, Check, ChevronRight, Edit2, FileText, MapPin, Plane, PlusCircle, Save, Trash2, X } from 'lucide-react';
 import {
   createJournalEntry,
@@ -44,6 +45,7 @@ const getInitialDraft = (trip) => ({
 export default function TravelMemoryPanel({
   trip,
   readOnly = false,
+  savedPlaces = [],
   onUpdateTrip,
   onOpenItinerary,
   onOpenPlace
@@ -221,7 +223,31 @@ export default function TravelMemoryPanel({
             <input disabled={readOnly} value={detailsDraft.flightNumber} onChange={event => updateDetailsField('flightNumber', event.target.value)} placeholder="예: KE703" />
           </label>
           <label>
-            <span>숙소</span>
+            <span>출발일 (현지)</span>
+            <input type="date" disabled={readOnly} value={detailsDraft.flightDepartureDate} onChange={event => updateDetailsField('flightDepartureDate', event.target.value)} />
+          </label>
+          <label>
+            <span>출발 시간 (현지)</span>
+            <input type="time" disabled={readOnly} value={detailsDraft.flightDepartureTime} onChange={event => updateDetailsField('flightDepartureTime', event.target.value)} />
+          </label>
+          <label>
+            <span>도착일 (현지)</span>
+            <input type="date" disabled={readOnly} value={detailsDraft.flightArrivalDate} onChange={event => updateDetailsField('flightArrivalDate', event.target.value)} />
+          </label>
+          <label>
+            <span>도착 시간 (현지)</span>
+            <input type="time" disabled={readOnly} value={detailsDraft.flightArrivalTime} onChange={event => updateDetailsField('flightArrivalTime', event.target.value)} />
+          </label>
+          <label>
+            <span>탑승일 (확인된 경우)</span>
+            <input type="date" disabled={readOnly} value={detailsDraft.flightBoardingDate} onChange={event => updateDetailsField('flightBoardingDate', event.target.value)} />
+          </label>
+          <label>
+            <span>탑승 시간 (확인된 경우)</span>
+            <input type="time" disabled={readOnly} value={detailsDraft.flightBoardingTime} onChange={event => updateDetailsField('flightBoardingTime', event.target.value)} />
+          </label>
+          <label>
+            <span>기존 숙소 (날짜 미지정)</span>
             <input disabled={readOnly} value={detailsDraft.stayName} onChange={event => updateDetailsField('stayName', event.target.value)} placeholder="예: 도쿄 호텔" />
           </label>
           <label className="travel-memory-form-grid-wide">
@@ -236,6 +262,8 @@ export default function TravelMemoryPanel({
           </button>
         )}
       </section>
+
+      <LodgingManager trip={trip} readOnly={readOnly} savedPlaces={savedPlaces} legacyDetails={travelDetails} onUpdateTrip={onUpdateTrip} />
 
       <section className="travel-memory-card travel-memory-journal-card">
         <div className="travel-memory-card-heading">

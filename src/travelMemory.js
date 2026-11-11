@@ -2,6 +2,8 @@ const TRAVEL_DETAIL_KEYS = [
   'departure',
   'arrival',
   'flightNumber',
+  'flightDepartureDate', 'flightDepartureTime', 'flightArrivalDate', 'flightArrivalTime',
+  'flightBoardingDate', 'flightBoardingTime',
   'stayName',
   'stayAddress'
 ];
@@ -10,19 +12,21 @@ export const getDefaultTravelDetails = () => ({
   departure: '',
   arrival: '',
   flightNumber: '',
+  flightDepartureDate: '', flightDepartureTime: '', flightArrivalDate: '', flightArrivalTime: '',
+  flightBoardingDate: '', flightBoardingTime: '',
   stayName: '',
   stayAddress: ''
 });
 
 export const getTravelDetails = (trip = {}) => {
-  const source = trip?.travelDetails && typeof trip.travelDetails === 'object'
+  const source = trip?.travelDetails && typeof trip.travelDetails === 'object' && !Array.isArray(trip.travelDetails)
     ? trip.travelDetails
     : {};
 
   return TRAVEL_DETAIL_KEYS.reduce((details, key) => {
     details[key] = String(source[key] || '');
     return details;
-  }, getDefaultTravelDetails());
+  }, { ...getDefaultTravelDetails(), ...source });
 };
 
 const normalizeCoordinate = (value) => {
