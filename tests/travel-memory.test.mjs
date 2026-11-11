@@ -19,6 +19,8 @@ test('provides stable defaults for optional travel details and journal data', ()
     departure: '',
     arrival: '',
     flightNumber: '',
+    flightDepartureDate: '', flightDepartureTime: '', flightArrivalDate: '', flightArrivalTime: '',
+    flightBoardingDate: '', flightBoardingTime: '',
     stayName: '',
     stayAddress: ''
   });
@@ -33,6 +35,8 @@ test('keeps existing travel details while filling missing fields', () => {
     departure: '',
     arrival: '인천국제공항',
     flightNumber: '',
+    flightDepartureDate: '', flightDepartureTime: '', flightArrivalDate: '', flightArrivalTime: '',
+    flightBoardingDate: '', flightBoardingTime: '',
     stayName: '호텔',
     stayAddress: ''
   });
@@ -180,4 +184,12 @@ test('sorts journal entries chronologically without mutating the source array', 
 
   assert.deepEqual(sorted.map(entry => entry.id), ['old', 'new', 'undated']);
   assert.deepEqual(entries.map(entry => entry.id), ['new', 'undated', 'old']);
+});
+
+test('preserves imported flight dates and unknown details during web normalization', () => {
+  const details = getTravelDetails({ travelDetails: { flightNumber: 'KE703', flightDepartureDate: '2026-11-29', flightDepartureTime: '09:30', flightArrivalDate: '2026-11-29', flightArrivalTime: '12:00', flightBoardingTime: '08:50', futureField: { keep: true } } });
+  assert.equal(details.flightDepartureDate, '2026-11-29');
+  assert.equal(details.flightDepartureTime, '09:30');
+  assert.equal(details.flightBoardingTime, '08:50');
+  assert.deepEqual(details.futureField, { keep: true });
 });

@@ -213,6 +213,23 @@ export function createSyncV2Repository({ supabase, queueStore, makeOperationID =
     };
   };
 
+  const listChanges = async (userID, known) => {
+    if (!userID || !Array.isArray(known)) return null;
+    try {
+      const p_known = known.map(record => ({ record_type: record.type, record_id: record.recordID, revision: record.revision, deleted: !!record.deletedAt }));
+      const { data, error } = await supabase.rpc('account_sync_delta', { p_known });
+      if (error || !data || typeof data.requires_full !== 'boolean' || !Array.isArray(data.records)) return null;
+      return { requiresFull: data.requires_full, records: data.records.map(normalizeRecord) };
+    } catch { return null; }
+  };
+
+  const fingerprint = async () => {
+    try {
+      const { data, error } = await supabase.rpc('account_sync_fingerprint');
+      return !error && typeof data === 'string' && data.length > 0 ? data : null;
+    } catch { return null; }
+  };
+
   const listPendingOperations = (userID) => queueStore.list(userID);
 
   const discardPendingOperations = async (userID, recordKeys = null) => {
@@ -241,6 +258,8 @@ export function createSyncV2Repository({ supabase, queueStore, makeOperationID =
   return {
     listRecords,
     listAllRecords,
+    listChanges,
+    fingerprint,
     applyOperation,
     previewLegacyRows,
     importLegacyRows,

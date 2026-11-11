@@ -17,13 +17,16 @@ import TripHomeActions from './TripHomeActions';
 import AiItineraryImportDialog from './AiItineraryImportDialog';
 import { getJournalEntries, getTravelDetails } from './travelMemory';
 import { calculateSettlement, createExpensePayerSelection, getNextExpensePayerIndex, normalizeExpenseParticipants, normalizeSettlementParticipants } from './expenseSettlement';
+import { EXPENSE_CATEGORIES, normalizeExpenseCategory, categoryBudget, categoryTotals } from './expenseCategories';
 import { createCashWallet, getCashWalletCreationCurrency, removeCashWalletState } from './cashWallets';
 import { buildItineraryRouteGroups, normalizeRouteSettings, ROUTE_SETTINGS_STORAGE_KEY } from './itineraryRoutes';
 import useItineraryRoadRoutes from './useItineraryRoadRoutes';
 import ItineraryRouteSettings from './MapRouteSettings';
 import { createNearbyOrderPreview, applyNearbyOrderPreview, sortDayItems, moveDayItem } from './itineraryOrder';
+import { getLodgings, lodgingForDate, tripDayDate } from './lodging';
 import { ITINERARY_ICON_OPTIONS, getItineraryItemCategory, withItineraryIcon } from './itineraryCategories';
 import { createSyncV2Repository } from './sync/syncV2Repository.js';
+import { createAccountRealtimeListener, fallbackInterval, canSkipFullRefresh, confirmedFingerprint, canApplySnapshot, mergeAccountDelta } from './sync/accountRealtime.js';
 import { IndexedDBQueueStore } from './sync/indexedDBQueueStore.js';
 import { LOCAL_SYNC_BACKUP_PREFIX, LOCAL_SYNC_SAVED_PLACES_KEY, LOCAL_SYNC_TRIPS_KEY, LEGACY_SAVED_PLACES_KEY, LEGACY_TRIPS_KEY, SYNC_MIGRATION_COMPLETED_PREFIX } from './sync/localSyncStorage.js';
 import { hashLegacySnapshot } from './sync/legacyUserStateImporter.js';
@@ -512,18 +515,6 @@ const PAYMENT_METHODS = [
   { value: 'transfer', label: '계좌이체' }
 ];
 
-const EXPENSE_CATEGORIES = [
-  { value: 'food', label: '식비', emoji: '🍽️' },
-  { value: 'transport', label: '교통', emoji: '🚕' },
-  { value: 'lodging', label: '숙박', emoji: '🛏️' },
-  { value: 'flight', label: '항공', emoji: '✈️' },
-  { value: 'sightseeing', label: '관광', emoji: '🎟️' },
-  { value: 'shopping', label: '쇼핑', emoji: '🛍️' },
-  { value: 'communication', label: '통신', emoji: '📶' },
-  { value: 'insurance', label: '보험', emoji: '🛡️' },
-  { value: 'other', label: '기타', emoji: '🧾' }
-];
-
 const DEFAULT_CHECKLIST_ITEMS = [
   { id: 'passport', label: '여권 및 신분증', checked: false },
   { id: 'insurance', label: '여행자 보험', checked: false },
@@ -535,11 +526,11 @@ const DEFAULT_CHECKLIST_ITEMS = [
 const getDefaultChecklist = () => DEFAULT_CHECKLIST_ITEMS.map(item => ({ ...item }));
 
 const getExpenseCategoryLabel = (category) => (
-  EXPENSE_CATEGORIES.find(option => option.value === category)?.label || '기타'
+  EXPENSE_CATEGORIES.find(option => option.value === normalizeExpenseCategory(category))?.label || '기타'
 );
 
 const getExpenseCategoryEmoji = (category) => (
-  EXPENSE_CATEGORIES.find(option => option.value === category)?.emoji || '🧾'
+  EXPENSE_CATEGORIES.find(option => option.value === normalizeExpenseCategory(category))?.emoji || '🧾'
 );
 
 const getEffectiveExchangeRate = (currency, rates = {}, budgetSettings = {}) => {
@@ -1216,7 +1207,8 @@ export const ExpensePayerSelect = ({ id, labelId, ariaLabel, options, value, onC
   );
 };
 
-const ExpenseSplitFields = ({ participants, payerId, participantIds, onChange, compact = false }) => {
+const ExpenseSplitFields = ({ participants, payerId, participantIds, onChange, onAddParticipant, compact = false }) => {
+  const [participantName, setParticipantName] = useState('');
   const safeParticipants = normalizeSettlementParticipants(participants);
   const selectedIds = Array.isArray(participantIds) && participantIds.length > 0
     ? participantIds
@@ -1235,6 +1227,12 @@ const ExpenseSplitFields = ({ participants, payerId, participantIds, onChange, c
       participantIds: nextIds.length > 0 ? nextIds : [safePayerId]
     });
   };
+  const addParticipant = () => {
+    const participantId = onAddParticipant?.(participantName);
+    if (!participantId) return;
+    onChange(createExpensePayerSelection(participantId, selectedIds));
+    setParticipantName('');
+  };
 
   return (
     <div className={`expense-split-fields${compact ? ' is-compact' : ''}`}>
@@ -1248,6 +1246,24 @@ const ExpenseSplitFields = ({ participants, payerId, participantIds, onChange, c
           value={safePayerId}
           onChange={selectPayer}
         />
+        <div className="expense-payer-add">
+          <input
+            type="text"
+            value={participantName}
+            onChange={event => setParticipantName(event.target.value)}
+            onKeyDown={event => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                addParticipant();
+              }
+            }}
+            placeholder="추가할 지출자 이름"
+            aria-label="추가할 지출자 이름"
+          />
+          <button type="button" onClick={addParticipant} disabled={!participantName.trim()}>
+            이름 추가
+          </button>
+        </div>
       </div>
       <div className="expense-split-participants-field">
         <div className="expense-form-label">함께 사용한 사람 <span className="expense-split-count">{selectedIds.length}명</span></div>
@@ -1784,6 +1800,34 @@ function App() {
     }
     return [];
   });
+
+  const tripListToday = formatLocalDate(new Date());
+  const displayedTrips = useMemo(() => {
+    const getSortableStartDate = (value) => {
+      if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return '';
+      const date = new Date(`${value}T00:00:00`);
+      return !Number.isNaN(date.getTime()) && formatLocalDate(date) === value ? value : '';
+    };
+
+    return (trips || [])
+      .map((trip, index) => {
+        const startDate = getSortableStartDate(trip?.startDate);
+        return { trip, index, startDate, upcoming: Boolean(startDate && startDate > tripListToday) };
+      })
+      .sort((first, second) => {
+        if (first.upcoming !== second.upcoming) return first.upcoming ? -1 : 1;
+        if (Boolean(first.startDate) !== Boolean(second.startDate)) return first.startDate ? -1 : 1;
+
+        const dateOrder = first.startDate && second.startDate
+          ? (first.upcoming
+            ? first.startDate.localeCompare(second.startDate)
+            : second.startDate.localeCompare(first.startDate))
+          : 0;
+
+        return dateOrder || first.index - second.index;
+      })
+      .map(({ trip }) => trip);
+  }, [trips, tripListToday]);
 
   const [activeTripId, setActiveTripId] = useState(() => initialNavigationState?.activeTripId || null);
 
@@ -2362,19 +2406,45 @@ function App() {
 
     let cancelled = false;
     let refreshing = false;
+    let refreshAgain = false;
+    let lastFingerprint = null;
+    let fingerprintAvailable = false;
+    let realtimeConnected = false;
+    let lastFallbackAt = Date.now();
+    let debounceTimer;
+    let stopRealtime;
     const refreshAccountRecords = async () => {
       const work = syncWorkRef.current;
-      if (cancelled || refreshing || !navigator.onLine || document.visibilityState === 'hidden' || work.active || work.dirty.trip || work.dirty.savedPlace) return;
+      if (cancelled || !navigator.onLine || document.visibilityState === 'hidden' || work.active || work.dirty.trip || work.dirty.savedPlace) return;
+      if (refreshing) { refreshAgain = true; return; }
       const version = work.version;
       refreshing = true;
       try {
         const repository = getSyncV2Repository();
         if ((await repository.listPendingOperations(userID)).length > 0) return;
+        const before = await repository.fingerprint();
+        fingerprintAvailable = before !== null;
+        if (cancelled || syncReadyUserRef.current !== userID || work.version !== version || work.active || work.dirty.trip || work.dirty.savedPlace) return;
+        if ((await repository.listPendingOperations(userID)).length > 0) return;
+        if (canSkipFullRefresh(lastFingerprint, before, 0)) return;
 
-        const remoteRecords = await repository.listAllRecords(userID);
+        const knownRecords = [...syncRecordsRef.current.values()];
+        const delta = before !== null ? await repository.listChanges(userID, knownRecords) : null;
+        let remoteRecords = delta && !delta.requiresFull ? mergeAccountDelta(userID, knownRecords, delta.records) : null;
+        if (!remoteRecords) remoteRecords = await repository.listAllRecords(userID);
         if (cancelled || syncReadyUserRef.current !== userID || work.version !== version || work.active || work.dirty.trip || work.dirty.savedPlace) return;
         if ((await repository.listPendingOperations(userID)).length > 0) return;
         if (cancelled || syncReadyUserRef.current !== userID || work.version !== version || work.active || work.dirty.trip || work.dirty.savedPlace) return;
+        const after = await repository.fingerprint();
+        if (cancelled || syncReadyUserRef.current !== userID || work.version !== version || work.active || work.dirty.trip || work.dirty.savedPlace) return;
+        if ((await repository.listPendingOperations(userID)).length > 0) return;
+        if (cancelled || syncReadyUserRef.current !== userID || work.version !== version || work.active || work.dirty.trip || work.dirty.savedPlace) return;
+        if (!canApplySnapshot(before, after)) {
+          lastFingerprint = null;
+          if (after !== null) scheduleRefresh();
+          return;
+        }
+        lastFingerprint = confirmedFingerprint(before, after);
         if (syncRecordsUnchanged(syncRecordsRef.current, remoteRecords)) return;
         hydrateSyncRecords(userID, remoteRecords);
       } catch (error) {
@@ -2384,17 +2454,49 @@ function App() {
         }
       } finally {
         refreshing = false;
+        if (refreshAgain && !cancelled) { refreshAgain = false; scheduleRefresh(); }
       }
     };
-
-    window.addEventListener('focus', refreshAccountRecords);
-    document.addEventListener('visibilitychange', refreshAccountRecords);
-    const timer = window.setInterval(refreshAccountRecords, 10000);
+    const scheduleRefresh = () => {
+      window.clearTimeout(debounceTimer);
+      debounceTimer = window.setTimeout(refreshAccountRecords, 500);
+    };
+    const updateRealtime = () => {
+      if (cancelled) return;
+      if (document.visibilityState === 'hidden' || !navigator.onLine) {
+        stopRealtime?.(); stopRealtime = undefined; realtimeConnected = false;
+        return;
+      }
+      if (!stopRealtime) {
+        try {
+          stopRealtime = createAccountRealtimeListener({ supabase, userID, onChange: scheduleRefresh,
+            onConnected: () => { realtimeConnected = true; scheduleRefresh(); },
+            onDisconnected: () => { realtimeConnected = false; } });
+        } catch (error) { console.error('Account change notifications unavailable:', error); }
+      }
+      scheduleRefresh();
+    };
+    updateRealtime();
+    window.addEventListener('focus', scheduleRefresh);
+    window.addEventListener('tripplot:sync-idle', scheduleRefresh);
+    window.addEventListener('online', updateRealtime);
+    window.addEventListener('offline', updateRealtime);
+    document.addEventListener('visibilitychange', updateRealtime);
+    const timer = window.setInterval(() => {
+      if (Date.now() - lastFallbackAt < fallbackInterval(fingerprintAvailable && realtimeConnected)) return;
+      lastFallbackAt = Date.now();
+      void refreshAccountRecords();
+    }, 10_000);
     return () => {
       cancelled = true;
+      stopRealtime?.();
+      window.clearTimeout(debounceTimer);
       window.clearInterval(timer);
-      window.removeEventListener('focus', refreshAccountRecords);
-      document.removeEventListener('visibilitychange', refreshAccountRecords);
+      window.removeEventListener('focus', scheduleRefresh);
+      window.removeEventListener('tripplot:sync-idle', scheduleRefresh);
+      window.removeEventListener('online', updateRealtime);
+      window.removeEventListener('offline', updateRealtime);
+      document.removeEventListener('visibilitychange', updateRealtime);
     };
   }, [session?.user?.id, hydrateSyncRecords, getSyncV2Repository, isLoadingDB, syncMigration]);
 
@@ -2407,7 +2509,7 @@ function App() {
     let cancelled = false;
     let polling = false;
     const pollSharedTrips = async () => {
-      if (cancelled || polling || !navigator.onLine) return;
+      if (cancelled || polling || !navigator.onLine || document.visibilityState === 'hidden') return;
       polling = true;
       try {
         const results = await Promise.allSettled(
@@ -2443,10 +2545,14 @@ function App() {
     };
 
     pollSharedTrips();
+    document.addEventListener('visibilitychange', pollSharedTrips);
+    window.addEventListener('online', pollSharedTrips);
     const intervalId = window.setInterval(pollSharedTrips, 15000);
 
     return () => {
       cancelled = true;
+      document.removeEventListener('visibilitychange', pollSharedTrips);
+      window.removeEventListener('online', pollSharedTrips);
       window.clearInterval(intervalId);
     };
   }, [sharedTripIdsKey]);
@@ -2912,7 +3018,10 @@ function App() {
     const queued = work.queue.then(execute, execute);
     work.queue = queued;
     try { return await queued; }
-    finally { work.active -= 1; }
+    finally {
+      work.active -= 1;
+      if (work.active === 0) window.dispatchEvent(new Event('tripplot:sync-idle'));
+    }
   };
 
   const syncFavoritesToCloud = async (newFavs) => {
@@ -3393,6 +3502,16 @@ function App() {
     setSettlementParticipantName('');
   };
 
+  const addExpenseSettlementParticipant = (rawName) => {
+    const name = String(rawName || '').trim();
+    if (!name || isReadOnlyTrip) return null;
+    const existing = settlementParticipants.find(person => person.name.trim().toLocaleLowerCase() === name.toLocaleLowerCase());
+    if (existing) return existing.id;
+    const participant = { id: makeEntityId(), name };
+    void saveSettlementParticipants([...settlementParticipants, participant]);
+    return participant.id;
+  };
+
   const removeSettlementParticipant = (participantId) => {
     if (participantId === 'self') return;
     saveSettlementParticipants(settlementParticipants.filter(person => person.id !== participantId));
@@ -3623,6 +3742,7 @@ function App() {
             id: newId,
             name: data.name || "업로드한 여행",
             country: data.country || "",
+            ...(Object.hasOwn(data, "lodgings") ? { lodgings: data.lodgings } : {}),
             startDate: data.startDate || new Date().toISOString().split('T')[0],
             endDate: data.endDate || new Date().toISOString().split('T')[0],
             itinerary: (data.itinerary || []).map((day, idx) => ({
@@ -3697,6 +3817,7 @@ function App() {
         id: newId,
         name: data.name || "붙여넣은 여행",
         country: data.country || "",
+        ...(Object.hasOwn(data, "lodgings") ? { lodgings: data.lodgings } : {}),
         startDate: data.startDate || new Date().toISOString().split('T')[0],
         endDate: data.endDate || new Date().toISOString().split('T')[0],
         itinerary: (data.itinerary || []).map((day, idx) => ({
@@ -3886,20 +4007,6 @@ function App() {
     }
   };
 
-  const moveTrip = async (id, direction) => {
-    const index = (trips || []).findIndex(t => t.id === id);
-    if (index === -1) return;
-    if (direction === 'up' && index === 0) return;
-    if (direction === 'down' && index === (trips || []).length - 1) return;
-
-    const newTrips = [...(trips || [])];
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    [newTrips[index], newTrips[targetIndex]] = [newTrips[targetIndex], newTrips[index]];
-    
-    await syncTripsToCloud(newTrips);
-  };
-
-
   const addToItinerary = (place) => {
     const targetDay = parseDay(activeDay);
     const displayName = itineraryDisplayName.trim() || place.displayName || place.name || '장소 이름 정보 없음';
@@ -4029,7 +4136,7 @@ function App() {
       amount: String(expense.amount ?? ''),
       currency: expense.currency || budgetSettings.travelCurrency || 'USD',
       paymentMethod: expense.paymentMethod || '',
-      category: expense.category || 'other',
+      category: normalizeExpenseCategory(expense.category),
       memo: expense.memo || '',
       day: expense.day ?? 1,
       time: expense.time || '',
@@ -4118,7 +4225,7 @@ function App() {
       sourceDay: day,
       day,
       id: item.id,
-      time: item.time || '09:00',
+      time: item.time || '',
       displayName: item.displayName || item.name || '',
       originalName: item.name || '',
       reservationNumber: item.reservationNumber || '',
@@ -4541,16 +4648,12 @@ function App() {
   const budgetProgress = budgetSettings.limitKRW > 0 ? Math.min((totalSpentKRW / budgetSettings.limitKRW) * 100, 100) : 0;
   // getExpenseAmountKRW is intentionally scoped to the active trip's settings.
   /* eslint-disable react-hooks/exhaustive-deps */
-  const categoryTotalsKRW = useMemo(() => (expenses || []).reduce((totals, expense) => {
-    const category = expense.category || 'other';
-    totals[category] = (totals[category] || 0) + getExpenseAmountKRW(expense.amount, expense.currency);
-    return totals;
-  }, {}), [expenses, exchangeRates, budgetSettings]);
+  const categoryTotalsKRW = useMemo(() => categoryTotals(expenses || [], expense => getExpenseAmountKRW(expense.amount, expense.currency)), [expenses, exchangeRates, budgetSettings]);
   /* eslint-enable react-hooks/exhaustive-deps */
   const categoryBudgetEntries = EXPENSE_CATEGORIES.map(category => ({
     ...category,
     spent: categoryTotalsKRW[category.value] || 0,
-    budget: Number(budgetSettings.categoryBudgets?.[category.value]) || 0
+    budget: categoryBudget(budgetSettings.categoryBudgets, category.value)
   }));
   /* eslint-disable react-hooks/exhaustive-deps */
   const paymentTotalsKRW = useMemo(() => (expenses || []).reduce((totals, expense) => {
@@ -5414,7 +5517,7 @@ function App() {
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {(trips || []).map(trip => {
+                    {displayedTrips.map(trip => {
                       const tripStatus = getTripStatusMeta(trip);
                       return (
                       <div 
@@ -5502,29 +5605,6 @@ function App() {
                               </div>
                               
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', borderRight: '1px solid #f3f4f6', paddingRight: '8px' }}>
-                                  <button 
-                                    type="button"
-                                    aria-label={`${trip.name} 목록에서 위로 이동`}
-                                    title="여행을 위로 이동"
-                                    onClick={(e) => { e.stopPropagation(); moveTrip(trip.id, 'up'); }}
-                                    style={{ background: 'none', border: 'none', color: (trips || []).indexOf(trip) === 0 ? '#f3f4f6' : '#cbd5e1', cursor: (trips || []).indexOf(trip) === 0 ? 'default' : 'pointer', padding: '1px', display: 'flex' }}
-                                    disabled={(trips || []).indexOf(trip) === 0}
-                                  >
-                                    <ChevronUp size={14} />
-                                  </button>
-                                  <button 
-                                    type="button"
-                                    aria-label={`${trip.name} 목록에서 아래로 이동`}
-                                    title="여행을 아래로 이동"
-                                    onClick={(e) => { e.stopPropagation(); moveTrip(trip.id, 'down'); }}
-                                    style={{ background: 'none', border: 'none', color: (trips || []).indexOf(trip) === (trips || []).length - 1 ? '#f3f4f6' : '#cbd5e1', cursor: (trips || []).indexOf(trip) === (trips || []).length - 1 ? 'default' : 'pointer', padding: '1px', display: 'flex' }}
-                                    disabled={(trips || []).indexOf(trip) === (trips || []).length - 1}
-                                  >
-                                    <ChevronDown size={14} />
-                                  </button>
-                                </div>
-
                                 <div style={{ display: 'flex', gap: '4px' }}>
                                   <button 
                                     type="button"
@@ -6008,6 +6088,12 @@ function App() {
                       </div>
                     </div>
 
+                    {lodgingForDate(getLodgings(activeTrip), tripDayDate(activeTrip?.startDate, parseDay(dayPlan?.day))).map(({ lodging, checkIn, checkOut, overnight }) => (
+                      <div className="lodging-day-summary" key={`lodging-${lodging.id}`}>
+                        🏨 {lodging.name} · {[checkOut && '체크아웃', checkIn && '체크인', overnight && '숙박'].filter(Boolean).join(' · ')}
+                        {lodging.address && <span> · {lodging.address}</span>}
+                      </div>
+                    ))}
                     {dayPlan.orderMode === 'distance' && <p className="itinerary-distance-order-note" role="status">거리 정렬 순서를 유지하고 있습니다. 도착 시간은 변경되지 않았으니 확인해주세요. 새 장소는 마지막에 추가됩니다.</p>}
                     {getDayConflictWarnings(dayPlan).length > 0 && <div className="itinerary-conflict-warning" role="status" style={{ margin: '12px 24px 0', padding: '10px 12px', borderRadius: '12px', background: '#fff7ed', color: '#c2410c', fontSize: '11px', fontWeight: '800' }}>시간·이동 확인: {getDayConflictWarnings(dayPlan)[0]}{getDayConflictWarnings(dayPlan).length > 1 ? ` 외 ${getDayConflictWarnings(dayPlan).length - 1}건` : ''}</div>}
 
@@ -6059,7 +6145,7 @@ function App() {
                                   <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                                       <div
-                                        aria-label={`${item.displayName || item.name || '일정'} 도착 시간 ${item.time || '09:00'}`}
+                                        aria-label={`${item.displayName || item.name || '일정'} 도착 시간 ${item.time || '시간 미정'}`}
                                         style={{
                                           display: 'flex',
                                           alignItems: 'center',
@@ -6081,7 +6167,7 @@ function App() {
                                           color: '#475569',
                                           fontVariantNumeric: 'tabular-nums'
                                         }}>
-                                          {item.time || '09:00'}
+                                          {item.time || '시간 미정'}
                                         </span>
                                       </div>
                                       <h4 
@@ -6274,6 +6360,7 @@ function App() {
                   key={activeTrip.id}
                   trip={activeTrip}
                   readOnly={isReadOnlyTrip}
+                  savedPlaces={favorites}
                   onUpdateTrip={updateActiveTrip}
                   onOpenItinerary={openItinerary}
                   onOpenPlace={openMemoryPlace}
@@ -6465,6 +6552,7 @@ function App() {
                     payerId={expenseInput.payerId}
                     participantIds={expenseInput.participantIds}
                     onChange={split => setExpenseInput(current => ({ ...current, ...split }))}
+                    onAddParticipant={addExpenseSettlementParticipant}
                   />
 
                   <div className="expense-form-row expense-form-currency-payment-amount">
@@ -7873,11 +7961,14 @@ function App() {
               <textarea value={editingTimeItem.memo || ''} onChange={(e) => setEditingTimeItem({ ...editingTimeItem, memo: e.target.value })} placeholder="체크인 방법, 준비물 등을 적어두세요." rows={3} style={{ width: '100%', boxSizing: 'border-box', marginTop: '7px', padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '12px', resize: 'vertical' }} />
             </label>
 
-            <ScrollTimeInput
-              value={editingTimeItem.time}
-              onChange={(newTime) => setEditingTimeItem({ ...editingTimeItem, time: newTime })}
-              label="일정 시간 선택"
-            />
+            {editingTimeItem.time ? <>
+              <ScrollTimeInput
+                value={editingTimeItem.time}
+                onChange={(newTime) => setEditingTimeItem({ ...editingTimeItem, time: newTime })}
+                label="일정 시간 선택"
+              />
+              <button type="button" className="travel-memory-cancel-button" onClick={() => setEditingTimeItem({ ...editingTimeItem, time: '' })}>시간 미정으로 변경</button>
+            </> : <div style={{ marginBottom: 12, color: '#64748b', fontSize: 13 }}>시간 미정 <button type="button" className="travel-memory-cancel-button" onClick={() => setEditingTimeItem({ ...editingTimeItem, time: '09:00' })}>시간 설정</button></div>}
 
             <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
               <button 
@@ -7962,7 +8053,7 @@ function App() {
               <div style={{ minWidth: 0 }}>
                 <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b', marginBottom: '8px' }}>카테고리</label>
                 <ExpenseChoiceGroup
-                  options={EXPENSE_CATEGORIES}
+                  options={expenseInput.category && !EXPENSE_CATEGORIES.some(option => option.value === expenseInput.category) ? [...EXPENSE_CATEGORIES, { value: expenseInput.category, label: '기존 분류', emoji: '🧾' }] : EXPENSE_CATEGORIES}
                   value={expenseInput.category || 'other'}
                   onChange={(category) => setExpenseInput(current => ({ ...current, category }))}
                   ariaLabel="지출 수정 카테고리"
@@ -7976,6 +8067,7 @@ function App() {
               payerId={expenseInput.payerId}
               participantIds={expenseInput.participantIds}
               onChange={split => setExpenseInput(current => ({ ...current, ...split }))}
+              onAddParticipant={addExpenseSettlementParticipant}
               compact
             />
 

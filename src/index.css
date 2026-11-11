@@ -1797,6 +1797,49 @@ body {
   min-width: 0;
 }
 
+.expense-payer-add {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.expense-payer-add input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 9px 10px;
+  border: 1px solid #a7f3d0;
+  border-radius: 9px;
+  background: #fff;
+  color: #0f172a;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.expense-payer-add input:focus-visible {
+  outline: 2px solid #34d399;
+  outline-offset: 1px;
+}
+
+.expense-payer-add button {
+  flex-shrink: 0;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 9px;
+  background: #0f766e;
+  color: #fff;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.expense-payer-add button:disabled {
+  background: #a7c8c1;
+  cursor: not-allowed;
+}
+
 .expense-payer-select-trigger {
   display: flex;
   align-items: center;
@@ -4797,3 +4840,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     display: none !important;
   }
 }
+
+.lodging-hint { color: #64748b; font-size: 13px; line-height: 1.5; margin: 8px 0 14px; }
+.lodging-list { display: grid; gap: 10px; margin-bottom: 14px; }
+.lodging-card { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 14px; border: 1px solid #dce6f5; border-radius: 14px; background: #f8faff; }
+.lodging-card p { color: #64748b; margin: 5px 0 0; font-size: 12px; overflow-wrap: anywhere; }
+.lodging-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.lodging-actions button { display: inline-flex; align-items: center; gap: 4px; border: 1px solid #dbe5f4; border-radius: 9px; background: white; color: #4b5d7c; padding: 8px 10px; cursor: pointer; }
+.lodging-form { display: grid; gap: 14px; margin-top: 12px; }
+.lodging-day-summary { margin: 12px 24px 0; padding: 10px 12px; border-radius: 12px; background: #f4f0ff; color: #5b38a0; font-size: 12px; line-height: 1.5; }
