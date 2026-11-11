@@ -10,6 +10,7 @@ final class NativeTripStore: ObservableObject {
     private var repository: TripRepository?
     private var mediaStore: TravelMediaStore?
     private var draftStore: MemoryDraftStore?
+    private var writeContext = SyncWriteContext.local
 
     init() { open() }
 
@@ -19,7 +20,7 @@ final class NativeTripStore: ObservableObject {
             let next = try TripRepository(url: directory.appendingPathComponent("TripPlotNative/trips.sqlite"))
             let media = try TravelMediaStore(root: directory.appendingPathComponent("TripPlotNative/media", isDirectory: true))
             let drafts = try MemoryDraftStore(root: directory.appendingPathComponent("TripPlotNative/drafts", isDirectory: true))
-            let loaded = try next.list()
+            let loaded = try next.list(context: writeContext)
             if let staleDrafts = try? drafts.removeStaleJournals() {
                 for draft in staleDrafts {
                     if let fileName = draft.stagedPhotoFileName {
@@ -35,6 +36,19 @@ final class NativeTripStore: ObservableObject {
             reloadSavedPlaces()
         } catch {
             repository = nil
+            loadError = error.localizedDescription
+        }
+    }
+
+    func setSyncUserID(_ userID: String?) {
+        writeContext = SyncWriteContext(userID: userID)
+        do {
+            guard let repository else { throw CocoaError(.fileReadUnknown) }
+            trips = try repository.list(context: writeContext)
+            savedPlaces = try repository.listSavedPlaces(context: writeContext)
+            loadError = nil
+            savedLoadError = nil
+        } catch {
             loadError = error.localizedDescription
         }
     }
@@ -92,64 +106,63 @@ final class NativeTripStore: ObservableObject {
     func reloadSavedPlaces() {
         do {
             guard let repository else { throw CocoaError(.fileReadUnknown) }
-            savedPlaces = try repository.listSavedPlaces(); savedLoadError = nil
+            savedPlaces = try repository.listSavedPlaces(context: writeContext); savedLoadError = nil
         } catch { savedLoadError = error.localizedDescription }
     }
     func saveFavorite(selection: PlaceSelection, draft: PlaceDraft, id: String) throws -> SavedPlaceDocument {
         guard let repository else { throw CocoaError(.fileWriteUnknown) }
-        let saved = try repository.savePlace(selection: selection, draft: draft, id: id)
-        savedPlaces = try repository.listSavedPlaces(); savedLoadError = nil
+        let saved = try repository.savePlace(selection: selection, draft: draft, id: id, context: writeContext)
+        savedPlaces = try repository.listSavedPlaces(context: writeContext); savedLoadError = nil
         return saved
     }
     func deleteFavorite(id: String) throws {
         guard let repository else { throw CocoaError(.fileWriteUnknown) }
-        try repository.deleteSavedPlace(id: id); savedPlaces = try repository.listSavedPlaces()
+        try repository.deleteSavedPlace(id: id, context: writeContext); savedPlaces = try repository.listSavedPlaces(context: writeContext)
     }
 
     func save(draft: TripDraft, original: TripDocument?) throws -> String {
         guard let repository else { throw CocoaError(.fileWriteUnknown) }
         let trip = try original?.edited(draft: draft) ?? TripDocument.create(draft: draft)
-        try repository.save(trip)
-        trips.removeAll { $0.id == trip.id }
-        trips.insert(trip, at: 0)
+        try repository.save(trip, context: writeContext)
+        trips = try repository.list(context: writeContext)
         return trip.id
     }
 
     func delete(_ trip: TripDocument) throws {
         guard let repository else { throw CocoaError(.fileWriteUnknown) }
-        try repository.delete(id: trip.id)
+        try repository.delete(id: trip.id, context: writeContext)
         trips.removeAll { $0.id == trip.id }
     }
 
     func applySchedule(tripID: String, change: ScheduleChange) throws {
         guard let repository else { throw CocoaError(.fileWriteUnknown) }
-        _ = try repository.applySchedule(tripID: tripID, change: change)
-        trips = try repository.list()
+        _ = try repository.applySchedule(tripID: tripID, change: change, context: writeContext)
+        trips = try repository.list(context: writeContext)
     }
     func upsertExpense(tripID: String, expenseID: String, fields: [String: Any]) throws {
         guard let repository else { throw CocoaError(.fileWriteUnknown) }
-        _ = try repository.upsertExpense(tripID: tripID, expenseID: expenseID, fields: fields)
-        trips = try repository.list()
+        _ = try repository.upsertExpense(tripID: tripID, expenseID: expenseID, fields: fields, context: writeContext)
+        trips = try repository.list(context: writeContext)
     }
     func deleteExpense(tripID: String, expenseID: String) throws {
         guard let repository else { throw CocoaError(.fileWriteUnknown) }
-        try repository.deleteExpense(tripID: tripID, expenseID: expenseID)
-        trips = try repository.list()
+        try repository.deleteExpense(tripID: tripID, expenseID: expenseID, context: writeContext)
+        trips = try repository.list(context: writeContext)
     }
     func updateBudgetSettings(tripID: String, values: [String: Any]) throws {
         guard let repository else { throw CocoaError(.fileWriteUnknown) }
-        _ = try repository.updateBudgetSettings(tripID: tripID, values: values)
-        trips = try repository.list()
+        _ = try repository.updateBudgetSettings(tripID: tripID, values: values, context: writeContext)
+        trips = try repository.list(context: writeContext)
     }
     func updateParticipants(tripID: String, participants: [[String: Any]]) throws {
         guard let repository else { throw CocoaError(.fileWriteUnknown) }
-        _ = try repository.updateSettlementParticipants(tripID: tripID, participants: participants)
-        trips = try repository.list()
+        _ = try repository.updateSettlementParticipants(tripID: tripID, participants: participants, context: writeContext)
+        trips = try repository.list(context: writeContext)
     }
     func applyMemoryChange(tripID: String, change: MemoryChange) throws {
         guard let repository else { throw CocoaError(.fileWriteUnknown) }
-        _ = try repository.applyMemoryChange(tripID: tripID, change: change)
-        trips = try repository.list()
+        _ = try repository.applyMemoryChange(tripID: tripID, change: change, context: writeContext)
+        trips = try repository.list(context: writeContext)
     }
     func prepareImport(url: URL) async throws -> ImportPreview {
         guard let repository else { throw CocoaError(.fileReadUnknown) }
@@ -162,9 +175,10 @@ final class NativeTripStore: ObservableObject {
     }
     func commitImport(_ preview: ImportPreview, decision: ImportDecision) async throws -> ImportOutcome {
         guard let repository else { throw CocoaError(.fileWriteUnknown) }
+        let syncContext = writeContext
         let result = try await Task.detached(priority: .userInitiated) {
             let outcome = try repository.commitImport(preview, decision: decision)
-            return (outcome, try repository.list())
+            return (outcome, try repository.list(context: syncContext))
         }.value
         trips = result.1
         return result.0

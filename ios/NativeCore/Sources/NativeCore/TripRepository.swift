@@ -2,7 +2,7 @@ import Foundation
 import CoreData
 
 public final class TripRepository {
-    private let context: NSManagedObjectContext
+    let context: NSManagedObjectContext
     private static let accessLock = NSRecursiveLock()
     var beforeReceiptWrite: (() throws -> Void)?
 
@@ -10,15 +10,16 @@ public final class TripRepository {
         Self.accessLock.lock(); defer { Self.accessLock.unlock() }
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try TripStoreModel.migrateIfNeeded(at: url)
-        let coordinator = NSPersistentStoreCoordinator(managedObjectModel: TripStoreModel.current)
+        let coordinator = NSPersistentStoreCoordinator(managedObjectModel: TripStoreModel.syncV2)
         try coordinator.addPersistentStore(ofType: NSSQLiteStoreType, configurationName: nil, at: url, options: nil)
         context = NSManagedObjectContext(concurrencyType: .privateQueueConcurrencyType)
         context.persistentStoreCoordinator = coordinator
     }
 
-    public func list() throws -> [TripDocument] {
+    public func list(context writeContext: SyncWriteContext = .local) throws -> [TripDocument] {
         try transaction {
             let request = NSFetchRequest<NSManagedObject>(entityName: "TripRecord")
+            request.predicate = visibleRecordsPredicate(context: writeContext)
             request.sortDescriptors = [NSSortDescriptor(key: "updatedAt", ascending: false), NSSortDescriptor(key: "id", ascending: true)]
             return try context.fetch(request).map { record in
                 guard let data = record.value(forKey: "payload") as? Data else { throw TripError.invalidDocument }
@@ -27,26 +28,30 @@ public final class TripRepository {
         }
     }
 
-    public func save(_ trip: TripDocument) throws {
-        try transaction { try write(trip) }
+    public func save(_ trip: TripDocument, context writeContext: SyncWriteContext = .local) throws {
+        try transaction { try write(trip, context: writeContext, enqueueSync: true) }
     }
 
-    public func applyMemoryChange(tripID: String, change: MemoryChange, now: Double = floor(Date().timeIntervalSince1970 * 1000)) throws -> TripDocument {
+    public func applyMemoryChange(tripID: String, change: MemoryChange, now: Double = floor(Date().timeIntervalSince1970 * 1000), context writeContext: SyncWriteContext = .local) throws -> TripDocument {
         try transaction {
-            guard let row = try find(tripID), let bytes = row.value(forKey: "payload") as? Data else { throw TripError.invalidDocument }
+            guard let row = try find(tripID) else { throw TripError.invalidDocument }
+            try validateWriteAccess(row, context: writeContext)
+            guard let bytes = row.value(forKey: "payload") as? Data else { throw TripError.invalidDocument }
             let current = try TripDocument(data: bytes)
             let next = try TripMemory.apply(change, to: current, now: now)
             if try next.encoded() == current.encoded() { return current }
-            try write(next)
+            try write(next, context: writeContext, enqueueSync: true)
             guard let saved = try find(tripID)?.value(forKey: "payload") as? Data else { throw TripError.invalidDocument }
             guard try TripDocument(data: saved).encoded() == next.encoded() else { throw TripError.invalidDocument }
             return try TripDocument(data: saved)
         }
     }
 
-    public func upsertExpense(tripID: String, expenseID: String, fields: [String: Any]) throws -> TripDocument {
+    public func upsertExpense(tripID: String, expenseID: String, fields: [String: Any], context writeContext: SyncWriteContext = .local) throws -> TripDocument {
         try transaction {
-            guard let row = try find(tripID), let bytes = row.value(forKey: "payload") as? Data else { throw TripError.invalidDocument }
+            guard let row = try find(tripID) else { throw TripError.invalidDocument }
+            try validateWriteAccess(row, context: writeContext)
+            guard let bytes = row.value(forKey: "payload") as? Data else { throw TripError.invalidDocument }
             var raw = try TripDocument(data: bytes).raw
             var entries: [[String: Any]]
             if let existing = raw["expenses"] {
@@ -61,82 +66,126 @@ public final class TripRepository {
             raw["expenses"] = entries
             raw["updatedAt"] = max(floor(Date().timeIntervalSince1970 * 1000), ((raw["updatedAt"] as? NSNumber)?.doubleValue ?? 0) + 1)
             let next = try TripDocument(data: JSONSerialization.data(withJSONObject: raw))
-            try write(next)
+            try write(next, context: writeContext, enqueueSync: true)
             guard let saved = try find(tripID)?.value(forKey: "payload") as? Data else { throw TripError.invalidDocument }
             return try TripDocument(data: saved)
         }
     }
 
-    public func deleteExpense(tripID: String, expenseID: String) throws {
+    public func deleteExpense(tripID: String, expenseID: String, context writeContext: SyncWriteContext = .local) throws {
         try transaction {
-            guard let row = try find(tripID), let bytes = row.value(forKey: "payload") as? Data else { throw TripError.invalidDocument }
+            guard let row = try find(tripID) else { throw TripError.invalidDocument }
+            try validateWriteAccess(row, context: writeContext)
+            guard let bytes = row.value(forKey: "payload") as? Data else { throw TripError.invalidDocument }
             var raw = try TripDocument(data: bytes).raw
             guard let existing = raw["expenses"] else { return }
             guard let entries = existing as? [[String: Any]] else { throw TripError.invalidDocument }
             raw["expenses"] = entries.filter { ($0["id"] as? String) != expenseID }
             raw["updatedAt"] = max(floor(Date().timeIntervalSince1970 * 1000), ((raw["updatedAt"] as? NSNumber)?.doubleValue ?? 0) + 1)
-            try write(TripDocument(data: JSONSerialization.data(withJSONObject: raw)))
+            try write(TripDocument(data: JSONSerialization.data(withJSONObject: raw)), context: writeContext, enqueueSync: true)
         }
     }
 
-    public func updateBudgetSettings(tripID: String, values: [String: Any]) throws -> TripDocument {
+    public func updateBudgetSettings(tripID: String, values: [String: Any], context writeContext: SyncWriteContext = .local) throws -> TripDocument {
         try transaction {
-            guard let row = try find(tripID), let bytes = row.value(forKey: "payload") as? Data else { throw TripError.invalidDocument }
+            guard let row = try find(tripID) else { throw TripError.invalidDocument }
+            try validateWriteAccess(row, context: writeContext)
+            guard let bytes = row.value(forKey: "payload") as? Data else { throw TripError.invalidDocument }
             var raw = try TripDocument(data: bytes).raw
             var settings = (raw["budgetSettings"] as? [String: Any]) ?? [:]
             values.forEach { settings[$0.key] = $0.value }
             raw["budgetSettings"] = settings
             raw["updatedAt"] = max(floor(Date().timeIntervalSince1970 * 1000), ((raw["updatedAt"] as? NSNumber)?.doubleValue ?? 0) + 1)
-            let next = try TripDocument(data: JSONSerialization.data(withJSONObject: raw)); try write(next)
+            let next = try TripDocument(data: JSONSerialization.data(withJSONObject: raw)); try write(next, context: writeContext, enqueueSync: true)
             guard let saved = try find(tripID)?.value(forKey: "payload") as? Data else { throw TripError.invalidDocument }
             return try TripDocument(data: saved)
         }
     }
 
-    public func updateSettlementParticipants(tripID: String, participants: [[String: Any]]) throws -> TripDocument {
+    public func updateSettlementParticipants(tripID: String, participants: [[String: Any]], context writeContext: SyncWriteContext = .local) throws -> TripDocument {
         try transaction {
-            guard let row = try find(tripID), let bytes = row.value(forKey: "payload") as? Data else { throw TripError.invalidDocument }
+            guard let row = try find(tripID) else { throw TripError.invalidDocument }
+            try validateWriteAccess(row, context: writeContext)
+            guard let bytes = row.value(forKey: "payload") as? Data else { throw TripError.invalidDocument }
             var raw = try TripDocument(data: bytes).raw
             raw["settlementParticipants"] = participants
             raw["updatedAt"] = max(floor(Date().timeIntervalSince1970 * 1000), ((raw["updatedAt"] as? NSNumber)?.doubleValue ?? 0) + 1)
-            let next = try TripDocument(data: JSONSerialization.data(withJSONObject: raw)); try write(next)
+            let next = try TripDocument(data: JSONSerialization.data(withJSONObject: raw)); try write(next, context: writeContext, enqueueSync: true)
             guard let saved = try find(tripID)?.value(forKey: "payload") as? Data else { throw TripError.invalidDocument }
             return try TripDocument(data: saved)
         }
     }
 
-    public func delete(id: String) throws {
-        try transaction { if let record = try find(id) { context.delete(record) } }
+    public func delete(id: String, context writeContext: SyncWriteContext = .local) throws {
+        try transaction {
+            guard let record = try find(id) else { return }
+            try validateWriteAccess(record, context: writeContext)
+            if let owner = record.value(forKey: "ownerUserID") as? String, owner == writeContext.userID,
+               let bytes = record.value(forKey: "payload") as? Data {
+                let trip = try TripDocument(data: bytes)
+                let deletedAt = Date()
+                try syncEnqueueWithinTransaction(SyncOperation(
+                    userID: owner, recordType: .trip, recordID: id,
+                    expectedRevision: syncRevisionWithinTransaction(userID: owner, recordType: .trip, recordID: id),
+                    payload: trip.raw, deletedAt: deletedAt
+                ))
+            }
+            context.delete(record)
+        }
     }
 
-    public func listSavedPlaces() throws -> [SavedPlaceDocument] {
+    public func listSavedPlaces(context writeContext: SyncWriteContext = .local) throws -> [SavedPlaceDocument] {
         try transaction {
             let request = NSFetchRequest<NSManagedObject>(entityName: "SavedPlaceRecord")
+            request.predicate = visibleRecordsPredicate(context: writeContext)
             request.sortDescriptors = [NSSortDescriptor(key: "updatedAt", ascending: false), NSSortDescriptor(key: "id", ascending: true)]
             return try context.fetch(request).map(savedDocument)
         }
     }
-    public func savePlace(selection: PlaceSelection, draft: PlaceDraft, id: String) throws -> SavedPlaceDocument {
+    public func savePlace(selection: PlaceSelection, draft: PlaceDraft, id: String, context writeContext: SyncWriteContext = .local) throws -> SavedPlaceDocument {
         try transaction {
             let payload = try selection.durablePayload(id: id, draft: draft)
             let sourceKey = try selection.sourceKey(creationID: id)
             if let sameID = try savedRecord(field: "id", value: id) {
+                try validateWriteAccess(sameID, context: writeContext)
                 let old = try savedDocument(sameID)
                 guard old.sourceKey == sourceKey else { throw PlaceError.conflictingOperation }
                 // Same source is already saved: never silently overwrite its user memo.
                 return old
             }
-            if let duplicate = try savedRecord(field: "sourceKey", value: sourceKey) { return try savedDocument(duplicate) }
+            if let duplicate = try savedPlaceWithSourceKey(sourceKey, context: writeContext) { return try savedDocument(duplicate) }
             let row = NSEntityDescription.insertNewObject(forEntityName: "SavedPlaceRecord", into: context)
             let now = floor(Date().timeIntervalSince1970 * 1000)
             row.setValue(id, forKey: "id"); row.setValue(sourceKey, forKey: "sourceKey")
+            row.setValue(writeContext.userID, forKey: "ownerUserID")
             row.setValue(try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]), forKey: "payload")
             row.setValue(now, forKey: "createdAt"); row.setValue(now, forKey: "updatedAt")
+            if let userID = writeContext.userID {
+                try syncEnqueueWithinTransaction(SyncOperation(
+                    userID: userID, recordType: .savedPlace, recordID: id,
+                    expectedRevision: syncRevisionWithinTransaction(userID: userID, recordType: .savedPlace, recordID: id),
+                    payload: payload, deletedAt: nil
+                ))
+            }
             return try savedDocument(row)
         }
     }
-    public func deleteSavedPlace(id: String) throws {
-        try transaction { if let record = try savedRecord(field: "id", value: id) { context.delete(record) } }
+    public func deleteSavedPlace(id: String, context writeContext: SyncWriteContext = .local) throws {
+        try transaction {
+            guard let record = try savedRecord(field: "id", value: id) else { return }
+            try validateWriteAccess(record, context: writeContext)
+            if let owner = record.value(forKey: "ownerUserID") as? String, owner == writeContext.userID,
+               let bytes = record.value(forKey: "payload") as? Data,
+               let payload = try JSONSerialization.jsonObject(with: bytes) as? [String: Any] {
+                let deletedAt = Date()
+                try syncEnqueueWithinTransaction(SyncOperation(
+                    userID: owner, recordType: .savedPlace, recordID: id,
+                    expectedRevision: syncRevisionWithinTransaction(userID: owner, recordType: .savedPlace, recordID: id),
+                    payload: payload, deletedAt: deletedAt
+                ))
+            }
+            context.delete(record)
+        }
     }
     private func savedRecord(field: String, value: String) throws -> NSManagedObject? {
         let request = NSFetchRequest<NSManagedObject>(entityName: "SavedPlaceRecord")
@@ -151,10 +200,12 @@ public final class TripRepository {
         return .init(id: id, sourceKey: source, payload: payload, createdAt: created, updatedAt: updated)
     }
 
-    public func applySchedule(tripID: String, change: ScheduleChange) throws -> TripDocument {
+    public func applySchedule(tripID: String, change: ScheduleChange, context writeContext: SyncWriteContext = .local) throws -> TripDocument {
         try transaction {
-            guard let bytes = try find(tripID)?.value(forKey: "payload") as? Data else { throw ScheduleError.missingItem }
-            let next = try TripSchedule.apply(change, to: TripDocument(data: bytes)); try write(next)
+            guard let row = try find(tripID) else { throw ScheduleError.missingItem }
+            try validateWriteAccess(row, context: writeContext)
+            guard let bytes = row.value(forKey: "payload") as? Data else { throw ScheduleError.missingItem }
+            let next = try TripSchedule.apply(change, to: TripDocument(data: bytes)); try write(next, context: writeContext, enqueueSync: true)
             guard let saved = try find(tripID)?.value(forKey: "payload") as? Data, saved == (try next.encoded()) else { throw TripError.invalidDocument }
             return try TripDocument(data: saved)
         }
@@ -209,9 +260,19 @@ public final class TripRepository {
         let target = disposition == .conflict || disposition == .previouslyDeleted ? UUID().uuidString : lookup
         return .init(candidate: candidate, disposition: disposition, targetID: target, expectedExistingHash: existingHash, expectedReceiptHash: receiptHash)
     }
-    private func write(_ trip: TripDocument) throws {
-        let row = try find(trip.id) ?? NSEntityDescription.insertNewObject(forEntityName: "TripRecord", into: context)
+    func write(_ trip: TripDocument, context writeContext: SyncWriteContext = .local, enqueueSync: Bool = false) throws {
+        let existing = try find(trip.id)
+        if let existing { try validateWriteAccess(existing, context: writeContext) }
+        let row = existing ?? NSEntityDescription.insertNewObject(forEntityName: "TripRecord", into: context)
+        if existing == nil { row.setValue(writeContext.userID, forKey: "ownerUserID") }
         row.setValue(trip.id, forKey: "id"); row.setValue(try trip.encoded(), forKey: "payload"); row.setValue(trip.updatedAt, forKey: "updatedAt")
+        if enqueueSync, let userID = row.value(forKey: "ownerUserID") as? String, userID == writeContext.userID {
+            try syncEnqueueWithinTransaction(SyncOperation(
+                userID: userID, recordType: .trip, recordID: trip.id,
+                expectedRevision: syncRevisionWithinTransaction(userID: userID, recordType: .trip, recordID: trip.id),
+                payload: trip.raw, deletedAt: nil
+            ))
+        }
     }
     private func receipt(_ hash: String) throws -> NSManagedObject? {
         let request = NSFetchRequest<NSManagedObject>(entityName: "ImportReceipt"); request.predicate = NSPredicate(format: "sourceHash == %@", hash); request.fetchLimit = 1
@@ -227,7 +288,7 @@ public final class TripRepository {
         let fields: [String: Any] = ["sourceHash": row.value(forKey: "sourceHash")!, "source": TripBackup.hash(source), "targetID": row.value(forKey: "targetID")!, "previous": try history(row), "importedAt": row.value(forKey: "importedAt")!]
         return TripBackup.hash(try JSONSerialization.data(withJSONObject: fields, options: [.sortedKeys]))
     }
-    private func transaction<T>(_ body: () throws -> T) throws -> T {
+    func transaction<T>(_ body: () throws -> T) throws -> T {
         Self.accessLock.lock(); defer { Self.accessLock.unlock() }
         return try context.performAndWait {
             context.reset()
@@ -239,6 +300,25 @@ public final class TripRepository {
     private func find(_ id: String) throws -> NSManagedObject? {
         let request = NSFetchRequest<NSManagedObject>(entityName: "TripRecord")
         request.predicate = NSPredicate(format: "id == %@", id)
+        request.fetchLimit = 1
+        return try context.fetch(request).first
+    }
+
+    private func visibleRecordsPredicate(context writeContext: SyncWriteContext) -> NSPredicate {
+        guard let userID = writeContext.userID else { return NSPredicate(format: "ownerUserID == nil") }
+        return NSPredicate(format: "ownerUserID == nil OR ownerUserID == %@", userID)
+    }
+
+    private func validateWriteAccess(_ row: NSManagedObject, context writeContext: SyncWriteContext) throws {
+        if let owner = row.value(forKey: "ownerUserID") as? String, owner != writeContext.userID {
+            throw SyncError.accountAccessDenied
+        }
+    }
+
+    private func savedPlaceWithSourceKey(_ sourceKey: String, context writeContext: SyncWriteContext) throws -> NSManagedObject? {
+        let request = NSFetchRequest<NSManagedObject>(entityName: "SavedPlaceRecord")
+        request.predicate = NSPredicate(format: "sourceKey == %@ AND ownerUserID == %@", sourceKey, writeContext.userID ?? "")
+        if writeContext.userID == nil { request.predicate = NSPredicate(format: "sourceKey == %@ AND ownerUserID == nil", sourceKey) }
         request.fetchLimit = 1
         return try context.fetch(request).first
     }

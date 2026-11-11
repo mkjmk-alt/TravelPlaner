@@ -1,0 +1,17 @@
+{
+  "user_id": "user-example-7",
+  "record_type": "trip",
+  "record_id": "trip-2026-spring",
+  "payload": {
+    "id": "trip-2026-spring",
+    "name": "교토 봄 여행",
+    "country": "일본",
+    "futureField": {
+      "preserve": true,
+      "source": "web"
+    }
+  },
+  "revision": 0,
+  "updated_at": "2026-10-13T12:30:00.000Z",
+  "deleted_at": null
+}
