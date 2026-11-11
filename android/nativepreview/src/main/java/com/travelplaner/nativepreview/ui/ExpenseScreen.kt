@@ -21,12 +21,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
+import com.travelplaner.nativepreview.data.ExchangeRateClient
+import com.travelplaner.nativepreview.data.ExchangeRateSnapshot
 import com.travelplaner.nativepreview.domain.*
 import kotlinx.serialization.json.*
 import java.util.UUID
 
 private val expenseCurrencies = listOf("KRW", "JPY", "USD", "EUR", "CNY", "VND")
 private val expenseCategories = listOf("food" to "식비", "transport" to "교통", "stay" to "숙박", "shopping" to "쇼핑", "other" to "기타")
+
+private fun exchangeRateDate(timestampMillis: Long): String =
+    java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date(timestampMillis))
 
 private fun JsonObject.string(key: String, fallback: String = "") = this[key]?.jsonPrimitive?.contentOrNull ?: fallback
 private fun JsonObject.int(key: String, fallback: Int = 0) = this[key]?.jsonPrimitive?.intOrNull ?: fallback
@@ -108,8 +113,8 @@ private fun ExpenseEditorDialog(
     onSave: (String, JsonObject) -> Unit,
 ) {
     var amount by rememberSaveable(existing?.string("id")) { mutableStateOf(existing?.double("amount")?.takeIf { it > 0 }?.toString() ?: "") }
-    var amountKrw by rememberSaveable(existing?.string("id")) { mutableStateOf(existing?.int("amountKRW")?.takeIf { it > 0 }?.toString() ?: "") }
-    var currency by rememberSaveable(existing?.string("id")) { mutableStateOf(existing?.string("currency", "KRW") ?: "KRW") }
+    var amountKrw by rememberSaveable(existing?.string("id")) { mutableStateOf(existing?.get("amountKRW")?.jsonPrimitive?.contentOrNull ?: "") }
+    var currency by rememberSaveable(existing?.string("id")) { mutableStateOf(existing?.string("currency", trip.travelCurrency)?.takeIf { it.isNotBlank() } ?: trip.travelCurrency) }
     var category by rememberSaveable(existing?.string("id")) { mutableStateOf(existing?.string("category", "other") ?: "other") }
     var memo by rememberSaveable(existing?.string("id")) { mutableStateOf(existing?.string("memo") ?: "") }
     var payer by rememberSaveable(existing?.string("id")) { mutableStateOf(existing?.string("payerId", "self") ?: "self") }
@@ -117,12 +122,77 @@ private fun ExpenseEditorDialog(
     var availableParticipants by remember(existing?.string("id")) { mutableStateOf(ExpenseSettlement.normalizeParticipants(participants)) }
     var participantName by rememberSaveable(existing?.string("id")) { mutableStateOf("") }
     var validation by remember { mutableStateOf<String?>(null) }
+    val savedRate = existing?.double("exchangeRate")?.takeIf { it.isFinite() && it > 0 }
+    var rate by rememberSaveable(existing?.string("id")) { mutableStateOf(savedRate?.toString() ?: if (currency == "KRW") "1" else "") }
+    var rateMode by rememberSaveable(existing?.string("id")) { mutableStateOf(existing?.string("exchangeRateMode") ?: if (savedRate == null) "automatic" else "manual") }
+    var rateReferenceDate by rememberSaveable(existing?.string("id")) { mutableStateOf(existing?.string("exchangeRateReferenceDate") ?: "") }
+    var rateWasApplied by remember(existing?.string("id")) { mutableStateOf(existing == null && currency == "KRW") }
+    var rateSnapshot by remember { mutableStateOf<ExchangeRateSnapshot?>(null) }
+    var rateStatus by remember { mutableStateOf("자동 환율을 불러오는 중이에요.") }
+    val currencyOptions = listOf(currency, trip.travelCurrency, "KRW", "JPY", "USD", "EUR", "CNY", "VND").distinct()
+
+    fun convertedKrw(amountText: String, rateText: String): String {
+        val amountValue = amountText.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0 } ?: return ""
+        val rateValue = rateText.toDoubleOrNull()?.takeIf { it.isFinite() && it > 0 } ?: return ""
+        val converted = amountValue * rateValue
+        val rounded = kotlin.math.floor(converted + 0.5)
+        if (!rounded.isFinite() || rounded < 0 || rounded > Int.MAX_VALUE.toDouble()) return ""
+        return rounded.toLong().toString()
+    }
+
+    fun applyRate(value: Double?, recalculate: Boolean) {
+        if (value == null || !value.isFinite() || value <= 0) {
+            rate = ""
+            if (recalculate) amountKrw = ""
+            rateStatus = "이 통화의 환율이 없어 직접 입력이 필요해요."
+            return
+        }
+        rate = value.toString()
+        if (rateMode == "automatic") {
+            rateReferenceDate = rateSnapshot?.updatedAtMillis?.let(::exchangeRateDate).orEmpty()
+        }
+        if (recalculate) amountKrw = convertedKrw(amount, rate)
+    }
+
+    LaunchedEffect(existing?.string("id"), trip.id) {
+        try {
+            val snapshot = ExchangeRateClient.latestSnapshot()
+            rateSnapshot = snapshot
+            rateStatus = if (snapshot.isStale) "네트워크 연결이 없어 저장된 환율을 사용해요." else "자동 환율을 적용했어요."
+            if (existing == null) {
+                rateMode = "automatic"
+                applyRate(snapshot.krwPerUnit(currency), recalculate = true)
+                rateWasApplied = true
+            } else if (rate.isBlank()) {
+                rateMode = "automatic"
+                applyRate(snapshot.krwPerUnit(currency), recalculate = rateWasApplied)
+            }
+        } catch (_: Exception) {
+            rateStatus = "환율을 불러오지 못했어요. 환율과 원화 금액을 직접 입력할 수 있어요."
+        }
+    }
+
     AlertDialog(onDismissRequest = onDismiss, title = { Text(if (existing == null) "지출 추가" else "지출 수정") }, text = {
         Column(Modifier.heightIn(max = 560.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            OutlinedTextField(amount, { amount = it }, label = { Text("원래 금액") }, modifier = Modifier.testTag("expense-amount"), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true)
+            OutlinedTextField(amount, { amount = it; rateWasApplied = true; amountKrw = convertedKrw(it, rate) }, label = { Text("원래 금액") }, modifier = Modifier.testTag("expense-amount"), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true)
             Text("사용 통화", style = MaterialTheme.typography.labelLarge)
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) { expenseCurrencies.forEach { code -> FilterChip(selected = currency == code, onClick = { currency = code }, label = { Text(code) }) } }
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) { currencyOptions.forEach { code -> FilterChip(selected = currency == code, onClick = {
+                currency = code
+                rateMode = "automatic"
+                rateWasApplied = true
+                applyRate(rateSnapshot?.krwPerUnit(code) ?: if (code == "KRW") 1.0 else null, recalculate = true)
+            }, label = { Text(code) }) } }
             OutlinedTextField(amountKrw, { amountKrw = it }, label = { Text("KRW 환산 금액") }, modifier = Modifier.testTag("expense-amount-krw"), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
+            OutlinedTextField(rate, { rate = it; rateMode = "manual"; rateReferenceDate = ""; rateWasApplied = true; amountKrw = convertedKrw(amount, it) }, label = { Text("적용 환율 (₩/1단위)") }, modifier = Modifier.testTag("expense-exchange-rate"), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true, enabled = currency != "KRW")
+            Text(when {
+                currency == "KRW" -> "원화 지출은 1 KRW = 1 KRW로 계산해요."
+                rateMode == "manual" && rate.isNotBlank() -> "직접 입력한 환율을 적용하고 있어요."
+                rate.isBlank() -> rateStatus
+                else -> {
+                    val source = if (rateSnapshot?.isStale == true) "저장된 환율" else if (rateReferenceDate.isBlank()) "적용 환율" else "자동 환율"
+                    "$source · 1 $currency = ₩$rate${rateReferenceDate.takeIf { it.isNotBlank() }?.let { " · 기준일 $it" }.orEmpty()}"
+                }
+            }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("카테고리", style = MaterialTheme.typography.labelLarge)
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) { expenseCategories.forEach { (code, label) -> FilterChip(selected = category == code, onClick = { category = code }, label = { Text(label) }) } }
             OutlinedTextField(memo, { memo = it }, label = { Text("메모") }, singleLine = true)
@@ -162,9 +232,17 @@ private fun ExpenseEditorDialog(
         }
     }, confirmButton = { TextButton(onClick = {
         val parsedAmount = amount.toDoubleOrNull(); val parsedKrw = amountKrw.toIntOrNull()
-        if (parsedAmount == null || parsedAmount <= 0 || parsedKrw == null || parsedKrw < 0) { validation = "금액과 KRW 환산 금액을 확인해주세요."; return@TextButton }
+        if (parsedAmount == null || !parsedAmount.isFinite() || parsedAmount <= 0 || parsedKrw == null || parsedKrw < 0) { validation = "금액과 KRW 환산 금액을 확인해주세요."; return@TextButton }
         val ids = availableParticipants.map { it.id }.filter { it in selected || it == payer }.distinct()
-        onSave(existing?.string("id") ?: "expense-${UUID.randomUUID()}", buildJsonObject { put("amount", parsedAmount); put("currency", currency); put("amountKRW", parsedKrw); put("category", category); put("memo", memo); put("payerId", payer); put("participantIds", buildJsonArray { ids.forEach { add(it) } }); put("updatedAt", System.currentTimeMillis()) })
+        val rateValue = rate.toDoubleOrNull()?.takeIf { rateWasApplied && it.isFinite() && it > 0 }
+        onSave(existing?.string("id") ?: "expense-${UUID.randomUUID()}", buildJsonObject {
+            put("amount", parsedAmount); put("currency", currency); put("amountKRW", parsedKrw); put("category", category); put("memo", memo); put("payerId", payer); put("participantIds", buildJsonArray { ids.forEach { add(it) } }); put("updatedAt", System.currentTimeMillis())
+            if (rateValue != null) {
+                put("exchangeRate", rateValue)
+                put("exchangeRateMode", rateMode)
+                put("exchangeRateReferenceDate", if (rateMode == "automatic" && rateReferenceDate.isNotBlank()) JsonPrimitive(rateReferenceDate) else JsonNull)
+            }
+        })
     }, enabled = !busy, modifier = Modifier.testTag("expense-save")) { Text("저장") } }, dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text("취소") } })
 }
 

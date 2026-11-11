@@ -13,6 +13,11 @@ class TripDocument internal constructor(val json: JsonObject) {
     val id: String get() = json.getValue("id").jsonPrimitive.content
     val name: String get() = json.getValue("name").jsonPrimitive.content
     val country: String get() = json.getValue("country").jsonPrimitive.content
+    val travelCurrency: String get() {
+        val settings = json["budgetSettings"] as? JsonObject ?: return "USD"
+        val code = (settings["travelCurrency"] as? JsonPrimitive)?.contentOrNull?.trim()?.uppercase()
+        return code?.takeIf { it.isNotEmpty() } ?: "USD"
+    }
     val startDate: String get() = json.getValue("startDate").jsonPrimitive.content
     val endDate: String get() = json.getValue("endDate").jsonPrimitive.content
     val dayCount: Int get() = json.getValue("itinerary").jsonArray.size

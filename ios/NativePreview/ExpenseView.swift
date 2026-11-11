@@ -117,8 +117,8 @@ struct ExpenseView: View {
                         .toolbar(.hidden, for: .navigationBar)
                 }
             }
-            .sheet(isPresented: $adding) { if let trip { ExpenseEditorView(tripID: trip.id) } }
-            .sheet(isPresented: Binding(get: { editing != nil }, set: { if !$0 { editing = nil } })) { if let trip, let editing { ExpenseEditorView(tripID: trip.id, expense: editing) } }
+            .sheet(isPresented: $adding) { if let trip { ExpenseEditorView(tripID: trip.id, defaultCurrency: trip.travelCurrency) } }
+            .sheet(isPresented: Binding(get: { editing != nil }, set: { if !$0 { editing = nil } })) { if let trip, let editing { ExpenseEditorView(tripID: trip.id, defaultCurrency: trip.travelCurrency, expense: editing) } }
             .alert("저장 오류", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) { Button("확인") { error = nil } } message: { Text(error ?? "") }
             .alert("지출 삭제", isPresented: Binding(get: { pendingDeletion != nil }, set: { if !$0 { pendingDeletion = nil } })) {
                 Button("삭제", role: .destructive) { if let row = pendingDeletion { delete(row) }; pendingDeletion = nil }
@@ -147,32 +147,68 @@ struct ExpenseEditorView: View {
     @State private var participantIDs: Set<String>
     @State private var newParticipantName = ""
     @State private var rate: String
+    @State private var rateMode: String
+    @State private var rateReferenceDate: String
+    @State private var rateWasApplied: Bool
+    @State private var rateSnapshot: ExchangeRateSnapshot?
+    @State private var rateStatus = "자동 환율을 불러오는 중이에요."
     @State private var saving = false
     @State private var error: String?
 
-    init(tripID: String, expense: [String: Any]? = nil) {
+    init(tripID: String, defaultCurrency: String, expense: [String: Any]? = nil) {
         self.tripID = tripID; self.expense = expense
+        let cleanedDefault = defaultCurrency.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        let defaultCode = cleanedDefault.isEmpty ? "USD" : cleanedDefault
         _amount = State(initialValue: expense.map { String(rawDouble($0["amount"])) } ?? "")
         _amountKRW = State(initialValue: expense.map { String(rawInt($0["amountKRW"])) } ?? "")
-        _currency = State(initialValue: expense.map { rawString($0["currency"], fallback: "KRW") } ?? "KRW")
+        _currency = State(initialValue: expense.map { rawString($0["currency"], fallback: defaultCode) } ?? defaultCode)
         _category = State(initialValue: ExpenseCategories.normalize(expense.map { rawString($0["category"], fallback: "other") } ?? "other"))
         _memo = State(initialValue: expense.map { rawString($0["memo"]) } ?? "")
         _payerID = State(initialValue: expense.map { rawString($0["payerId"], fallback: "self") } ?? "self")
         _participantIDs = State(initialValue: Set((expense?["participantIds"] as? [String]) ?? ["self"]))
-        _rate = State(initialValue: expense.map { rawString($0["exchangeRate"]) } ?? "")
+        let savedRate = expense.map { row -> String in
+            if let value = row["exchangeRate"] as? String { return value }
+            if let value = row["exchangeRate"] as? NSNumber { return value.stringValue }
+            return ""
+        } ?? ""
+        _rate = State(initialValue: savedRate.isEmpty && defaultCode == "KRW" ? "1" : savedRate)
+        _rateMode = State(initialValue: expense.map { rawString($0["exchangeRateMode"], fallback: savedRate.isEmpty ? "automatic" : "manual") } ?? "automatic")
+        _rateReferenceDate = State(initialValue: expense.map { rawString($0["exchangeRateReferenceDate"]) } ?? "")
+        _rateWasApplied = State(initialValue: expense == nil && defaultCode == "KRW")
     }
 
     private var trip: TripDocument? { store.trips.first { $0.id == tripID } }
     private var participants: [SettlementParticipant] { trip.map(nativeParticipants) ?? [SettlementParticipant(id: "self", name: "나")] }
+    private var currencyOptions: [String] {
+        [currency, "KRW", "JPY", "USD", "EUR", "CNY", "VND"].reduce(into: []) { result, code in
+            if !code.isEmpty && !result.contains(code) { result.append(code) }
+        }
+    }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section("금액") {
-                    TextField("원래 금액", text: $amount).keyboardType(.decimalPad).accessibilityIdentifier("expenseAmount")
-                    Picker("사용 통화", selection: $currency) { ForEach(expenseCurrencies, id: \.self) { Text($0).tag($0) } }
+                    TextField("원래 금액", text: Binding(get: { amount }, set: { value in
+                        amount = value
+                        rateWasApplied = true
+                        amountKRW = convertedKRW(amount: value, rate: rate)
+                    })).keyboardType(.decimalPad).accessibilityIdentifier("expenseAmount")
+                    Picker("사용 통화", selection: Binding(get: { currency }, set: { code in
+                        currency = code
+                        rateMode = "automatic"
+                        rateWasApplied = true
+                        applyRate(rateSnapshot?.krwPerUnit(for: code) ?? (code == "KRW" ? 1 : nil), recalculate: true)
+                    })) { ForEach(currencyOptions, id: \.self) { Text($0).tag($0) } }
                     TextField("KRW 환산 금액", text: $amountKRW).keyboardType(.numberPad).accessibilityIdentifier("expenseAmountKRW")
-                    TextField("적용 환율(선택)", text: $rate).keyboardType(.decimalPad)
+                    TextField("적용 환율 (₩/1단위)", text: Binding(get: { rate }, set: { value in
+                        rate = value
+                        rateMode = "manual"
+                        rateReferenceDate = ""
+                        rateWasApplied = true
+                        amountKRW = convertedKRW(amount: amount, rate: value)
+                    })).keyboardType(.decimalPad).disabled(currency == "KRW")
+                    Text(rateSummary).font(.footnote).foregroundStyle(NativePreviewTheme.textMuted)
                 }
                 Section("내용") {
                     Picker("카테고리", selection: $category) {
@@ -207,7 +243,57 @@ struct ExpenseEditorView: View {
                 ToolbarItem(placement: .cancellationAction) { Button("취소") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) { Button("저장") { save() }.disabled(saving).accessibilityIdentifier("saveExpense") }
             }
+            .task { await loadExchangeRates() }
         }
+    }
+
+    private var rateSummary: String {
+        if rateMode == "manual", !rate.isEmpty { return "직접 입력한 환율을 적용하고 있어요." }
+        if currency == "KRW" { return "원화 지출은 1 KRW = 1 KRW로 계산해요." }
+        guard let rateValue = Double(rate), rateValue > 0 else { return rateStatus }
+        let source = rateSnapshot?.isStale == true ? "저장된 환율" : (rateReferenceDate.isEmpty ? "적용 환율" : "자동 환율")
+        let date = rateReferenceDate
+        return date.isEmpty
+            ? "\(source) · 1 \(currency) = ₩\(rateValue)"
+            : "\(source) · 1 \(currency) = ₩\(rateValue) · 기준일 \(date)"
+    }
+
+    private func loadExchangeRates() async {
+        do {
+            let snapshot = try await ExchangeRateClient.shared.latestSnapshot()
+            rateSnapshot = snapshot
+            rateStatus = snapshot.isStale ? "네트워크 연결이 없어 저장된 환율을 사용해요." : "자동 환율을 적용했어요."
+            if expense == nil {
+                applyRate(snapshot.krwPerUnit(for: currency), recalculate: true)
+                rateWasApplied = true
+            } else if rate.isEmpty {
+                applyRate(snapshot.krwPerUnit(for: currency), recalculate: rateWasApplied)
+            }
+        } catch {
+            rateStatus = "환율을 불러오지 못했어요. 환율과 원화 금액을 직접 입력할 수 있어요."
+        }
+    }
+
+    private func applyRate(_ value: Double?, recalculate: Bool) {
+        guard let value, value.isFinite, value > 0 else {
+            rate = ""
+            if recalculate { amountKRW = "" }
+            rateStatus = "이 통화의 환율이 없어 직접 입력이 필요해요."
+            return
+        }
+        rate = String(value)
+        if rateMode == "automatic", let rateSnapshot {
+            rateReferenceDate = TripDate.string(rateSnapshot.updatedAt)
+        }
+        if recalculate { amountKRW = convertedKRW(amount: amount, rate: rate) }
+    }
+
+    private func convertedKRW(amount: String, rate: String) -> String {
+        guard let amountValue = Double(amount), amountValue.isFinite,
+              let rateValue = Double(rate), rateValue.isFinite, rateValue > 0 else { return "" }
+        let converted = (amountValue * rateValue).rounded()
+        guard converted.isFinite, converted >= 0, converted < Double(Int.max) else { return "" }
+        return String(Int(converted))
     }
 
     private func addParticipant() {
@@ -233,12 +319,16 @@ struct ExpenseEditorView: View {
     }
 
     private func save() {
-        guard let trip, let numericAmount = Double(amount), numericAmount > 0, let converted = Int(amountKRW), converted >= 0 else { error = "원래 금액과 KRW 환산 금액을 확인해주세요."; return }
+        guard let trip, let numericAmount = Double(amount), numericAmount.isFinite, numericAmount > 0, let converted = Int(amountKRW), converted >= 0 else { error = "원래 금액과 KRW 환산 금액을 확인해주세요."; return }
         var ids = participants.map(\.id).filter { participantIDs.contains($0) }
         if !ids.contains(payerID) { ids.append(payerID) }
         saving = true
         var fields: [String: Any] = ["amount": numericAmount, "currency": currency, "amountKRW": converted, "category": category, "memo": memo, "payerId": payerID, "participantIds": ids, "updatedAt": Date().timeIntervalSince1970 * 1000]
-        if let rateValue = Double(rate), rateValue > 0 { fields["exchangeRate"] = rateValue; fields["exchangeRateMode"] = "manual" }
+        if rateWasApplied, let rateValue = Double(rate), rateValue.isFinite, rateValue > 0 {
+            fields["exchangeRate"] = rateValue
+            fields["exchangeRateMode"] = rateMode
+            fields["exchangeRateReferenceDate"] = rateMode == "automatic" && !rateReferenceDate.isEmpty ? rateReferenceDate as Any : NSNull()
+        }
         do { try store.upsertExpense(tripID: trip.id, expenseID: expense?["id"] as? String ?? UUID().uuidString, fields: fields); dismiss() }
         catch { self.error = error.localizedDescription; saving = false }
     }

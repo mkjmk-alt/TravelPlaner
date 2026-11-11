@@ -17,6 +17,11 @@ public struct TripDocument: Identifiable {
     public var days: [[String: Any]] { raw["itinerary"] as? [[String: Any]] ?? [] }
     public var dayCount: Int { days.count }
     public var country: String { raw["country"] as? String ?? "" }
+    public var travelCurrency: String {
+        let value = (raw["budgetSettings"] as? [String: Any])?["travelCurrency"] as? String
+        let code = value?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() ?? ""
+        return code.isEmpty ? "USD" : code
+    }
     public var startDate: String { raw["startDate"] as? String ?? "" }
     public var endDate: String { raw["endDate"] as? String ?? "" }
     public var updatedAt: Double { (raw["updatedAt"] as? NSNumber)?.doubleValue ?? 0 }
@@ -99,6 +104,7 @@ public struct TripDocument: Identifiable {
 
     public func encoded() throws -> Data { try JSONSerialization.data(withJSONObject: raw, options: [.sortedKeys]) }
 }
+
 
 public enum TripError: LocalizedError {
     case emptyName, invalidDate, reversedDates, tooLong, wouldDiscardPlaces, invalidDocument
