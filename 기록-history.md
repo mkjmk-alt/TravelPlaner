@@ -2364,3 +2364,9 @@
   > 깃 푸시·배포를 마쳤습니다. 지출 일차 드롭다운과 상단 메뉴 수정이 운영 사이트에 반영됐습니다.
   >
   > [TripPlot](https://travelplaner-545.pages.dev/)에서 새로고침해 확인해 주세요. iOS·Android 미커밋 작업은 이번 배포에 포함되지 않았습니다.
+
+
+## 요청 ID: H2nQ6vD9rA
+- 사용자 요청: 아하 전체 깃 푸시 해주고 실 기기에 앱 적용해줘
+- 최종 답변: 웹, 네이티브 동기화 기반, 네이티브 기능 브랜치를 각각 GitHub 원격에 푸시했습니다. iOS 기기 빌드가 성공했고, 실제 iPhone의 기존 TripPlot Native 앱에 업데이트 설치한 뒤 실행을 확인했습니다. 메인 병합과 웹 배포는 하지 않았습니다.
+- 수정 내용: 웹 여행·동기화 변경은 `4487df9` (`codex/web-sync-import-recovery`), 동기화 계약·아웃박스 변경은 `60d5892` (`codex/native-sync-foundation`), 네이티브 앱 기능 변경은 `79c01bf` (`codex/native-sync-foundation-acxvnxs9vw`)로 각각 커밋·푸시했습니다. Xcode 기기용 빌드 성공, 번들 ID `com.travelplaner.app.nativepreview`를 유지해 덮어 설치, 앱 실행 성공.
