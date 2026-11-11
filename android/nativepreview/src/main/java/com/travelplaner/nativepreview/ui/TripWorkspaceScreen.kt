@@ -28,7 +28,7 @@ import kotlin.math.roundToInt
 
 @Composable
 fun TripWorkspaceScreen(trip:TripDocument,state:TripUiState,onBack:()->Unit,onEdit:(ScheduleSection,ItemKey?)->Unit,onChange:(ScheduleChange)->Unit,
-    onSave:suspend (PlaceSelection,PlaceDraft,String)->Unit) {
+    onSave:suspend (PlaceSelection,PlaceDraft,String)->Unit, initialAddDay:Int = -1) {
     BackHandler { onBack() }
     val prefs=LocalContext.current.getSharedPreferences("native.workspace",0); val key="workspace.${trip.id}."
     var ratio by rememberSaveable(trip.id) { mutableDoubleStateOf(SplitLayout.commit(prefs.getFloat(key+"ratio",0.5f).toDouble())) }
@@ -60,6 +60,12 @@ fun TripWorkspaceScreen(trip:TripDocument,state:TripUiState,onBack:()->Unit,onEd
     }
     LaunchedEffect(references) { map.resolveReferences(references) }
     LaunchedEffect(selected) { prefs.edit().putInt(key+"day",selected).apply() }
+    LaunchedEffect(trip.id, initialAddDay) {
+        if (initialAddDay in 1..trip.dayCount) {
+            selected = initialAddDay
+            onEdit(ScheduleSection.Day(initialAddDay), null)
+        }
+    }
     LaunchedEffect(trip.id) {
         val token=prefs.getString(key+"scroll",null)
         val items=runCatching {TripSchedule.items(section(),trip)}.getOrDefault(emptyList())

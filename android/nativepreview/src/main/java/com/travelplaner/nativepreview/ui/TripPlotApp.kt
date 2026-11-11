@@ -154,7 +154,11 @@ fun TripPlotApp(model: TripViewModel, backupModel: TripBackupViewModel, lastLoca
                     composable("trips/list") {
                         TripList(state, model::refresh,
                             onCreate = { nav.navigate("trips/editor/new") },
-                            onOpen = { nav.navigate("trips/detail/" + Uri.encode(it)) })
+                            onOpen = { nav.navigate("trips/detail/" + Uri.encode(it)) },
+                            onQuickAdd = { id, day ->
+                                selectActiveTrip(id)
+                                nav.navigate("trips/itinerary/" + Uri.encode(id) + "?addDay=" + day)
+                            })
                     }
                     composable("trips/detail/{id}", arguments = listOf(navArgument("id") { type = NavType.StringType })) { detail ->
                         val id = detail.arguments?.getString("id")
@@ -177,12 +181,20 @@ fun TripPlotApp(model: TripViewModel, backupModel: TripBackupViewModel, lastLoca
                                 onBackup = { nav.navigate("backup?trip=" + Uri.encode(trip.id)) })
                         }
                     }
-                    composable("trips/itinerary/{id}", arguments = listOf(navArgument("id") { type = NavType.StringType })) { detail ->
+                    composable(
+                        "trips/itinerary/{id}?addDay={addDay}",
+                        arguments = listOf(
+                            navArgument("id") { type = NavType.StringType },
+                            navArgument("addDay") { type = NavType.IntType; defaultValue = -1 },
+                        ),
+                    ) { detail ->
                         val id = detail.arguments?.getString("id")
+                        val addDay = detail.arguments?.getInt("addDay") ?: -1
                         val trip = state.trips.find { it.id == id }
                         if (trip != null) TripWorkspaceScreen(trip, state, { nav.popBackStack() }, { section, key ->
                             nav.navigate("trips/place/" + Uri.encode(trip.id) + "/" + section.token + "/" + Uri.encode(key?.token ?: "new"))
-                        }, { model.applySchedule(trip.id, it) }, {selection,draft,operation -> model.saveFavorite(selection,draft,operation); Unit})
+                        }, { model.applySchedule(trip.id, it) }, {selection,draft,operation -> model.saveFavorite(selection,draft,operation); Unit},
+                            initialAddDay = addDay)
                         else MissingTrip { nav.popBackStack("trips/list", false) }
                     }
                     composable("trips/place/{id}/{section}/{item}", arguments = listOf(navArgument("id") { type = NavType.StringType }, navArgument("section") { type = NavType.IntType }, navArgument("item") { type = NavType.StringType })) { form ->
@@ -267,7 +279,8 @@ private fun tripPhase(trip: TripDocument, today: String): TripCardPhase = when {
 }
 
 @Composable
-private fun TripList(state: TripUiState, retry: () -> Unit, onCreate: () -> Unit, onOpen: (String) -> Unit) {
+private fun TripList(state: TripUiState, retry: () -> Unit, onCreate: () -> Unit, onOpen: (String) -> Unit, onQuickAdd: (String, Int) -> Unit) {
+    var quickAddTripID by rememberSaveable { mutableStateOf<String?>(null) }
     val today = LocalDate.now().toString()
     val ongoing = state.trips.filter { tripPhase(it, today) == TripCardPhase.Ongoing }.sortedBy { it.endDate }
     val upcoming = state.trips.filter { tripPhase(it, today) == TripCardPhase.Upcoming }.sortedBy { it.startDate }
@@ -316,107 +329,158 @@ private fun TripList(state: TripUiState, retry: () -> Unit, onCreate: () -> Unit
                             style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     }
                     item(key = "featured-" + featured.id) {
-                        FeaturedTripCard(featured, tripPhase(featured, today)) { onOpen(featured.id) }
+                        FeaturedTripCard(featured, tripPhase(featured, today),
+                            onOpen = { onOpen(featured.id) },
+                            onQuickAdd = { quickAddTripID = featured.id })
                     }
                 }
                 if (other.isNotEmpty()) {
                     item { Text("다른 여행", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
                     items(other, key = { it.id }) { trip ->
-                        CompactTripCard(trip, tripPhase(trip, today)) { onOpen(trip.id) }
+                        CompactTripCard(trip, tripPhase(trip, today),
+                            onOpen = { onOpen(trip.id) },
+                            onQuickAdd = { quickAddTripID = trip.id })
                     }
                 }
                 if (past.isNotEmpty()) {
                     item { Text("지난 여행", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
                     items(past, key = { it.id }) { trip ->
-                        CompactTripCard(trip, TripCardPhase.Past) { onOpen(trip.id) }
+                        CompactTripCard(trip, TripCardPhase.Past,
+                            onOpen = { onOpen(trip.id) },
+                            onQuickAdd = { quickAddTripID = trip.id })
                     }
                 }
                 item { LocalStorageNote() }
             }
         }
     }
+    quickAddTripID?.let { tripID ->
+        val trip = state.trips.firstOrNull { it.id == tripID }
+        if (trip != null) AlertDialog(
+            onDismissRequest = { quickAddTripID = null },
+            title = { Text("일정을 추가할 날짜") },
+            text = {
+                Column {
+                    Text(trip.name, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
+                        (1..trip.dayCount).forEach { day ->
+                            val date = runCatching { LocalDate.parse(trip.startDate).plusDays((day - 1).toLong()) }.getOrNull()
+                            TextButton(
+                                onClick = {
+                                    quickAddTripID = null
+                                    onQuickAdd(trip.id, day)
+                                },
+                                modifier = Modifier.fillMaxWidth().testTag("quickAddDay-$day"),
+                            ) {
+                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                    Text(if (date == null) "${day}일차 날짜" else "${date.monthValue}월 ${date.dayOfMonth}일")
+                                    Spacer(Modifier.weight(1f))
+                                    Text("${day}일차", color = MaterialTheme.colorScheme.primary)
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { quickAddTripID = null }) { Text("취소") } },
+        )
+    }
 }
 
 @Composable
-private fun FeaturedTripCard(trip: TripDocument, phase: TripCardPhase, onOpen: () -> Unit) {
-    Card(
-        onClick = onOpen,
-        modifier = Modifier.fillMaxWidth().testTag("trip-row-" + trip.id),
-        shape = RoundedCornerShape(26.dp),
-    ) {
-        val featuredGradient = if (isSystemInDarkTheme()) {
-            listOf(Color(0xFF5B21B6), Color(0xFF4338CA))
-        } else {
-            listOf(Color(0xFF6D28D9), Color(0xFF4F46E5))
-        }
-        Box(Modifier.fillMaxWidth().background(Brush.linearGradient(featuredGradient))) {
-            Box(Modifier.align(Alignment.TopEnd).offset(x = 40.dp, y = (-52).dp).size(170.dp)
-                .background(Color.White.copy(alpha = 0.10f), CircleShape))
-            Icon(Icons.Outlined.FlightTakeoff, null, Modifier.align(Alignment.CenterEnd).padding(end = 26.dp).size(70.dp),
-                tint = Color.White.copy(alpha = 0.24f))
-            Column(Modifier.fillMaxWidth().padding(22.dp), verticalArrangement = Arrangement.spacedBy(15.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(trip.country.ifBlank { "여행지 미정" }, style = MaterialTheme.typography.labelLarge,
-                        color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                    Text(if (phase == TripCardPhase.Ongoing) "여행 중" else "예정",
-                        style = MaterialTheme.typography.labelMedium, color = Color.White,
-                        modifier = Modifier.background(Color.White.copy(alpha = 0.18f), RoundedCornerShape(10.dp))
-                            .padding(horizontal = 10.dp, vertical = 6.dp))
-                }
-                Spacer(Modifier.height(16.dp))
-                Text(trip.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold,
-                    color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(trip.startDate.replace("-", ".") + " – " + trip.endDate.replace("-", "."),
-                    style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.9f))
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Outlined.CalendarMonth, null, Modifier.size(17.dp), tint = Color.White)
-                    Spacer(Modifier.width(5.dp))
-                    Text(trip.dayCount.toString() + "일", style = MaterialTheme.typography.labelLarge, color = Color.White)
-                    Spacer(Modifier.weight(1f))
-                    Text("여행 열기", style = MaterialTheme.typography.labelLarge, color = Color.White)
-                    Spacer(Modifier.width(5.dp))
-                    Icon(Icons.AutoMirrored.Outlined.ArrowForward, null, Modifier.size(18.dp), tint = Color.White)
+private fun FeaturedTripCard(trip: TripDocument, phase: TripCardPhase, onOpen: () -> Unit, onQuickAdd: () -> Unit) {
+    Column(Modifier.fillMaxWidth()) {
+        Card(
+            onClick = onOpen,
+            modifier = Modifier.fillMaxWidth().testTag("trip-row-" + trip.id),
+            shape = RoundedCornerShape(26.dp),
+        ) {
+            val featuredGradient = if (isSystemInDarkTheme()) {
+                listOf(Color(0xFF5B21B6), Color(0xFF4338CA))
+            } else {
+                listOf(Color(0xFF6D28D9), Color(0xFF4F46E5))
+            }
+            Box(Modifier.fillMaxWidth().background(Brush.linearGradient(featuredGradient))) {
+                Box(Modifier.align(Alignment.TopEnd).offset(x = 40.dp, y = (-52).dp).size(170.dp)
+                    .background(Color.White.copy(alpha = 0.10f), CircleShape))
+                Icon(Icons.Outlined.FlightTakeoff, null, Modifier.align(Alignment.CenterEnd).padding(end = 26.dp).size(70.dp),
+                    tint = Color.White.copy(alpha = 0.24f))
+                Column(Modifier.fillMaxWidth().padding(22.dp), verticalArrangement = Arrangement.spacedBy(15.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(trip.country.ifBlank { "여행지 미정" }, style = MaterialTheme.typography.labelLarge,
+                            color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                        Text(if (phase == TripCardPhase.Ongoing) "여행 중" else "예정",
+                            style = MaterialTheme.typography.labelMedium, color = Color.White,
+                            modifier = Modifier.background(Color.White.copy(alpha = 0.18f), RoundedCornerShape(10.dp))
+                                .padding(horizontal = 10.dp, vertical = 6.dp))
+                    }
+                    Spacer(Modifier.height(16.dp))
+                    Text(trip.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold,
+                        color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(trip.startDate.replace("-", ".") + " – " + trip.endDate.replace("-", "."),
+                        style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.9f))
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.CalendarMonth, null, Modifier.size(17.dp), tint = Color.White)
+                        Spacer(Modifier.width(5.dp))
+                        Text(trip.dayCount.toString() + "일", style = MaterialTheme.typography.labelLarge, color = Color.White)
+                        Spacer(Modifier.weight(1f))
+                        Text("여행 열기", style = MaterialTheme.typography.labelLarge, color = Color.White)
+                        Spacer(Modifier.width(5.dp))
+                        Icon(Icons.AutoMirrored.Outlined.ArrowForward, null, Modifier.size(18.dp), tint = Color.White)
+                    }
                 }
             }
+        }
+        TextButton(onClick = onQuickAdd, modifier = Modifier.align(Alignment.End).testTag("quickAdd-" + trip.id)) {
+            Icon(Icons.Outlined.CalendarMonth, null)
+            Spacer(Modifier.width(6.dp))
+            Text("일정 추가")
         }
     }
 }
 
 @Composable
-private fun CompactTripCard(trip: TripDocument, phase: TripCardPhase, onOpen: () -> Unit) {
+private fun CompactTripCard(trip: TripDocument, phase: TripCardPhase, onOpen: () -> Unit, onQuickAdd: () -> Unit) {
     val status = when (phase) {
         TripCardPhase.Ongoing -> "여행 중"
         TripCardPhase.Upcoming -> "예정"
         TripCardPhase.Past -> "완료"
     }
-    Card(
-        onClick = onOpen,
-        modifier = Modifier.fillMaxWidth().testTag("trip-row-" + trip.id),
-        shape = RoundedCornerShape(21.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-    ) {
-        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Column(
-                Modifier.size(width = 58.dp, height = 60.dp)
-                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (phase == TripCardPhase.Past) 0.45f else 1f), RoundedCornerShape(16.dp)),
-                verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(trip.startDate.substring(5, 7), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                Text(trip.startDate.substring(8, 10), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary)
+    Column(Modifier.fillMaxWidth()) {
+        Card(
+            onClick = onOpen,
+            modifier = Modifier.fillMaxWidth().testTag("trip-row-" + trip.id),
+            shape = RoundedCornerShape(21.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+        ) {
+            Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Column(
+                    Modifier.size(width = 58.dp, height = 60.dp)
+                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (phase == TripCardPhase.Past) 0.45f else 1f), RoundedCornerShape(16.dp)),
+                    verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(trip.startDate.substring(5, 7), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    Text(trip.startDate.substring(8, 10), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary)
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(trip.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(trip.country.ifBlank { "여행지 미정" } + " · " + trip.dayCount + "일 · " + status,
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(trip.startDate.replace("-", ".") + " – " + trip.endDate.replace("-", "."),
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Icon(Icons.AutoMirrored.Outlined.ArrowForward, "여행 상세 보기", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
             }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(trip.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
-                    maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(trip.country.ifBlank { "여행지 미정" } + " · " + trip.dayCount + "일 · " + status,
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(trip.startDate.replace("-", ".") + " – " + trip.endDate.replace("-", "."),
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            Icon(Icons.AutoMirrored.Outlined.ArrowForward, "여행 상세 보기", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+        }
+        TextButton(onClick = onQuickAdd, modifier = Modifier.align(Alignment.End).testTag("quickAdd-" + trip.id)) {
+            Icon(Icons.Outlined.CalendarMonth, null)
+            Spacer(Modifier.width(6.dp))
+            Text("일정 추가")
         }
     }
 }

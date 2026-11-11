@@ -11,6 +11,7 @@ struct TripListView: View {
     private let onOpenAccount: () -> Void
     @State private var presentedSheet: TripListSheet?
     @State private var actionNotice: TripListActionNotice?
+    @State private var quickAddTarget: QuickAddTarget?
     @State private var path: [String]
     @StateObject private var map = MapConfiguration.makeState()
     @State private var topSafeAreaInset: CGFloat = 0
@@ -44,13 +45,17 @@ struct TripListView: View {
             .ignoresSafeArea(edges: .top)
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: String.self) { id in
-                TripWorkspaceView(tripID: id, onSelectTrip: { selectedID in
+                TripWorkspaceView(
+                    tripID: id,
+                    quickAddDay: quickAddTarget?.tripID == id ? quickAddTarget?.day : nil,
+                    onConsumeQuickAdd: { quickAddTarget = nil },
+                    onSelectTrip: { selectedID in
                     activeTrip = selectedID
                     path = [selectedID]
                 }, onBack: { path = [] })
                     .id(id)
             }
-            .sheet(item: $presentedSheet) { sheet in
+            .sheet(item: $presentedSheet, onDismiss: continueQuickAdd) { sheet in
                 switch sheet {
                 case .newTrip:
                     TripEditorView(original: nil) { id in
@@ -75,6 +80,13 @@ struct TripListView: View {
                         map.focus(marker.coordinate)
                         presentedSheet = nil
                     })
+                case .quickAdd(let tripID):
+                    if let trip = store.trips.first(where: { $0.id == tripID }) {
+                        QuickAddDateSheet(trip: trip, onSelect: { day in
+                            quickAddTarget = QuickAddTarget(tripID: tripID, day: day)
+                            presentedSheet = nil
+                        }, onCancel: { presentedSheet = nil })
+                    }
                 }
             }
             .presentationDragIndicator(.visible)
@@ -203,6 +215,7 @@ struct TripListView: View {
                         .buttonStyle(.plain)
                         .accessibilityValue("대표 여행")
                         .accessibilityIdentifier("trip-\(featuredTrip.trip.id)")
+                        quickAddButton(for: featuredTrip.trip)
                     }
                 }
                 if !otherTrips.isEmpty {
@@ -214,6 +227,7 @@ struct TripListView: View {
                             }
                             .buttonStyle(.plain)
                             .accessibilityIdentifier("trip-\(entry.trip.id)")
+                            quickAddButton(for: entry.trip)
                         }
                     }
                 }
@@ -226,6 +240,7 @@ struct TripListView: View {
                             }
                             .buttonStyle(.plain)
                             .accessibilityIdentifier("trip-\(entry.trip.id)")
+                            quickAddButton(for: entry.trip)
                         }
                     }
                 }
@@ -349,6 +364,28 @@ struct TripListView: View {
     private var featuredTrip: TripListEntry? { groupedTrips.featured }
     private var otherTrips: [TripListEntry] { groupedTrips.other }
     private var pastTrips: [TripListEntry] { groupedTrips.past }
+
+    private func quickAddButton(for trip: TripDocument) -> some View {
+        HStack {
+            Spacer()
+            Button { presentedSheet = .quickAdd(trip.id) } label: {
+                Label("일정 추가", systemImage: "calendar.badge.plus")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(NativePreviewTheme.primary)
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: 40)
+                    .background(NativePreviewTheme.primaryContainer, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("quickAdd-\(trip.id)")
+        }
+    }
+
+    private func continueQuickAdd() {
+        guard let target = quickAddTarget else { return }
+        activeTrip = target.tripID
+        path = [target.tripID]
+    }
 }
 
 private enum TripListSheet: Identifiable {
@@ -357,6 +394,7 @@ private enum TripListSheet: Identifiable {
     case mapSearch
     case savedPlace(String)
     case itineraryPlace(MapMarker)
+    case quickAdd(String)
 
     var id: String {
         switch self {
@@ -365,7 +403,67 @@ private enum TripListSheet: Identifiable {
         case .mapSearch: "map-search"
         case .savedPlace(let id): "saved-\(id)"
         case .itineraryPlace(let marker): "itinerary-\(marker.key)"
+        case .quickAdd(let tripID): "quick-add-\(tripID)"
         }
+    }
+}
+
+private struct QuickAddTarget {
+    let tripID: String
+    let day: Int
+}
+
+private struct QuickAddDateSheet: View {
+    let trip: TripDocument
+    let onSelect: (Int) -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section(trip.name) {
+                    ForEach(1...max(1, trip.dayCount), id: \.self) { day in
+                        Button { onSelect(day) } label: {
+                            HStack {
+                                Text(dateLabel(for: day))
+                                    .foregroundStyle(NativePreviewTheme.textPrimary)
+                                Spacer()
+                                Text("\(day)일차")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(NativePreviewTheme.primary)
+                            }
+                            .frame(minHeight: 36)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("quickAddDay-\(day)")
+                    }
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(NativePreviewTheme.background)
+            .navigationTitle("일정을 추가할 날짜")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("취소", action: onCancel)
+                        .accessibilityIdentifier("cancelQuickAddDate")
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
+
+    private func dateLabel(for day: Int) -> String {
+        guard let start = TripDate.date(trip.startDate),
+              let date = TripDate.calendar.date(byAdding: .day, value: day - 1, to: start) else {
+            return "\(day)일차 날짜"
+        }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ko_KR")
+        formatter.dateFormat = "M월 d일 (E)"
+        return formatter.string(from: date)
     }
 }
 

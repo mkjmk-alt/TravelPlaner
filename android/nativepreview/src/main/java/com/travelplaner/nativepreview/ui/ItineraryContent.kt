@@ -10,20 +10,46 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.travelplaner.nativepreview.domain.*
 import kotlinx.serialization.json.*
+import java.time.LocalDate
+
+private enum class DayTabLabelMode { DATE, ORDINAL }
+
+private fun dayTabTitle(day: Int, trip: TripDocument, mode: DayTabLabelMode): String {
+    if (day == 0) return "예비 목록"
+    if (mode == DayTabLabelMode.DATE) {
+        val date = runCatching { LocalDate.parse(trip.startDate).plusDays((day - 1).toLong()) }.getOrNull()
+        if (date != null) return "${date.monthValue}월 ${date.dayOfMonth}일"
+    }
+    return "${day}일차"
+}
 
 @Composable
 fun ItineraryContent(trip: TripDocument, state: TripUiState, selected:Int, onSelectDay:(Int)->Unit, listState:LazyListState,
     onEdit: (ScheduleSection, ItemKey?) -> Unit, onChange: (ScheduleChange) -> Unit, onShowMap:(ItemKey)->Unit, onSave:(ScheduleSection,ItemKey)->Unit) {
     var pendingDelete by remember { mutableStateOf<ItemKey?>(null) }
+    var dayTabLabelMode by remember(trip.id) { mutableStateOf(DayTabLabelMode.DATE) }
     val section = if (selected == 0) ScheduleSection.Reserve else ScheduleSection.Day(selected.coerceAtMost(trip.dayCount))
     val result = runCatching { TripSchedule.items(section, trip) }
     Column(Modifier.fillMaxSize()) {
-        LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items((0..trip.dayCount).toList()) { day ->
-                FilterChip(selected = selected == day, onClick = { onSelectDay(day) }, label = { Text(if (day == 0) "예비 목록" else "${day}일차") }, modifier = Modifier.testTag(if (day == 0) "section-reserve" else "section-day-$day"))
+        Row(Modifier.fillMaxWidth().padding(end = 12.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            LazyRow(Modifier.weight(1f), contentPadding = PaddingValues(start = 16.dp, end = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items((0..trip.dayCount).toList()) { day ->
+                    FilterChip(selected = selected == day, onClick = { onSelectDay(day) }, label = { Text(dayTabTitle(day, trip, dayTabLabelMode), maxLines = 1) }, modifier = Modifier.testTag(if (day == 0) "section-reserve" else "section-day-$day"))
+                }
+            }
+            OutlinedButton(
+                onClick = { dayTabLabelMode = if (dayTabLabelMode == DayTabLabelMode.DATE) DayTabLabelMode.ORDINAL else DayTabLabelMode.DATE },
+                modifier = Modifier.heightIn(min = 44.dp)
+                    .semantics { contentDescription = if (dayTabLabelMode == DayTabLabelMode.DATE) "일차 표기로 변경" else "날짜 표기로 변경" }
+                    .testTag("toggleDayLabelMode"),
+                contentPadding = PaddingValues(horizontal = 10.dp),
+            ) {
+                Text(if (dayTabLabelMode == DayTabLabelMode.DATE) "1일차" else "날짜", maxLines = 1)
             }
         }
         LazyColumn(Modifier.fillMaxSize().testTag("itinerary-list"), state=listState, contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {

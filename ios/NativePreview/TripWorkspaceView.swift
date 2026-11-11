@@ -8,6 +8,8 @@ struct TripWorkspaceView:View {
     let tripID:String
     let onSelectTrip: (String) -> Void
     let onBack: (() -> Void)?
+    @State private var quickAddDay:Int?
+    private let onConsumeQuickAdd: () -> Void
     @StateObject private var map=MapConfiguration.makeState()
     @State private var ratio:Double
     @State private var interior:Double
@@ -22,10 +24,12 @@ struct TripWorkspaceView:View {
     @State private var deletingTrip = false
     @State private var tripError: String?
     @State private var mapLoadFailed = false
-    init(tripID:String, onSelectTrip: @escaping (String) -> Void = { _ in }, onBack: (() -> Void)? = nil) {
+    init(tripID:String, quickAddDay:Int? = nil, onConsumeQuickAdd: @escaping () -> Void = {}, onSelectTrip: @escaping (String) -> Void = { _ in }, onBack: (() -> Void)? = nil) {
         self.tripID=tripID
+        self.onConsumeQuickAdd = onConsumeQuickAdd
         self.onSelectTrip = onSelectTrip
         self.onBack = onBack
+        _quickAddDay = State(initialValue: quickAddDay)
         let prefs=UserDefaults.standard, key="workspace.\(tripID)."
         _ratio=State(initialValue:SplitLayout.commit(prefs.object(forKey:key+"ratio") as? Double ?? 0.5))
         _interior=State(initialValue:SplitLayout.restore(prefs.object(forKey:key+"interior") as? Double ?? 0.5))
@@ -48,7 +52,8 @@ struct TripWorkspaceView:View {
                     .frame(maxWidth: .infinity, minHeight: 36)
                     .background(NativePreviewTheme.mapAccentContainer)
                     .accessibilityIdentifier("workspaceMapUnavailable")
-                ItineraryContent(tripID:tripID,selected:$selected,scrollToken:$scrollToken,onShowMap:showMap,focusedToken:focusedToken)
+                ItineraryContent(tripID:tripID,selected:$selected,scrollToken:$scrollToken,onShowMap:showMap,focusedToken:focusedToken,
+                                 quickAddDay:quickAddDay,onConsumeQuickAdd:consumeQuickAdd)
             }
         } else {
         GeometryReader { geometry in
@@ -73,7 +78,8 @@ struct TripWorkspaceView:View {
                     if let error=map.error { Text(error).font(.caption).foregroundStyle(.red) }
                 }.frame(width:horizontal ? extent*ratio:nil,height:horizontal ? nil:extent*ratio).contentShape(Rectangle()).clipped().allowsHitTesting(ratio>0).accessibilityHidden(ratio==0)
                 divider(horizontal:horizontal,extent:extent)
-                ItineraryContent(tripID:tripID,selected:$selected,scrollToken:$scrollToken,onShowMap:showMap,focusedToken:focusedToken)
+                ItineraryContent(tripID:tripID,selected:$selected,scrollToken:$scrollToken,onShowMap:showMap,focusedToken:focusedToken,
+                                 quickAddDay:quickAddDay,onConsumeQuickAdd:consumeQuickAdd)
                     .frame(width:horizontal ? extent*(1-ratio):nil,height:horizontal ? nil:extent*(1-ratio)).contentShape(Rectangle()).clipped().allowsHitTesting(ratio<1).accessibilityHidden(ratio==1)
             }
         }
@@ -132,6 +138,10 @@ struct TripWorkspaceView:View {
             .alert("알림", isPresented: Binding(get: { tripError != nil }, set: { if !$0 { tripError = nil } })) {
                 Button("확인") { tripError = nil }
             } message: { Text(tripError ?? "") }
+    }
+    private func consumeQuickAdd() {
+        quickAddDay = nil
+        onConsumeQuickAdd()
     }
     private func divider(horizontal:Bool,extent:Double)->some View {
         let layout=horizontal ? AnyLayout(VStackLayout(spacing:0)):AnyLayout(HStackLayout(spacing:0))

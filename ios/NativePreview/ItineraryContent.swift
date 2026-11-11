@@ -31,6 +31,22 @@ private struct PlaceDeleteTarget {
     let section: ScheduleSection
     let key: ItemKey
 }
+private enum DayTabLabelMode {
+    case date, ordinal
+}
+
+private func dayTabTitle(_ number: Int, trip: TripDocument, mode: DayTabLabelMode) -> String {
+    guard number > 0 else { return "예비 목록" }
+    if mode == .date,
+       let start = TripDate.date(trip.startDate),
+       let date = TripDate.calendar.date(byAdding: .day, value: number - 1, to: start) {
+        let components = TripDate.calendar.dateComponents([.month, .day], from: date)
+        if let month = components.month, let day = components.day {
+            return "\(month)월 \(day)일"
+        }
+    }
+    return "\(number)일차"
+}
 
 struct ItineraryContent: View {
     @EnvironmentObject private var store: NativeTripStore
@@ -39,28 +55,51 @@ struct ItineraryContent: View {
     @Binding var scrollToken:String
     var onShowMap:(ItemKey)->Void
     var focusedToken:String?
+    var quickAddDay:Int? = nil
+    var onConsumeQuickAdd:()->Void = {}
     @State private var editing: PlaceEditTarget?
     @State private var deleting: PlaceDeleteTarget?
     @State private var actionTarget: PlaceActionTarget?
     @State private var pendingAction: PendingPlaceAction?
     @State private var error: String?
+    @State private var dayTabLabelMode: DayTabLabelMode = .date
+    @State private var didOpenQuickAdd = false
     private var trip: TripDocument? { store.trips.first { $0.id == tripID } }
     private var section: ScheduleSection { selected == 0 ? .reserve : .day(selected) }
     var body: some View {
         Group {
             if let trip {
                 VStack(spacing: 0) {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(0...trip.dayCount, id: \.self) { number in
-                                Button(number == 0 ? "예비 목록" : "\(number)일차") { selected = number }
-                                    .buttonStyle(.bordered)
-                                    .tint(number == selected ? NativePreviewTheme.primary : NativePreviewTheme.textMuted)
-                                    .accessibilityIdentifier(number == 0 ? "section-reserve" : "section-day-\(number)")
-                                    .frame(minHeight: 44)
+                    HStack(spacing: 8) {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(0...trip.dayCount, id: \.self) { number in
+                                    Button(number == 0 ? "예비 목록" : dayTabTitle(number, trip: trip, mode: dayTabLabelMode)) { selected = number }
+                                        .buttonStyle(.bordered)
+                                        .tint(number == selected ? NativePreviewTheme.primary : NativePreviewTheme.textMuted)
+                                        .accessibilityIdentifier(number == 0 ? "section-reserve" : "section-day-\(number)")
+                                        .frame(minHeight: 44)
+                                }
                             }
-                        }.padding(.horizontal, NativePreviewTheme.screenPadding)
+                        }
+                        .frame(maxWidth: .infinity)
+                        Button {
+                            dayTabLabelMode = dayTabLabelMode == .date ? .ordinal : .date
+                        } label: {
+                            Label(dayTabLabelMode == .date ? "1일차" : "날짜",
+                                  systemImage: dayTabLabelMode == .date ? "number" : "calendar")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(NativePreviewTheme.primary)
+                                .padding(.horizontal, 10)
+                                .frame(minHeight: 44)
+                                .background(NativePreviewTheme.primaryContainer, in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(dayTabLabelMode == .date ? "일차 표기로 변경" : "날짜 표기로 변경")
+                        .accessibilityHint("일정 탭에 표시하는 날짜와 일차를 바꿉니다.")
+                        .accessibilityIdentifier("toggleDayLabelMode")
                     }
+                    .padding(.horizontal, NativePreviewTheme.screenPadding)
                     .padding(.vertical, 8)
                     .background(NativePreviewTheme.background)
                     ScrollViewReader { proxy in
@@ -148,6 +187,16 @@ struct ItineraryContent: View {
             }
             Button("취소", role: .cancel) { deleting = nil }
         } message: { Text("해당 장소만 일정에서 제거됩니다. 지출 기록은 삭제되지 않습니다.") }
+        .onAppear(perform: openQuickAddIfNeeded)
+        .onChange(of: quickAddDay) { _ in openQuickAddIfNeeded() }
+    }
+    private func openQuickAddIfNeeded() {
+        guard !didOpenQuickAdd, let day = quickAddDay, let trip else { return }
+        let destination = min(max(day, 1), trip.dayCount)
+        selected = destination
+        editing = .init(section: .day(destination), key: nil, draft: .init())
+        didOpenQuickAdd = true
+        onConsumeQuickAdd()
     }
     private func performPendingAction() {
         guard let pending = pendingAction else { return }
