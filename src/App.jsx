@@ -1786,6 +1786,34 @@ function App() {
     return [];
   });
 
+  const tripListToday = formatLocalDate(new Date());
+  const displayedTrips = useMemo(() => {
+    const getSortableStartDate = (value) => {
+      if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return '';
+      const date = new Date(`${value}T00:00:00`);
+      return !Number.isNaN(date.getTime()) && formatLocalDate(date) === value ? value : '';
+    };
+
+    return (trips || [])
+      .map((trip, index) => {
+        const startDate = getSortableStartDate(trip?.startDate);
+        return { trip, index, startDate, upcoming: Boolean(startDate && startDate > tripListToday) };
+      })
+      .sort((first, second) => {
+        if (first.upcoming !== second.upcoming) return first.upcoming ? -1 : 1;
+        if (Boolean(first.startDate) !== Boolean(second.startDate)) return first.startDate ? -1 : 1;
+
+        const dateOrder = first.startDate && second.startDate
+          ? (first.upcoming
+            ? first.startDate.localeCompare(second.startDate)
+            : second.startDate.localeCompare(first.startDate))
+          : 0;
+
+        return dateOrder || first.index - second.index;
+      })
+      .map(({ trip }) => trip);
+  }, [trips, tripListToday]);
+
   const [activeTripId, setActiveTripId] = useState(() => initialNavigationState?.activeTripId || null);
 
   const [exchangeRates, setExchangeRates] = useState({});
@@ -5417,7 +5445,7 @@ function App() {
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {(trips || []).map(trip => {
+                    {displayedTrips.map(trip => {
                       const tripStatus = getTripStatusMeta(trip);
                       return (
                       <div 
