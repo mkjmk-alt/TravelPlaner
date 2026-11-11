@@ -2,7 +2,6 @@ import SwiftUI
 import NativeCore
 
 private let expenseCurrencies = ["KRW", "JPY", "USD", "EUR", "CNY", "VND"]
-private let expenseCategories = [("food", "식비"), ("transport", "교통"), ("stay", "숙박"), ("shopping", "쇼핑"), ("other", "기타")]
 
 private func rawString(_ value: Any?, fallback: String = "") -> String { (value as? String) ?? fallback }
 private func rawInt(_ value: Any?, fallback: Int = 0) -> Int { if let value = value as? NSNumber { return value.intValue }; return Int((value as? String) ?? "") ?? fallback }
@@ -11,6 +10,13 @@ private func walletText(_ row: [String: Any], _ key: String) -> String {
     if let value = row[key] as? String { return value }
     if let value = row[key] as? NSNumber { return String(value.intValue) }
     return ""
+}
+
+private func expenseTitle(_ row: [String: Any]) -> String {
+    let memo = rawString(row["memo"]).trimmingCharacters(in: .whitespacesAndNewlines)
+    if !memo.isEmpty { return memo }
+    let category = ExpenseCategories.normalize(rawString(row["category"]))
+    return ExpenseCategories.all.first(where: { $0.id == category })?.label ?? "기존 분류"
 }
 
 private func nativeParticipants(_ trip: TripDocument) -> [SettlementParticipant] {
@@ -33,6 +39,7 @@ private func nativeExpenses(_ trip: TripDocument) -> [SettlementExpense] {
 struct ExpenseView: View {
     @EnvironmentObject private var store: NativeTripStore
     @Binding var activeTrip: String
+    let onGoToTrips: () -> Void
     @State private var adding = false
     @State private var editing: [String: Any]?
     @State private var pendingDeletion: [String: Any]?
@@ -43,41 +50,71 @@ struct ExpenseView: View {
         NavigationStack {
             Group {
                 if let trip {
-                    List {
-                        Section {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 14) {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("지출").font(.title.bold()).foregroundStyle(NativePreviewTheme.textPrimary)
+                                    Text(trip.name).font(.subheadline).foregroundStyle(NativePreviewTheme.textMuted)
+                                }
+                                Spacer()
+                                Button { adding = true } label: { Label("추가", systemImage: "plus") }
+                                    .buttonStyle(.borderedProminent).tint(NativePreviewTheme.primary)
+                                    .frame(minHeight: 44)
+                                    .accessibilityIdentifier("addExpense")
+                            }
                             Text("원래 금액·통화·환율과 누가 함께 사용했는지 저장해요.")
-                                .font(.footnote).foregroundStyle(.secondary)
-                        }
-                        Section("지출 내역") {
+                                .font(.footnote).foregroundStyle(NativePreviewTheme.textMuted)
+                            Text("지출 내역").font(.headline).foregroundStyle(NativePreviewTheme.textPrimary)
                             let rows = trip.raw["expenses"] as? [[String: Any]] ?? []
-                            if rows.isEmpty { EmptyExpenseView(title: "아직 지출이 없어요", message: "오른쪽 위 + 버튼으로 첫 지출을 추가해보세요.", symbol: "creditcard") }
+                            if rows.isEmpty { EmptyExpenseView(title: "아직 지출이 없어요", message: "추가 버튼으로 첫 지출을 기록해보세요.", symbol: "creditcard").nativeCard() }
                             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                                HStack(spacing: 12) {
                                 Button { editing = row } label: {
                                     HStack {
                                         VStack(alignment: .leading, spacing: 4) {
-                                            Text(rawString(row["memo"], fallback: rawString(row["category"], fallback: "지출"))).font(.headline)
-                                            Text("\(rawString(row["currency"], fallback: "KRW")) \(rawDouble(row["amount"])) · \(rawString(row["payerId"], fallback: "self")) 결제")
-                                                .font(.caption).foregroundStyle(.secondary)
+                                            Text(expenseTitle(row)).font(.headline)
+                                            Text(verbatim: "\(rawString(row["currency"], fallback: "KRW")) \(rawDouble(row["amount"])) · \(rawString(row["payerId"], fallback: "self")) 결제")
+                                                .font(.caption).foregroundStyle(NativePreviewTheme.textMuted)
                                         }
                                         Spacer()
                                         Text("₩\(rawInt(row["amountKRW"]))").font(.subheadline.weight(.semibold))
                                     }
-                                }.buttonStyle(.plain)
-                                    .swipeActions(edge: .trailing) {
-                                        Button(role: .destructive) { pendingDeletion = row } label: { Label("삭제", systemImage: "trash") }
-                                    }
+                                }.buttonStyle(.plain).foregroundStyle(NativePreviewTheme.textPrimary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .accessibilityIdentifier("editExpense-\(rawString(row["id"]))")
+                                Button(role: .destructive) { pendingDeletion = row } label: {
+                                    Image(systemName: "trash")
+                                        .frame(minWidth: 44, minHeight: 44)
+                                }
+                                .accessibilityLabel("지출 삭제")
+                                .accessibilityIdentifier("deleteExpense-\(rawString(row["id"]))")
+                                }.nativeCard(padding: 16)
                             }
-                        }
-                        Section {
-                            NavigationLink { SettlementView(tripID: trip.id) } label: { Label("함께 정산", systemImage: "person.2") }
+                            NavigationLink { SettlementView(tripID: trip.id) } label: {
+                                Label("함께 정산", systemImage: "person.2")
+                                    .frame(maxWidth: .infinity, minHeight: NativePreviewTheme.primaryButtonHeight)
+                            }
+                                .buttonStyle(.borderedProminent).tint(NativePreviewTheme.primary)
                                 .accessibilityIdentifier("openSettlement")
                         }
+                        .padding(.horizontal, NativePreviewTheme.screenPadding)
+                        .padding(.vertical, NativePreviewTheme.sectionSpacing)
                     }
+                    .background(NativePreviewTheme.background)
+                    .accessibilityIdentifier("expense-page")
                     .navigationTitle("지출")
-                    .toolbar { Button { adding = true } label: { Image(systemName: "plus") }.accessibilityIdentifier("addExpense") }
+                    .toolbar(.hidden, for: .navigationBar)
                 } else {
-                    EmptyExpenseView(title: "여행을 먼저 선택해주세요", message: "내 여행 탭에서 여행을 선택하면 지출을 기록할 수 있어요.", symbol: "suitcase")
+                    ScrollView {
+                        TripRequiredBudgetView(onGoToTrips: onGoToTrips)
+                            .padding(.horizontal, NativePreviewTheme.screenPadding)
+                            .padding(.top, 12)
+                    }
+                        .background(NativePreviewTheme.background)
+                        .accessibilityIdentifier("expense-page")
                         .navigationTitle("지출")
+                        .toolbar(.hidden, for: .navigationBar)
                 }
             }
             .sheet(isPresented: $adding) { if let trip { ExpenseEditorView(tripID: trip.id) } }
@@ -108,6 +145,7 @@ struct ExpenseEditorView: View {
     @State private var memo: String
     @State private var payerID: String
     @State private var participantIDs: Set<String>
+    @State private var newParticipantName = ""
     @State private var rate: String
     @State private var saving = false
     @State private var error: String?
@@ -117,7 +155,7 @@ struct ExpenseEditorView: View {
         _amount = State(initialValue: expense.map { String(rawDouble($0["amount"])) } ?? "")
         _amountKRW = State(initialValue: expense.map { String(rawInt($0["amountKRW"])) } ?? "")
         _currency = State(initialValue: expense.map { rawString($0["currency"], fallback: "KRW") } ?? "KRW")
-        _category = State(initialValue: expense.map { rawString($0["category"], fallback: "other") } ?? "other")
+        _category = State(initialValue: ExpenseCategories.normalize(expense.map { rawString($0["category"], fallback: "other") } ?? "other"))
         _memo = State(initialValue: expense.map { rawString($0["memo"]) } ?? "")
         _payerID = State(initialValue: expense.map { rawString($0["payerId"], fallback: "self") } ?? "self")
         _participantIDs = State(initialValue: Set((expense?["participantIds"] as? [String]) ?? ["self"]))
@@ -137,11 +175,22 @@ struct ExpenseEditorView: View {
                     TextField("적용 환율(선택)", text: $rate).keyboardType(.decimalPad)
                 }
                 Section("내용") {
-                    Picker("카테고리", selection: $category) { ForEach(expenseCategories, id: \.0) { Text($0.1).tag($0.0) } }
+                    Picker("카테고리", selection: $category) {
+                        if !ExpenseCategories.all.contains(where: { $0.id == category }) { Text("기존 분류").tag(category) }
+                        ForEach(ExpenseCategories.all, id: \.id) { Text($0.label).tag($0.id) }
+                    }.accessibilityIdentifier("expenseCategory")
                     TextField("메모", text: $memo)
                 }
                 Section("함께 정산") {
                     Picker("지출자", selection: $payerID) { ForEach(participants) { Text($0.name).tag($0.id) } }
+                    HStack {
+                        TextField("지출자 이름 추가", text: $newParticipantName)
+                            .textInputAutocapitalization(.words)
+                            .accessibilityIdentifier("addExpenseParticipantName")
+                        Button("추가") { addParticipant() }
+                            .disabled(newParticipantName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            .accessibilityIdentifier("addExpenseParticipant")
+                    }
                     ForEach(participants) { person in
                         Toggle(person.name, isOn: Binding(get: { participantIDs.contains(person.id) }, set: { enabled in
                             if enabled { participantIDs.insert(person.id) } else if person.id != payerID { participantIDs.remove(person.id) }
@@ -151,11 +200,35 @@ struct ExpenseEditorView: View {
                 }
                 if let error { Text(error).foregroundStyle(.red) }
             }
+            .scrollContentBackground(.hidden)
+            .background(NativePreviewTheme.background)
             .navigationTitle(expense == nil ? "지출 추가" : "지출 수정")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("취소") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) { Button("저장") { save() }.disabled(saving).accessibilityIdentifier("saveExpense") }
             }
+        }
+    }
+
+    private func addParticipant() {
+        let name = newParticipantName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        if let existing = participants.first(where: { $0.name.trimmingCharacters(in: .whitespacesAndNewlines).caseInsensitiveCompare(name) == .orderedSame }) {
+            payerID = existing.id
+            participantIDs.insert(existing.id)
+            newParticipantName = ""
+            return
+        }
+        let participant = SettlementParticipant(id: UUID().uuidString, name: name)
+        let nextParticipants = ExpenseSettlement.normalizeParticipants(participants + [participant])
+        do {
+            try store.updateParticipants(tripID: tripID, participants: nextParticipants.map { ["id": $0.id, "name": $0.name] })
+            payerID = participant.id
+            participantIDs.insert(participant.id)
+            newParticipantName = ""
+            error = nil
+        } catch {
+            self.error = error.localizedDescription
         }
     }
 
@@ -193,7 +266,7 @@ struct SettlementView: View {
     var body: some View {
         List {
             Section("정산 요약") {
-                Text("총 지출 ₩\(summary.totalKRW) · \(summary.expenseCount)건")
+                Text(verbatim: "총 지출 ₩\(summary.totalKRW) · \(summary.expenseCount)건")
                 ForEach(summary.people) { person in
                     HStack { Text(person.name); Spacer(); Text("지불 ₩\(person.paidKRW) · 부담 ₩\(person.shareKRW)"); Text(person.balanceKRW >= 0 ? "+₩\(person.balanceKRW)" : "-₩\(-person.balanceKRW)").foregroundStyle(person.balanceKRW >= 0 ? .green : .red) }
                         .font(.caption)
@@ -227,7 +300,10 @@ struct SettlementView: View {
             }
             if let error { Text(error).foregroundStyle(.red) }
         }
+        .scrollContentBackground(.hidden)
+        .background(NativePreviewTheme.background)
         .navigationTitle("함께 정산")
+        .toolbar(.visible, for: .navigationBar)
         .toolbar { ToolbarItem(placement: .cancellationAction) { Button("닫기") { dismiss() } } }
         .onAppear { selectedCurrency = rawString((trip?.raw["budgetSettings"] as? [String: Any])?["travelCurrency"], fallback: "USD") }
         .alert("지갑 삭제", isPresented: Binding(get: { pendingWalletDeletion != nil }, set: { if !$0 { pendingWalletDeletion = nil } })) {
@@ -270,10 +346,55 @@ private struct EmptyExpenseView: View {
     let message: String
     let symbol: String
     var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: symbol).font(.title2).foregroundStyle(.secondary)
-            Text(title).font(.headline)
-            Text(message).font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
+        VStack(spacing: 12) {
+            Image(systemName: symbol).font(.system(size: 30)).foregroundStyle(NativePreviewTheme.primary)
+                .frame(width: 72, height: 72).background(NativePreviewTheme.primaryContainer, in: Circle())
+            Text(title).font(.headline).foregroundStyle(NativePreviewTheme.textPrimary)
+            Text(message).font(.footnote).foregroundStyle(NativePreviewTheme.textMuted).multilineTextAlignment(.center)
         }.frame(maxWidth: .infinity).padding(.vertical, 18)
+    }
+}
+
+private struct TripRequiredBudgetView: View {
+    let onGoToTrips: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Image(systemName: "airplane")
+                .font(.system(size: 23, weight: .semibold))
+                .foregroundStyle(NativePreviewTheme.primary)
+                .frame(width: 48, height: 48)
+                .background(NativePreviewTheme.primaryContainer, in: RoundedRectangle(cornerRadius: 15))
+            Text("예산·지출")
+                .font(.title2.bold())
+                .foregroundStyle(NativePreviewTheme.textPrimary)
+            Text("여행을 선택하면 예산과 지출을 관리할 수 있어요.")
+                .font(.subheadline)
+                .foregroundStyle(NativePreviewTheme.textMuted)
+            Button(action: onGoToTrips) {
+                Label("내 여행으로 이동", systemImage: "arrow.right")
+                    .font(.subheadline.weight(.heavy))
+                    .foregroundStyle(NativePreviewTheme.onPrimary)
+                    .padding(.horizontal, 16)
+                    .frame(minHeight: 44)
+                    .background(NativePreviewTheme.primary, in: RoundedRectangle(cornerRadius: 13))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("budgetGoToTrips")
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(
+                colors: [NativePreviewTheme.primaryContainer, NativePreviewTheme.card],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(cornerRadius: 22)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 22)
+                .stroke(NativePreviewTheme.primary.opacity(0.2), lineWidth: 1)
+        }
     }
 }

@@ -51,5 +51,6 @@ android/**/build/
 supabase/.temp/
 # Native preview provider credentials: never reuse the web referrer key.
 ios/NativePreview/Map/NativeMaps.local.xcconfig
+ios/NativePreview/Sync/NativeSync.local.xcconfig
 ios/TravelPlaner/Build/Debug.local.xcconfig
 android/native-maps.properties

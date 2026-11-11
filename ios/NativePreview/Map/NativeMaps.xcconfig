@@ -1,2 +1,3 @@
 TRIPPLOT_MAPS_API_KEY =
 #include? "NativeMaps.local.xcconfig"
+#include? "../Sync/NativeSync.local.xcconfig"

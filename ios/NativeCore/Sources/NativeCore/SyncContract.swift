@@ -182,6 +182,7 @@ public struct SyncWriteContext {
 
 public enum SyncError: Error, LocalizedError {
     case invalidRecord
+    case snapshotChanged
     case invalidOperation
     case operationIDReused
     case accountMismatch
@@ -193,6 +194,7 @@ public enum SyncError: Error, LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .invalidRecord: "동기화 레코드 형식이 올바르지 않습니다."
+        case .snapshotChanged: "서버 자료가 변경되어 동기화를 다시 시도합니다."
         case .invalidOperation: "동기화 작업 형식이 올바르지 않습니다."
         case .operationIDReused: "같은 작업 ID가 다른 내용으로 재사용되었습니다."
         case .accountMismatch: "다른 계정이 소유한 데이터는 수정할 수 없습니다."

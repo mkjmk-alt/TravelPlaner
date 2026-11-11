@@ -22,6 +22,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalFocusManager
@@ -35,6 +36,7 @@ import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -45,6 +47,7 @@ import androidx.navigation.compose.*
 import androidx.navigation.navArgument
 import com.travelplaner.nativepreview.domain.*
 import kotlinx.serialization.json.*
+import java.time.LocalDate
 
 private data class Tab(val route: String, val label: String, val icon: ImageVector, val tag: String)
 private val tabs = listOf(
@@ -56,22 +59,26 @@ private val tabs = listOf(
 )
 
 private val lightColors = lightColorScheme(
-    primary = Color(0xFF416C62), onPrimary = Color.White,
-    primaryContainer = Color(0xFFDDECE3), onPrimaryContainer = Color(0xFF193C33),
-    secondary = Color(0xFF667C89), secondaryContainer = Color(0xFFE3EDF3),
-    background = Color(0xFFF8FAF7), surface = Color(0xFFF8FAF7),
-    surfaceContainer = Color(0xFFEEF2ED), surfaceContainerLow = Color(0xFFF1F5EF),
+    primary = Color(0xFF8B5CF6), onPrimary = Color.White,
+    primaryContainer = Color(0xFFF5F3FF), onPrimaryContainer = Color(0xFF4C1D95),
+    secondary = Color(0xFF2563EB), onSecondary = Color.White,
+    secondaryContainer = Color(0xFFF5F3FF),
+    background = Color.White, surface = Color.White,
+    surfaceContainer = Color(0xFFF1F5F9), surfaceContainerLow = Color(0xFFF8FAFC),
     surfaceContainerLowest = Color.White,
-    onSurface = Color(0xFF25372F), onSurfaceVariant = Color(0xFF637269),
-    outlineVariant = Color(0xFFDCE3DC),
+    onSurface = Color(0xFF0F172A), onSurfaceVariant = Color(0xFF64748B),
+    outlineVariant = Color(0xFFE2E8F0),
 )
 private val darkColors = darkColorScheme(
-    primary = Color(0xFFA8D0BD), onPrimary = Color(0xFF17392E),
-    primaryContainer = Color(0xFF315348), onPrimaryContainer = Color(0xFFDDECE3),
-    background = Color(0xFF131B17), surface = Color(0xFF131B17),
-    surfaceContainer = Color(0xFF24312A), surfaceContainerLow = Color(0xFF1C2721),
-    surfaceContainerLowest = Color(0xFF18231D),
-    onSurface = Color(0xFFE0E9E1), onSurfaceVariant = Color(0xFFB0BEB3),
+    primary = Color(0xFFA78BFA), onPrimary = Color(0xFF1E1B4B),
+    primaryContainer = Color(0xFF38245C), onPrimaryContainer = Color(0xFFEDE9FE),
+    secondary = Color(0xFF60A5FA), onSecondary = Color(0xFF0F172A),
+    secondaryContainer = Color(0xFF38245C),
+    background = Color(0xFF0F172A), surface = Color(0xFF0F172A),
+    surfaceContainer = Color(0xFF243041), surfaceContainerLow = Color(0xFF1E293B),
+    surfaceContainerLowest = Color(0xFF1E293B),
+    onSurface = Color(0xFFF8FAFC), onSurfaceVariant = Color(0xFF94A3B8),
+    outlineVariant = Color(0xFF334155),
 )
 
 @Composable
@@ -157,7 +164,14 @@ fun TripPlotApp(model: TripViewModel, backupModel: TripBackupViewModel, lastLoca
                             state.loading -> Loading()
                             state.readError != null -> ReadError(state.readError!!, model::refresh)
                             trip == null -> MissingTrip { nav.popBackStack("trips/list", false) }
-                            else -> TripDetail(trip, onBack = { nav.popBackStack() },
+                            else -> TripDetail(trip, trips = state.trips, onBack = { nav.popBackStack() },
+                                onSelectTrip = { selectedID ->
+                                    selectActiveTrip(selectedID)
+                                    nav.navigate("trips/detail/" + Uri.encode(selectedID)) {
+                                        popUpTo("trips/list")
+                                        launchSingleTop = true
+                                    }
+                                },
                                 onEdit = { nav.navigate("trips/editor/" + Uri.encode(trip.id)) },
                                 onItinerary = { nav.navigate("trips/itinerary/" + Uri.encode(trip.id)) },
                                 onBackup = { nav.navigate("backup?trip=" + Uri.encode(trip.id)) })
@@ -241,23 +255,41 @@ private fun BrandHeader() {
             Icon(Icons.Outlined.Explore, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(25.dp))
         }
         Text("TripPlot", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.weight(1f))
-        Text("미리보기", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
+}
+
+private enum class TripCardPhase { Ongoing, Upcoming, Past }
+
+private fun tripPhase(trip: TripDocument, today: String): TripCardPhase = when {
+    trip.startDate > today -> TripCardPhase.Upcoming
+    trip.endDate < today -> TripCardPhase.Past
+    else -> TripCardPhase.Ongoing
 }
 
 @Composable
 private fun TripList(state: TripUiState, retry: () -> Unit, onCreate: () -> Unit, onOpen: (String) -> Unit) {
+    val today = LocalDate.now().toString()
+    val ongoing = state.trips.filter { tripPhase(it, today) == TripCardPhase.Ongoing }.sortedBy { it.endDate }
+    val upcoming = state.trips.filter { tripPhase(it, today) == TripCardPhase.Upcoming }.sortedBy { it.startDate }
+    val past = state.trips.filter { tripPhase(it, today) == TripCardPhase.Past }.sortedByDescending { it.endDate }
+    val featured = (ongoing + upcoming).firstOrNull()
+    val other = (ongoing + upcoming).filterNot { it.id == featured?.id }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize().testTag("trip-list"),
-        contentPadding = PaddingValues(24.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item { BrandHeader() }
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("나의 다음 여행", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold, modifier = Modifier.semantics { heading() })
-                Text("떠나고 싶은 마음부터, 차근차근.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("내 여행", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f).semantics { heading() })
+                    Text(state.trips.size.toString() + "개", style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Text("떠날 여행을 골라 일정을 이어보세요.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         when {
@@ -278,27 +310,25 @@ private fun TripList(state: TripUiState, retry: () -> Unit, onCreate: () -> Unit
                         Text("여행 이름과 날짜를 정해 보세요.\n로그인 없이 이 기기에 저장돼요.", color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 25.sp)
                     }
                 }
-                if (state.trips.isNotEmpty()) item {
-                    Text("내 여행 · " + state.trips.size, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (featured != null) {
+                    item {
+                        Text(if (tripPhase(featured, today) == TripCardPhase.Ongoing) "지금 여행 중" else "가장 가까운 여행",
+                            style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    }
+                    item(key = "featured-" + featured.id) {
+                        FeaturedTripCard(featured, tripPhase(featured, today)) { onOpen(featured.id) }
+                    }
                 }
-                items(state.trips, key = { it.id }) { trip ->
-                    Card(
-                        onClick = { onOpen(trip.id) },
-                        modifier = Modifier.fillMaxWidth().testTag("trip-row-" + trip.id),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                    ) {
-                        Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(trip.country.ifBlank { "나만의 여행" }, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
-                                Text(trip.dayCount.toString() + "일", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            Text(trip.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(trip.startDate + " → " + trip.endDate, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Icon(Icons.AutoMirrored.Outlined.ArrowForward, "여행 상세 보기", Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-                            }
-                        }
+                if (other.isNotEmpty()) {
+                    item { Text("다른 여행", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
+                    items(other, key = { it.id }) { trip ->
+                        CompactTripCard(trip, tripPhase(trip, today)) { onOpen(trip.id) }
+                    }
+                }
+                if (past.isNotEmpty()) {
+                    item { Text("지난 여행", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
+                    items(past, key = { it.id }) { trip ->
+                        CompactTripCard(trip, TripCardPhase.Past) { onOpen(trip.id) }
                     }
                 }
                 item { LocalStorageNote() }
@@ -308,10 +338,124 @@ private fun TripList(state: TripUiState, retry: () -> Unit, onCreate: () -> Unit
 }
 
 @Composable
-private fun TripDetail(trip: TripDocument, onBack: () -> Unit, onEdit: () -> Unit, onItinerary: () -> Unit, onBackup: () -> Unit) {
+private fun FeaturedTripCard(trip: TripDocument, phase: TripCardPhase, onOpen: () -> Unit) {
+    Card(
+        onClick = onOpen,
+        modifier = Modifier.fillMaxWidth().testTag("trip-row-" + trip.id),
+        shape = RoundedCornerShape(26.dp),
+    ) {
+        val featuredGradient = if (isSystemInDarkTheme()) {
+            listOf(Color(0xFF5B21B6), Color(0xFF4338CA))
+        } else {
+            listOf(Color(0xFF6D28D9), Color(0xFF4F46E5))
+        }
+        Box(Modifier.fillMaxWidth().background(Brush.linearGradient(featuredGradient))) {
+            Box(Modifier.align(Alignment.TopEnd).offset(x = 40.dp, y = (-52).dp).size(170.dp)
+                .background(Color.White.copy(alpha = 0.10f), CircleShape))
+            Icon(Icons.Outlined.FlightTakeoff, null, Modifier.align(Alignment.CenterEnd).padding(end = 26.dp).size(70.dp),
+                tint = Color.White.copy(alpha = 0.24f))
+            Column(Modifier.fillMaxWidth().padding(22.dp), verticalArrangement = Arrangement.spacedBy(15.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(trip.country.ifBlank { "여행지 미정" }, style = MaterialTheme.typography.labelLarge,
+                        color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    Text(if (phase == TripCardPhase.Ongoing) "여행 중" else "예정",
+                        style = MaterialTheme.typography.labelMedium, color = Color.White,
+                        modifier = Modifier.background(Color.White.copy(alpha = 0.18f), RoundedCornerShape(10.dp))
+                            .padding(horizontal = 10.dp, vertical = 6.dp))
+                }
+                Spacer(Modifier.height(16.dp))
+                Text(trip.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold,
+                    color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(trip.startDate.replace("-", ".") + " – " + trip.endDate.replace("-", "."),
+                    style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.9f))
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.CalendarMonth, null, Modifier.size(17.dp), tint = Color.White)
+                    Spacer(Modifier.width(5.dp))
+                    Text(trip.dayCount.toString() + "일", style = MaterialTheme.typography.labelLarge, color = Color.White)
+                    Spacer(Modifier.weight(1f))
+                    Text("여행 열기", style = MaterialTheme.typography.labelLarge, color = Color.White)
+                    Spacer(Modifier.width(5.dp))
+                    Icon(Icons.AutoMirrored.Outlined.ArrowForward, null, Modifier.size(18.dp), tint = Color.White)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompactTripCard(trip: TripDocument, phase: TripCardPhase, onOpen: () -> Unit) {
+    val status = when (phase) {
+        TripCardPhase.Ongoing -> "여행 중"
+        TripCardPhase.Upcoming -> "예정"
+        TripCardPhase.Past -> "완료"
+    }
+    Card(
+        onClick = onOpen,
+        modifier = Modifier.fillMaxWidth().testTag("trip-row-" + trip.id),
+        shape = RoundedCornerShape(21.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+    ) {
+        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Column(
+                Modifier.size(width = 58.dp, height = 60.dp)
+                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (phase == TripCardPhase.Past) 0.45f else 1f), RoundedCornerShape(16.dp)),
+                verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(trip.startDate.substring(5, 7), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                Text(trip.startDate.substring(8, 10), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary)
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(trip.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(trip.country.ifBlank { "여행지 미정" } + " · " + trip.dayCount + "일 · " + status,
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(trip.startDate.replace("-", ".") + " – " + trip.endDate.replace("-", "."),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Icon(Icons.AutoMirrored.Outlined.ArrowForward, "여행 상세 보기", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+        }
+    }
+}
+
+@Composable
+private fun TripDetail(
+    trip: TripDocument,
+    trips: List<TripDocument>,
+    onBack: () -> Unit,
+    onSelectTrip: (String) -> Unit,
+    onEdit: () -> Unit,
+    onItinerary: () -> Unit,
+    onBackup: () -> Unit,
+) {
     BackHandler { onBack() }
+    var selectorExpanded by rememberSaveable(trip.id) { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
-        ScreenHeader("여행 정보", onBack)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            ScreenHeader("여행 정보", onBack)
+            Spacer(Modifier.weight(1f))
+            Box {
+                OutlinedButton(onClick = { selectorExpanded = true }, modifier = Modifier.testTag("trip-selector")) {
+                    Text("여행 선택")
+                }
+                DropdownMenu(expanded = selectorExpanded, onDismissRequest = { selectorExpanded = false }) {
+                    trips.forEach { option ->
+                        DropdownMenuItem(
+                            text = { Text(option.name) },
+                            leadingIcon = if (option.id == trip.id) ({ Icon(Icons.Outlined.Check, contentDescription = null) }) else null,
+                            onClick = {
+                                selectorExpanded = false
+                                if (option.id != trip.id) onSelectTrip(option.id)
+                            },
+                            modifier = Modifier.testTag("trip-choice-${option.id}"),
+                        )
+                    }
+                }
+            }
+        }
         CalmCard {
             Illustration(Icons.Outlined.FlightTakeoff)
             Text(trip.country.ifBlank { "나만의 여행" }, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)

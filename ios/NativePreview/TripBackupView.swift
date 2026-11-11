@@ -59,7 +59,10 @@ struct TripBackupView: View {
                 Text("공유 연결과 관리 권한 정보는 내보내지 않습니다.").font(.footnote).foregroundStyle(.secondary)
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(NativePreviewTheme.background)
         .navigationTitle("여행 백업").navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
         .fileImporter(isPresented: $importing, allowedContentTypes: [.json, .data]) { result in
             switch result {
             case .success(let url):

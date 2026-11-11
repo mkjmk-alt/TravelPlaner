@@ -76,6 +76,8 @@ fun TripBackupScreen(model: TripBackupViewModel, trips: List<TripDocument>, init
         }
     }
     if (choosing) AlertDialog(onDismissRequest = { choosing = false }, title = { Text("내보낼 여행") }, text = {
-        LazyColumn { items(trips.size) { index -> TextButton(onClick = { selected = trips[index].id; choosing = false }) { Text(trips[index].name) } } }
+        LazyColumn(Modifier.testTag("backup-trip-picker-list")) {
+            items(trips.size) { index -> TextButton(onClick = { selected = trips[index].id; choosing = false }) { Text(trips[index].name) } }
+        }
     }, confirmButton = { TextButton(onClick = { choosing = false }) { Text("취소") } })
 }

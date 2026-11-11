@@ -5,27 +5,104 @@ struct SavedPlacesView:View {
     @EnvironmentObject private var store:NativeTripStore
     @State private var adding=false
     @State private var query=""
+    @State private var isSearching=false
+    @FocusState private var searchFocused: Bool
     var body:some View {
         NavigationStack {
-            List {
-                Button { adding=true } label: { Label("장소 직접 등록",systemImage:"plus.circle") }.accessibilityIdentifier("savedPlaceAddManual")
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(spacing: 10) {
+                        Text("저장 장소")
+                            .font(.title.bold())
+                            .foregroundStyle(NativePreviewTheme.textPrimary)
+                        Spacer(minLength: 8)
+                        Button { adding=true } label: {
+                            Image(systemName: "plus")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundStyle(.white)
+                                .frame(width: 44, height: 44)
+                                .background(NativePreviewTheme.favoritesAccent, in: Circle())
+                                .contentShape(Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("장소 직접 등록")
+                        .accessibilityIdentifier("savedPlaceAddManual")
+
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.18)) {
+                                isSearching.toggle()
+                                searchFocused = isSearching
+                                if !isSearching { query = "" }
+                            }
+                        } label: {
+                            Image(systemName: isSearching ? "xmark" : "magnifyingglass")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(NativePreviewTheme.favoritesAccent)
+                                .frame(width: 44, height: 44)
+                                .background(NativePreviewTheme.favoritesContainer, in: Circle())
+                                .contentShape(Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(isSearching ? "검색 닫기" : "장소 검색")
+                        .accessibilityIdentifier("savedPlaceToggleSearch")
+                    }
+                    if isSearching {
+                        TextField("내 이름·메모 검색", text: $query)
+                            .textFieldStyle(.roundedBorder)
+                            .focused($searchFocused)
+                            .accessibilityIdentifier("savedPlaceSearch")
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
                 if let error=store.savedLoadError {
                     Text(error).foregroundStyle(.red)
                     Button("다시 불러오기",action:store.reloadSavedPlaces)
                 } else {
                     let filtered=store.savedPlaces.filter { query.isEmpty || $0.draft.name.localizedCaseInsensitiveContains(query) || $0.draft.memo.localizedCaseInsensitiveContains(query) }
-                    if store.savedPlaces.isEmpty { Text("마음에 드는 장소를 모아두세요. 여행 없이도 저장할 수 있어요.").foregroundStyle(.secondary) }
-                    else if filtered.isEmpty { Text("검색 결과가 없습니다.") }
+                    if store.savedPlaces.isEmpty {
+                        VStack(spacing: 12) {
+                            Image(systemName: "heart")
+                                .font(.system(size: 34, weight: .regular))
+                                .foregroundStyle(NativePreviewTheme.favoritesAccent.opacity(0.48))
+                                .accessibilityIdentifier("savedPlaceEmptyHeart")
+                            Text("저장한 장소가 없습니다")
+                                .font(.headline)
+                                .foregroundStyle(NativePreviewTheme.textMuted)
+                                .accessibilityIdentifier("savedPlaceEmptyMessage")
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 116)
+                        .nativeCard(padding: 16)
+                        .accessibilityElement(children: .contain)
+                        .accessibilityIdentifier("savedPlaceEmptyCard")
+                        .overlay {
+                            RoundedRectangle(cornerRadius: NativePreviewTheme.cardRadius)
+                                .stroke(NativePreviewTheme.favoritesAccent.opacity(0.22), style: StrokeStyle(lineWidth: 1, dash: [6, 5]))
+                        }
+                    } else if filtered.isEmpty { Text("검색 결과가 없습니다.").nativeCard() }
                     ForEach(filtered) { row in
                         NavigationLink { PlaceDetailView(savedID:row.id) } label: {
-                            VStack(alignment:.leading,spacing:6) {
-                                HStack { Text(row.draft.emoji); Text(row.draft.name).font(.headline) }
-                                if !row.draft.memo.isEmpty { Text(row.draft.memo).font(.subheadline).foregroundStyle(.secondary).lineLimit(2) }
-                            }.padding(.vertical,6)
-                        }.accessibilityIdentifier("saved-row-"+row.id)
+                            HStack(spacing: 14) {
+                                Text(row.draft.emoji).font(.title2)
+                                    .frame(width: 48, height: 48)
+                                    .background(NativePreviewTheme.primaryContainer, in: RoundedRectangle(cornerRadius: 15))
+                                VStack(alignment:.leading,spacing:6) {
+                                    Text(row.draft.name).font(.headline).accessibilityIdentifier("saved-row-"+row.id)
+                                    if !row.draft.memo.isEmpty { Text(row.draft.memo).font(.subheadline).foregroundStyle(NativePreviewTheme.textMuted).lineLimit(2) }
+                                }
+                                Spacer(minLength: 0)
+                                Image(systemName: "chevron.right").font(.caption).foregroundStyle(NativePreviewTheme.textMuted)
+                            }
+                            .foregroundStyle(NativePreviewTheme.textPrimary)
+                            .nativeCard()
+                        }.buttonStyle(.plain).accessibilityIdentifier("saved-place-card-"+row.id)
                     }
                 }
-            }.navigationTitle("저장 장소").searchable(text:$query,prompt:"내 이름·메모 검색")
+                }
+                .padding(.horizontal, NativePreviewTheme.screenPadding)
+                .padding(.vertical, NativePreviewTheme.sectionSpacing)
+            }
+            .background(NativePreviewTheme.background)
+            .navigationTitle("저장 장소").navigationBarTitleDisplayMode(.inline)
+            .toolbar(.hidden, for: .navigationBar)
                 .onAppear(perform:store.reloadSavedPlaces)
                 .sheet(isPresented:$adding) { SavedPlaceEditorView() }
         }
@@ -64,7 +141,10 @@ struct SavedPlaceEditorView:View {
                     }
                 }
                 if let error { Text(error).foregroundStyle(.red) }
-            }.navigationTitle(toItinerary ? "일정에 추가할 장소":"장소 저장")
+            }
+            .scrollContentBackground(.hidden)
+            .background(NativePreviewTheme.background)
+            .navigationTitle(toItinerary ? "일정에 추가할 장소":"장소 저장")
                 .toolbar {
                     ToolbarItem(placement:.cancellationAction) { Button("취소") { dismiss() }.disabled(saving) }
                     ToolbarItem(placement:.confirmationAction) { Button("저장",action:save).disabled(saving).accessibilityIdentifier("savedPlaceSave") }

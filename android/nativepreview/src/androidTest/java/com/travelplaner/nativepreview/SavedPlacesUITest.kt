@@ -5,18 +5,33 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.RuleChain
 import java.util.UUID
 
 class SavedPlacesUITest {
-    @get:Rule val rule=createAndroidComposeRule<MainActivity>()
+    private val rule=createAndroidComposeRule<MainActivity>()
+    @get:Rule val rules=RuleChain.outerRule(NativeNavigationTestRule()).around(rule)
+
+    private fun openDetail(name: String) {
+        rule.onNodeWithText(name).performScrollTo().performClick()
+        rule.waitUntil(5_000) { rule.onAllNodesWithText("일정에 추가").fetchSemanticsNodes().isNotEmpty() }
+    }
+
+    private fun waitForSavedPlace(name: String) {
+        rule.waitUntil(5_000) {
+            rule.onAllNodesWithTag("savedPlaceAddManual").fetchSemanticsNodes().isNotEmpty() &&
+                rule.onAllNodesWithText(name).fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
     @Test fun manualSaveAndReturnWithoutKey() {
         rule.waitUntil(10000) { rule.onAllNodesWithTag("tab-saved").fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithTag("tab-saved").performClick()
         rule.onNodeWithTag("savedPlaceAddManual").assertExists().performClick()
         val name="MapQA-" + UUID.randomUUID().toString().take(8)
         rule.onNodeWithTag("savedPlaceName").performTextInput(name)
-        rule.onNodeWithTag("savedPlaceSave").performScrollTo().performClick()
-        rule.waitUntil(5000) { rule.onAllNodesWithText(name).fetchSemanticsNodes().isNotEmpty() }
+        rule.tapSavedPlaceSave()
+        waitForSavedPlace(name)
         rule.onNodeWithTag("tab-map").performClick()
         rule.onNodeWithTag("nativeMapUnavailable").assertExists()
         rule.onNodeWithTag("tab-saved").performClick()
@@ -27,14 +42,14 @@ class SavedPlacesUITest {
         rule.onNodeWithTag("savedPlaceAddManual").performClick()
         val name="CopyQA-"+UUID.randomUUID().toString().take(8)
         rule.onNodeWithTag("savedPlaceName").performTextInput(name)
-        rule.onNodeWithTag("savedPlaceSave").performScrollTo().performClick()
-        rule.waitUntil(5000) { rule.onAllNodesWithText(name).fetchSemanticsNodes().isNotEmpty() }
-        rule.onNodeWithText(name).performClick()
+        rule.tapSavedPlaceSave()
+        waitForSavedPlace(name)
+        openDetail(name)
         rule.onNodeWithText("일정에 추가").performScrollTo().performClick()
         rule.onNodeWithText("새 여행 만들기").assertExists().performClick()
         val trip="DestinationQA-"+UUID.randomUUID().toString().take(8)
         rule.onNodeWithTag("trip-name").performTextReplacement(trip)
-        rule.onNodeWithTag("trip-save").performScrollTo().performClick()
+        rule.tapTripSave()
         rule.waitUntil(5000) { rule.onAllNodesWithTag("destinationConfirm").fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithText(name).assertExists()
         rule.onNodeWithTag("destinationTrip").assertTextContains(trip)
@@ -47,9 +62,9 @@ class SavedPlacesUITest {
         rule.onNodeWithTag("savedPlaceAddManual").performClick()
         val name="BackQA-"+UUID.randomUUID().toString().take(8)
         rule.onNodeWithTag("savedPlaceName").performTextInput(name)
-        rule.onNodeWithTag("savedPlaceSave").performScrollTo().performClick()
-        rule.waitUntil(5000) { rule.onAllNodesWithText(name).fetchSemanticsNodes().isNotEmpty() }
-        rule.onNodeWithText(name).performClick()
+        rule.tapSavedPlaceSave()
+        waitForSavedPlace(name)
+        openDetail(name)
         rule.onNodeWithText("일정에 추가").performScrollTo().performClick()
         rule.onNodeWithTag("destinationTrip").assertExists()
 
@@ -64,9 +79,9 @@ class SavedPlacesUITest {
         rule.onNodeWithTag("savedPlaceAddManual").performClick()
         val name="DetailBackQA-"+UUID.randomUUID().toString().take(8)
         rule.onNodeWithTag("savedPlaceName").performTextInput(name)
-        rule.onNodeWithTag("savedPlaceSave").performScrollTo().performClick()
-        rule.waitUntil(5000) { rule.onAllNodesWithText(name).fetchSemanticsNodes().isNotEmpty() }
-        rule.onNodeWithText(name).performClick()
+        rule.tapSavedPlaceSave()
+        waitForSavedPlace(name)
+        openDetail(name)
         rule.onNodeWithText("일정에 추가").performScrollTo().assertExists()
 
         UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
@@ -80,9 +95,9 @@ class SavedPlacesUITest {
         rule.onNodeWithTag("savedPlaceAddManual").performClick()
         val name="DraftBackQA-"+UUID.randomUUID().toString().take(8)
         rule.onNodeWithTag("savedPlaceName").performTextInput(name)
-        rule.onNodeWithTag("savedPlaceSave").performScrollTo().performClick()
-        rule.waitUntil(5000) { rule.onAllNodesWithText(name).fetchSemanticsNodes().isNotEmpty() }
-        rule.onNodeWithText(name).performClick()
+        rule.tapSavedPlaceSave()
+        waitForSavedPlace(name)
+        openDetail(name)
         rule.onNodeWithText("일정에 추가").performScrollTo().performClick()
         rule.onNodeWithText("새 여행 만들기").assertExists().performClick()
         rule.onNodeWithTag("trip-name").assertExists()

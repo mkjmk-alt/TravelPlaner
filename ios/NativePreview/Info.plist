@@ -16,6 +16,19 @@
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
 	<string>1.0</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.travelplaner.app</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>travelplaner</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
@@ -24,6 +37,10 @@
 	<string>현재 위치 버튼을 누르면 지도에서 내 위치를 확인합니다. 위치를 여행 기록으로 자동 저장하지 않습니다.</string>
 	<key>TripPlotMapsAPIKey</key>
 	<string>$(TRIPPLOT_MAPS_API_KEY)</string>
+	<key>TripPlotSupabaseAnonKey</key>
+	<string>$(TRIPPLOT_SUPABASE_ANON_KEY)</string>
+	<key>TripPlotSupabaseURL</key>
+	<string>$(TRIPPLOT_SUPABASE_URL)</string>
 	<key>UIFileSharingEnabled</key>
 	<true/>
 </dict>

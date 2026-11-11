@@ -1,0 +1,7 @@
+// Copy this file to NativeSync.local.xcconfig and enter only the public project URL
+// and anon/publishable key from Supabase. Never add a service-role key to the app.
+// Build the URL from components so xcconfig does not treat "//" as a comment.
+TRIPPLOT_SUPABASE_SCHEME = https:
+TRIPPLOT_SUPABASE_SLASH = /
+TRIPPLOT_SUPABASE_URL = $(TRIPPLOT_SUPABASE_SCHEME)$(TRIPPLOT_SUPABASE_SLASH)$(TRIPPLOT_SUPABASE_SLASH)YOUR_PROJECT_REF.supabase.co
+TRIPPLOT_SUPABASE_ANON_KEY = YOUR_PUBLIC_ANON_OR_PUBLISHABLE_KEY

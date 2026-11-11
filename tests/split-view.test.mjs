@@ -81,6 +81,10 @@ test('derives save status presentation from initialized sync state', () => {
     label: '저장됨',
     color: '#10b981'
   });
+  assert.deepEqual(getSaveStatusPresentation({ isOnline: true, isLoadingDB: false, syncStatus: 'local-only' }), {
+    label: '기기 저장',
+    color: '#d97706'
+  });
 });
 
 test('supports classic and split display modes with classic as the fallback', () => {

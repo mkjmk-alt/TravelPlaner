@@ -64,6 +64,16 @@ final class TripDocumentTests: XCTestCase {
         }
     }
 
+    func testReadsLegacyTripWithExtraPopulatedDayWithoutDiscardingIt() throws {
+        let trip = try TripDocument.create(draft: draft)
+        var raw = trip.raw
+        raw["itinerary"] = trip.days + [["day": 3, "items": [["id": "extra", "name": "기존 일정"]], "note": "보존"]]
+        let loaded = try TripDocument(data: JSONSerialization.data(withJSONObject: raw))
+        XCTAssertEqual(loaded.days.count, 3)
+        XCTAssertEqual((loaded.days[2]["items"] as? [[String: Any]])?.first?["name"] as? String, "기존 일정")
+        XCTAssertThrowsError(try loaded.edited(draft: loaded.draft))
+    }
+
     func testCannotShrinkDaysWithUnrecognizedMetadata() throws {
         let trip = try TripDocument.create(draft: draft)
         var raw = trip.raw

@@ -10,10 +10,12 @@ import com.travelplaner.nativepreview.ui.*
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.RuleChain
 import java.util.UUID
 
 class SplitWorkspaceUITest {
-    @get:Rule val rule=createAndroidComposeRule<MainActivity>()
+    private val rule=createAndroidComposeRule<MainActivity>()
+    @get:Rule val rules=RuleChain.outerRule(NativeNavigationTestRule()).around(rule)
     @Test fun freeDividerDoesNotFollowListScrollAndRestores() {
         var trip=TripDocument.create(TripDraft("SplitQA","","2026-09-21","2026-09-21"))
         repeat(50) { index -> trip=TripSchedule.apply(ScheduleChange.Add(ScheduleSection.Day(1),UUID.randomUUID().toString(),PlaceDraft(name="Row-$index")),trip) }

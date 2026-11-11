@@ -8,6 +8,7 @@ struct NativeMapPane:View {
     var onSelect:(MapMarker)->Void={_ in}
     var initialCamera:MapCameraSnapshot?=nil
     var onCameraIdle:(MapCameraSnapshot)->Void={_ in}
+    var onUnavailable:()->Void={}
     @State private var ready=false
     @State private var delayed=false
     @State private var retry=0
@@ -28,7 +29,7 @@ struct NativeMapPane:View {
                 .task(id:"\(active)-\(phase)-\(retry)") {
                     guard active,phase == .active,!ready else { return }
                     do { try await Task.sleep(nanoseconds:15000000000) } catch { return }
-                    if !ready { delayed=true }
+                    if !ready { delayed=true; onUnavailable() }
                 }
             } else {
                 VStack(spacing:8) {
@@ -36,8 +37,11 @@ struct NativeMapPane:View {
                     Text("지도 연결 준비 중").font(.headline)
                     Text("네이티브 지도 키가 필요합니다.\n일정과 저장 장소는 계속 사용할 수 있어요.")
                         .font(.caption).multilineTextAlignment(.center)
-                }.padding().frame(maxWidth:.infinity,maxHeight:.infinity)
-                    .background(Color.green.opacity(0.06)).accessibilityIdentifier("nativeMapUnavailable")
+                }
+                .foregroundStyle(NativePreviewTheme.textMuted)
+                .padding().frame(maxWidth:.infinity,maxHeight:.infinity)
+                .background(NativePreviewTheme.mapAccentContainer.opacity(0.45))
+                .accessibilityIdentifier("nativeMapUnavailable")
             }
         }.clipped()
     }

@@ -35,6 +35,15 @@ public final class SyncOutboxRepository {
         }
     }
 
+    public func pendingCount(userID: String) throws -> Int {
+        guard !userID.isEmpty else { return 0 }
+        return try transaction {
+            let request = NSFetchRequest<NSManagedObject>(entityName: "SyncOutboxRecord")
+            request.predicate = NSPredicate(format: "userID == %@", userID)
+            return try context.count(for: request)
+        }
+    }
+
     public func markApplied(operationID: UUID, revision: Int64) throws {
         guard revision >= 0 else { throw SyncError.invalidRecord }
         try transaction {
@@ -46,6 +55,24 @@ public final class SyncOutboxRepository {
                                     recordID: operation.recordID, payload: operation.payload,
                                     revision: revision, updatedAt: Date(), deletedAt: operation.deletedAt)
             try Self.applyRemote(record, in: context)
+            context.delete(row)
+        }
+    }
+
+    public func markApplied(operationID: UUID, serverRecord: SyncRecord) throws {
+        try transaction {
+            guard let row = try Self.find(entity: "SyncOutboxRecord", field: "operationID", value: operationID.uuidString.lowercased(), in: context) else {
+                throw SyncError.missingOperation
+            }
+            let operation = try Self.operation(from: row)
+            guard operation.userID == serverRecord.userID,
+                  operation.recordType == serverRecord.recordType,
+                  operation.recordID == serverRecord.recordID,
+                  serverRecord.revision >= operation.expectedRevision else {
+                throw SyncError.invalidRecord
+            }
+            _ = try serverRecord.encoded()
+            try Self.applyRemote(serverRecord, in: context)
             context.delete(row)
         }
     }
@@ -89,26 +116,49 @@ public final class SyncOutboxRepository {
         }
     }
 
-    public func resolveConflict(id: UUID, choice: SyncConflictChoice) throws {
-        try transaction {
-            guard let row = try Self.find(entity: "SyncConflictRecord", field: "conflictID", value: id.uuidString.lowercased(), in: context) else {
-                throw SyncError.missingConflict
-            }
+    static func hasPendingOrConflict(userID: String, recordType: SyncRecordType, recordID: String,
+                                     in context: NSManagedObjectContext) throws -> Bool {
+        let pending = NSFetchRequest<NSManagedObject>(entityName: "SyncOutboxRecord")
+        pending.predicate = NSPredicate(format: "userID == %@ AND recordType == %@ AND recordID == %@",
+                                        userID, recordType.rawValue, recordID)
+        pending.fetchLimit = 1
+        if try !context.fetch(pending).isEmpty { return true }
+
+        let conflicts = NSFetchRequest<NSManagedObject>(entityName: "SyncConflictRecord")
+        conflicts.predicate = NSPredicate(format: "userID == %@", userID)
+        for row in try context.fetch(conflicts) {
             let conflict = try Self.conflict(from: row)
-            switch choice {
-            case .keepLocal:
-                let retry = SyncOperation(operationID: UUID(), userID: conflict.operation.userID,
-                                          recordType: conflict.operation.recordType,
-                                          recordID: conflict.operation.recordID,
-                                          expectedRevision: conflict.serverRecord.revision,
-                                          payload: conflict.operation.payload,
-                                          deletedAt: conflict.operation.deletedAt)
-                try Self.enqueue(retry, in: context)
-            case .acceptServer:
-                try Self.applyRemote(conflict.serverRecord, in: context)
+            if conflict.operation.recordType == recordType && conflict.operation.recordID == recordID {
+                return true
             }
-            context.delete(row)
         }
+        return false
+    }
+
+    public func resolveConflict(id: UUID, choice: SyncConflictChoice) throws {
+        try transaction { _ = try Self.resolveConflict(id: id, choice: choice, in: context) }
+    }
+
+    static func resolveConflict(id: UUID, choice: SyncConflictChoice,
+                                in context: NSManagedObjectContext) throws -> SyncConflict {
+        guard let row = try find(entity: "SyncConflictRecord", field: "conflictID", value: id.uuidString.lowercased(), in: context) else {
+            throw SyncError.missingConflict
+        }
+        let conflict = try Self.conflict(from: row)
+        switch choice {
+        case .keepLocal:
+            let retry = SyncOperation(operationID: UUID(), userID: conflict.operation.userID,
+                                      recordType: conflict.operation.recordType,
+                                      recordID: conflict.operation.recordID,
+                                      expectedRevision: conflict.serverRecord.revision,
+                                      payload: conflict.operation.payload,
+                                      deletedAt: conflict.operation.deletedAt)
+            try Self.enqueue(retry, in: context)
+        case .acceptServer:
+            try Self.applyRemote(conflict.serverRecord, in: context)
+        }
+        context.delete(row)
+        return conflict
     }
 
     func enqueueSnapshot(userID: String, recordType: SyncRecordType, recordID: String,
@@ -171,7 +221,7 @@ public final class SyncOutboxRepository {
         row.setValue(Date().timeIntervalSince1970, forKey: "createdAt")
     }
 
-    fileprivate static func applyRemote(_ record: SyncRecord, in context: NSManagedObjectContext) throws {
+    static func applyRemote(_ record: SyncRecord, in context: NSManagedObjectContext) throws {
         let existing = try findState(userID: record.userID, recordType: record.recordType, recordID: record.recordID, in: context)
         let previousRevision = existing?.value(forKey: "revision") as? Int64
         if let previousRevision, previousRevision > record.revision { return }
@@ -189,8 +239,8 @@ public final class SyncOutboxRepository {
         row.setValue(record.deletedAt?.timeIntervalSince1970, forKey: "deletedAt")
     }
 
-    fileprivate static func findState(userID: String, recordType: SyncRecordType, recordID: String,
-                                      in context: NSManagedObjectContext) throws -> NSManagedObject? {
+    static func findState(userID: String, recordType: SyncRecordType, recordID: String,
+                          in context: NSManagedObjectContext) throws -> NSManagedObject? {
         let request = NSFetchRequest<NSManagedObject>(entityName: "SyncRecordStateRecord")
         request.predicate = NSPredicate(format: "userID == %@ AND recordType == %@ AND recordID == %@",
                                         userID, recordType.rawValue, recordID)
@@ -198,20 +248,20 @@ public final class SyncOutboxRepository {
         return try context.fetch(request).first
     }
 
-    fileprivate static func find(entity: String, field: String, value: String,
-                                  in context: NSManagedObjectContext) throws -> NSManagedObject? {
+    static func find(entity: String, field: String, value: String,
+                     in context: NSManagedObjectContext) throws -> NSManagedObject? {
         let request = NSFetchRequest<NSManagedObject>(entityName: entity)
         request.predicate = NSPredicate(format: "%K == %@", field, value)
         request.fetchLimit = 1
         return try context.fetch(request).first
     }
 
-    fileprivate static func operation(from row: NSManagedObject) throws -> SyncOperation {
+    static func operation(from row: NSManagedObject) throws -> SyncOperation {
         guard let bytes = row.value(forKey: "body") as? Data else { throw SyncError.invalidOperation }
         return try SyncOperation(data: bytes)
     }
 
-    fileprivate static func conflict(from row: NSManagedObject) throws -> SyncConflict {
+    static func conflict(from row: NSManagedObject) throws -> SyncConflict {
         guard let idString = row.value(forKey: "conflictID") as? String, let id = UUID(uuidString: idString),
               let operationBytes = row.value(forKey: "operation") as? Data,
               let serverBytes = row.value(forKey: "serverRecord") as? Data else { throw SyncError.invalidRecord }
@@ -246,6 +296,20 @@ public final class SyncRecordStateStore {
                                                                recordID: recordID, in: context),
                   let bytes = row.value(forKey: "record") as? Data else { return nil }
             return try SyncRecord(data: bytes)
+        }
+    }
+
+    public func records(userID: String) throws -> [SyncRecord] {
+        guard !userID.isEmpty else { return [] }
+        return try transaction {
+            let request = NSFetchRequest<NSManagedObject>(entityName: "SyncRecordStateRecord")
+            request.predicate = NSPredicate(format: "userID == %@", userID)
+            request.sortDescriptors = [NSSortDescriptor(key: "recordType", ascending: true),
+                                       NSSortDescriptor(key: "recordID", ascending: true)]
+            return try context.fetch(request).compactMap { row in
+                guard let bytes = row.value(forKey: "record") as? Data else { throw SyncError.invalidRecord }
+                return try SyncRecord(data: bytes)
+            }
         }
     }
 

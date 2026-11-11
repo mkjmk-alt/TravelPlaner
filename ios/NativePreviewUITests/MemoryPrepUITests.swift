@@ -3,8 +3,8 @@ import XCTest
 final class MemoryPrepUITests: XCTestCase {
     func testMoreRoutesExposeMemoryPreparationAndDetails() {
         let app = XCUIApplication()
-        app.launch()
-        app.tabBars.buttons["내 여행"].tap()
+        app.launchNativeTest()
+        app.nativeTab("내 여행").tap()
         if !app.buttons["newTripButton"].exists {
             app.navigationBars.buttons.element(boundBy: 0).tap()
         }
@@ -15,9 +15,9 @@ final class MemoryPrepUITests: XCTestCase {
         XCTAssertTrue(nameField.waitForExistence(timeout: 5))
         nameField.tap(); nameField.typeText(name)
         app.buttons["saveTripButton"].tap()
-        XCTAssertTrue(app.buttons["editTripButton"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["tripManagementMenu"].waitForExistence(timeout: 5))
 
-        app.tabBars.buttons["더보기"].tap()
+        app.nativeTab("더보기").tap()
         app.buttons["여행 기록·사진"].tap()
         XCTAssertTrue(app.navigationBars["여행 기록"].waitForExistence(timeout: 5))
         app.navigationBars.buttons.element(boundBy: 0).tap()
@@ -30,15 +30,15 @@ final class MemoryPrepUITests: XCTestCase {
 
     func testMemoryRecordCanEditAndConfirmDelete() {
         let app = XCUIApplication()
-        app.launch()
-        app.tabBars.buttons["내 여행"].tap()
+        app.launchNativeTest()
+        app.nativeTab("내 여행").tap()
         if !app.buttons["newTripButton"].exists { app.navigationBars.buttons.element(boundBy: 0).tap() }
         XCTAssertTrue(app.buttons["newTripButton"].waitForExistence(timeout: 5))
         app.buttons["newTripButton"].tap()
         let tripName = "Memory Edit QA-\(UUID().uuidString.prefix(6))"
         app.textFields["tripNameField"].tap(); app.textFields["tripNameField"].typeText(tripName)
         app.buttons["saveTripButton"].tap()
-        app.tabBars.buttons["더보기"].tap(); app.buttons["여행 기록·사진"].tap()
+        app.nativeTab("더보기").tap(); app.buttons["여행 기록·사진"].tap()
         let title = app.textFields["memory-title"]
         XCTAssertTrue(title.waitForExistence(timeout: 5))
         let originalTitle = "Original Memory-\(UUID().uuidString.prefix(6))"
@@ -62,15 +62,15 @@ final class MemoryPrepUITests: XCTestCase {
 
     func testMemoryDraftRestoresAfterLeavingAndReentering() {
         let app = XCUIApplication()
-        app.launch()
-        app.tabBars.buttons["내 여행"].tap()
+        app.launchNativeTest()
+        app.nativeTab("내 여행").tap()
         if !app.buttons["newTripButton"].exists { app.navigationBars.buttons.element(boundBy: 0).tap() }
         XCTAssertTrue(app.buttons["newTripButton"].waitForExistence(timeout: 5))
         app.buttons["newTripButton"].tap()
         let tripName = "Memory Draft QA-\(UUID().uuidString.prefix(6))"
         app.textFields["tripNameField"].tap(); app.textFields["tripNameField"].typeText(tripName)
         app.buttons["saveTripButton"].tap()
-        app.tabBars.buttons["더보기"].tap(); app.buttons["여행 기록·사진"].tap()
+        app.nativeTab("더보기").tap(); app.buttons["여행 기록·사진"].tap()
         let title = app.textFields["memory-title"]
         XCTAssertTrue(title.waitForExistence(timeout: 5))
         title.tap(); title.typeText("Restored Memory Draft")

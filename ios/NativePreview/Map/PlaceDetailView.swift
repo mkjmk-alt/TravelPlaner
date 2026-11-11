@@ -34,9 +34,15 @@ struct PlaceDetailView:View {
                     Button("일정에 추가") { destination=true }.buttonStyle(.borderedProminent)
                     Button("저장 장소 삭제",role:.destructive) { deleting=true }
                     if let error=error ?? map.error { Text(error).foregroundStyle(.red) }
-                }.padding().frame(maxWidth:.infinity,alignment:.leading)
+                }
+                .padding(.horizontal, NativePreviewTheme.screenPadding)
+                .padding(.vertical, NativePreviewTheme.sectionSpacing)
+                .frame(maxWidth:.infinity,alignment:.leading)
             } else { Text("저장 장소가 삭제되었거나 변경되었습니다.").padding() }
-        }.navigationTitle("장소 상세").navigationBarTitleDisplayMode(.inline)
+        }
+        .background(NativePreviewTheme.background)
+        .navigationTitle("장소 상세").navigationBarTitleDisplayMode(.inline)
+            .toolbar(.visible, for: .navigationBar)
             .sheet(isPresented:$destination) { if let row { PlaceDestinationView(selection:row.selection,draft:row.draft) } }
             .alert("저장 장소를 삭제할까요?",isPresented:$deleting) {
                 Button("삭제",role:.destructive) { do { try store.deleteFavorite(id:savedID); dismiss() } catch { self.error=error.localizedDescription } }

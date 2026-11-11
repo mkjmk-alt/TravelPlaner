@@ -24,7 +24,11 @@ struct TravelPrepView: View {
                 }
             }
             if let error { Text(error).foregroundStyle(.red) }
-        }.navigationTitle("여행 준비")
+        }
+        .scrollContentBackground(.hidden)
+        .background(NativePreviewTheme.background)
+        .navigationTitle("여행 준비")
+        .toolbar(.visible, for: .navigationBar)
     }
     private func add() {
         guard let trip else { return }; let value = newItem.trimmingCharacters(in: .whitespacesAndNewlines)

@@ -2,6 +2,12 @@ import XCTest
 @testable import NativeCore
 
 final class ExpenseSettlementTests: XCTestCase {
+    func testExpenseCategoriesMatchWebAndPreserveLegacyLodging() {
+        XCTAssertEqual(ExpenseCategories.normalize("stay"), "lodging")
+        XCTAssertEqual(ExpenseCategories.normalize("custom-category"), "custom-category")
+        let identifiers = Set(ExpenseCategories.all.map(\.id))
+        XCTAssertEqual(identifiers, Set(["food", "cafe", "transport", "lodging", "flight", "sightseeing", "activity", "shopping", "essentials", "medical", "communication", "insurance", "other"]))
+    }
     func testNormalizesParticipantsAndAlwaysIncludesPayer() throws {
         let people = ExpenseSettlement.normalizeParticipants([
             .init(id: "person-1", name: "민지"),

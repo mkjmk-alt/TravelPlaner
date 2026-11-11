@@ -3,12 +3,17 @@ import SwiftUI
 @main
 struct TripPlotNativePreviewApp: App {
     @StateObject private var store = NativeTripStore()
+    @StateObject private var authStore = NativeAuthStore()
+    @StateObject private var syncCoordinator = NativeSyncCoordinator()
 
     var body: some Scene {
         WindowGroup {
             NativeRootView()
                 .environmentObject(store)
-                .tint(Color(red: 0.49, green: 0.34, blue: 0.87))
+                .environmentObject(authStore)
+                .environmentObject(syncCoordinator)
+                .tint(NativePreviewTheme.primary)
+                .onOpenURL { authStore.handleOpenURL($0) }
         }
     }
 }

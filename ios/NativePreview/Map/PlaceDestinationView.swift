@@ -41,7 +41,10 @@ struct PlaceDestinationView:View {
                         activeTrip=tripID; dismiss(); onAdded()
                     } catch { self.error=error.localizedDescription; saving=false }
                 }.disabled(tripID.isEmpty || saving).accessibilityIdentifier("destinationConfirm")
-            }.navigationTitle("일정에 추가")
+            }
+            .scrollContentBackground(.hidden)
+            .background(NativePreviewTheme.background)
+            .navigationTitle("일정에 추가")
                 .toolbar { ToolbarItem(placement:.cancellationAction) { Button("취소") { dismiss() } } }
                 .onAppear { if tripID.isEmpty && store.trips.contains(where:{$0.id==activeTrip}) { tripID=activeTrip } }
                 .onChange(of:tripID) { _ in day=0 }

@@ -21,6 +21,8 @@ public struct MemoryRowSelector {
 
 public enum MemoryChange {
     case setTravelDetails(values: [String: String], expected: [String: String])
+    case setLodgings(rows: [[String: Any]], expected: [[String: Any]])
+    case addLodgingEvents(row: [String: Any])
     case addChecklist(operationID: String, item: [String: Any])
     case setChecklistChecked(selector: MemoryRowSelector, checked: Bool)
     case removeChecklist(selector: MemoryRowSelector)
@@ -65,6 +67,25 @@ public enum TripMemory {
                 didChange = true
             }
             next["travelDetails"] = details
+
+        case .setLodgings(let newRows, let expected):
+            let existing = try rows(from: next, key: "lodgings")
+            guard JSONEqual.array(existing, expected) else { throw MemoryError.staleSelection }
+            var ids = Set<String>()
+            for row in newRows {
+                guard let id = row["id"] as? String, !id.isEmpty, ids.insert(id).inserted else { throw LodgingError.duplicateID }
+                try TripLodging.validate(row)
+            }
+            guard !JSONEqual.array(existing, newRows) else { return trip }
+            next["lodgings"] = newRows
+            didChange = true
+
+        case .addLodgingEvents(let row):
+            let currentRows = try rows(from: next, key: "lodgings")
+            guard let id = row["id"] as? String,
+                  let current = currentRows.first(where: { ($0["id"] as? String) == id }),
+                  JSONEqual.object(current, row) else { throw MemoryError.staleSelection }
+            return try TripLodging.addEvents(row, to: trip)
 
         case .addChecklist(let operationID, let item):
             var rows = try rows(from: next, key: "checklist")

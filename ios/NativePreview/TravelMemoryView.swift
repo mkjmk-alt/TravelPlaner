@@ -20,6 +20,10 @@ struct TravelMemoryView: View {
     @State private var error: String?
     @State private var draftID = "new"
     @State private var draftPersistenceEnabled = false
+    @State private var savedRecordScrollToken = 0
+    @FocusState private var focusedField: MemoryField?
+
+    private enum MemoryField: Hashable { case date, title, body }
 
     private var trip: TripDocument? { store.trips.first { $0.id == tripID } }
     private var entries: [[String: Any]] { (trip?.raw["journalEntries"] as? [[String: Any]]) ?? [] }
@@ -34,15 +38,19 @@ struct TravelMemoryView: View {
     }
 
     var body: some View {
+        ScrollViewReader { proxy in
         Form {
             Section(isEditing ? "기록 편집" : "새 기록") {
                 TextField("날짜 (선택)", text: $date)
                     .textInputAutocapitalization(.never)
+                    .focused($focusedField, equals: .date)
                     .accessibilityIdentifier("memory-date")
                 TextField("제목", text: $title)
+                    .focused($focusedField, equals: .title)
                     .accessibilityIdentifier("memory-title")
                 TextField("내용", text: $bodyText, axis: .vertical)
                     .lineLimit(3...8)
+                    .focused($focusedField, equals: .body)
                     .accessibilityIdentifier("memory-body")
 
                 if let photoData {
@@ -70,9 +78,11 @@ struct TravelMemoryView: View {
                     }
                 }
 
-                Button(isEditing ? "기록 수정" : "기록 저장") { save() }
-                    .disabled(!canSave)
-                    .accessibilityIdentifier(isEditing ? "memory-edit-save" : "memory-save")
+                if !isEditing {
+                    Button("기록 저장") { save() }
+                        .disabled(!canSave)
+                        .accessibilityIdentifier("memory-save")
+                }
             }
 
             Section("저장한 기록") {
@@ -83,13 +93,32 @@ struct TravelMemoryView: View {
                 ForEach(Array(entries.enumerated()), id: \.offset) { index, entry in
                     memoryRow(index: index, entry: entry)
                 }
-            }
+            }.id("saved-records")
 
             if let error {
                 Text(error).foregroundStyle(.red)
             }
         }
+        .onChange(of: savedRecordScrollToken) { _ in
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(250))
+                withAnimation { proxy.scrollTo("saved-records", anchor: .top) }
+            }
+        }
+        }
+        .scrollContentBackground(.hidden)
+        .background(NativePreviewTheme.background)
         .navigationTitle("여행 기록")
+        .toolbar(.visible, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                if isEditing {
+                    Button("기록 수정") { save() }
+                        .disabled(!canSave)
+                        .accessibilityIdentifier("memory-edit-save")
+                }
+            }
+        }
         .task(id: tripID) { restoreDraft() }
         .onChange(of: date) { _ in persistDraft() }
         .onChange(of: title) { _ in persistDraft() }
@@ -220,7 +249,9 @@ struct TravelMemoryView: View {
                 try store.applyMemoryChange(tripID: trip.id, change: .addJournal(operationID: UUID().uuidString, entry: entry))
                 discardDraft(preserving: stagedPhotoFileName)
             }
+            focusedField = nil
             resetForm()
+            savedRecordScrollToken += 1
         } catch {
             self.error = error.localizedDescription
         }

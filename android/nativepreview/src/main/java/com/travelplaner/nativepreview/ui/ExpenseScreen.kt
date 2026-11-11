@@ -73,7 +73,15 @@ fun ExpenseScreen(state: TripUiState, model: TripViewModel, activeTripID: String
                 item { Button(onClick = { onSettlement(trip.id) }, modifier = Modifier.fillMaxWidth().testTag("open-settlement")) { Icon(Icons.Outlined.Person, null); Spacer(Modifier.width(8.dp)); Text("함께 정산") } }
                 if (state.expenseError != null) item { Text(state.expenseError, color = MaterialTheme.colorScheme.error) }
             }
-            if (showEditor) ExpenseEditorDialog(trip, editing, tripParticipants(trip), onDismiss = { showEditor = false }, onSave = { id, fields -> model.upsertExpense(trip.id, id, fields); showEditor = false })
+            if (showEditor) ExpenseEditorDialog(
+                trip,
+                editing,
+                tripParticipants(trip),
+                busy = state.expenseBusy,
+                onDismiss = { showEditor = false },
+                onAddParticipants = { people, onComplete -> model.updateParticipants(trip.id, people, onComplete) },
+                onSave = { id, fields -> model.upsertExpense(trip.id, id, fields); showEditor = false },
+            )
             pendingDeletion?.let { expenseID ->
                 AlertDialog(
                     onDismissRequest = { pendingDeletion = null },
@@ -90,7 +98,15 @@ fun ExpenseScreen(state: TripUiState, model: TripViewModel, activeTripID: String
 }
 
 @Composable
-private fun ExpenseEditorDialog(trip: TripDocument, existing: JsonObject?, participants: List<SettlementParticipant>, onDismiss: () -> Unit, onSave: (String, JsonObject) -> Unit) {
+private fun ExpenseEditorDialog(
+    trip: TripDocument,
+    existing: JsonObject?,
+    participants: List<SettlementParticipant>,
+    busy: Boolean,
+    onDismiss: () -> Unit,
+    onAddParticipants: (JsonArray, (Boolean, String?) -> Unit) -> Unit,
+    onSave: (String, JsonObject) -> Unit,
+) {
     var amount by rememberSaveable(existing?.string("id")) { mutableStateOf(existing?.double("amount")?.takeIf { it > 0 }?.toString() ?: "") }
     var amountKrw by rememberSaveable(existing?.string("id")) { mutableStateOf(existing?.int("amountKRW")?.takeIf { it > 0 }?.toString() ?: "") }
     var currency by rememberSaveable(existing?.string("id")) { mutableStateOf(existing?.string("currency", "KRW") ?: "KRW") }
@@ -98,6 +114,8 @@ private fun ExpenseEditorDialog(trip: TripDocument, existing: JsonObject?, parti
     var memo by rememberSaveable(existing?.string("id")) { mutableStateOf(existing?.string("memo") ?: "") }
     var payer by rememberSaveable(existing?.string("id")) { mutableStateOf(existing?.string("payerId", "self") ?: "self") }
     var selected by remember(existing?.string("id")) { mutableStateOf((existing?.get("participantIds")?.jsonArray?.map { it.jsonPrimitive.content } ?: listOf("self")).toSet()) }
+    var availableParticipants by remember(existing?.string("id")) { mutableStateOf(ExpenseSettlement.normalizeParticipants(participants)) }
+    var participantName by rememberSaveable(existing?.string("id")) { mutableStateOf("") }
     var validation by remember { mutableStateOf<String?>(null) }
     AlertDialog(onDismissRequest = onDismiss, title = { Text(if (existing == null) "지출 추가" else "지출 수정") }, text = {
         Column(Modifier.heightIn(max = 560.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -109,18 +127,45 @@ private fun ExpenseEditorDialog(trip: TripDocument, existing: JsonObject?, parti
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) { expenseCategories.forEach { (code, label) -> FilterChip(selected = category == code, onClick = { category = code }, label = { Text(label) }) } }
             OutlinedTextField(memo, { memo = it }, label = { Text("메모") }, singleLine = true)
             Text("누가 결제했나요?", style = MaterialTheme.typography.labelLarge)
-            participants.forEach { person -> Row(verticalAlignment = Alignment.CenterVertically) { RadioButton(payer == person.id, { payer = person.id; selected = selected + person.id }); Text(person.name) } }
+            availableParticipants.forEach { person -> Row(verticalAlignment = Alignment.CenterVertically) { RadioButton(payer == person.id, { payer = person.id; selected = selected + person.id }, enabled = !busy); Text(person.name) } }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(participantName, { participantName = it }, label = { Text("지출자 이름 추가") }, modifier = Modifier.weight(1f), singleLine = true, enabled = !busy)
+                Button(onClick = {
+                    val name = participantName.trim()
+                    if (name.isBlank()) return@Button
+                    val existingPerson = availableParticipants.firstOrNull { it.name.trim().equals(name, ignoreCase = true) }
+                    if (existingPerson != null) {
+                        payer = existingPerson.id
+                        selected = selected + existingPerson.id
+                        participantName = ""
+                        return@Button
+                    }
+                    val person = SettlementParticipant("person-${UUID.randomUUID()}", name)
+                    val next = ExpenseSettlement.normalizeParticipants(availableParticipants + person)
+                    onAddParticipants(next.participantsToJson()) { saved, message ->
+                        if (saved) {
+                            availableParticipants = next
+                            payer = person.id
+                            selected = selected + person.id
+                            participantName = ""
+                            validation = null
+                        } else {
+                            validation = message ?: "지출자를 저장하지 못했어요. 다시 시도해주세요."
+                        }
+                    }
+                }, enabled = !busy && participantName.isNotBlank()) { Text(if (busy) "저장 중" else "추가") }
+            }
             Text("함께 사용한 사람", style = MaterialTheme.typography.labelLarge)
-            participants.forEach { person -> Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(selected.contains(person.id), { checked -> if (checked || person.id == payer) selected = selected + person.id else selected = selected - person.id }); Text(person.name) } }
+            availableParticipants.forEach { person -> Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(selected.contains(person.id), { checked -> if (checked || person.id == payer) selected = selected + person.id else selected = selected - person.id }, enabled = !busy); Text(person.name) } }
             Text("지출자는 자동 포함되어 선택한 사람 수로 1/n 정산합니다.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             validation?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }
     }, confirmButton = { TextButton(onClick = {
         val parsedAmount = amount.toDoubleOrNull(); val parsedKrw = amountKrw.toIntOrNull()
         if (parsedAmount == null || parsedAmount <= 0 || parsedKrw == null || parsedKrw < 0) { validation = "금액과 KRW 환산 금액을 확인해주세요."; return@TextButton }
-        val ids = participants.map { it.id }.filter { it in selected || it == payer }.distinct()
+        val ids = availableParticipants.map { it.id }.filter { it in selected || it == payer }.distinct()
         onSave(existing?.string("id") ?: "expense-${UUID.randomUUID()}", buildJsonObject { put("amount", parsedAmount); put("currency", currency); put("amountKRW", parsedKrw); put("category", category); put("memo", memo); put("payerId", payer); put("participantIds", buildJsonArray { ids.forEach { add(it) } }); put("updatedAt", System.currentTimeMillis()) })
-    }, modifier = Modifier.testTag("expense-save")) { Text("저장") } }, dismissButton = { TextButton(onClick = onDismiss) { Text("취소") } })
+    }, enabled = !busy, modifier = Modifier.testTag("expense-save")) { Text("저장") } }, dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text("취소") } })
 }
 
 @Composable

@@ -104,7 +104,7 @@ fun TravelMemoryScreen(trip: TripDocument, model: TripViewModel, onBack: () -> U
         restoringDraft = false
     }
 
-    LaunchedEffect(date, title, body, editingIndex, removePhoto, stagedPhotoFileName) {
+    LaunchedEffect(date, title, body, editingIndex, removePhoto, stagedPhotoFileName, restoringDraft) {
         if (!restoringDraft && hasDraftContent) {
             val draft = JournalEditorDraft(
                 tripId = trip.id,
@@ -141,7 +141,11 @@ fun TravelMemoryScreen(trip: TripDocument, model: TripViewModel, onBack: () -> U
 
     Column(Modifier.fillMaxSize().padding(20.dp)) {
         ScreenHeader("여행 기록", onBack)
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(vertical = 16.dp)) {
+        LazyColumn(
+            modifier = Modifier.testTag("memory-list"),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(vertical = 16.dp),
+        ) {
             item {
                 Card {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {

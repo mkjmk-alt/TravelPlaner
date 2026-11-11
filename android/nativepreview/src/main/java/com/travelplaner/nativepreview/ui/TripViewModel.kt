@@ -106,7 +106,7 @@ class TripViewModel(private val repository: TripRepository, private val savedSta
     fun upsertExpense(tripID: String, expenseID: String, fields: JsonObject) = mutateExpense { repository.upsertExpense(tripID, expenseID, fields) }
     fun deleteExpense(tripID: String, expenseID: String) = mutateExpense { repository.deleteExpense(tripID, expenseID) }
     fun updateBudgetSettings(tripID: String, values: JsonObject) = mutateExpense { repository.updateBudgetSettings(tripID, values) }
-    fun updateParticipants(tripID: String, participants: JsonArray) = mutateExpense { repository.updateSettlementParticipants(tripID, participants) }
+    fun updateParticipants(tripID: String, participants: JsonArray, onComplete: (Boolean, String?) -> Unit = { _, _ -> }) = mutateExpense(onComplete) { repository.updateSettlementParticipants(tripID, participants) }
     fun applyMemoryChange(tripID: String, change: MemoryChange, photoBytes: ByteArray? = null, stagedPhotoFileName: String? = null, onComplete: (Boolean) -> Unit = {}) {
         if (state.value.expenseBusy) return
         mutableState.update { it.copy(expenseBusy = true, expenseError = null) }
@@ -209,18 +209,24 @@ class TripViewModel(private val repository: TripRepository, private val savedSta
         }
     }
     fun clearExpenseError() { mutableState.update { it.copy(expenseError = null) } }
-    private fun mutateExpense(operation: suspend () -> TripDocument) {
-        if (state.value.expenseBusy) return
+    private fun mutateExpense(onComplete: (Boolean, String?) -> Unit = { _, _ -> }, operation: suspend () -> TripDocument) {
+        if (state.value.expenseBusy) {
+            onComplete(false, "다른 변경사항을 저장 중이에요. 잠시 후 다시 시도해주세요.")
+            return
+        }
         mutableState.update { it.copy(expenseBusy = true, expenseError = null) }
         viewModelScope.launch {
             operations.withLock {
                 try {
                     val trip = operation()
                     mutableState.update { it.copy(trips = it.trips.filterNot { old -> old.id == trip.id } + trip, expenseBusy = false) }
+                    onComplete(true, null)
                 } catch (error: CancellationException) {
                     mutableState.update { it.copy(expenseBusy = false) }; throw error
                 } catch (error: Exception) {
-                    mutableState.update { it.copy(expenseBusy = false, expenseError = error.message ?: "지출 정보를 저장하지 못했어요.") }
+                    val message = error.message ?: "지출 정보를 저장하지 못했어요."
+                    mutableState.update { it.copy(expenseBusy = false, expenseError = message) }
+                    onComplete(false, message)
                 }
             }
         }

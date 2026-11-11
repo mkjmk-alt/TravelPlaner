@@ -152,19 +152,40 @@ test('rejects an invalid supplied session instead of creating anonymously', asyn
 
 test('patches only trip_data for the exact shared id', async () => {
   const originalFetch = globalThis.fetch;
-  let captured;
+  const managementToken = 'patch-owner-token';
+  const calls = [];
   globalThis.fetch = async (input, options = {}) => {
-    captured = { url: new URL(String(input)), options };
-    return jsonResponse([{ id: tripId, trip_data: tripData, updated_at: '2026-09-01T00:00:00Z' }]);
+    const url = new URL(String(input));
+    calls.push({ url, options });
+    if (url.pathname === '/rest/v1/rpc/apply_shared_trip_operation') {
+      return jsonResponse({
+        status: 'applied',
+        trip: { id: tripId, trip_data: tripData, updated_at: '2026-09-01T00:00:00Z', revision: 2, deleted_at: null }
+      });
+    }
+    return jsonResponse([{
+      id: tripId,
+      owner_id: null,
+      management_token_hash: await hashToken(managementToken),
+      revision: 1,
+      deleted_at: null
+    }]);
   };
   try {
     const response = await onRequestPatch({
-      request: makeRequest('PATCH', { id: tripId, body: { trip_data: tripData } }),
+      request: makeRequest('PATCH', { id: tripId, managementToken, body: { trip_data: tripData } }),
       env
     });
     assert.equal(response.status, 200);
-    assert.equal(captured.url.searchParams.get('id'), `eq.${tripId}`);
-    assert.deepEqual(JSON.parse(captured.options.body), { trip_data: tripData });
+    assert.equal(calls.length, 2);
+    assert.equal(calls[0].url.searchParams.get('select'), 'id,owner_id,management_token_hash,revision,deleted_at');
+    assert.equal(calls[1].url.pathname, '/rest/v1/rpc/apply_shared_trip_operation');
+    const operation = JSON.parse(calls[1].options.body);
+    assert.equal(operation.p_trip_id, tripId);
+    assert.equal(operation.p_expected_revision, 1);
+    assert.equal(operation.p_operation_type, 'update');
+    assert.deepEqual(operation.p_trip_data, tripData);
+    assert.match(operation.p_operation_id, /^[0-9a-f-]{36}$/i);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -199,11 +220,15 @@ test('deletes a shared trip with its creator management token', async () => {
   globalThis.fetch = async (input, options = {}) => {
     const url = new URL(String(input));
     calls.push({ url, options });
-    if (options.method === 'DELETE') return jsonResponse([{ id: tripId }]);
+    if (url.pathname === '/rest/v1/rpc/apply_shared_trip_operation') {
+      return jsonResponse({ status: 'applied', trip: { id: tripId, trip_data: tripData, revision: 2 } });
+    }
     return jsonResponse([{
       id: tripId,
       owner_id: null,
-      management_token_hash: await hashToken(managementToken)
+      management_token_hash: await hashToken(managementToken),
+      revision: 1,
+      deleted_at: null
     }]);
   };
   try {
@@ -216,9 +241,10 @@ test('deletes a shared trip with its creator management token', async () => {
       env
     });
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { deleted: true, id: tripId });
+    assert.deepEqual(await response.json(), { deleted: true, id: tripId, revision: 2, status: 'applied' });
     assert.equal(calls.length, 2);
-    assert.equal(calls[1].options.method, 'DELETE');
+    assert.equal(calls[1].url.pathname, '/rest/v1/rpc/apply_shared_trip_operation');
+    assert.equal(JSON.parse(calls[1].options.body).p_operation_type, 'delete');
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -231,8 +257,10 @@ test('allows the authenticated owner to delete a legacy shared trip', async () =
     const url = new URL(String(input));
     calls.push({ url, options });
     if (url.pathname === '/auth/v1/user') return jsonResponse({ id: 'user-123' });
-    if (options.method === 'DELETE') return jsonResponse([{ id: tripId }]);
-    return jsonResponse([{ id: tripId, owner_id: 'user-123', management_token_hash: null }]);
+    if (url.pathname === '/rest/v1/rpc/apply_shared_trip_operation') {
+      return jsonResponse({ status: 'applied', trip: { id: tripId, trip_data: tripData, revision: 2 } });
+    }
+    return jsonResponse([{ id: tripId, owner_id: 'user-123', management_token_hash: null, revision: 1, deleted_at: null }]);
   };
   try {
     const response = await onRequestDelete({
@@ -241,7 +269,7 @@ test('allows the authenticated owner to delete a legacy shared trip', async () =
     });
     assert.equal(response.status, 200);
     assert.equal(calls.length, 3);
-    assert.equal(calls[2].options.method, 'DELETE');
+    assert.equal(calls[2].url.pathname, '/rest/v1/rpc/apply_shared_trip_operation');
   } finally {
     globalThis.fetch = originalFetch;
   }

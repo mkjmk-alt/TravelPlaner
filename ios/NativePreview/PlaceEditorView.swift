@@ -25,11 +25,15 @@ struct PlaceEditorView: View {
                     TextField("시간: 09:30 또는 미정", text: $draft.time).keyboardType(.numbersAndPunctuation).accessibilityIdentifier("placeTime")
                     TextField("메모 (선택)", text: $draft.memo, axis: .vertical).lineLimit(2...8).accessibilityIdentifier("placeMemo")
                     TextField("아이콘", text: $draft.emoji)
-                }
+                }.listRowBackground(NativePreviewTheme.card)
                 if let error { Text(error).foregroundStyle(.red).accessibilityIdentifier("place-error") }
-                Section { Text("시간을 바꿔도 장소 순서는 유지됩니다. 일정 화면의 시간순 정렬로 따로 정렬할 수 있어요.").font(.footnote) }
+                Section { Text("시간을 바꿔도 장소 순서는 유지됩니다. 일정 화면의 시간순 정렬로 따로 정렬할 수 있어요.").font(.footnote).foregroundStyle(NativePreviewTheme.textMuted) }
+                    .listRowBackground(NativePreviewTheme.card)
             }
+            .scrollContentBackground(.hidden)
+            .background(NativePreviewTheme.background)
             .navigationTitle(key == nil ? "장소 추가" : "장소 편집").navigationBarTitleDisplayMode(.inline)
+            .tint(NativePreviewTheme.primary)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("취소") { if draft != initial { discarding = true } else { dismiss() } } }
                 ToolbarItem(placement: .confirmationAction) {

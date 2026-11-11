@@ -1,6 +1,29 @@
 import Foundation
 import CoreData
 
+public struct RemoteHydrationResult {
+    public let appliedRecordCount: Int
+    public let deletedRecordCount: Int
+    public let retainedLocalDraftCount: Int
+    public let retainedPendingEditCount: Int
+    public let retainedConflictCount: Int
+    public let retainedOtherAccountCount: Int
+    public let retainedDuplicatePlaceCount: Int
+
+    public init(appliedRecordCount: Int = 0, deletedRecordCount: Int = 0,
+                retainedLocalDraftCount: Int = 0, retainedPendingEditCount: Int = 0,
+                retainedConflictCount: Int = 0, retainedOtherAccountCount: Int = 0,
+                retainedDuplicatePlaceCount: Int = 0) {
+        self.appliedRecordCount = appliedRecordCount
+        self.deletedRecordCount = deletedRecordCount
+        self.retainedLocalDraftCount = retainedLocalDraftCount
+        self.retainedPendingEditCount = retainedPendingEditCount
+        self.retainedConflictCount = retainedConflictCount
+        self.retainedOtherAccountCount = retainedOtherAccountCount
+        self.retainedDuplicatePlaceCount = retainedDuplicatePlaceCount
+    }
+}
+
 public final class TripRepository {
     private let context: NSManagedObjectContext
     private let outbox: SyncOutboxRepository
@@ -27,6 +50,102 @@ public final class TripRepository {
                 return try TripDocument(data: data)
             }
         }
+    }
+
+    public func list(userID: String?) throws -> [TripDocument] {
+        try transaction {
+            let request = NSFetchRequest<NSManagedObject>(entityName: "TripRecord")
+            request.predicate = Self.accountScopePredicate(userID: userID)
+            request.sortDescriptors = [NSSortDescriptor(key: "updatedAt", ascending: false), NSSortDescriptor(key: "id", ascending: true)]
+            return try context.fetch(request).map { record in
+                guard let data = record.value(forKey: "payload") as? Data else { throw TripError.invalidDocument }
+                return try TripDocument(data: data)
+            }
+        }
+    }
+
+    public func makeSyncEngine(transport: SyncTransport) -> SyncEngine {
+        SyncEngine(transport: transport, outbox: outbox, states: SyncRecordStateStore(context: context))
+    }
+
+    public func syncRecords(userID: String) throws -> [SyncRecord] {
+        guard !userID.isEmpty else { throw SyncError.accountMismatch }
+        return try transaction {
+            let request = NSFetchRequest<NSManagedObject>(entityName: "SyncRecordStateRecord")
+            request.predicate = NSPredicate(format: "userID == %@", userID)
+            request.sortDescriptors = [NSSortDescriptor(key: "recordType", ascending: true),
+                                       NSSortDescriptor(key: "recordID", ascending: true)]
+            return try context.fetch(request).map { row in
+                guard let bytes = row.value(forKey: "record") as? Data else { throw SyncError.invalidRecord }
+                return try SyncRecord(data: bytes)
+            }
+        }
+    }
+
+    public func applyRemoteRecords(_ records: [SyncRecord], userID: String) throws -> RemoteHydrationResult {
+        guard !userID.isEmpty else { throw SyncError.accountMismatch }
+        return try transaction {
+            var applied = 0
+            var deleted = 0
+            var localDrafts = 0
+            var pendingEdits = 0
+            var conflicts = 0
+            var otherAccounts = 0
+            var duplicatePlaces = 0
+
+            for incoming in records {
+                guard incoming.userID == userID else { throw SyncError.accountMismatch }
+                _ = try incoming.encoded()
+                try SyncOutboxRepository.applyRemote(incoming, in: context)
+
+                guard let state = try SyncOutboxRepository.findState(userID: userID, recordType: incoming.recordType,
+                                                                     recordID: incoming.recordID, in: context),
+                      let bytes = state.value(forKey: "record") as? Data else { throw SyncError.invalidRecord }
+                let current = try SyncRecord(data: bytes)
+                switch try applyRemoteDomainRecord(current, userID: userID) {
+                case .applied: applied += 1
+                case .deleted: deleted += 1
+                case .retainedLocalDraft: localDrafts += 1
+                case .retainedPendingEdit: pendingEdits += 1
+                case .retainedConflict: conflicts += 1
+                case .retainedOtherAccount: otherAccounts += 1
+                case .retainedDuplicatePlace: duplicatePlaces += 1
+                case .unchanged: break
+                }
+            }
+            return RemoteHydrationResult(appliedRecordCount: applied, deletedRecordCount: deleted,
+                                         retainedLocalDraftCount: localDrafts, retainedPendingEditCount: pendingEdits,
+                                         retainedConflictCount: conflicts, retainedOtherAccountCount: otherAccounts,
+                                         retainedDuplicatePlaceCount: duplicatePlaces)
+        }
+    }
+
+    public func resolveConflict(id: UUID, choice: SyncConflictChoice, userID: String) throws {
+        guard !userID.isEmpty else { throw SyncError.accountMismatch }
+        try transaction {
+            guard let row = try SyncOutboxRepository.find(entity: "SyncConflictRecord", field: "conflictID",
+                                                          value: id.uuidString.lowercased(), in: context) else {
+                throw SyncError.missingConflict
+            }
+            let existing = try SyncOutboxRepository.conflict(from: row)
+            guard existing.operation.userID == userID else { throw SyncError.accountMismatch }
+            let resolved = try SyncOutboxRepository.resolveConflict(id: id, choice: choice, in: context)
+            if case .acceptServer = choice,
+               let state = try SyncOutboxRepository.findState(userID: resolved.operation.userID,
+                                                              recordType: resolved.operation.recordType,
+                                                              recordID: resolved.operation.recordID, in: context),
+               let bytes = state.value(forKey: "record") as? Data {
+                _ = try applyRemoteDomainRecord(SyncRecord(data: bytes), userID: userID)
+            }
+        }
+    }
+
+    public func conflicts(userID: String) throws -> [SyncConflict] {
+        try outbox.conflicts(userID: userID)
+    }
+
+    public func pendingSyncCount(userID: String) throws -> Int {
+        try outbox.pendingCount(userID: userID)
     }
 
     public func save(_ trip: TripDocument, syncContext: SyncWriteContext = .device) throws {
@@ -137,6 +256,15 @@ public final class TripRepository {
             return try context.fetch(request).map(savedDocument)
         }
     }
+
+    public func listSavedPlaces(userID: String?) throws -> [SavedPlaceDocument] {
+        try transaction {
+            let request = NSFetchRequest<NSManagedObject>(entityName: "SavedPlaceRecord")
+            request.predicate = Self.accountScopePredicate(userID: userID)
+            request.sortDescriptors = [NSSortDescriptor(key: "updatedAt", ascending: false), NSSortDescriptor(key: "id", ascending: true)]
+            return try context.fetch(request).map(savedDocument)
+        }
+    }
     public func savePlace(selection: PlaceSelection, draft: PlaceDraft, id: String,
                           syncContext: SyncWriteContext = .device) throws -> SavedPlaceDocument {
         try transaction {
@@ -195,6 +323,22 @@ public final class TripRepository {
               payload["id"] as? String == id, let created = row.value(forKey: "createdAt") as? Double,
               let updated = row.value(forKey: "updatedAt") as? Double else { throw TripError.invalidDocument }
         return .init(id: id, sourceKey: source, payload: payload, createdAt: created, updatedAt: updated)
+    }
+
+    public func saveFlightConfirmation(tripID: String, flight: FlightReceiptDraft, expected: [String: String],
+                                       addToItinerary: Bool, itemID: String,
+                                       syncContext: SyncWriteContext = .device) throws -> TripDocument {
+        try transaction {
+            guard let row = try find(tripID), let bytes = row.value(forKey: "payload") as? Data else { throw TripError.invalidDocument }
+            let owner = try writableOwner(of: row, syncContext: syncContext)
+            let current = try TripDocument(data: bytes)
+            let next = try FlightConfirmation.apply(flight, to: current, expected: expected, addToItinerary: addToItinerary, itemID: itemID)
+            if try next.encoded() == current.encoded() { return current }
+            try persist(next, ownerUserID: owner)
+            guard let saved = try find(tripID)?.value(forKey: "payload") as? Data,
+                  try TripDocument(data: saved).encoded() == next.encoded() else { throw TripError.invalidDocument }
+            return try TripDocument(data: saved)
+        }
     }
 
     public func applySchedule(tripID: String, change: ScheduleChange,
@@ -275,6 +419,101 @@ public final class TripRepository {
         guard let owner = row.value(forKey: "ownerUserID") as? String else { return nil }
         guard syncContext.userID == owner else { throw SyncError.accountMismatch }
         return owner
+    }
+
+    private enum RemoteDomainDisposition {
+        case applied, deleted, retainedLocalDraft, retainedPendingEdit, retainedConflict
+        case retainedOtherAccount, retainedDuplicatePlace, unchanged
+    }
+
+    private func applyRemoteDomainRecord(_ record: SyncRecord, userID: String) throws -> RemoteDomainDisposition {
+        guard record.userID == userID else { throw SyncError.accountMismatch }
+        if try SyncOutboxRepository.hasPendingOrConflict(userID: userID, recordType: record.recordType,
+                                                         recordID: record.recordID, in: context) {
+            let request = NSFetchRequest<NSManagedObject>(entityName: "SyncConflictRecord")
+            request.predicate = NSPredicate(format: "userID == %@", userID)
+            let hasConflict = try context.fetch(request).contains { row in
+                let value = try SyncOutboxRepository.conflict(from: row)
+                return value.operation.recordType == record.recordType && value.operation.recordID == record.recordID
+            }
+            return hasConflict ? .retainedConflict : .retainedPendingEdit
+        }
+
+        switch record.recordType {
+        case .trip:
+            let existing = try find(record.recordID)
+            if let existing, let owner = existing.value(forKey: "ownerUserID") as? String, owner != userID {
+                return .retainedOtherAccount
+            }
+            if let existing, existing.value(forKey: "ownerUserID") == nil {
+                return .retainedLocalDraft
+            }
+            if record.deletedAt != nil {
+                guard let existing else { return .unchanged }
+                context.delete(existing)
+                return .deleted
+            }
+            guard let payload = record.payload,
+                  JSONSerialization.isValidJSONObject(payload),
+                  let trip = try? TripDocument(data: JSONSerialization.data(withJSONObject: payload)),
+                  trip.id == record.recordID else { throw SyncError.invalidRecord }
+            try write(trip, newOwnerUserID: userID)
+            return .applied
+
+        case .savedPlace:
+            let existing = try savedRecord(field: "id", value: record.recordID)
+            if let existing, let owner = existing.value(forKey: "ownerUserID") as? String, owner != userID {
+                return .retainedOtherAccount
+            }
+            if let existing, existing.value(forKey: "ownerUserID") == nil {
+                return .retainedLocalDraft
+            }
+            if record.deletedAt != nil {
+                guard let existing else { return .unchanged }
+                context.delete(existing)
+                return .deleted
+            }
+            guard let payload = record.payload, JSONSerialization.isValidJSONObject(payload),
+                  payload["id"] as? String == record.recordID else { throw SyncError.invalidRecord }
+            let sourceKey = remoteSourceKey(payload: payload, recordID: record.recordID)
+            if let duplicate = try savedRecord(field: "sourceKey", value: sourceKey, ownerUserID: userID),
+               duplicate.value(forKey: "id") as? String != record.recordID {
+                return .retainedDuplicatePlace
+            }
+            let row = existing ?? NSEntityDescription.insertNewObject(forEntityName: "SavedPlaceRecord", into: context)
+            let encoded = try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
+            row.setValue(record.recordID, forKey: "id")
+            row.setValue(sourceKey, forKey: "sourceKey")
+            row.setValue(encoded, forKey: "payload")
+            row.setValue(remoteMilliseconds(payload["createdAt"]) ?? record.updatedAt.timeIntervalSince1970 * 1000, forKey: "createdAt")
+            row.setValue(remoteMilliseconds(payload["updatedAt"]) ?? record.updatedAt.timeIntervalSince1970 * 1000, forKey: "updatedAt")
+            row.setValue(userID, forKey: "ownerUserID")
+            return .applied
+        }
+    }
+
+    private func remoteSourceKey(payload: [String: Any], recordID: String) -> String {
+        if let sourceKey = payload["sourceKey"] as? String, !sourceKey.isEmpty { return sourceKey }
+        if let placeID = (payload["placeId"] as? String) ?? (payload["place_id"] as? String), !placeID.isEmpty {
+            return "google:" + placeID
+        }
+        return "manual:" + recordID
+    }
+
+    private func remoteMilliseconds(_ value: Any?) -> Double? {
+        guard let number = value as? NSNumber else { return nil }
+        let result = number.doubleValue
+        return result.isFinite && result > 0 ? result : nil
+    }
+
+    private static func accountScopePredicate(userID: String?) -> NSPredicate {
+        guard let userID, !userID.isEmpty else {
+            return NSPredicate(format: "ownerUserID == nil")
+        }
+        return NSCompoundPredicate(orPredicateWithSubpredicates: [
+            NSPredicate(format: "ownerUserID == nil"),
+            NSPredicate(format: "ownerUserID == %@", userID)
+        ])
     }
     private func receipt(_ hash: String) throws -> NSManagedObject? {
         let request = NSFetchRequest<NSManagedObject>(entityName: "ImportReceipt"); request.predicate = NSPredicate(format: "sourceHash == %@", hash); request.fetchLimit = 1

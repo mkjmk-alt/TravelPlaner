@@ -5,6 +5,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.RuleChain
 import java.util.UUID
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
@@ -13,13 +14,64 @@ import androidx.test.uiautomator.Until
 import androidx.test.uiautomator.StaleObjectException
 
 class NativePreviewUiTest {
-    @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    private val compose = createAndroidComposeRule<MainActivity>()
+    @get:Rule val rules = RuleChain.outerRule(NativeNavigationTestRule()).around(compose)
+
+    @Test fun tripSelectorSwitchesDetailAndSharedMapTrip() {
+        list()
+        fun createTrip(name: String) {
+            compose.onNodeWithTag("trip-create").performClick(); waitFor("trip-name")
+            compose.onNodeWithTag("trip-name").performTextReplacement(name)
+            compose.tapTripSave()
+            try {
+                compose.waitUntil(15_000) {
+                    compose.onAllNodesWithTag("trip-detail-title").fetchSemanticsNodes().isNotEmpty() ||
+                        compose.onAllNodesWithTag("form-error").fetchSemanticsNodes().isNotEmpty()
+                }
+            } catch (error: Throwable) {
+                compose.onRoot().printToLog("TripSwitchSaveQA")
+                throw error
+            }
+            if (compose.onAllNodesWithTag("form-error").fetchSemanticsNodes().isNotEmpty()) {
+                compose.onRoot().printToLog("TripSwitchSaveQA")
+                compose.onNodeWithTag("form-error").assertDoesNotExist()
+            }
+            waitFor("trip-detail-title")
+        }
+
+        val firstName = "TripSwitchA-" + UUID.randomUUID().toString().take(6)
+        val secondName = "TripSwitchB-" + UUID.randomUUID().toString().take(6)
+        createTrip(firstName)
+        compose.onNodeWithTag("trip-back").performClick(); waitFor("trip-list")
+        createTrip(secondName)
+
+        compose.onNodeWithTag("trip-selector").assertExists().performClick()
+        compose.onNodeWithText(firstName).performClick()
+        compose.onNodeWithTag("trip-detail-title").assertTextEquals(firstName)
+
+        compose.onNodeWithTag("tab-map").performClick(); waitFor("map-trip-picker")
+        compose.onNodeWithTag("map-trip-picker").assertTextEquals(firstName)
+    }
 
     @Test fun landscapeEditorCanScrollAndSave() {
         val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
         list(); compose.onNodeWithTag("trip-create").performClick(); waitFor("trip-name")
         compose.onNodeWithTag("trip-name").performTextReplacement("LayoutQA-" + UUID.randomUUID().toString().take(6))
-        compose.onNodeWithTag("trip-save").performScrollTo().performClick(); waitFor("trip-detail-title")
+        compose.tapTripSave()
+        try {
+            compose.waitUntil(15_000) {
+                compose.onAllNodesWithTag("trip-detail-title").fetchSemanticsNodes().isNotEmpty() ||
+                    compose.onAllNodesWithTag("form-error").fetchSemanticsNodes().isNotEmpty()
+            }
+        } catch (error: Throwable) {
+            compose.onRoot().printToLog("LandscapeTripSaveQA")
+            throw error
+        }
+        if (compose.onAllNodesWithTag("form-error").fetchSemanticsNodes().isNotEmpty()) {
+            compose.onRoot().printToLog("LandscapeTripSaveQA")
+            compose.onNodeWithTag("form-error").assertDoesNotExist()
+        }
+        waitFor("trip-detail-title")
         compose.onNodeWithTag("openItinerary").performScrollTo().performClick(); waitFor("addPlace")
         compose.onNodeWithTag("addPlace").performClick(); waitFor("placeName")
         try {
@@ -71,7 +123,9 @@ class NativePreviewUiTest {
         device.wait(Until.findObject(By.desc("Show roots")), 5000); device.pressBack()
         waitFor("backup-list"); compose.onNodeWithTag("import-preview").assertDoesNotExist()
         compose.onNodeWithTag("backup-list").performScrollToNode(hasText("내보낼 여행 선택"))
-        compose.onNodeWithText("내보낼 여행 선택").performClick(); compose.onAllNodesWithText("구형 여행").onFirst().performClick()
+        compose.onNodeWithText("내보낼 여행 선택").performClick()
+        compose.onNodeWithTag("backup-trip-picker-list").performScrollToNode(hasText("구형 여행"))
+        compose.onAllNodesWithText("구형 여행").onLast().performClick()
         compose.onNodeWithTag("backup-list").performScrollToNode(hasTestTag("backupExport"))
         compose.onNodeWithTag("backupExport").assertIsDisplayed().assertIsEnabled().performClick()
         // Advance Compose frames while async encoding emits the launch event.
@@ -98,7 +152,7 @@ class NativePreviewUiTest {
     @Test fun manualPlaceDraftMoveAndRecreate() {
         list(); compose.onNodeWithTag("trip-create").performClick(); waitFor("trip-name")
         compose.onNodeWithTag("trip-name").performTextReplacement("ScheduleQA-" + UUID.randomUUID().toString().take(6))
-        compose.onNodeWithTag("trip-save").performScrollTo().performClick(); waitFor("trip-detail-title")
+        compose.tapTripSave(); waitFor("trip-detail-title")
         compose.onNodeWithTag("openItinerary").performScrollTo().performClick(); waitFor("addPlace")
         compose.onNodeWithTag("section-day-1").performClick(); compose.onNodeWithTag("addPlace").performClick(); waitFor("placeName")
         compose.onNodeWithTag("placeName").performTextReplacement("Tokyo place")
@@ -156,17 +210,32 @@ class NativePreviewUiTest {
         val deadline = android.os.SystemClock.uptimeMillis() + timeout
         var stale = false
         while (android.os.SystemClock.uptimeMillis() < deadline) {
-            val label = device.wait(Until.findObject(By.text(title)),
-                (deadline - android.os.SystemClock.uptimeMillis()).coerceAtMost(1_000))
+            val label = try {
+                // DocumentsUI can expose the same provider name in Recents and
+                // in the roots drawer at once; choose the drawer row, not the
+                // behind-the-drawer shortcut or a breadcrumb.
+                device.findObjects(By.text(title)).maxByOrNull { it.visibleBounds.centerY() }
+                    ?: device.wait(Until.findObject(By.text(title)),
+                        (deadline - android.os.SystemClock.uptimeMillis()).coerceAtMost(1_000))
+            } catch (_: StaleObjectException) {
+                stale = true
+                device.waitForIdle()
+                null
+            }
             if (label != null) {
                 try {
                     val bounds = label.visibleBounds
-                    // The title is a non-clickable child. Tap the provider
-                    // card's icon/row area above it so DocumentsUI receives
-                    // the click on Android 16's "other apps" layout.
-                    if (device.click(bounds.centerX(), (bounds.top - 70).coerceAtLeast(0))) {
+                    // The title is a non-clickable child. Tap the provider icon
+                    // in the same row; the old offset landed on a divider in
+                    // Android 16's taller roots drawer, leaving it open over the files.
+                    val iconCenterX = (bounds.left - 96).coerceAtLeast(24)
+                    if (device.click(iconCenterX, bounds.centerY())) {
                         device.waitForIdle()
-                        return
+                        val drawerClosed = device.wait(
+                            Until.gone(By.res("com.google.android.documentsui", "drawer_roots")),
+                            (deadline - android.os.SystemClock.uptimeMillis()).coerceAtLeast(0),
+                        )
+                        if (drawerClosed) return
                     }
                 } catch (_: StaleObjectException) {
                     stale = true
@@ -204,7 +273,7 @@ class NativePreviewUiTest {
         compose.onNodeWithTag("trip-country").performTextReplacement("일본")
         compose.onNodeWithTag("trip-start").performScrollTo().performTextReplacement("2026-10-10")
         compose.onNodeWithTag("trip-end").performScrollTo().performTextReplacement("2026-10-12")
-        compose.onNodeWithTag("trip-save").performScrollTo().performClick()
+        compose.tapTripSave()
         waitFor("trip-detail-title")
         compose.onNodeWithTag("trip-detail-title").assertTextEquals(name)
         compose.onNodeWithText("3일").assertExists()
@@ -214,7 +283,7 @@ class NativePreviewUiTest {
         compose.onNodeWithTag("trip-edit").performScrollTo().performClick()
         waitFor("trip-name")
         compose.onNodeWithTag("trip-name").performTextReplacement(name + " 수정")
-        compose.onNodeWithTag("trip-save").performScrollTo().performClick()
+        compose.tapTripSave()
         waitFor("trip-detail-title")
         compose.onNodeWithTag("trip-detail-title").assertTextEquals(name + " 수정")
         compose.activityRule.scenario.recreate()
@@ -227,7 +296,7 @@ class NativePreviewUiTest {
         compose.onNodeWithTag("trip-create").performClick()
         waitFor("trip-name")
         compose.onNodeWithTag("trip-name").performTextReplacement("ExpenseQA-" + UUID.randomUUID().toString().take(6))
-        compose.onNodeWithTag("trip-save").performScrollTo().performClick()
+        compose.tapTripSave()
         waitFor("trip-detail-title")
         compose.onNodeWithTag("tab-expenses").performClick()
         waitFor("add-expense")
@@ -262,7 +331,7 @@ class NativePreviewUiTest {
         waitFor("trip-name")
         compose.onNodeWithTag("trip-name").assertTextContains("보존할 작성 내용")
         compose.onNodeWithTag("trip-start").performScrollTo().performTextReplacement("2026-02-30")
-        compose.onNodeWithTag("trip-save").performScrollTo().performClick()
+        compose.tapTripSave()
         waitFor("form-error")
         compose.onNodeWithTag("trip-name").performScrollTo().assertTextContains("보존할 작성 내용")
         assertTrue(compose.onAllNodesWithTag("trip-detail-title").fetchSemanticsNodes().isEmpty())
@@ -274,7 +343,21 @@ class NativePreviewUiTest {
         list()
         compose.onNodeWithTag("trip-create").performClick(); waitFor("trip-name")
         compose.onNodeWithTag("trip-name").performTextReplacement("BackRouteQA-" + UUID.randomUUID().toString().take(6))
-        compose.onNodeWithTag("trip-save").performScrollTo().performClick(); waitFor("trip-detail-title")
+        compose.tapTripSave()
+        try {
+            compose.waitUntil(15_000) {
+                compose.onAllNodesWithTag("trip-detail-title").fetchSemanticsNodes().isNotEmpty() ||
+                    compose.onAllNodesWithTag("form-error").fetchSemanticsNodes().isNotEmpty()
+            }
+        } catch (error: Throwable) {
+            compose.onRoot().printToLog("SystemBackTripSaveQA")
+            throw error
+        }
+        if (compose.onAllNodesWithTag("form-error").fetchSemanticsNodes().isNotEmpty()) {
+            compose.onRoot().printToLog("SystemBackTripSaveQA")
+            compose.onNodeWithTag("form-error").assertDoesNotExist()
+        }
+        waitFor("trip-detail-title")
 
         compose.onNodeWithTag("trip-edit").performScrollTo().performClick(); waitFor("trip-name")
         device.pressBack(); waitFor("trip-detail-title")

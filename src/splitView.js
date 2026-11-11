@@ -55,6 +55,7 @@ export const getSaveStatusPresentation = ({
   syncStatus = 'saved'
 } = {}) => {
   const isOffline = !isOnline || syncStatus === 'offline';
+  const isLocalOnly = syncStatus === 'local-only';
 
   return {
     label: isOffline
@@ -65,14 +66,18 @@ export const getSaveStatusPresentation = ({
           ? '저장 중…'
           : syncStatus === 'error'
             ? '로컬 저장됨'
-            : '저장됨',
+            : isLocalOnly
+              ? '기기 저장'
+              : '저장됨',
     color: isOffline
       ? '#d97706'
       : syncStatus === 'error'
         ? '#ef4444'
         : syncStatus === 'saving'
           ? '#f59e0b'
-          : '#10b981'
+          : isLocalOnly
+            ? '#d97706'
+            : '#10b981'
   };
 };
 

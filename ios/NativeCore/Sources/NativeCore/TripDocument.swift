@@ -35,7 +35,9 @@ public struct TripDocument: Identifiable {
               let days = object["itinerary"] as? [[String: Any]],
               days.allSatisfy({ $0["items"] is [[String: Any]] }) else { throw TripError.invalidDocument }
         let count = try Self.validatedDayCount(.init(name: name, country: "", startDate: start, endDate: end))
-        guard days.count == count,
+        // Older web trips can contain extra scheduled days beyond their date range.
+        // Keep those days intact; editing already refuses to discard populated days.
+        guard days.count >= count,
               days.enumerated().allSatisfy({ index, day in
                   guard let number = day["day"] as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID() else { return false }
                   return number.doubleValue == Double(index + 1)

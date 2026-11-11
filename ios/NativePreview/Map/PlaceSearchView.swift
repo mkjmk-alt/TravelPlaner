@@ -4,6 +4,7 @@ import NativeCore
 struct PlaceSearchView:View {
     @EnvironmentObject private var store:NativeTripStore
     @Binding var activeTrip:String
+    var onClose:(() -> Void)? = nil
     @StateObject private var map=MapConfiguration.makeState()
     @State private var query=""
     @State private var saving=false
@@ -18,15 +19,31 @@ struct PlaceSearchView:View {
     var body:some View {
         NavigationStack {
             VStack(spacing:0) {
-                HStack {
-                    TextField("장소 검색",text:$query).textFieldStyle(.roundedBorder)
+                HStack(spacing: 12) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(NativePreviewTheme.mapAccent)
+                    TextField("장소 검색",text:$query)
+                        .tint(NativePreviewTheme.mapAccent)
                         .accessibilityIdentifier("placeSearch")
-                    Button("취소") { query=""; map.cancelSearch() }
-                }.padding(.horizontal)
+                    if !query.isEmpty { Button("취소") { query=""; map.cancelSearch() }.frame(minHeight: 44) }
+                    if let onClose {
+                        Button("완료", action: onClose)
+                            .frame(minHeight: 44)
+                            .accessibilityIdentifier("closeMapSearch")
+                    }
+                }
+                .padding(16)
+                .background(NativePreviewTheme.card, in: RoundedRectangle(cornerRadius: 20))
+                .overlay(RoundedRectangle(cornerRadius: 20).stroke(NativePreviewTheme.outline))
+                .padding(.horizontal, NativePreviewTheme.screenPadding)
+                .padding(.top, NativePreviewTheme.sectionSpacing)
                 Picker("지도에 표시할 여행",selection:$activeTrip) {
                     Text("여행 미선택").tag("")
                     ForEach(store.trips) { Text($0.name).tag($0.id) }
-                }.pickerStyle(.menu)
+                }
+                .pickerStyle(.menu)
+                .tint(NativePreviewTheme.mapAccent)
+                .accessibilityIdentifier("mapTripPicker")
+                .accessibilityValue(store.trips.first { $0.id == activeTrip }?.name ?? "여행 미선택")
                 if !map.results.isEmpty {
                     ScrollView {
                         VStack(alignment:.leading) {
@@ -40,17 +57,24 @@ struct PlaceSearchView:View {
                     else {tripMarker=marker}
                 })
                 HStack {
-                    Button("전체 장소 보기") { map.fit(projection.markers.map(\.coordinate)) }
+                    Button("전체 장소 보기") { map.fit(projection.markers.map(\.coordinate)) }.frame(minHeight: 44)
                     Spacer()
-                    Button("현재 위치") { Task { await map.locate() } }
-                }.buttonStyle(.bordered).padding(.horizontal)
+                    Button("현재 위치") { Task { await map.locate() } }.frame(minHeight: 44)
+                }
+                .buttonStyle(.bordered)
+                .tint(NativePreviewTheme.mapAccent)
+                .padding(.horizontal, NativePreviewTheme.screenPadding)
+                .padding(.vertical, 8)
                 if map.loading { ProgressView().padding(4) }
                 if projection.unlocatedItemCount>0 { Button("위치 미확인 \(projection.unlocatedItemCount)곳 · 다시 조회") {Task {await map.resolveReferences(references)}}.font(.caption) }
                 if let error=map.error { Text(error).font(.caption).foregroundStyle(.red).padding(.horizontal) }
                 if let outcome=map.locationOutcome,case .granted = outcome {} else if map.locationOutcome != nil {
                     Text("현재 위치를 확인하지 못했어요. 위치 권한·연결을 확인해주세요. 검색과 직접 등록은 계속 사용할 수 있어요.").font(.caption).padding(.horizontal)
                 }
-            }.navigationTitle("지도").navigationBarTitleDisplayMode(.inline)
+            }
+            .background(NativePreviewTheme.background)
+            .navigationTitle("지도").navigationBarTitleDisplayMode(.inline)
+                .toolbar(.hidden, for: .navigationBar)
                 .onChange(of:query) { map.search($0) }
                 .task(id:references) {await map.resolveReferences(references)}
                 .onDisappear { query=""; map.deactivate() }

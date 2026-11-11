@@ -7,6 +7,11 @@ final class NativeTripStore: ObservableObject {
     @Published private(set) var loadError: String?
     @Published private(set) var savedPlaces: [SavedPlaceDocument] = []
     @Published private(set) var savedLoadError: String?
+    @Published private(set) var syncConflicts: [SyncConflict] = []
+    @Published private(set) var syncWarningMessage: String?
+    @Published private(set) var pendingSyncOperationCount = 0
+    @Published private(set) var syncMutationGeneration = 0
+    private(set) var activeUserID: String?
     private var repository: TripRepository?
     private var mediaStore: TravelMediaStore?
     private var draftStore: MemoryDraftStore?
@@ -19,7 +24,7 @@ final class NativeTripStore: ObservableObject {
             let next = try TripRepository(url: directory.appendingPathComponent("TripPlotNative/trips.sqlite"))
             let media = try TravelMediaStore(root: directory.appendingPathComponent("TripPlotNative/media", isDirectory: true))
             let drafts = try MemoryDraftStore(root: directory.appendingPathComponent("TripPlotNative/drafts", isDirectory: true))
-            let loaded = try next.list()
+            let loaded = try next.list(userID: activeUserID)
             if let staleDrafts = try? drafts.removeStaleJournals() {
                 for draft in staleDrafts {
                     if let fileName = draft.stagedPhotoFileName {
@@ -33,6 +38,7 @@ final class NativeTripStore: ObservableObject {
             trips = loaded
             loadError = nil
             reloadSavedPlaces()
+            refreshPendingSyncCount()
         } catch {
             repository = nil
             loadError = error.localizedDescription
@@ -92,64 +98,164 @@ final class NativeTripStore: ObservableObject {
     func reloadSavedPlaces() {
         do {
             guard let repository else { throw CocoaError(.fileReadUnknown) }
-            savedPlaces = try repository.listSavedPlaces(); savedLoadError = nil
+            savedPlaces = try repository.listSavedPlaces(userID: activeUserID); savedLoadError = nil
         } catch { savedLoadError = error.localizedDescription }
     }
+    func setActiveAccount(_ userID: String?) {
+        let normalized = userID.flatMap { $0.isEmpty ? nil : $0 }
+        activeUserID = normalized
+        do {
+            guard let repository else { throw CocoaError(.fileReadUnknown) }
+            trips = try repository.list(userID: normalized)
+            savedPlaces = try repository.listSavedPlaces(userID: normalized)
+            syncConflicts = try normalized.map(repository.conflicts(userID:)) ?? []
+            refreshPendingSyncCount()
+            syncWarningMessage = nil
+            loadError = nil
+            savedLoadError = nil
+        } catch {
+            loadError = error.localizedDescription
+            syncConflicts = []
+        }
+    }
+
+    func performSync(userID: String, transport: SyncTransport, forceFull: Bool = false) async throws -> SyncRunResult {
+        guard let repository else { throw CocoaError(.fileWriteUnknown) }
+        guard userID == activeUserID else { throw SyncError.accountMismatch }
+        let result = try await repository.makeSyncEngine(transport: transport).sync(userID: userID, forceFull: forceFull)
+        let remoteRecords = try repository.syncRecords(userID: userID)
+        let hydration = try repository.applyRemoteRecords(remoteRecords, userID: userID)
+        guard activeUserID == userID else { return result }
+
+        trips = try repository.list(userID: userID)
+        savedPlaces = try repository.listSavedPlaces(userID: userID)
+        syncConflicts = try repository.conflicts(userID: userID)
+        refreshPendingSyncCount()
+        let retainedCount = hydration.retainedLocalDraftCount + hydration.retainedPendingEditCount
+            + hydration.retainedConflictCount + hydration.retainedOtherAccountCount
+            + hydration.retainedDuplicatePlaceCount
+        if retainedCount > 0 {
+            syncWarningMessage = "안전 확인이 필요한 \(retainedCount)개 항목은 덮어쓰지 않고 보존했습니다. 충돌 항목은 아래에서 확인하고, 기기 초안은 데이터 이전 기능에서 별도로 병합할 수 있습니다."
+        } else {
+            syncWarningMessage = nil
+        }
+        return result
+    }
+
+    func resolveSyncConflict(id: UUID, choice: SyncConflictChoice, userID: String) throws {
+        guard let repository else { throw CocoaError(.fileWriteUnknown) }
+        guard activeUserID == userID else { throw SyncError.accountMismatch }
+        try repository.resolveConflict(id: id, choice: choice, userID: userID)
+        trips = try repository.list(userID: userID)
+        savedPlaces = try repository.listSavedPlaces(userID: userID)
+        syncConflicts = try repository.conflicts(userID: userID)
+        refreshPendingSyncCount()
+    }
+
+    func accountSyncRecordCount(userID: String) throws -> Int {
+        guard let repository else { throw CocoaError(.fileReadUnknown) }
+        return try repository.syncRecords(userID: userID).filter { $0.deletedAt == nil }.count
+    }
+
+    func pendingSyncCount(userID: String) throws -> Int {
+        guard let repository else { throw CocoaError(.fileReadUnknown) }
+        return try repository.pendingSyncCount(userID: userID)
+    }
+
+    private func refreshPendingSyncCount() {
+        guard let userID = activeUserID, let repository else {
+            pendingSyncOperationCount = 0
+            return
+        }
+        do {
+            pendingSyncOperationCount = try repository.pendingSyncCount(userID: userID)
+        } catch {
+            pendingSyncOperationCount = 0
+            syncWarningMessage = error.localizedDescription
+        }
+    }
+
+    private func recordLocalSyncMutation() {
+        refreshPendingSyncCount()
+        syncMutationGeneration &+= 1
+    }
+
+    private var writeContext: SyncWriteContext { SyncWriteContext(userID: activeUserID) }
+
     func saveFavorite(selection: PlaceSelection, draft: PlaceDraft, id: String) throws -> SavedPlaceDocument {
         guard let repository else { throw CocoaError(.fileWriteUnknown) }
-        let saved = try repository.savePlace(selection: selection, draft: draft, id: id)
-        savedPlaces = try repository.listSavedPlaces(); savedLoadError = nil
+        let saved = try repository.savePlace(selection: selection, draft: draft, id: id, syncContext: writeContext)
+        savedPlaces = try repository.listSavedPlaces(userID: activeUserID); savedLoadError = nil
+        recordLocalSyncMutation()
         return saved
     }
     func deleteFavorite(id: String) throws {
         guard let repository else { throw CocoaError(.fileWriteUnknown) }
-        try repository.deleteSavedPlace(id: id); savedPlaces = try repository.listSavedPlaces()
+        try repository.deleteSavedPlace(id: id, syncContext: writeContext)
+        savedPlaces = try repository.listSavedPlaces(userID: activeUserID)
+        recordLocalSyncMutation()
     }
 
     func save(draft: TripDraft, original: TripDocument?) throws -> String {
         guard let repository else { throw CocoaError(.fileWriteUnknown) }
         let trip = try original?.edited(draft: draft) ?? TripDocument.create(draft: draft)
-        try repository.save(trip)
+        try repository.save(trip, syncContext: writeContext)
         trips.removeAll { $0.id == trip.id }
         trips.insert(trip, at: 0)
+        recordLocalSyncMutation()
         return trip.id
     }
 
     func delete(_ trip: TripDocument) throws {
         guard let repository else { throw CocoaError(.fileWriteUnknown) }
-        try repository.delete(id: trip.id)
+        try repository.delete(id: trip.id, syncContext: writeContext)
         trips.removeAll { $0.id == trip.id }
+        recordLocalSyncMutation()
+    }
+
+    func saveFlightConfirmation(tripID: String, flight: FlightReceiptDraft, expected: [String: String], addToItinerary: Bool, itemID: String) throws {
+        guard let repository else { throw CocoaError(.fileWriteUnknown) }
+        _ = try repository.saveFlightConfirmation(tripID: tripID, flight: flight, expected: expected,
+                                                   addToItinerary: addToItinerary, itemID: itemID, syncContext: writeContext)
+        trips = try repository.list(userID: activeUserID)
+        recordLocalSyncMutation()
     }
 
     func applySchedule(tripID: String, change: ScheduleChange) throws {
         guard let repository else { throw CocoaError(.fileWriteUnknown) }
-        _ = try repository.applySchedule(tripID: tripID, change: change)
-        trips = try repository.list()
+        _ = try repository.applySchedule(tripID: tripID, change: change, syncContext: writeContext)
+        trips = try repository.list(userID: activeUserID)
+        recordLocalSyncMutation()
     }
     func upsertExpense(tripID: String, expenseID: String, fields: [String: Any]) throws {
         guard let repository else { throw CocoaError(.fileWriteUnknown) }
-        _ = try repository.upsertExpense(tripID: tripID, expenseID: expenseID, fields: fields)
-        trips = try repository.list()
+        _ = try repository.upsertExpense(tripID: tripID, expenseID: expenseID, fields: fields, syncContext: writeContext)
+        trips = try repository.list(userID: activeUserID)
+        recordLocalSyncMutation()
     }
     func deleteExpense(tripID: String, expenseID: String) throws {
         guard let repository else { throw CocoaError(.fileWriteUnknown) }
-        try repository.deleteExpense(tripID: tripID, expenseID: expenseID)
-        trips = try repository.list()
+        try repository.deleteExpense(tripID: tripID, expenseID: expenseID, syncContext: writeContext)
+        trips = try repository.list(userID: activeUserID)
+        recordLocalSyncMutation()
     }
     func updateBudgetSettings(tripID: String, values: [String: Any]) throws {
         guard let repository else { throw CocoaError(.fileWriteUnknown) }
-        _ = try repository.updateBudgetSettings(tripID: tripID, values: values)
-        trips = try repository.list()
+        _ = try repository.updateBudgetSettings(tripID: tripID, values: values, syncContext: writeContext)
+        trips = try repository.list(userID: activeUserID)
+        recordLocalSyncMutation()
     }
     func updateParticipants(tripID: String, participants: [[String: Any]]) throws {
         guard let repository else { throw CocoaError(.fileWriteUnknown) }
-        _ = try repository.updateSettlementParticipants(tripID: tripID, participants: participants)
-        trips = try repository.list()
+        _ = try repository.updateSettlementParticipants(tripID: tripID, participants: participants, syncContext: writeContext)
+        trips = try repository.list(userID: activeUserID)
+        recordLocalSyncMutation()
     }
     func applyMemoryChange(tripID: String, change: MemoryChange) throws {
         guard let repository else { throw CocoaError(.fileWriteUnknown) }
-        _ = try repository.applyMemoryChange(tripID: tripID, change: change)
-        trips = try repository.list()
+        _ = try repository.applyMemoryChange(tripID: tripID, change: change, syncContext: writeContext)
+        trips = try repository.list(userID: activeUserID)
+        recordLocalSyncMutation()
     }
     func prepareImport(url: URL) async throws -> ImportPreview {
         guard let repository else { throw CocoaError(.fileReadUnknown) }
@@ -160,11 +266,18 @@ final class NativeTripStore: ObservableObject {
             return try repository.prepareImport(candidate)
         }.value
     }
+    func prepareImport(data: Data) async throws -> ImportPreview {
+        guard let repository else { throw CocoaError(.fileReadUnknown) }
+        return try await Task.detached(priority: .userInitiated) {
+            try repository.prepareImport(TripBackup.decode(data))
+        }.value
+    }
     func commitImport(_ preview: ImportPreview, decision: ImportDecision) async throws -> ImportOutcome {
         guard let repository else { throw CocoaError(.fileWriteUnknown) }
+        let currentUserID = activeUserID
         let result = try await Task.detached(priority: .userInitiated) {
             let outcome = try repository.commitImport(preview, decision: decision)
-            return (outcome, try repository.list())
+            return (outcome, try repository.list(userID: currentUserID))
         }.value
         trips = result.1
         return result.0
