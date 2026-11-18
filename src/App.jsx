@@ -5308,7 +5308,7 @@ function App() {
                   onCreateAiPlan={() => setShowPasteModal(true)}
                   onJoinTrip={openJoinTripModal}
                   session={session}
-                  onSignOut={() => supabase.auth.signOut()}
+                  onSignOut={() => supabase.auth.signOut({ scope: 'local' })}
                   onLogin={() => openAuthModal('login')}
                   deferredInstallPrompt={deferredInstallPrompt}
                   onInstallApp={installPwa}
@@ -5317,7 +5317,7 @@ function App() {
               {viewMode !== 'trips' && <div className="sidebar-auth-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 {session ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <button onClick={() => supabase.auth.signOut()} style={{ background: '#f3f4f6', border: 'none', color: '#6b7280', fontWeight: '800', fontSize: '10px', cursor: 'pointer', padding: '8px 10px', borderRadius: '10px' }}>로그아웃</button>
+                    <button onClick={() => supabase.auth.signOut({ scope: 'local' })} style={{ background: '#f3f4f6', border: 'none', color: '#6b7280', fontWeight: '800', fontSize: '10px', cursor: 'pointer', padding: '8px 10px', borderRadius: '10px' }}>로그아웃</button>
                   </div>
                 ) : (
                   <button onClick={() => openAuthModal('login')} style={{ background: 'white', border: '1px solid #e5e7eb', color: '#4b5563', padding: '8px 12px', borderRadius: '10px', fontWeight: '800', fontSize: '10px', cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -6901,7 +6901,7 @@ function App() {
                 <div className="mobile-more-list">
                   <AccountMoreActions
                     session={session}
-                    onSignOut={() => supabase.auth.signOut()}
+                    onSignOut={() => supabase.auth.signOut({ scope: 'local' })}
                     onLogin={() => openAuthModal('login')}
                     onDeleteAccount={requestAccountDeletion}
                   />

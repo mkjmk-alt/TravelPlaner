@@ -76,3 +76,6 @@ test('mounts account deletion in More and not beside the TripPlot header', () =>
   assert.doesNotMatch(headerAuthRegion, /requestAccountDeletion|AccountMoreActions/);
   assert.match(moreRegion, /<AccountMoreActions\b/);
 });
+test('web logout controls limit revocation to the current session', () => {
+  assert.doesNotMatch(appSource, /\.auth\.signOut\(\s*\)/);
+});
