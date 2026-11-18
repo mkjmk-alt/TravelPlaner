@@ -19,6 +19,7 @@ import { getJournalEntries, getTravelDetails } from './travelMemory';
 import { calculateSettlement, createExpensePayerSelection, getNextExpensePayerIndex, normalizeExpenseParticipants, normalizeSettlementParticipants } from './expenseSettlement';
 import { createCashWallet, getCashWalletCreationCurrency, removeCashWalletState } from './cashWallets';
 import { buildItineraryRouteGroups, normalizeRouteSettings, ROUTE_SETTINGS_STORAGE_KEY } from './itineraryRoutes';
+import { getSavedPlaceEntries } from './savedPlacePresentation.js';
 import useItineraryRoadRoutes from './useItineraryRoadRoutes';
 import ItineraryRouteSettings from './MapRouteSettings';
 import { createNearbyOrderPreview, applyNearbyOrderPreview, sortDayItems, moveDayItem } from './itineraryOrder';
@@ -2733,21 +2734,22 @@ function App() {
     }
   };
 
+  const savedPlaceEntries = useMemo(() => getSavedPlaceEntries(favorites), [favorites]);
   const groupedFavorites = useMemo(() => {
-    const groups = {};
-    (favorites || []).forEach(fav => {
-      if (!fav || !fav.loc) return;
+    const groups = Object.create(null);
+    savedPlaceEntries.forEach(entry => {
+      const { place, address } = entry;
       const addressGrouping = getPlaceAddressGrouping(
-        fav.addressComponents || fav.address_components
+        place.addressComponents || place.address_components
       );
-      const country = fav.country || addressGrouping.country || getCountryFromAddress(fav.loc) || '기타';
-      const region = normalizeRegionLabel(fav.region) || addressGrouping.region || getRegionFromAddress(fav.loc, country) || '지역 미분류';
-      if (!groups[country]) groups[country] = {};
+      const country = place.country || addressGrouping.country || getCountryFromAddress(address) || '기타';
+      const region = normalizeRegionLabel(place.region) || addressGrouping.region || getRegionFromAddress(address, country) || '지역 미분류';
+      if (!groups[country]) groups[country] = Object.create(null);
       if (!groups[country][region]) groups[country][region] = [];
-      groups[country][region].push(fav);
+      groups[country][region].push(entry);
     });
     return groups;
-  }, [favorites]);
+  }, [savedPlaceEntries]);
 
   const toggleCountry = (country) => {
     setExpandedCountries(prev => ({
@@ -4160,27 +4162,30 @@ function App() {
     if (editingExpenseId === id) cancelEditingExpense();
   };
 
+  const findFavorite = (place) => {
+    const saved = favorites || [];
+    const byID = place?.id == null ? undefined : saved.find(item => item && String(item.id) === String(place.id));
+    return byID ?? (place?.name ? saved.find(item => item?.name === place.name) : undefined);
+  };
+
   const toggleFavorite = (place) => {
     if (!place) return;
     const safeFavs = favorites || [];
-    const isFav = safeFavs.some(f => f.name === place.name);
+    const existing = findFavorite(place);
     const addressGrouping = getPlaceAddressGrouping(place.addressComponents || place.address_components);
     const favoritePlace = {
       ...place,
       country: place.country || addressGrouping.country || getCountryFromAddress(place.loc),
       region: normalizeRegionLabel(place.region) || addressGrouping.region || getRegionFromAddress(place.loc, place.country || addressGrouping.country)
     };
-    const nextFavs = isFav 
-      ? safeFavs.filter(f => f.name !== place.name)
+    const nextFavs = existing
+      ? safeFavs.filter(f => f !== existing)
       : [...safeFavs, { ...favoritePlace, id: makeEntityId() }];
     
     saveFavorites(nextFavs);
   };
 
-  const isFavorite = (place) => {
-    if (!place) return false;
-    return (favorites || []).some(f => f.name === place.name);
-  };
+  const isFavorite = (place) => Boolean(findFavorite(place));
 
   const startEditingItineraryItem = (dayNumber, item) => {
     const day = parseDay(dayNumber);
@@ -5743,25 +5748,25 @@ function App() {
 
                                   {expandedRegions[regionKey] && (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '8px 0 0 8px' }}>
-                                      {places.map((loc) => (
+                                      {places.map(({ place, address, name, position }, index) => (
                                         <div
-                                          key={`fav-list-${loc.id || loc.name}`}
+                                          key={`fav-list-${place.id ?? place.placeId ?? index}`}
                                           onClick={() => {
-                                            openMemoryPlace(loc);
+                                            if (position) openMemoryPlace({ ...place, ...position, name, address });
                                           }}
-                                          style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px', backgroundColor: selectedPlace?.name === loc.name ? '#fef2f2' : 'transparent', borderRadius: '12px', cursor: 'pointer', border: '1px solid transparent' }}
+                                          style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px', backgroundColor: selectedPlace?.name === name ? '#fef2f2' : 'transparent', borderRadius: '12px', cursor: position ? 'pointer' : 'default', border: '1px solid transparent' }}
                                         >
-                                          <div style={{ width: '42px', height: '42px', backgroundColor: 'white', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '21px', border: '1px solid #f3f4f6', flexShrink: 0 }}>{loc.emoji}</div>
+                                          <div style={{ width: '42px', height: '42px', backgroundColor: 'white', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '21px', border: '1px solid #f3f4f6', flexShrink: 0 }}>{place.emoji || '📍'}</div>
                                           <div style={{ flex: 1, minWidth: 0 }}>
-                                            <h3 style={{ fontSize: '13px', fontWeight: '800', color: '#111827', margin: '0 0 4px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{loc.name}</h3>
-                                            <p style={{ fontSize: '10px', fontWeight: '700', color: '#9ca3af', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{loc.loc}</p>
+                                            <h3 style={{ fontSize: '13px', fontWeight: '800', color: '#111827', margin: '0 0 4px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</h3>
+                                            <p style={{ fontSize: '10px', fontWeight: '700', color: '#9ca3af', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{address || '주소 정보 없음'}</p>
                                           </div>
                                           <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
                                             {activeTripId && !isReadOnlyTrip && (
                                               <button
                                                 onClick={(e) => {
                                                   e.stopPropagation();
-                                                  addToItinerary(loc);
+                                                  addToItinerary({ ...place, name, loc: address });
                                                 }}
                                                 style={{ padding: '8px', backgroundColor: '#eff6ff', border: 'none', color: '#3b82f6', borderRadius: '9px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                                 title={`${activeDay}일차 일정에 추가`}
@@ -5770,7 +5775,7 @@ function App() {
                                               </button>
                                             )}
                                             <button
-                                              onClick={(e) => { e.stopPropagation(); toggleFavorite(loc); }}
+                                              onClick={(e) => { e.stopPropagation(); saveFavorites(favorites.filter(favorite => favorite !== place)); }}
                                               style={{ padding: '8px', backgroundColor: '#fef2f2', border: 'none', color: '#ef4444', borderRadius: '9px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                               title="즐겨찾기에서 제거"
                                             >
@@ -6970,7 +6975,7 @@ function App() {
             )}
 
             <div className="sidebar-list-end-meta">
-              <span style={{ fontSize: "11px", fontWeight: "900", color: "#111827", letterSpacing: "0.05em" }}>{(favorites || []).length} 저장 • {totalSpots} 일정</span>
+              <span style={{ fontSize: "11px", fontWeight: "900", color: "#111827", letterSpacing: "0.05em" }}>{savedPlaceEntries.length} 저장 • {totalSpots} 일정</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '9px', fontWeight: '800' }}>
                 <a href="/privacy.html" style={{ color: '#64748b', textDecoration: 'none' }}>개인정보처리방침</a>
                 <span aria-hidden="true" style={{ color: '#cbd5e1' }}>·</span>
@@ -6986,7 +6991,7 @@ function App() {
         {sidebarFooterVariant === 'full' && (
           <div className="sidebar-footer sidebar-footer-full" style={{ padding: '18px 32px', borderTop: '1px solid #f3f4f6', backgroundColor: '#f9fafb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
             <div className="sidebar-footer-meta" style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
-              <span style={{ fontSize: "11px", fontWeight: "900", color: "#111827", letterSpacing: "0.05em" }}>{(favorites || []).length} 저장 • {totalSpots} 일정</span>
+              <span style={{ fontSize: "11px", fontWeight: "900", color: "#111827", letterSpacing: "0.05em" }}>{savedPlaceEntries.length} 저장 • {totalSpots} 일정</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '9px', fontWeight: '800' }}>
                 <a href="/privacy.html" style={{ color: '#64748b', textDecoration: 'none' }}>개인정보처리방침</a>
                 <span aria-hidden="true" style={{ color: '#cbd5e1' }}>·</span>
@@ -7658,7 +7663,7 @@ function App() {
           <MapPaneErrorBoundary onRetry={() => window.location.reload()}>
             <Suspense fallback={<div className="map-pane-loading-state" role="status" aria-label="지도 화면 불러오는 중"><div className="map-unavailable-spinner" aria-hidden="true" /></div>}>
               <LazyMapPane
-                mapData={{ favorites, userLocation, activeDay, itinerary, reserveItems, searchResult, dayColors }}
+                mapData={{ savedPlaceEntries, userLocation, activeDay, itinerary, reserveItems, searchResult, dayColors }}
                 mapView={{ showFullRoute, routeSettings: mapRouteSettings, roadRoutes: mapRoadRoutes, selectedPlace, useFloatingPlacePanel, selectedPlaceBusinessStatus, selectedPlaceOpeningHours, windowWidth: windowSize.width, sidebarOpen, activeTripId, tripName: activeTrip?.name, isReadOnlyTrip, itineraryDisplayName, itineraryEmoji, itineraryTime }}
                 actions={{
                   onSaveMapImage: saveBlobAsFile,

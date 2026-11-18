@@ -93,7 +93,7 @@ const mapOptions = {
 };
 
 export default function MapPane({ mapData = {}, mapView = {}, actions = {}, formComponents = {} }) {
-  const { favorites = [], userLocation, activeDay, itinerary = [], reserveItems = [], searchResult, dayColors = [] } = mapData;
+  const { savedPlaceEntries = [], userLocation, activeDay, itinerary = [], reserveItems = [], searchResult, dayColors = [] } = mapData;
   const { showFullRoute = false, selectedPlace, useFloatingPlacePanel = false, selectedPlaceBusinessStatus = '', selectedPlaceOpeningHours = [], windowWidth = 1024, sidebarOpen = true, activeTripId, isReadOnlyTrip = false, itineraryDisplayName = '', itineraryEmoji = '📍', itineraryTime = '' } = mapView;
   const { onMapLoad, onMapUnmount, onMapClick, onSelectedPlaceChange, onMyLocation, onOpenSidebar, onToggleFavorite, isFavorite, onActiveDayChange, onItineraryDisplayNameChange, onItineraryEmojiChange, onItineraryTimeChange, onAddToItinerary } = actions;
   const { ItineraryEmojiPicker, PremiumTimeInput } = formComponents;
@@ -166,11 +166,12 @@ export default function MapPane({ mapData = {}, mapView = {}, actions = {}, form
           onClick={onMapClick}
         >
           {/* Favorite Markers */}
-          {(favorites || []).map(fav => (
+          {savedPlaceEntries.map(({ place, name, address, position }, index) => position && (
             <CustomMapMarker
-              key={`fav-${fav.name}`}
-              position={{ lat: fav.lat, lng: fav.lng }}
-              onClick={() => onSelectedPlaceChange(fav)}
+              key={`fav-${place.id ?? place.placeId ?? index}`}
+              position={position}
+              ariaLabel={`저장 장소 ${name}`}
+              onClick={() => onSelectedPlaceChange({ ...place, ...position, name, loc: address })}
               icon={{
                 url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
                   <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
