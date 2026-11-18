@@ -44,7 +44,10 @@ const defaultMakeOperationID = () => {
   return globalThis.crypto.randomUUID();
 };
 
-export function createSyncV2Repository({ supabase, queueStore, makeOperationID = defaultMakeOperationID, pageSize = 500 }) {
+export function createSyncV2Repository({
+  supabase, queueStore, makeOperationID = defaultMakeOperationID, pageSize = 500,
+  comparablePayload = (_type, payload) => payload
+}) {
   if (!supabase?.from || !supabase?.rpc) throw new TypeError('A Supabase client is required.');
   if (!queueStore?.put || !queueStore?.list || !queueStore?.remove) throw new TypeError('A durable sync queue store is required.');
   if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 1000) throw new RangeError('pageSize must be between 1 and 1000.');
@@ -102,9 +105,13 @@ export function createSyncV2Repository({ supabase, queueStore, makeOperationID =
     return result;
   };
 
-  const previewLegacyRows = async (userID, rows) => {
-    const converted = convertLegacyUserStateRows(userID, rows);
-    const existingRecords = await listAllRecords(userID);
+  const payloadsEqual = (type, left, right) => (
+    canonicalSyncJson(comparablePayload(type, left)) === canonicalSyncJson(comparablePayload(type, right))
+  );
+
+  const previewLegacyRows = async (userID, rows, syncedRecords = null) => {
+    const converted = convertLegacyUserStateRows(userID, rows, comparablePayload);
+    const existingRecords = syncedRecords ?? await listAllRecords(userID);
     const existingByKey = new Map(existingRecords.map(record => [recordKey(record.type, record.recordID), record]));
     const importable = [];
     const identical = [];
@@ -115,7 +122,7 @@ export function createSyncV2Repository({ supabase, queueStore, makeOperationID =
       const current = existingByKey.get(recordKey(candidate.type, candidate.recordID));
       if (!current) {
         importable.push(candidate);
-      } else if (!current.deletedAt && canonicalSyncJson(current.payload) === canonicalSyncJson(candidate.payload)) {
+      } else if (!current.deletedAt && payloadsEqual(candidate.type, current.payload, candidate.payload)) {
         identical.push({ local: candidate, remote: current });
       } else {
         conflicts.push({ local: candidate, remote: current });
@@ -173,7 +180,7 @@ export function createSyncV2Repository({ supabase, queueStore, makeOperationID =
         ? { ...candidate, payload: sourceAlternate.payload }
         : candidate;
       let current = recordsByKey.get(key);
-      const identical = current && !current.deletedAt && canonicalSyncJson(current.payload) === canonicalSyncJson(selectedCandidate.payload);
+      const identical = current && !current.deletedAt && payloadsEqual(selectedCandidate.type, current.payload, selectedCandidate.payload);
       if (identical) continue;
 
       if (current && conflictChoices[key] !== 'local') {
@@ -238,12 +245,40 @@ export function createSyncV2Repository({ supabase, queueStore, makeOperationID =
     return results;
   };
 
+  const applyReviewedDeviceChoices = async (userID, conflicts) => {
+    const pending = await listPendingOperations(userID);
+    const results = [];
+    for (const { local, remote, pendingOperation } of conflicts) {
+      const deletedAt = pendingOperation?.deletedAt || null;
+      const operation = {
+        userID, type: local.type, recordID: local.recordID,
+        expectedRevision: remote?.revision || 0,
+        operationID: makeOperationID(),
+        payload: deletedAt ? null : local.payload,
+        deletedAt
+      };
+      const result = await applyOperation(operation);
+      if (result.status === 'conflict') {
+        await queueStore.remove(operation.operationID, userID);
+      } else {
+        for (const previous of pending) {
+          if (previous.userID === userID && previous.type === local.type && previous.recordID === local.recordID) {
+            await queueStore.remove(previous.operationID, userID);
+          }
+        }
+      }
+      results.push({ operation, result });
+    }
+    return results;
+  };
+
   return {
     listRecords,
     listAllRecords,
     applyOperation,
     previewLegacyRows,
     importLegacyRows,
+    applyReviewedDeviceChoices,
     listPendingOperations,
     discardPendingOperations,
     resumePendingOperations

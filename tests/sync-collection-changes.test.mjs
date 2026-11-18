@@ -77,3 +77,86 @@ test('unchanged server revisions do not require replacing the visible list', () 
   assert.equal(syncRecordsUnchanged(known, [record('a', 2), record('b', 1)]), false);
   assert.equal(syncRecordsUnchanged(known, [{ ...record('a', 2), deletedAt: '2026-01-01' }]), false);
 });
+
+test('startup accepts server changes and deletions for rows unchanged since the last login', async () => {
+  const { createSyncCheckpoint, planStartupSync } = await import('../src/sync/localSyncStorage.js');
+  const original = { id: 'a', name: 'same' };
+  const checkpoint = await createSyncCheckpoint('user', base([['a', original, 2]]));
+  for (const remote of [
+    { ...record('a', 3), payload: { id: 'a', name: 'changed in app' } },
+    { ...record('a', 3), deletedAt: '2026-01-01', payload: null }
+  ]) {
+    const result = await planStartupSync('user', checkpoint, [{ type: 'trip', recordID: 'a', payload: original }], [remote]);
+    assert.deepEqual(result, { changes: [], review: [] });
+  }
+  const candidate = { type: 'trip', recordID: 'a', payload: original };
+  assert.deepEqual(await planStartupSync('user', checkpoint, [candidate], []), { changes: [], review: [candidate] });
+});
+
+test('startup uploads a genuine offline edit only while its server revision still matches', async () => {
+  const { createSyncCheckpoint, planStartupSync } = await import('../src/sync/localSyncStorage.js');
+  const previous = { id: 'a', name: 'old' };
+  const changed = { type: 'trip', recordID: 'a', payload: { id: 'a', name: 'edited offline' } };
+  const checkpoint = await createSyncCheckpoint('user', base([['a', previous, 2]]));
+  const result = await planStartupSync('user', checkpoint, [changed], [{ ...record('a', 2), payload: previous }]);
+  assert.deepEqual(result, { changes: [{ ...changed, expectedRevision: 2 }], review: [] });
+  const collision = await planStartupSync('user', checkpoint, [changed], [{ ...record('a', 3), payload: previous }]);
+  assert.deepEqual(collision, { changes: [], review: [changed] });
+  const otherAccount = await planStartupSync('other', checkpoint, [changed], [{ ...record('a', 2), payload: previous }]);
+  assert.deepEqual(otherAccount, { changes: [], review: [changed] });
+});
+
+test('migration comparison accepts web display defaults and preserves real itinerary changes', async () => {
+  const { comparableSyncPayload } = await import('../src/sync/localSyncStorage.js');
+  const original = { id: 'a', name: 'old', itinerary: [{ day: 1, items: [] }] };
+  const defaults = { ...original, updatedAt: 100, reserveItems: [], expenses: [], journalEntries: [], travelDetails: { flightNumber: '' }, settlementParticipants: [{ id: 'self', name: '나' }] };
+  const remote = { user_id: 'user', record_type: 'trip', record_id: 'a', revision: 2, payload: original };
+  const repository = createSyncV2Repository({
+    supabase: { from: () => ({ select() { return this; }, eq() { return this; }, order() { return this; }, range: async () => ({ data: [remote] }) }), rpc() {} },
+    queueStore: { put() {}, list() {}, remove() {} },
+    comparablePayload: comparableSyncPayload
+  });
+  const legacyRow = value => ({ key: 'world_pro_trips_v1', value });
+  const same = await repository.previewLegacyRows('user', [legacyRow([original]), legacyRow([defaults])]);
+  assert.equal(same.conflicts.length, 0);
+  assert.equal(same.identical.length, 1);
+  const changed = { ...defaults, itinerary: [{ day: 1, items: [{ id: 'place', name: '새 장소' }] }] };
+  assert.equal((await repository.previewLegacyRows('user', [legacyRow([changed])])).conflicts.length, 1);
+});
+
+test('device choice checks the revision seen during review and preserves queued deletions', async () => {
+  const pending = new Map();
+  let serverRevision = 5;
+  let writes = 0;
+  const repository = createSyncV2Repository({
+    supabase: {
+      from() {},
+      async rpc(_name, params) {
+        if (params.p_expected_revision !== serverRevision) return { data: { status: 'conflict' } };
+        assert.ok(params.p_deleted_at);
+        assert.equal(params.p_payload, null);
+        writes += 1;
+        return { data: { status: 'applied' } };
+      }
+    },
+    queueStore: {
+      async put(operation) { pending.set(operation.operationID, operation); },
+      async list() { return [...pending.values()]; },
+      async remove(id) { pending.delete(id); }
+    }
+  });
+  const queuedDelete = {
+    userID: 'user', operationID: '22222222-2222-4222-8222-222222222222', expectedRevision: 3,
+    type: 'trip', recordID: 'a', deletedAt: '2026-11-18T01:00:00Z', payload: null
+  };
+  pending.set(queuedDelete.operationID, queuedDelete);
+  const choices = [{ local: queuedDelete, pendingOperation: queuedDelete, remote: record('a', 4) }];
+  const results = await repository.applyReviewedDeviceChoices('user', choices);
+  assert.equal(results[0].result.status, 'conflict');
+  assert.equal(writes, 0);
+  assert.deepEqual([...pending.values()], [queuedDelete]);
+  serverRevision = 4;
+  assert.equal((await repository.applyReviewedDeviceChoices('user', choices))[0].result.status, 'applied');
+  assert.equal(writes, 1);
+  assert.equal(pending.size, 0);
+});

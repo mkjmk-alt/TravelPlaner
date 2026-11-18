@@ -26,7 +26,7 @@ const hashText = (value) => {
 const describeInvalid = (key, index, reason) => ({ key, index, reason });
 
 /** Convert legacy array-valued user_state rows to stable v2 records without mutating the source. */
-export function convertLegacyUserStateRows(userID, rows) {
+export function convertLegacyUserStateRows(userID, rows, comparablePayload = (_type, payload) => payload) {
   const records = [];
   const invalidEntries = [];
   const duplicates = [];
@@ -104,7 +104,7 @@ export function convertLegacyUserStateRows(userID, rows) {
           recordID,
           key: row.key,
           index,
-          identical: JSON.stringify(canonicalize(previous.payload)) === JSON.stringify(canonicalize(payload)),
+          identical: canonicalSyncJson(comparablePayload(type, previous.payload)) === canonicalSyncJson(comparablePayload(type, payload)),
           previous: previous.payload,
           payload
         });

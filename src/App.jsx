@@ -26,8 +26,12 @@ import { getLodgings, lodgingForDate, tripDayDate } from './lodging';
 import { ITINERARY_ICON_OPTIONS, getItineraryItemCategory, withItineraryIcon } from './itineraryCategories';
 import { createSyncV2Repository } from './sync/syncV2Repository.js';
 import { IndexedDBQueueStore } from './sync/indexedDBQueueStore.js';
-import { LOCAL_SYNC_BACKUP_PREFIX, LOCAL_SYNC_SAVED_PLACES_KEY, LOCAL_SYNC_TRIPS_KEY, LEGACY_SAVED_PLACES_KEY, LEGACY_TRIPS_KEY, SYNC_MIGRATION_COMPLETED_PREFIX } from './sync/localSyncStorage.js';
-import { hashLegacySnapshot } from './sync/legacyUserStateImporter.js';
+import {
+  LOCAL_SYNC_BACKUP_PREFIX, LOCAL_SYNC_SAVED_PLACES_KEY, LOCAL_SYNC_TRIPS_KEY, LEGACY_SAVED_PLACES_KEY,
+  LEGACY_TRIPS_KEY, SYNC_MIGRATION_COMPLETED_PREFIX, SYNC_CHECKPOINT_PREFIX, comparableSyncPayload,
+  createSyncCheckpoint, excludeSyncRows, getDefaultChecklist, planStartupSync, withSyncDisplayDefaults
+} from './sync/localSyncStorage.js';
+import { convertLegacyUserStateRows, hashLegacySnapshot } from './sync/legacyUserStateImporter.js';
 import { planCollectionChanges, syncRecordsUnchanged } from './sync/collectionChanges.js';
 import SyncMigrationDialog from './components/SyncMigrationDialog.jsx';
 import './index.css';
@@ -525,15 +529,6 @@ const EXPENSE_CATEGORIES = [
   { value: 'other', label: '기타', emoji: '🧾' }
 ];
 
-const DEFAULT_CHECKLIST_ITEMS = [
-  { id: 'passport', label: '여권 및 신분증', checked: false },
-  { id: 'insurance', label: '여행자 보험', checked: false },
-  { id: 'charger', label: '충전기·보조배터리', checked: false },
-  { id: 'cash', label: '환전·현금 준비', checked: false },
-  { id: 'reservation', label: '예약·티켓 확인', checked: false }
-];
-
-const getDefaultChecklist = () => DEFAULT_CHECKLIST_ITEMS.map(item => ({ ...item }));
 
 const getExpenseCategoryLabel = (category) => (
   EXPENSE_CATEGORIES.find(option => option.value === category)?.label || '기타'
@@ -583,7 +578,6 @@ const getSafeExternalUrl = (value) => {
   }
 };
 
-const getTripUpdatedAt = (trip) => Number(trip?.updatedAt || trip?.createdAt || 0);
 const copySyncValue = (value) => JSON.parse(JSON.stringify(value));
 
 const sortSyncValue = (value) => {
@@ -1319,6 +1313,7 @@ function App() {
   const syncRecordsRef = useRef(new Map());
   const syncReadyUserRef = useRef('');
   const syncBaselineRef = useRef(new Map());
+  const syncCheckpointWriteRef = useRef(0);
   const syncWorkRef = useRef({ queue: Promise.resolve(), active: 0, version: 0, blocked: false, generation: { trip: 0, savedPlace: 0 }, dirty: { trip: false, savedPlace: false } });
   const [syncInitAttempt, setSyncInitAttempt] = useState(0);
   const [authResolved, setAuthResolved] = useState(false);
@@ -1674,7 +1669,8 @@ function App() {
     if (!syncRepositoryRef.current) {
       syncRepositoryRef.current = createSyncV2Repository({
         supabase,
-        queueStore: new IndexedDBQueueStore()
+        queueStore: new IndexedDBQueueStore(),
+        comparablePayload: comparableSyncPayload
       });
     }
     return syncRepositoryRef.current;
@@ -1745,20 +1741,7 @@ function App() {
       if (cleanedTrips.length !== savedTrips.length) {
         writeStoredJson(LOCAL_SYNC_TRIPS_KEY, cleanedTrips);
       }
-      return cleanedTrips.map(trip => ({
-        ...trip,
-        updatedAt: getTripUpdatedAt(trip),
-        reserveItems: Array.isArray(trip.reserveItems) ? trip.reserveItems : [],
-        checklist: Array.isArray(trip.checklist) ? trip.checklist : getDefaultChecklist(),
-        travelDetails: getTravelDetails(trip),
-        journalEntries: getJournalEntries(trip),
-        settlementParticipants: normalizeSettlementParticipants(trip.settlementParticipants),
-        expenses: Array.isArray(trip.expenses) ? trip.expenses.map(expense => ({
-          ...expense,
-          category: expense.category || 'other',
-          memo: expense.memo || ''
-        })) : []
-      }));
+      return cleanedTrips.map(withSyncDisplayDefaults);
     }
     
     const oldItinerary = readStoredJson("world_pro_v16", []);
@@ -2213,6 +2196,19 @@ function App() {
     setItineraryEmoji(selectedPlace?.emoji || '📍');
   }, [selectedPlace]);
 
+  const persistSyncCheckpoint = useCallback(async (userID) => {
+    const write = ++syncCheckpointWriteRef.current;
+    const baseline = syncBaselineRef.current;
+    try {
+      const checkpoint = await createSyncCheckpoint(userID, baseline);
+      if (syncCheckpointWriteRef.current === write && syncBaselineRef.current === baseline && syncReadyUserRef.current === userID) {
+        writeStoredJson(`${SYNC_CHECKPOINT_PREFIX}${userID}`, checkpoint);
+      }
+    } catch (error) {
+      console.warn('동기화 기준을 저장하지 못했습니다.', error);
+    }
+  }, []);
+
   const hydrateSyncRecords = useCallback((userID, records) => {
     const recordMap = new Map(records.map(record => [`${record.type}:${record.recordID}`, record]));
     syncRecordsRef.current = recordMap;
@@ -2224,20 +2220,9 @@ function App() {
     );
     const nextTrips = activeRecords
       .filter(record => record.type === 'trip' && !record.payload.localOnly)
-      .map(record => ({
-        ...preserveLocalShareMetadata(record.payload, localTripsByID.get(String(record.recordID))),
-        updatedAt: getTripUpdatedAt(record.payload),
-        reserveItems: Array.isArray(record.payload.reserveItems) ? record.payload.reserveItems : [],
-        checklist: Array.isArray(record.payload.checklist) ? record.payload.checklist : getDefaultChecklist(),
-        travelDetails: getTravelDetails(record.payload),
-        journalEntries: getJournalEntries(record.payload),
-        settlementParticipants: normalizeSettlementParticipants(record.payload.settlementParticipants),
-        expenses: Array.isArray(record.payload.expenses) ? record.payload.expenses.map(expense => ({
-          ...expense,
-          category: expense.category || 'other',
-          memo: expense.memo || ''
-        })) : []
-      }));
+      .map(record => withSyncDisplayDefaults(
+        preserveLocalShareMetadata(record.payload, localTripsByID.get(String(record.recordID)))
+      ));
     const remoteTripIDs = new Set(nextTrips.map(trip => String(trip.id)));
     for (const trip of localTripsByID.values()) {
       if (trip?.localOnly && !remoteTripIDs.has(String(trip.id))) nextTrips.push(trip);
@@ -2259,11 +2244,12 @@ function App() {
 
     setTrips(nextTrips);
     setFavorites(nextFavorites);
-    writeStoredJson(LOCAL_SYNC_TRIPS_KEY, nextTrips);
-    writeStoredJson(LOCAL_SYNC_SAVED_PLACES_KEY, nextFavorites);
+    const tripsSaved = writeStoredJson(LOCAL_SYNC_TRIPS_KEY, nextTrips);
+    const placesSaved = writeStoredJson(LOCAL_SYNC_SAVED_PLACES_KEY, nextFavorites);
     syncReadyUserRef.current = userID;
-    setSyncStatus('saved');
-  }, []);
+    setSyncStatus(tripsSaved && placesSaved ? 'saved' : 'error');
+    if (tripsSaved && placesSaved) void persistSyncCheckpoint(userID);
+  }, [persistSyncCheckpoint]);
 
   // Cloud Sync Initialization: read legacy rows only; v1 is never written by this client.
   useEffect(() => {
@@ -2292,7 +2278,7 @@ function App() {
         const repository = getSyncV2Repository();
         const pendingResults = await repository.resumePendingOperations(userID);
         const pendingConflicts = pendingResults.filter(({ result }) => result.status === 'conflict');
-        const [{ data: legacyData, error: legacyError }, remoteRecords] = await Promise.all([
+        const [{ data: legacyData, error: legacyError }, initialRemoteRecords] = await Promise.all([
           supabase.from('user_state').select('*').eq('user_id', userID),
           repository.listAllRecords(userID)
         ]);
@@ -2313,16 +2299,48 @@ function App() {
         const legacyFingerprint = await hashLegacySnapshot([...legacyCloudRows, ...legacyDeviceSnapshotRows]);
         const migrationMarker = readStoredJson(`${SYNC_MIGRATION_COMPLETED_PREFIX}${userID}`, null);
         const legacyRowsChanged = !migrationMarker?.completed || migrationMarker.legacyFingerprint !== legacyFingerprint;
-        const legacyRowsForImport = legacyRowsChanged ? legacyCloudRows : [];
-        const importRows = [...legacyRowsForImport, ...localRows];
-        const preview = await repository.previewLegacyRows(userID, [...legacyRowsForImport, ...localRows]);
+        const keyOf = item => `${item.type}:${item.recordID}`;
+        const remoteByKey = new Map(initialRemoteRecords.map(record => [keyOf(record), record]));
+        const local = convertLegacyUserStateRows(userID, localRows, comparableSyncPayload);
+        const duplicateKeys = new Set(local.duplicates.filter(item => !item.identical).map(keyOf));
+        const pendingKeys = new Set(pendingConflicts.map(({ operation }) => keyOf(operation)));
+        const startupCandidates = local.records.filter(item => !duplicateKeys.has(keyOf(item)) && !pendingKeys.has(keyOf(item)));
+        const checkpoint = readStoredJson(`${SYNC_CHECKPOINT_PREFIX}${userID}`, null);
+        const startup = await planStartupSync(userID, checkpoint, startupCandidates, initialRemoteRecords);
+        const reviewKeys = new Set(startup.review.map(keyOf));
+        const handledKeys = new Set(startupCandidates.filter(item => !reviewKeys.has(keyOf(item))).map(keyOf));
+        for (const change of startup.changes) {
+          if (cancelled) return;
+          if (syncWorkRef.current.version !== initialMutationVersion) {
+            setSyncInitAttempt(attempt => attempt + 1);
+            return;
+          }
+          const operation = { ...change, userID, operationID: makeEntityId(), deletedAt: null };
+          const result = await repository.applyOperation(operation);
+          if (result.record) remoteByKey.set(keyOf(operation), result.record);
+          if (result.status === 'conflict') {
+            handledKeys.delete(keyOf(operation));
+            pendingConflicts.push({ operation, result });
+          }
+        }
+        if (cancelled) return;
+        const remoteRecords = [...remoteByKey.values()];
+        const legacyRowsForImport = !legacyRowsChanged ? [] : migrationMarker?.completed
+          ? excludeSyncRows(userID, legacyCloudRows, new Set(remoteByKey.keys()))
+          : legacyCloudRows;
+        const importRows = [...legacyRowsForImport, ...excludeSyncRows(userID, localRows, handledKeys)];
+        const preview = await repository.previewLegacyRows(userID, importRows, remoteRecords);
         pendingConflicts.forEach(({ operation, result }) => {
           const key = `${operation.type}:${operation.recordID}`;
-          if (preview.conflicts.some(conflict => `${conflict.local.type}:${conflict.local.recordID}` === key)) return;
+          const match = preview.conflicts.find(conflict => keyOf(conflict.local) === key);
+          if (match) {
+            match.pendingOperation = operation;
+            return;
+          }
           preview.conflicts.push({
             local: { type: operation.type, recordID: operation.recordID, payload: operation.payload },
             remote: result.record,
-            pendingOperation: true
+            pendingOperation: operation
           });
         });
         if (cancelled) return;
@@ -2381,6 +2399,16 @@ function App() {
   // Read the device snapshot only when the authenticated account changes.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user?.id, syncInitAttempt]);
+
+  useEffect(() => {
+    const userID = session?.user?.id;
+    if (!userID || syncMigration || isLoadingDB) return;
+    const retry = () => {
+      if (syncReadyUserRef.current !== userID) setSyncInitAttempt(attempt => attempt + 1);
+    };
+    window.addEventListener('online', retry);
+    return () => window.removeEventListener('online', retry);
+  }, [session?.user?.id, syncMigration, isLoadingDB]);
 
   // Pull account changes made by the native app when this web page becomes
   // visible again. Pending web edits are flushed first and are never replaced
@@ -2739,11 +2767,13 @@ function App() {
   const preserveLocalSyncSnapshot = (migration) => {
     const tripSnapshot = localStorage.getItem(LOCAL_SYNC_TRIPS_KEY);
     const placeSnapshot = localStorage.getItem(LOCAL_SYNC_SAVED_PLACES_KEY);
-    if (!tripSnapshot && !placeSnapshot) return true;
+    const conflicts = migration.preview?.conflicts || [];
+    if (!tripSnapshot && !placeSnapshot && !conflicts.length) return true;
     return writeStoredJson(`${LOCAL_SYNC_BACKUP_PREFIX}${migration.userID}_${Date.now()}`, {
       savedAt: new Date().toISOString(),
       tripsRaw: tripSnapshot,
-      savedPlacesRaw: placeSnapshot
+      savedPlacesRaw: placeSnapshot,
+      conflicts
     });
   };
 
@@ -2791,21 +2821,31 @@ function App() {
     setIsSyncMigrationBusy(true);
     try {
       if (!preserveLocalSyncSnapshot(syncMigration)) throw new Error('기기 데이터 백업 공간이 부족합니다. 저장 공간을 확보한 뒤 다시 시도해주세요.');
-      const conflictChoices = Object.fromEntries(
-        (syncMigration.preview?.conflicts || []).map(conflict => [
-          `${conflict.local.type}:${conflict.local.recordID}`,
-          'local'
-        ])
-      );
       const repository = getSyncV2Repository();
-      await repository.discardPendingOperations(syncMigration.userID, Object.keys(conflictChoices));
-      const result = await repository.importLegacyRows(syncMigration.userID, syncMigration.rows, { conflictChoices });
+      const keyOf = item => `${item.type}:${item.recordID}`;
+      const reviewed = new Map(syncMigration.remoteRecords.map(record => [keyOf(record), record]));
+      const deviceEntries = convertLegacyUserStateRows(syncMigration.userID, syncMigration.localRows).records;
+      const deviceByKey = new Map(deviceEntries.map(entry => [keyOf(entry), entry]));
+      const choices = new Map();
+      for (const conflict of syncMigration.preview.conflicts) {
+        const key = keyOf(conflict.local);
+        const device = deviceByKey.get(key);
+        choices.set(key, {
+          local: device ?? conflict.local,
+          remote: reviewed.get(key),
+          pendingOperation: device ? null : conflict.pendingOperation
+        });
+      }
+      const resolved = await repository.applyReviewedDeviceChoices(syncMigration.userID, [...choices.values()]);
+      if (resolved.some(({ result }) => result.status === 'conflict')) {
+        // Restart against a new snapshot while keeping the backed-up local choices.
+        setSyncInitAttempt(attempt => attempt + 1);
+        return;
+      }
+      const rows = excludeSyncRows(syncMigration.userID, syncMigration.rows, new Set(choices.keys()));
+      const result = await repository.importLegacyRows(syncMigration.userID, rows);
       if (result.conflicts.length > 0) {
-        const [remoteRecords, preview] = await Promise.all([
-          repository.listAllRecords(syncMigration.userID),
-          repository.previewLegacyRows(syncMigration.userID, syncMigration.rows)
-        ]);
-        setSyncMigration(current => current ? { ...current, remoteRecords, preview, error: '다른 기기에서 동시에 수정했습니다. 최신 상태를 확인하고 다시 선택해주세요.' } : current);
+        setSyncInitAttempt(attempt => attempt + 1);
         return;
       }
       const remoteRecords = await repository.listAllRecords(syncMigration.userID);
@@ -2887,17 +2927,6 @@ function App() {
         const repository = getSyncV2Repository();
         const pendingResults = await repository.resumePendingOperations(userID);
         if (syncReadyUserRef.current !== userID) return false;
-        const pendingConflict = pendingResults.find(({ result }) => result.status === 'conflict');
-        if (pendingConflict) {
-          work.blocked = true;
-          setSyncConflictNotice({
-            conflicts: 1,
-            signature: `v2:${pendingConflict.operation.type}:${pendingConflict.operation.recordID}:${pendingConflict.result.record?.revision || 0}`,
-            kind: 'revision'
-          });
-          setSyncStatus('error');
-          return false;
-        }
         for (const { operation, result } of pendingResults) {
           if (result.record && ['applied', 'replayed'].includes(result.status)) {
             const key = `${operation.type}:${operation.recordID}`;
@@ -2906,8 +2935,13 @@ function App() {
           }
         }
         const changes = planCollectionChanges(type, userID, syncBaselineRef.current, nextItems);
+        const conflicts = new Map(pendingResults.filter(({ result }) => result.status === 'conflict').map(entry => [
+          `${entry.operation.type}:${entry.operation.recordID}`, entry
+        ]));
         for (const change of changes) {
           if (syncReadyUserRef.current !== userID) return false;
+          const key = `${type}:${change.recordID}`;
+          if (conflicts.has(key)) continue;
           const result = await repository.applyOperation({
             userID,
             type,
@@ -2919,18 +2953,23 @@ function App() {
           });
           if (syncReadyUserRef.current !== userID) return false;
           if (result.status === 'conflict') {
-            work.blocked = true;
-            setSyncConflictNotice({ conflicts: 1, signature: `v2:${type}:${change.recordID}:${result.record?.revision || 0}`, kind: 'revision' });
-            setSyncStatus('error');
-            return false;
+            conflicts.set(key, { result });
+            continue;
           }
           if (result.record) {
-            const key = `${type}:${change.recordID}`;
             syncRecordsRef.current.set(key, result.record);
             syncBaselineRef.current.set(key, { record: result.record, payload: change.payload });
           }
         }
         if (work.generation[type] === generation) work.dirty[type] = false;
+        await persistSyncCheckpoint(userID);
+        if (conflicts.size) {
+          work.blocked = true;
+          const revisions = [...conflicts].map(([key, entry]) => `${key}:${entry.result.record?.revision || 0}`).sort();
+          setSyncConflictNotice({ conflicts: conflicts.size, signature: `v2:${revisions.join('|')}`, kind: 'revision' });
+          setSyncStatus('local-only');
+          return false;
+        }
         return true;
       } catch (error) {
         console.error('V2 data sync failed:', error);
