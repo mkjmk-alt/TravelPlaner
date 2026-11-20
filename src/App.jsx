@@ -22,7 +22,7 @@ import { buildItineraryRouteGroups, normalizeRouteSettings, ROUTE_SETTINGS_STORA
 import { getSavedPlaceEntries } from './savedPlacePresentation.js';
 import useItineraryRoadRoutes from './useItineraryRoadRoutes';
 import ItineraryRouteSettings from './MapRouteSettings';
-import { createNearbyOrderPreview, applyNearbyOrderPreview, sortDayItems, moveDayItem } from './itineraryOrder';
+import { createNearbyOrderPreview, applyNearbyOrderPreview, sortDayItems, moveDayItem, isRouteOrderFixed } from './itineraryOrder';
 import { getLodgings, lodgingForDate, tripDayDate } from './lodging';
 import { ITINERARY_ICON_OPTIONS, getItineraryItemCategory, withItineraryIcon } from './itineraryCategories';
 import { createSyncV2Repository } from './sync/syncV2Repository.js';
@@ -3976,6 +3976,7 @@ function App() {
     const targetDay = parseDay(activeDay);
     const displayName = itineraryDisplayName.trim() || place.displayName || place.name || '장소 이름 정보 없음';
     const itineraryPlace = withItineraryIcon(place, itineraryEmoji || place.emoji || '📍');
+    delete itineraryPlace.routeOrderFixed;
 
     if (activeDay === 'reserve') {
       const reserveItem = {
@@ -4178,6 +4179,7 @@ function App() {
       country: place.country || addressGrouping.country || getCountryFromAddress(place.loc),
       region: normalizeRegionLabel(place.region) || addressGrouping.region || getRegionFromAddress(place.loc, place.country || addressGrouping.country)
     };
+    delete favoritePlace.routeOrderFixed;
     const nextFavs = existing
       ? safeFavs.filter(f => f !== existing)
       : [...safeFavs, { ...favoritePlace, id: makeEntityId() }];
@@ -4193,12 +4195,13 @@ function App() {
       sourceDay: day,
       day,
       id: item.id,
-      time: item.time || '09:00',
+      time: item.time || '',
       displayName: item.displayName || item.name || '',
       originalName: item.name || '',
       reservationNumber: item.reservationNumber || '',
       reservationUrl: item.reservationUrl || '',
       memo: item.memo || '',
+      routeOrderFixed: isRouteOrderFixed(item),
     });
   };
 
@@ -4216,6 +4219,7 @@ function App() {
       const sourceItem = sourceDay?.items?.find(item => item.id === itemId);
       if (!sourceItem) return t;
       const updatedItem = { ...sourceItem, ...itemUpdates };
+      if (itemUpdates.routeOrderFixed === false) delete updatedItem.routeOrderFixed;
       const newItin = (t.itinerary || []).map(day => {
         const dayNum = parseDay(day.day);
         if (destinationIsReserve && dayNum === sourceDayNum) {
@@ -6199,7 +6203,8 @@ function App() {
                                       >
                                         {item.displayName || item.name || '장소 이름 정보 없음'}
                                       </h4>
-                                      {(item.reservationNumber || item.memo || item.reservationUrl) && <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginTop: '5px' }}>
+                                      {(isRouteOrderFixed(item) || item.reservationNumber || item.memo || item.reservationUrl) && <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginTop: '5px' }}>
+                                        {isRouteOrderFixed(item) && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '3px 6px', borderRadius: '6px', background: '#eff6ff', color: '#2563eb', fontSize: '9px', fontWeight: '800' }}><Lock size={10} aria-hidden="true" />고정</span>}
                                         {item.reservationNumber && <span style={{ padding: '3px 6px', borderRadius: '6px', background: '#fef3c7', color: '#92400e', fontSize: '9px', fontWeight: '800' }}>예약 {item.reservationNumber}</span>}
                                         {item.memo && <span style={{ padding: '3px 6px', borderRadius: '6px', background: '#f1f5f9', color: '#64748b', fontSize: '9px', fontWeight: '800', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>메모 {item.memo}</span>}
                                         {getSafeExternalUrl(item.reservationUrl) && <a href={getSafeExternalUrl(item.reservationUrl)} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()} style={{ padding: '3px 6px', borderRadius: '6px', background: '#eff6ff', color: '#2563eb', fontSize: '9px', fontWeight: '800' }}>예약 링크</a>}
@@ -7955,11 +7960,19 @@ function App() {
               <textarea value={editingTimeItem.memo || ''} onChange={(e) => setEditingTimeItem({ ...editingTimeItem, memo: e.target.value })} placeholder="체크인 방법, 준비물 등을 적어두세요." rows={3} style={{ width: '100%', boxSizing: 'border-box', marginTop: '7px', padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '12px', resize: 'vertical' }} />
             </label>
 
-            <ScrollTimeInput
-              value={editingTimeItem.time}
-              onChange={(newTime) => setEditingTimeItem({ ...editingTimeItem, time: newTime })}
-              label="일정 시간 선택"
-            />
+            {editingTimeItem.day !== 'reserve' && <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', fontSize: '13px', fontWeight: '700', color: '#334155' }}>
+              <input type="checkbox" checked={editingTimeItem.routeOrderFixed} onChange={(e) => setEditingTimeItem({ ...editingTimeItem, routeOrderFixed: e.target.checked })} />
+              거리순 정렬에서 순서와 시간 고정
+            </label>}
+
+            {editingTimeItem.time ? <>
+              <ScrollTimeInput
+                value={editingTimeItem.time}
+                onChange={(newTime) => setEditingTimeItem({ ...editingTimeItem, time: newTime })}
+                label="일정 시간 선택"
+              />
+              <button type="button" className="travel-memory-cancel-button" onClick={() => setEditingTimeItem({ ...editingTimeItem, time: '' })}>시간 미정으로 변경</button>
+            </> : <div style={{ marginBottom: 12, color: '#64748b', fontSize: 13 }}>시간 미정 <button type="button" className="travel-memory-cancel-button" onClick={() => setEditingTimeItem({ ...editingTimeItem, time: '09:00' })}>시간 설정</button></div>}
 
             <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
               <button 
@@ -7973,6 +7986,7 @@ function App() {
                   updateItineraryItem(editingTimeItem.sourceDay, editingTimeItem.id, {
                     day: editingTimeItem.day,
                     time: editingTimeItem.time,
+                    routeOrderFixed: editingTimeItem.routeOrderFixed,
                     displayName: editingTimeItem.displayName.trim() || editingTimeItem.originalName,
                     reservationNumber: editingTimeItem.reservationNumber?.trim() || '',
                     reservationUrl: editingTimeItem.reservationUrl?.trim() || '',

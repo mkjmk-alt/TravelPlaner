@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Route, X, MapPin, Clock } from 'lucide-react';
 import { getRoutePoint } from './itineraryRoutes';
 import { getItineraryItemCategory } from './itineraryCategories';
+import { isRouteOrderFixed } from './itineraryOrder';
 
 const formatDistance = meters => meters < 1000 ? `${Math.round(meters)}m` : `${(meters / 1000).toFixed(1)}km`;
 const reasons = {
@@ -20,7 +21,7 @@ export function NearbyOrderPreviewContent({ preview, blockedReason = '', onApply
         <button type="button" className="nearby-order-close" aria-label="정렬 미리보기 닫기" onClick={onCancel}><X size={20} /></button>
       </header>
       <div className="nearby-order-scroll">
-        <p className="nearby-order-description">첫 장소와 식사 시간을 유지하고, 식사 전후의 장소를 각각 가까운 순서로 정렬합니다.</p>
+        <p className="nearby-order-description">첫 장소, 식사 시간, 직접 고정한 일정을 유지합니다. 그 사이의 장소를 가까운 순서로 정렬합니다.</p>
         <div className="nearby-order-distance" aria-label="위치가 있는 장소 사이의 직선 거리 합계">
           <span>기존 <strong>{formatDistance(preview.beforeMeters)}</strong></span><span aria-hidden="true">→</span><span>정렬 후 <strong>{formatDistance(preview.afterMeters)}</strong></span>
         </div>
@@ -35,7 +36,7 @@ export function NearbyOrderPreviewContent({ preview, blockedReason = '', onApply
             const isMeal = getItineraryItemCategory(item) === 'meal';
             return <li key={`${item.id || 'item'}-${index}`}>
               <span className="nearby-order-number">{index + 1}</span>
-              <div className="nearby-order-place"><strong>{item.displayName || item.name || '이름 없는 일정'}</strong><small>{isMeal ? '식사 고정 · 기존 시간 유지' : index === 0 ? '출발점 유지' : !hasLocation ? '위치 없음 · 자리 유지' : previousIndex === index ? '기존 순서 유지' : `기존 ${previousIndex + 1}번째 → ${index + 1}번째`}</small></div>
+              <div className="nearby-order-place"><strong>{item.displayName || item.name || '이름 없는 일정'}</strong><small>{isRouteOrderFixed(item) ? '고정 · 순서와 시간 유지' : isMeal ? '식사 고정 · 기존 시간 유지' : index === 0 ? '출발점 유지' : !hasLocation ? '위치 없음 · 자리 유지' : previousIndex === index ? '기존 순서 유지' : `기존 ${previousIndex + 1}번째 → ${index + 1}번째`}</small></div>
               <span className="nearby-order-time"><Clock size={12} aria-hidden="true" />{item.time || '미지정'}</span>
             </li>;
           })}

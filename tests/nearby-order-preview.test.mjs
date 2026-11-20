@@ -39,16 +39,18 @@ test('shows reassigned places in the existing time slots and applies only after 
   assert.deepEqual(calls, ['apply', 'cancel']);
 });
 
-test('shows fixed meals with their saved time and explains the meal-aware ordering', () => {
+test('shows meals and explicitly fixed stops with their saved time', () => {
   assert.ok(Content, 'The preview UI must exist');
   const mealPreview = createNearbyOrderPreview({ day: 1, items: [
     { id: 'start', name: '호텔', lat: 0, lng: 0, time: '09:00' },
     { id: 'far', name: '먼 관광지', lat: 0, lng: 3, time: '10:00' },
     { id: 'near', name: '가까운 관광지', lat: 0, lng: 1, time: '11:00' },
-    { id: 'meal', name: '점심 식당', lat: 0, lng: 2, emoji: '🍽️', time: '12:00' }
+    { id: 'meal', name: '점심 식당', lat: 0, lng: 2, emoji: '🍽️', time: '12:00' },
+    { id: 'return', name: '호텔 복귀', lat: 0, lng: 0, routeOrderFixed: true, time: '19:00' }
   ] });
   const markup = renderToStaticMarkup(React.createElement(Content, { preview: mealPreview, onApply: () => {}, onCancel: () => {} }));
   assert.match(markup, /점심 식당[\s\S]*?식사 고정[\s\S]*?12:00/);
+  assert.match(markup, /호텔 복귀[\s\S]*?고정 · 순서와 시간 유지[\s\S]*?19:00/);
 });
 
 test('blocks confirmation when the day changed while reviewing the preview', () => {

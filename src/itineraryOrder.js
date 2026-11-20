@@ -19,9 +19,9 @@ const keepTimeSlot = (item, slot) => {
   return next;
 };
 const hasValidTime = item => /^([01]\d|2[0-3]):[0-5]\d$/.test(item.time || '');
+export const isRouteOrderFixed = item => item?.routeOrderFixed === true;
 
-// Keep the start and unknown-location slots. Meals divide the day into blocks;
-// places can change within each block, but its time slots remain unchanged.
+// Keep the start and unknown-location slots. Fixed stops and meals divide the day into blocks.
 export const createNearbyOrderPreview = day => {
   const originalItems = [...(day?.items || [])];
   const stops = originalItems.map((item, index) => ({ item, index, point: getRoutePoint(item) }));
@@ -44,16 +44,20 @@ export const createNearbyOrderPreview = day => {
   if (located.length < 3) return { ...preview, reason: 'too-few' };
   if (located[0].index !== 0) return { ...preview, reason: 'start-missing' };
 
-  // Repair the old behavior's scrambled times before using them as slots.
-  // The first stop, unknown locations and unspecified times keep their slots.
+  // Repair scrambled times within each block between explicitly fixed stops.
   const slots = [...stops];
-  const timed = stops.filter(stop => stop.index > 0 && stop.point && hasValidTime(stop.item));
-  const chronological = [...timed].sort((a, b) => a.item.time.localeCompare(b.item.time));
-  timed.forEach((stop, index) => { slots[stop.index] = chronological[index]; });
+  const fixedBoundaries = stops.slice(1).filter(stop => isRouteOrderFixed(stop.item)).map(stop => stop.index);
+  let timeBlockStart = 1;
+  for (const boundary of [...fixedBoundaries, stops.length]) {
+    const timed = stops.slice(timeBlockStart, boundary).filter(stop => stop.point && hasValidTime(stop.item));
+    const chronological = [...timed].sort((a, b) => a.item.time.localeCompare(b.item.time));
+    timed.forEach((stop, index) => { slots[stop.index] = chronological[index]; });
+    timeBlockStart = boundary + 1;
+  }
   preview.timeSlotsRestored = slots.some((stop, index) => stop.index !== index);
 
   const ordered = [...slots];
-  const boundaries = slots.flatMap((stop, index) => index > 0 && getItineraryItemCategory(stop.item) === 'meal' ? [index] : []);
+  const boundaries = slots.flatMap((stop, index) => index > 0 && (isRouteOrderFixed(stop.item) || getItineraryItemCategory(stop.item) === 'meal') ? [index] : []);
   boundaries.push(slots.length);
   let blockStart = 1;
   let current = slots[0].point;

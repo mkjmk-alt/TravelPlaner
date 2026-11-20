@@ -148,3 +148,20 @@ test('pins a meal with no coordinates and preserves blank time slots and reserva
   assert.equal(preview.mealCount, 1);
   assert.equal(preview.items.find(item => item.id === 'near').reservationUrl, 'https://example.com/booking');
 });
+
+test('respects app-synced fixed departure, return and intermediate stops even when their time slots are scrambled', () => {
+  const departure = { ...place('hotel-start', 0, '09:00'), routeOrderFixed: true };
+  const appointment = { ...place('appointment', 2, '12:00'), routeOrderFixed: true };
+  const returnToHotel = { ...place('hotel-end', 0, '19:00'), routeOrderFixed: true };
+  const day = { day: 1, orderMode: 'distance', items: [
+    departure, place('far-morning', 4, '11:00'), place('near-morning', 1, '10:00'), appointment,
+    place('far-afternoon', 9, '17:00'), place('near-afternoon', 3, '11:30'), returnToHotel
+  ] };
+  const preview = api().createNearbyOrderPreview(day);
+  assert.deepEqual(preview.originalIndices, [0, 2, 1, 3, 5, 4, 6]);
+  assert.equal(preview.items[0], departure);
+  assert.equal(preview.items[3], appointment);
+  assert.equal(preview.items[6], returnToHotel);
+  assert.equal(preview.items[1].time, '10:00');
+  assert.equal(preview.items[4].time, '11:30');
+});
