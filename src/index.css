@@ -4806,3 +4806,43 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .lodging-actions button { display: inline-flex; align-items: center; gap: 4px; border: 1px solid #dbe5f4; border-radius: 9px; background: white; color: #4b5d7c; padding: 8px 10px; cursor: pointer; }
 .lodging-form { display: grid; gap: 14px; margin-top: 12px; }
 .lodging-day-summary { margin: 12px 24px 0; padding: 10px 12px; border-radius: 12px; background: #f4f0ff; color: #5b38a0; font-size: 12px; line-height: 1.5; }
+
+.business-place-details {
+  margin-block-start: 6px;
+  font-size: .8125rem;
+  color: #475569;
+}
+
+.business-place-details > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding-inline: 8px;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  cursor: pointer;
+  font-weight: 700;
+  list-style: none;
+}
+
+.business-place-details > summary::-webkit-details-marker { display: none; }
+
+.business-place-details-body {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  margin-top: 4px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  overflow-wrap: anywhere;
+}
+
+.business-place-details-body ul { margin: 0; padding-inline-start: 18px; }
+
+.business-place-links { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+
+.business-place-details-body a { color: #1d4ed8; text-decoration: underline; }
+.business-place-attribution { font-family: Roboto, Arial, sans-serif; font-size: .875rem; }

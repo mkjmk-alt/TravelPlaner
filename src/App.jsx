@@ -12,6 +12,8 @@ import { DISPLAY_MODES, getFreeSplitPanePosition, getResponsiveDisplayMode, getS
 import { BRAND_NAME_EN, BRAND_NAME_KO } from './brand';
 import AccountMoreActions from './AccountMoreActions';
 import TravelMemoryPanel from './TravelMemoryPanel';
+import PlaceBusinessDetails from './PlaceBusinessDetails.jsx';
+import { safePlaceLink } from './placeBusinessDetails.js';
 import TripRequiredEmptyState from './TripRequiredEmptyState';
 import TripHomeActions from './TripHomeActions';
 import AiItineraryImportDialog from './AiItineraryImportDialog';
@@ -22,7 +24,7 @@ import { buildItineraryRouteGroups, normalizeRouteSettings, ROUTE_SETTINGS_STORA
 import { getSavedPlaceEntries } from './savedPlacePresentation.js';
 import useItineraryRoadRoutes from './useItineraryRoadRoutes';
 import ItineraryRouteSettings from './MapRouteSettings';
-import { createNearbyOrderPreview, applyNearbyOrderPreview, sortDayItems, moveDayItem, isRouteOrderFixed } from './itineraryOrder';
+import { createNearbyOrderPreview, applyNearbyOrderPreview, sortDayItems, applyEditedDayItems, moveDayItem, isRouteOrderFixed } from './itineraryOrder';
 import { getLodgings, lodgingForDate, tripDayDate } from './lodging';
 import { ITINERARY_ICON_OPTIONS, getItineraryItemCategory, withItineraryIcon } from './itineraryCategories';
 import { createSyncV2Repository } from './sync/syncV2Repository.js';
@@ -183,19 +185,6 @@ const getTripStatusMeta = (trip) => {
     backgroundColor: '#ecfdf5',
     color: '#059669'
   };
-};
-
-const getOpeningHours = (place) => {
-  const openingHours = place?.openingHours || place?.opening_hours || place?.regularOpeningHours;
-  if (Array.isArray(openingHours)) return openingHours;
-  return openingHours?.weekday_text || openingHours?.weekdayDescriptions || [];
-};
-
-const getBusinessStatusLabel = (status) => {
-  if (status === 'OPERATIONAL') return '영업 중';
-  if (status === 'CLOSED_TEMPORARILY') return '임시 휴업';
-  if (status === 'CLOSED_PERMANENTLY') return '영구 폐업';
-  return '';
 };
 
 const getEndDateForDayCount = (startDate, dayCount) => {
@@ -4200,6 +4189,7 @@ function App() {
       originalName: item.name || '',
       reservationNumber: item.reservationNumber || '',
       reservationUrl: item.reservationUrl || '',
+      menuURL: typeof item.menuURL === 'string' ? item.menuURL : '',
       memo: item.memo || '',
       routeOrderFixed: isRouteOrderFixed(item),
     });
@@ -4219,6 +4209,7 @@ function App() {
       const sourceItem = sourceDay?.items?.find(item => item.id === itemId);
       if (!sourceItem) return t;
       const updatedItem = { ...sourceItem, ...itemUpdates };
+      const timeChanged = (sourceItem.time ?? '') !== (updatedItem.time ?? '');
       if (itemUpdates.routeOrderFixed === false) delete updatedItem.routeOrderFixed;
       const newItin = (t.itinerary || []).map(day => {
         const dayNum = parseDay(day.day);
@@ -4226,13 +4217,13 @@ function App() {
           return { ...day, items: day.items.filter(item => item.id !== itemId) };
         }
         if (dayNum === sourceDayNum && dayNum === destinationDayNum) {
-          return { ...day, items: sortDayItems(day, day.items.map(item => item.id === itemId ? updatedItem : item), { missingTime: '23:59' }) };
+          return applyEditedDayItems(day, day.items.map(item => item.id === itemId ? updatedItem : item), { timeChanged });
         }
         if (dayNum === sourceDayNum) {
           return { ...day, items: day.items.filter(item => item.id !== itemId) };
         }
         if (dayNum === destinationDayNum) {
-          return { ...day, items: sortDayItems(day, [...day.items, updatedItem], { missingTime: '23:59' }) };
+          return applyEditedDayItems(day, [...day.items, updatedItem], { timeChanged });
         }
         return day;
       });
@@ -4375,11 +4366,11 @@ function App() {
 
     try {
       const place = prediction.toPlace();
-      await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location', 'viewport', 'addressComponents', 'regularOpeningHours', 'currentOpeningHours', 'businessStatus'] });
+      await place.fetchFields({ fields: ['formattedAddress', 'location', 'viewport', 'addressComponents'] });
       const location = place.location;
       if (!location) return;
 
-      const name = getFormattableText(place.displayName) || getFormattableText(prediction.mainText) || getFormattableText(prediction.text) || '선택한 장소';
+      const name = getFormattableText(prediction.mainText) || getFormattableText(prediction.text) || '선택한 장소';
       const address = getFormattableText(place.formattedAddress) || getFormattableText(prediction.secondaryText) || '';
       const addressGrouping = getPlaceAddressGrouping(place.addressComponents);
       const newPlace = {
@@ -4390,8 +4381,7 @@ function App() {
         desc: address,
         country: addressGrouping.country,
         region: addressGrouping.region,
-        openingHours: getOpeningHours(place),
-        businessStatus: place.businessStatus || '',
+        googlePlaceId: prediction.placeId,
         emoji: '📍',
         type: 'search'
       };
@@ -4464,7 +4454,7 @@ function App() {
     if (!map || !window.google) return;
     const service = new window.google.maps.places.PlacesService(map);
     service.getDetails(
-      { placeId, fields: ['name', 'geometry', 'formatted_address', 'address_components', 'opening_hours', 'current_opening_hours', 'business_status'] },
+      { placeId, fields: ['name', 'geometry', 'formatted_address', 'address_components'] },
       (place, status) => {
         if (status === window.google.maps.places.PlacesServiceStatus.OK && place.geometry && place.geometry.location) {
           const addressGrouping = getPlaceAddressGrouping(place.address_components);
@@ -4476,8 +4466,7 @@ function App() {
             desc: place.formatted_address || 'Selected from Map',
             country: addressGrouping.country,
             region: addressGrouping.region,
-            openingHours: getOpeningHours(place),
-            businessStatus: place.business_status || '',
+            googlePlaceId: placeId,
             emoji: '📍',
             type: 'poi'
           };
@@ -4735,8 +4724,6 @@ function App() {
   const expenseCurrencyAdditionalValue = expenseCurrencyAdditionalChoices.includes(selectedExpenseCurrency) ? selectedExpenseCurrency : '';
   const useFloatingPlacePanel = true;
   const canAddSelectedPlaceToItinerary = Boolean(activeTripId && !isReadOnlyTrip);
-  const selectedPlaceOpeningHours = getOpeningHours(selectedPlace);
-  const selectedPlaceBusinessStatus = getBusinessStatusLabel(selectedPlace?.businessStatus);
 
   const renderCashWalletControls = () => (
     <div className="cash-wallet-controls">
@@ -5764,6 +5751,7 @@ function App() {
                                           <div style={{ flex: 1, minWidth: 0 }}>
                                             <h3 style={{ fontSize: '13px', fontWeight: '800', color: '#111827', margin: '0 0 4px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</h3>
                                             <p style={{ fontSize: '10px', fontWeight: '700', color: '#9ca3af', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{address || '주소 정보 없음'}</p>
+                                            <PlaceBusinessDetails place={{ ...place, name, loc: address }} />
                                           </div>
                                           <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
                                             {activeTripId && !isReadOnlyTrip && (
@@ -5980,6 +5968,7 @@ function App() {
                                   {item.displayName || item.name || '장소 이름 정보 없음'}
                                 </h4>
                                 {item.loc && <p style={{ display: 'flex', alignItems: 'center', gap: '3px', margin: '4px 0 0', color: '#94a3b8', fontSize: '10px', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><MapPin size={10} />{item.loc}</p>}
+                                <PlaceBusinessDetails place={item} />
                               </div>
                               <div className="read-only-hide" style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: '1 1 230px', justifyContent: 'flex-end' }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', backgroundColor: '#eff6ff', border: '1px solid #dbeafe', borderRadius: '10px', overflow: 'hidden' }}>
@@ -6087,7 +6076,7 @@ function App() {
                       </div>
                     </div>
 
-                    {dayPlan.orderMode === 'distance' && <p className="itinerary-distance-order-note" role="status">거리 정렬 순서를 유지하고 있습니다. 도착 시간은 변경되지 않았으니 확인해주세요. 새 장소는 마지막에 추가됩니다.</p>}
+                    {dayPlan.orderMode === 'distance' && <p className="itinerary-distance-order-note" role="status">가까운 순 정렬이 적용됐습니다. 도착 시간을 직접 변경하면 시간순으로 정렬됩니다.</p>}
                     {lodgingForDate(getLodgings(activeTrip), tripDayDate(activeTrip?.startDate, parseDay(dayPlan?.day))).map(({ lodging, checkIn, checkOut, overnight }) => (
                       <div className="lodging-day-summary" key={`lodging-${lodging.id}`}>
                         🏨 {lodging.name} · {[checkOut && '체크아웃', checkIn && '체크인', overnight && '숙박'].filter(Boolean).join(' · ')}
@@ -6210,6 +6199,7 @@ function App() {
                                         {getSafeExternalUrl(item.reservationUrl) && <a href={getSafeExternalUrl(item.reservationUrl)} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()} style={{ padding: '3px 6px', borderRadius: '6px', background: '#eff6ff', color: '#2563eb', fontSize: '9px', fontWeight: '800' }}>예약 링크</a>}
                                       </div>}
                                     </div>
+                                    <PlaceBusinessDetails place={item} visitDate={tripDayDate(activeTrip?.startDate, parseDay(dayPlan.day))} />
                                   </div>
                                   <div className="itinerary-item-actions" style={{
                                     display: 'grid', 
@@ -7669,7 +7659,7 @@ function App() {
             <Suspense fallback={<div className="map-pane-loading-state" role="status" aria-label="지도 화면 불러오는 중"><div className="map-unavailable-spinner" aria-hidden="true" /></div>}>
               <LazyMapPane
                 mapData={{ savedPlaceEntries, userLocation, activeDay, itinerary, reserveItems, searchResult, dayColors }}
-                mapView={{ showFullRoute, routeSettings: mapRouteSettings, roadRoutes: mapRoadRoutes, selectedPlace, useFloatingPlacePanel, selectedPlaceBusinessStatus, selectedPlaceOpeningHours, windowWidth: windowSize.width, sidebarOpen, activeTripId, tripName: activeTrip?.name, isReadOnlyTrip, itineraryDisplayName, itineraryEmoji, itineraryTime }}
+                mapView={{ showFullRoute, routeSettings: mapRouteSettings, roadRoutes: mapRoadRoutes, selectedPlace, useFloatingPlacePanel, windowWidth: windowSize.width, sidebarOpen, activeTripId, tripName: activeTrip?.name, isReadOnlyTrip, itineraryDisplayName, itineraryEmoji, itineraryTime }}
                 actions={{
                   onSaveMapImage: saveBlobAsFile,
                   onMapLoad: (loadedMap) => {
@@ -7725,16 +7715,7 @@ function App() {
                     <MapPin size={10} color="#3b82f6" style={{ marginTop: '1px', flexShrink: 0 }} />
                     <span style={{ overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{selectedPlace.loc}</span>
                     </p>
-                    {(selectedPlaceBusinessStatus || selectedPlaceOpeningHours.length > 0) && (
-                      <details className="place-hours-summary">
-                        <summary><Clock size={11} aria-hidden="true" />영업시간{selectedPlaceBusinessStatus ? ` · ${selectedPlaceBusinessStatus}` : ''}</summary>
-                        {selectedPlaceOpeningHours.length > 0 && (
-                          <div className="place-hours-list">
-                            {selectedPlaceOpeningHours.map((hours, index) => <span key={`${hours}-${index}`}>{hours}</span>)}
-                          </div>
-                        )}
-                      </details>
-                    )}
+                    <PlaceBusinessDetails place={selectedPlace} />
                   </div>
                 </div>
                 <div className="mobile-place-add-header-actions">
@@ -7960,6 +7941,12 @@ function App() {
               <textarea value={editingTimeItem.memo || ''} onChange={(e) => setEditingTimeItem({ ...editingTimeItem, memo: e.target.value })} placeholder="체크인 방법, 준비물 등을 적어두세요." rows={3} style={{ width: '100%', boxSizing: 'border-box', marginTop: '7px', padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '12px', resize: 'vertical' }} />
             </label>
 
+            <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b', marginBottom: '14px' }}>메뉴 링크 (선택)
+              <input type="url" value={editingTimeItem.menuURL} maxLength={2048} placeholder="https://"
+                onChange={(event) => setEditingTimeItem({ ...editingTimeItem, menuURL: event.target.value, menuError: false })}
+                style={{ width: '100%', boxSizing: 'border-box', padding: '10px', marginTop: '7px', borderRadius: '10px', border: '1px solid #e2e8f0' }} />
+              {editingTimeItem.menuError && <span role="alert">https:// 또는 http://로 시작하는 메뉴 주소를 입력해 주세요.</span>}
+            </label>
             {editingTimeItem.day !== 'reserve' && <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', fontSize: '13px', fontWeight: '700', color: '#334155' }}>
               <input type="checkbox" checked={editingTimeItem.routeOrderFixed} onChange={(e) => setEditingTimeItem({ ...editingTimeItem, routeOrderFixed: e.target.checked })} />
               거리순 정렬에서 순서와 시간 고정
@@ -7983,6 +7970,11 @@ function App() {
               </button>
               <button 
                 onClick={() => {
+                  const menuURL = editingTimeItem.menuURL.trim();
+                  if (menuURL && !safePlaceLink(menuURL)) {
+                    setEditingTimeItem({ ...editingTimeItem, menuError: true });
+                    return;
+                  }
                   updateItineraryItem(editingTimeItem.sourceDay, editingTimeItem.id, {
                     day: editingTimeItem.day,
                     time: editingTimeItem.time,
@@ -7990,6 +7982,7 @@ function App() {
                     displayName: editingTimeItem.displayName.trim() || editingTimeItem.originalName,
                     reservationNumber: editingTimeItem.reservationNumber?.trim() || '',
                     reservationUrl: editingTimeItem.reservationUrl?.trim() || '',
+                    menuURL,
                     memo: editingTimeItem.memo?.trim() || ''
                   });
                   if (editingTimeItem.day === 'reserve') setActiveDay('reserve');

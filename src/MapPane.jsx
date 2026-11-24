@@ -1,6 +1,7 @@
 import React, { useMemo, useRef } from 'react';
+import PlaceBusinessDetails from './PlaceBusinessDetails.jsx';
 import { GoogleMap, useJsApiLoader, OverlayViewF, InfoWindow, Polyline } from '@react-google-maps/api';
-import { AlertCircle, Clock, Heart, LocateFixed, MapPin, Menu, PlusCircle } from 'lucide-react';
+import { AlertCircle, Heart, LocateFixed, MapPin, Menu, PlusCircle } from 'lucide-react';
 import { getMapAvailability } from './mapAvailability';
 import { buildItineraryRouteGroups, getRoutePoint, normalizeRouteSettings } from './itineraryRoutes';
 import MapSnapshotControl from './MapSnapshotControl';
@@ -94,7 +95,7 @@ const mapOptions = {
 
 export default function MapPane({ mapData = {}, mapView = {}, actions = {}, formComponents = {} }) {
   const { savedPlaceEntries = [], userLocation, activeDay, itinerary = [], reserveItems = [], searchResult, dayColors = [] } = mapData;
-  const { showFullRoute = false, selectedPlace, useFloatingPlacePanel = false, selectedPlaceBusinessStatus = '', selectedPlaceOpeningHours = [], windowWidth = 1024, sidebarOpen = true, activeTripId, isReadOnlyTrip = false, itineraryDisplayName = '', itineraryEmoji = '📍', itineraryTime = '' } = mapView;
+  const { showFullRoute = false, selectedPlace, useFloatingPlacePanel = false, windowWidth = 1024, sidebarOpen = true, activeTripId, isReadOnlyTrip = false, itineraryDisplayName = '', itineraryEmoji = '📍', itineraryTime = '' } = mapView;
   const { onMapLoad, onMapUnmount, onMapClick, onSelectedPlaceChange, onMyLocation, onOpenSidebar, onToggleFavorite, isFavorite, onActiveDayChange, onItineraryDisplayNameChange, onItineraryEmojiChange, onItineraryTimeChange, onAddToItinerary } = actions;
   const { ItineraryEmojiPicker, PremiumTimeInput } = formComponents;
   const parseDay = (day) => parseInt(String(day).replace(/[^0-9]/g, '')) || 0;
@@ -381,16 +382,7 @@ export default function MapPane({ mapData = {}, mapView = {}, actions = {}, form
                       <MapPin size={9} color="#3b82f6" style={{ marginTop: '1px', flexShrink: 0 }} />
                       <span style={{ overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}>{selectedPlace.loc}</span>
                     </p>
-                    {(selectedPlaceBusinessStatus || selectedPlaceOpeningHours.length > 0) && (
-                      <details className="place-hours-summary">
-                        <summary><Clock size={11} aria-hidden="true" />영업시간{selectedPlaceBusinessStatus ? ` · ${selectedPlaceBusinessStatus}` : ''}</summary>
-                        {selectedPlaceOpeningHours.length > 0 && (
-                          <div className="place-hours-list">
-                            {selectedPlaceOpeningHours.map((hours, index) => <span key={`${hours}-${index}`}>{hours}</span>)}
-                          </div>
-                        )}
-                      </details>
-                    )}
+                    <PlaceBusinessDetails place={selectedPlace} />
                   </div>
                 </div>
 

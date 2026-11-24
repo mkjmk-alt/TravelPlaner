@@ -86,12 +86,32 @@ test('applies to just the selected day and rejects a stale preview after edits o
   assert.equal(api().applyNearbyOrderPreview(next, preview), null, 'A preview cannot apply twice');
 });
 
-test('preserves the chosen order after time edits and appended places but leaves legacy time ordering intact', () => {
+test('preserves the chosen order when appending places but leaves legacy time ordering intact', () => {
   const day = { day: 1, orderMode: 'distance' };
   const items = [place('a', 0, '12:00'), place('b', 1, '08:00'), place('new', 2, '07:00')];
   assert.deepEqual(ids(api().sortDayItems(day, items)), ['a', 'b', 'new']);
   assert.deepEqual(ids(api().sortDayItems({ day: 2 }, items)), ['new', 'b', 'a']);
   assert.deepEqual(ids(items), ['a', 'b', 'new']);
+});
+
+test('after nearby ordering, editing a time changes visit order and route without altering other times', () => {
+  const hotel = { ...place('hotel', 0, '09:00'), routeOrderFixed: true };
+  const day = { day: 1, orderMode: 'distance', items: [
+    hotel, place('near', '1', '10:00'), place('far', 3, '11:00'),
+    place('untimed', 4, ''), place('end', 5, '23:59')
+  ] };
+  const next = api().applyEditedDayItems(day, day.items.map(item =>
+    item.id === 'far' ? { ...item, time: '09:30' } : item
+  ), { timeChanged: true });
+  assert.equal(next.orderMode, undefined);
+  assert.equal(day.orderMode, 'distance');
+  assert.deepEqual(ids(next.items), ['hotel', 'far', 'near', 'end', 'untimed']);
+  assert.equal(next.items[2].lng, 1);
+  assert.equal(next.items[0], hotel);
+  assert.deepEqual(buildItineraryRouteGroups({ itinerary: [next], activeDay: 1 })[0].points.map(point => point.lng), [0, 3, 1, 5, 4]);
+  const memoEdit = api().applyEditedDayItems(day, day.items.map(item => ({ ...item, memo: '새 메모' })));
+  assert.equal(memoEdit.orderMode, 'distance');
+  assert.deepEqual(ids(memoEdit.items), ids(day.items));
 });
 
 test('keeps the existing time slots when manually adjusting a distance-sorted day', () => {

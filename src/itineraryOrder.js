@@ -104,11 +104,30 @@ export const applyNearbyOrderPreview = (itinerary, preview) => {
     : day);
 };
 
-// Existing days keep their time-based behavior. A distance-sorted day's order
-// stays explicit when editing times or appending/moving places into the day.
+// A distance-sorted day retains its explicit order when places are appended.
 export const sortDayItems = (day, items, { missingTime = '00:00' } = {}) => day.orderMode === 'distance'
   ? [...items]
   : [...items].sort((left, right) => (left.time || missingTime).localeCompare(right.time || missingTime));
+
+export const applyEditedDayItems = (day, items, { timeChanged = false } = {}) => {
+  if (!timeChanged) return { ...day, items: sortDayItems(day, items, { missingTime: '23:59' }) };
+  const next = { ...day, items: [...items].sort((left, right) => {
+    const leftTime = hasValidTime(left) ? left.time : '';
+    const rightTime = hasValidTime(right) ? right.time : '';
+    if (!leftTime || !rightTime) return Number(!leftTime) - Number(!rightTime);
+    return leftTime.localeCompare(rightTime);
+  }) };
+  if (next.orderMode === 'distance') {
+    delete next.orderMode;
+    // Preserve these map points when the day syncs to the native time-ordered projection.
+    next.items = next.items.map(item => {
+      if (item.nativePlaceSource === 'google' || (typeof item.lat !== 'string' && typeof item.lng !== 'string')) return item;
+      const point = getRoutePoint(item);
+      return point ? { ...item, ...point } : item;
+    });
+  }
+  return next;
+};
 
 export const moveDayItem = (day, itemId, direction) => {
   const items = [...(day.items || [])];
