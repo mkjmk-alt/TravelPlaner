@@ -158,6 +158,33 @@ body {
   gap: 10px;
 }
 
+.itinerary-reserve-card {
+  margin-bottom: 20px;
+  overflow: hidden;
+  border: 1px solid #dbeafe;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.itinerary-reserve-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 0;
+  border-bottom: 1px solid #dbeafe;
+  background: #eff6ff;
+  color: #1e40af;
+  font-size: 14px;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+.itinerary-reserve-header[aria-pressed='true'] { background: #dbeafe; }
+.itinerary-reserve-header span { margin-left: auto; font-size: 12px; }
+
 .itinerary-day-items { padding-inline: 12px; }
 .itinerary-day-empty { padding: 20px 12px; text-align: center; color: #64748b; font-size: 13px; }
 
@@ -248,13 +275,15 @@ body {
 }
 .itinerary-row-action:hover { background: #eff6ff; }
 .itinerary-row-action:focus-visible,
-.itinerary-item-focus:focus-visible { outline: 2px solid #2563eb; outline-offset: -2px; }
+.itinerary-item-focus:focus-visible,
+.itinerary-reserve-header:focus-visible { outline: 2px solid #2563eb; outline-offset: -2px; }
 
 .itinerary-row-menu { max-width: 360px; }
 .itinerary-row-menu-body { display: grid; gap: 4px; }
 .itinerary-row-menu-body h3 { color: #475569; font-size: 14px; overflow-wrap: anywhere; margin-bottom: 6px; }
 .itinerary-row-menu-body p { font-size: 14px; margin-bottom: 4px; }
-.itinerary-row-menu-body button {
+.itinerary-row-menu-body button,
+.itinerary-row-menu-body select {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -270,7 +299,7 @@ body {
   text-align: left;
   cursor: pointer;
 }
-.itinerary-row-menu-body button:disabled { color: #718096; cursor: default; }
+.itinerary-row-menu-body :is(button, select):disabled { color: #718096; cursor: default; }
 .itinerary-row-menu-body button.is-destructive { background: #fef2f2; color: #b91c1c; }
 
 @media (max-width: 768px) {

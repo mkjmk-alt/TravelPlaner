@@ -2527,6 +2527,7 @@ function App() {
     ? readOnlySharedTrip
     : (trips || []).find(t => String(t.id) === String(activeTripId));
   const itinerary = useMemo(() => activeTrip?.itinerary || [], [activeTrip]);
+  const itineraryDayNumbers = useMemo(() => itinerary.map(plan => parseDay(plan.day)), [itinerary]);
   const [itineraryNames, setItineraryNames] = useState(null);
   const resolvedItineraryNames = itineraryNames?.tripId === activeTripId ? itineraryNames?.names : undefined;
   const rememberItineraryPlaceName = useCallback((id, name) => {
@@ -4244,6 +4245,64 @@ function App() {
     } else {
       window.open(url.href, '_blank');
     }
+  };
+
+  const renderItineraryRow = (item, index, itemCount, day) => {
+    const isReserve = day === 'reserve';
+    const moveWithinList = direction => isReserve ? moveReserveItem(item.id, direction) : moveItineraryItem(day, item.id, direction);
+    const deleteItem = () => isReserve ? removeReserveItem(item.id) : removeFromItinerary(day, item.id);
+    const name = itineraryPlaceLabel(item);
+    const position = getPlaceCoordinates(item.lat, item.lng);
+    const placeID = getGooglePlaceID(item);
+    const address = String(item.loc || item.address || '').trim();
+    const showAddress = address && address.toLowerCase() !== name.toLowerCase();
+    const time = item.time || '미정';
+    const emoji = item.emoji || ITINERARY_ICON_OPTIONS.find(option => option.category === getItineraryItemCategory(item))?.emoji || '📍';
+    const routeFixed = !isReserve && isRouteOrderFixed(item);
+    const reservationURL = getSafeExternalUrl(item.reservationUrl);
+    return (
+      <div className={isReserve ? 'itinerary-item-card reserve-item-card' : 'itinerary-item-card'} key={item.id}>
+        <div className="itinerary-item-order">
+          {!isReserve && isBulkMoveMode && <input className="itinerary-bulk-checkbox" type="checkbox"
+            checked={selectedItineraryItems.includes(item.id)}
+            onChange={() => toggleItineraryItemSelection(item.id)}
+            aria-label={`${name} 선택`} />}
+          <span className="itinerary-item-number" aria-label={`${index + 1}번째 ${isReserve ? '예비 장소' : '일정'}`}>{index + 1}</span>
+        </div>
+        <span className={`itinerary-item-time${item.time ? '' : ' is-unscheduled'}`}
+          aria-label={`${name} 도착 시간 ${time}`}>{time}</span>
+        <div className="itinerary-item-place">
+          <span className="itinerary-item-icon" aria-hidden="true">{emoji}</span>
+          <div className="itinerary-item-place-text">
+            <h4 className="itinerary-item-title" title={name}>
+              {routeFixed && <Lock size={12} className="itinerary-item-lock" aria-label="거리순 정렬에서 고정됨" />}
+              {position ? (
+                <button type="button" className="itinerary-item-focus" aria-label={`${name} 지도에서 보기`}
+                  onClick={() => focusItineraryPlace(item, position)}>{renderItineraryPlaceName(item)}</button>
+              ) : renderItineraryPlaceName(item)}
+            </h4>
+            {showAddress && <p className="itinerary-item-address" title={address}>{address}</p>}
+            {!isReserve && (item.reservationNumber || item.memo || reservationURL) && <div className="itinerary-item-notes">
+              {item.reservationNumber && <span title={`예약 ${item.reservationNumber}`}>예약 {item.reservationNumber}</span>}
+              {item.memo && <span title={item.memo}>{item.memo}</span>}
+              {reservationURL && <a href={reservationURL} target="_blank" rel="noreferrer">예약 링크</a>}
+            </div>}
+          </div>
+        </div>
+        <div className="itinerary-row-actions">
+          <PlaceBusinessDetails iconOnly place={item} name={name}
+            visitDate={isReserve ? undefined : tripDayDate(activeTrip?.startDate, parseDay(day))} />
+          {(!isReserve || !isReadOnlyTrip) && <ItineraryRowMenu name={name}
+            onEdit={!isReserve && !isReadOnlyTrip ? () => startEditingItineraryItem(day, item) : undefined}
+            onMoveUp={index > 0 && !isReadOnlyTrip ? () => moveWithinList('up') : undefined}
+            onMoveDown={index < itemCount - 1 && !isReadOnlyTrip ? () => moveWithinList('down') : undefined}
+            dayMove={isReserve ? { days: itineraryDayNumbers, move: target => moveReserveItemToDay(item.id, target) } : undefined}
+            onNavigate={!isReserve && (position || placeID || address || item.name || item.displayName)
+              ? () => navigateToItineraryPlace(item, position, address, placeID) : undefined}
+            onDelete={isReadOnlyTrip ? undefined : deleteItem} />}
+        </div>
+      </div>
+    );
   };
 
   const startEditingItineraryItem = (dayNumber, item) => {
@@ -5979,85 +6038,22 @@ function App() {
                   </div>
                 )}
 
-                {/* Reserve list: places saved before assigning them to a day. */}
-                <div
-                  className="itinerary-reserve-card"
-                  onClick={() => setActiveDay('reserve')}
-                  style={{
-                    backgroundColor: activeDay === 'reserve' ? '#eff6ff' : 'white',
-                    borderRadius: '24px',
-                    border: `1px solid ${activeDay === 'reserve' ? '#93c5fd' : '#dbeafe'}`,
-                    boxShadow: '0 4px 20px rgba(37, 99, 235, 0.08)',
-                    overflow: 'hidden',
-                    marginBottom: '32px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <div style={{ padding: '20px 24px', backgroundColor: activeDay === 'reserve' ? '#dbeafe' : '#eff6ff', borderBottom: '1px solid #dbeafe', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
-                      <div style={{ width: '44px', height: '44px', borderRadius: '14px', backgroundColor: '#2563eb', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <Star size={21} fill="currentColor" />
-                      </div>
-                      <div style={{ minWidth: 0 }}>
-                        <h3 style={{ margin: 0, color: '#1e3a8a', fontSize: '17px', fontWeight: '900' }}>예비 목록</h3>
-                        <p style={{ margin: '4px 0 0', color: '#2563eb', fontSize: '11px', fontWeight: '700' }}>일차를 정하기 전 잠시 보관하는 장소</p>
-                      </div>
-                    </div>
-                    <span style={{ flexShrink: 0, padding: '7px 10px', borderRadius: '10px', backgroundColor: 'white', color: '#2563eb', fontSize: '11px', fontWeight: '900' }}>{reserveItems.length} 장소</span>
-                  </div>
-
-                  <div onClick={(event) => event.stopPropagation()} style={{ padding: '20px 24px' }}>
+                <section className="itinerary-reserve-card">
+                  <h3>
+                    <button type="button" className="itinerary-reserve-header" aria-pressed={activeDay === 'reserve'}
+                      onClick={() => setActiveDay('reserve')}>
+                      <Star size={16} aria-hidden="true" /> 예비 목록
+                      <span>{reserveItems.length} 장소</span>
+                    </button>
+                  </h3>
+                  <div className="itinerary-day-items">
                     {reserveItems.length === 0 ? (
-                      <div style={{ padding: '24px 16px', textAlign: 'center', border: '2px dashed #bfdbfe', borderRadius: '16px' }}>
-                        <p style={{ margin: 0, color: '#2563eb', fontSize: '12px', fontWeight: '800' }}>장소 추가 창에서 예비 목록을 선택해 보관할 수 있습니다.</p>
-                      </div>
+                      <div className="itinerary-day-empty">장소 추가 창에서 예비 목록을 선택해 보관할 수 있습니다.</div>
                     ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        {reserveItems.map((item, reserveIndex) => {
-                          const reserveDeleteId = `reserve-${item.id}`;
-                          return (
-                            <div key={item.id} className="reserve-item-card" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', padding: '14px', backgroundColor: 'white', border: '1px solid #dbeafe', borderRadius: '18px', boxShadow: '0 2px 8px rgba(37, 99, 235, 0.05)' }}>
-                              <div aria-label={`${reserveIndex + 1}번째 예비 장소`} style={{ width: '34px', height: '34px', borderRadius: '50%', backgroundColor: '#3b82f6', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', fontWeight: '900', flexShrink: 0 }}>{reserveIndex + 1}</div>
-                              <div style={{ flex: '1 1 150px', minWidth: 0 }}>
-                                <h4
-                                  onClick={() => {
-                                    if (!item.lat || !item.lng) return;
-                                    const newPos = { lat: Number(item.lat), lng: Number(item.lng) };
-                                    setSelectedPlace(item);
-                                    runOrQueueMapCameraAction(mapRef, pendingMapCameraActionRef, (activeMap) => {
-                                      activeMap.panTo(newPos);
-                                      activeMap.setZoom(16);
-                                    });
-                                    if (windowSize.width < 768 && sheetMode === 'full') setSheetMode('half');
-                                  }}
-                                  style={{ margin: 0, color: item.lat && item.lng ? '#2563eb' : '#111827', textDecoration: item.lat && item.lng ? 'underline' : 'none', textDecorationColor: '#93c5fd', fontSize: '15px', fontWeight: '900', lineHeight: 1.3, whiteSpace: 'normal', overflow: 'visible', overflowWrap: 'anywhere', wordBreak: 'keep-all', cursor: item.lat && item.lng ? 'pointer' : 'default' }}
-                                  title={item.lat && item.lng ? '지도에서 위치 보기' : undefined}
-                                >
-                                  {renderItineraryPlaceName(item)}
-                                </h4>
-                                {item.loc && <p style={{ display: 'flex', alignItems: 'center', gap: '3px', margin: '4px 0 0', color: '#94a3b8', fontSize: '10px', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><MapPin size={10} />{item.loc}</p>}
-                                <PlaceBusinessDetails place={item} name={itineraryPlaceLabel(item)} />
-                              </div>
-                              <div className="read-only-hide" style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: '1 1 230px', justifyContent: 'flex-end' }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', backgroundColor: '#eff6ff', border: '1px solid #dbeafe', borderRadius: '10px', overflow: 'hidden' }}>
-                                  <button type="button" aria-label="예비 장소 위로 이동" onClick={() => moveReserveItem(item.id, 'up')} disabled={reserveIndex === 0} style={{ width: '28px', height: '20px', padding: 0, border: 'none', background: 'transparent', color: reserveIndex === 0 ? '#bfdbfe' : '#2563eb', cursor: reserveIndex === 0 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChevronUp size={14} /></button>
-                                  <button type="button" aria-label="예비 장소 아래로 이동" onClick={() => moveReserveItem(item.id, 'down')} disabled={reserveIndex === reserveItems.length - 1} style={{ width: '28px', height: '20px', padding: 0, border: 'none', borderTop: '1px solid #dbeafe', background: 'transparent', color: reserveIndex === reserveItems.length - 1 ? '#bfdbfe' : '#2563eb', cursor: reserveIndex === reserveItems.length - 1 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChevronDown size={14} /></button>
-                                </div>
-                                <select value="" aria-label={`${itineraryPlaceLabel(item)} 일차로 이동`} onChange={(event) => moveReserveItemToDay(item.id, event.target.value)} onClick={(event) => event.stopPropagation()} style={{ minWidth: '116px', maxWidth: '140px', padding: '8px 8px', border: '1px solid #bfdbfe', borderRadius: '10px', backgroundColor: '#f8fbff', color: '#1d4ed8', fontSize: '10px', fontWeight: '800', outline: 'none' }}>
-                                  <option value="">일차로 이동</option>
-                                  {itinerary.map(dayPlan => <option key={`reserve-move-${item.id}-${dayPlan.day}`} value={parseDay(dayPlan.day)}>{parseDay(dayPlan.day)}일차</option>)}
-                                </select>
-                                <button type="button" aria-label="예비 장소 삭제" onClick={(event) => { event.stopPropagation(); handleInlineDelete(event, reserveDeleteId, () => removeReserveItem(item.id)); }} style={{ width: '36px', height: '36px', flexShrink: 0, border: `1px solid ${confirmDeleteId === reserveDeleteId ? '#dc2626' : '#fee2e2'}`, borderRadius: '10px', backgroundColor: confirmDeleteId === reserveDeleteId ? '#ef4444' : '#fff5f5', color: confirmDeleteId === reserveDeleteId ? 'white' : '#f87171', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '900' }}>
-                                  {confirmDeleteId === reserveDeleteId ? '확인' : <Trash2 size={16} />}
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
+                      reserveItems.map((item, index) => renderItineraryRow(item, index, reserveItems.length, 'reserve'))
                     )}
                   </div>
-                </div>
+                </section>
 
                 {(itinerary || []).map((dayPlan, dIdx) => (
                   <div 
@@ -6157,59 +6153,7 @@ function App() {
                       {(!dayPlan?.items || dayPlan.items.length === 0) ? (
                         <div className="itinerary-day-empty">이 날의 일정을 추가해 보세요!</div>
                       ) : (
-                        dayPlan.items.map((item, iIdx) => {
-                          const name = itineraryPlaceLabel(item);
-                          const position = getPlaceCoordinates(item.lat, item.lng);
-                          const placeID = getGooglePlaceID(item);
-                          const address = String(item.loc || item.address || '').trim();
-                          const showAddress = address && address.toLowerCase() !== name.toLowerCase();
-                          const time = item.time || '미정';
-                          const emoji = item.emoji || ITINERARY_ICON_OPTIONS.find(option => option.category === getItineraryItemCategory(item))?.emoji || '📍';
-                          const routeFixed = isRouteOrderFixed(item);
-                          const reservationURL = getSafeExternalUrl(item.reservationUrl);
-                          return (
-                            <div className="itinerary-item-card" key={item.id}>
-                              <div className="itinerary-item-order">
-                                {isBulkMoveMode && <input className="itinerary-bulk-checkbox" type="checkbox"
-                                  checked={selectedItineraryItems.includes(item.id)}
-                                  onChange={() => toggleItineraryItemSelection(item.id)}
-                                  aria-label={`${name} 선택`} />}
-                                <span className="itinerary-item-number" aria-label={`${iIdx + 1}번째 일정`}>{iIdx + 1}</span>
-                              </div>
-                              <span className={`itinerary-item-time${item.time ? '' : ' is-unscheduled'}`}
-                                aria-label={`${name} 도착 시간 ${time}`}>{time}</span>
-                              <div className="itinerary-item-place">
-                                <span className="itinerary-item-icon" aria-hidden="true">{emoji}</span>
-                                <div className="itinerary-item-place-text">
-                                  <h4 className="itinerary-item-title" title={name}>
-                                    {routeFixed && <Lock size={12} className="itinerary-item-lock" aria-label="거리순 정렬에서 고정됨" />}
-                                    {position ? (
-                                      <button type="button" className="itinerary-item-focus" aria-label={`${name} 지도에서 보기`}
-                                        onClick={() => focusItineraryPlace(item, position)}>{renderItineraryPlaceName(item)}</button>
-                                    ) : renderItineraryPlaceName(item)}
-                                  </h4>
-                                  {showAddress && <p className="itinerary-item-address" title={address}>{address}</p>}
-                                  {(item.reservationNumber || item.memo || reservationURL) && <div className="itinerary-item-notes">
-                                    {item.reservationNumber && <span title={`예약 ${item.reservationNumber}`}>예약 {item.reservationNumber}</span>}
-                                    {item.memo && <span title={item.memo}>{item.memo}</span>}
-                                    {reservationURL && <a href={reservationURL} target="_blank" rel="noreferrer">예약 링크</a>}
-                                  </div>}
-                                </div>
-                              </div>
-                              <div className="itinerary-row-actions">
-                                <PlaceBusinessDetails iconOnly place={item} name={name}
-                                  visitDate={tripDayDate(activeTrip?.startDate, parseDay(dayPlan.day))} />
-                                <ItineraryRowMenu name={name}
-                                  onEdit={isReadOnlyTrip ? undefined : () => startEditingItineraryItem(dayPlan.day, item)}
-                                  onMoveUp={iIdx > 0 ? () => moveItineraryItem(dayPlan.day, item.id, 'up') : undefined}
-                                  onMoveDown={iIdx < dayPlan.items.length - 1 ? () => moveItineraryItem(dayPlan.day, item.id, 'down') : undefined}
-                                  onNavigate={position || placeID || address || item.name || item.displayName
-                                    ? () => navigateToItineraryPlace(item, position, address, placeID) : undefined}
-                                  onDelete={isReadOnlyTrip ? undefined : () => removeFromItinerary(dayPlan.day, item.id)} />
-                              </div>
-                            </div>
-                          );
-                        })
+                        dayPlan.items.map((item, index) => renderItineraryRow(item, index, dayPlan.items.length, dayPlan.day))
                       )}
                     </div>
                   </div>
