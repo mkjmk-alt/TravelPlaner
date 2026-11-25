@@ -158,6 +158,128 @@ body {
   gap: 10px;
 }
 
+.itinerary-day-items { padding-inline: 12px; }
+.itinerary-day-empty { padding: 20px 12px; text-align: center; color: #64748b; font-size: 13px; }
+
+.itinerary-item-card {
+  display: grid;
+  grid-template-columns: auto 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  min-height: 54px;
+  padding: 5px 4px;
+}
+
+.itinerary-item-card + .itinerary-item-card { border-top: 1px solid #e2e8f0; }
+.itinerary-item-order { display: flex; align-items: center; gap: 5px; }
+.itinerary-item-number {
+  display: grid;
+  place-items: center;
+  min-width: 24px;
+  height: 24px;
+  padding-inline: 4px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.itinerary-item-time { color: #1d4ed8; font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.itinerary-item-time.is-unscheduled { color: #64748b; }
+.itinerary-item-place { display: flex; align-items: baseline; gap: 5px; min-width: 0; }
+.itinerary-item-icon { flex: none; width: 18px; font-size: 14px; }
+.itinerary-item-place-text { flex: 1; min-width: 0; }
+.itinerary-item-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+.itinerary-item-title > span { min-width: 0; }
+.itinerary-item-title .itinerary-place-name-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+.itinerary-item-title .itinerary-name-attribution { margin-top: 1px; }
+.itinerary-item-lock { flex: none; margin-top: 3px; color: #1d4ed8; }
+.itinerary-item-focus {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #1d4ed8;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.itinerary-item-focus:hover { text-decoration: underline; }
+.itinerary-item-address,
+.itinerary-item-notes {
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.itinerary-item-address,
+.itinerary-item-notes span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.itinerary-item-notes { display: flex; align-items: center; gap: 5px; }
+.itinerary-item-notes a { flex: none; color: #1d4ed8; white-space: nowrap; }
+
+.itinerary-row-actions { display: flex; align-items: center; }
+.itinerary-row-action {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #1d4ed8;
+  cursor: pointer;
+}
+.itinerary-row-action:hover { background: #eff6ff; }
+.itinerary-row-action:focus-visible,
+.itinerary-item-focus:focus-visible { outline: 2px solid #2563eb; outline-offset: -2px; }
+
+.itinerary-row-menu { max-width: 360px; }
+.itinerary-row-menu-body { display: grid; gap: 4px; }
+.itinerary-row-menu-body h3 { color: #475569; font-size: 14px; overflow-wrap: anywhere; margin-bottom: 6px; }
+.itinerary-row-menu-body p { font-size: 14px; margin-bottom: 4px; }
+.itinerary-row-menu-body button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 9px;
+  background: #f8fafc;
+  color: #1e293b;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.itinerary-row-menu-body button:disabled { color: #718096; cursor: default; }
+.itinerary-row-menu-body button.is-destructive { background: #fef2f2; color: #b91c1c; }
+
+@media (max-width: 768px) {
+  .itinerary-day-items { padding-inline: 8px; }
+  .itinerary-day-card .itinerary-distance-order-note { margin: 6px 10px 0; }
+  .itinerary-day-card .lodging-day-summary,
+  .itinerary-day-card .itinerary-conflict-warning { margin: 6px 10px 0 !important; padding: 6px 8px !important; }
+}
+
 .itinerary-day-header-actions {
   display: flex;
   align-items: center;
@@ -972,18 +1094,8 @@ body {
 .read-only-view .expense-form-card,
 .read-only-view .cash-reconciliation-card,
 .read-only-view .currency-manager-card,
-.read-only-view .expense-item-actions,
-.read-only-view .itinerary-edit-control,
-.read-only-view .itinerary-delete-control,
-.read-only-view .itinerary-order-control {
+.read-only-view .expense-item-actions {
   display: none !important;
-}
-
-.read-only-view .itinerary-item-actions {
-  display: flex !important;
-  width: 44px;
-  grid-template-columns: none !important;
-  grid-template-rows: none !important;
 }
 
 .read-only-view .itinerary-navigation-control {
@@ -3345,57 +3457,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     padding: 14px 16px !important;
   }
 
-  .itinerary-day-items {
-    padding: 12px !important;
-  }
-
-  .itinerary-item-card {
-    gap: 8px !important;
-    padding: 12px !important;
-    border-radius: 16px !important;
-  }
-
-  .itinerary-item-main {
-    gap: 8px !important;
-  }
-
-  .itinerary-item-number {
-    width: 30px !important;
-    height: 30px !important;
-    border-radius: 10px !important;
-    font-size: 13px !important;
-  }
-
-  .itinerary-item-actions {
-    grid-template-columns: repeat(2, 36px) !important;
-    grid-template-rows: repeat(2, 36px) !important;
-    gap: 4px !important;
-  }
-
-  .itinerary-item-actions > div:first-child,
-  .itinerary-item-actions > div:last-child {
-    width: 36px !important;
-    height: 36px !important;
-  }
-
-  .itinerary-item-actions > div:first-child button {
-    width: 36px !important;
-    height: 18px !important;
-    padding: 2px !important;
-  }
-
-  .itinerary-item-actions > label,
-  .itinerary-item-actions > button,
-  .itinerary-item-actions > div:last-child button {
-    width: 36px !important;
-    height: 36px !important;
-    border-radius: 10px !important;
-  }
-
-  .itinerary-item-actions svg {
-    width: 15px !important;
-    height: 15px !important;
-  }
 
   /* Google Maps limits InfoWindow content to the map viewport on mobile.
      Render the add form above that viewport so the time controls and action
@@ -3597,56 +3658,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     padding: 16px 20px !important;
   }
 
-  .itinerary-day-items {
-    padding: 16px !important;
-  }
-
-  .itinerary-item-card {
-    gap: 8px !important;
-    padding: 12px !important;
-    border-radius: 16px !important;
-  }
-
-  .itinerary-item-main {
-    gap: 8px !important;
-  }
-
-  .itinerary-item-number {
-    width: 32px !important;
-    height: 32px !important;
-    font-size: 14px !important;
-  }
-
-  .itinerary-item-actions {
-    grid-template-columns: repeat(2, 40px) !important;
-    grid-template-rows: repeat(2, 40px) !important;
-    gap: 4px !important;
-  }
-
-  .itinerary-item-actions > div:first-child,
-  .itinerary-item-actions > div:last-child {
-    width: 40px !important;
-    height: 40px !important;
-  }
-
-  .itinerary-item-actions > div:first-child button {
-    width: 40px !important;
-    height: 20px !important;
-    padding: 2px !important;
-  }
-
-  .itinerary-item-actions > label,
-  .itinerary-item-actions > button,
-  .itinerary-item-actions > div:last-child button {
-    width: 40px !important;
-    height: 40px !important;
-    border-radius: 10px !important;
-  }
-
-  .itinerary-item-actions svg {
-    width: 16px !important;
-    height: 16px !important;
-  }
 }
 
 @media (min-width: 769px) {

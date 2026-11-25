@@ -13,9 +13,9 @@ const prices = {
 
 const descriptions = value => Array.isArray(value) ? value.filter(line => typeof line === 'string') : [];
 
-export default function PlaceBusinessDetails({ place, name, visitDate }) {
+export default function PlaceBusinessDetails({ place, name, visitDate, iconOnly = false }) {
   const id = getGooglePlaceID(place);
-  return <PlaceDetailsTrigger key={id ?? placeMapsURL(place)} place={place} name={name} id={id} visitDate={visitDate} />;
+  return <PlaceDetailsTrigger key={id ?? placeMapsURL(place)} place={place} name={name} id={id} visitDate={visitDate} iconOnly={iconOnly} />;
 }
 
 function PlaceDetailsDialog({ name, address, onClose, children }) {
@@ -52,7 +52,7 @@ function PlaceDetailsDialog({ name, address, onClose, children }) {
   );
 }
 
-function PlaceDetailsTrigger({ place, name, id, visitDate }) {
+function PlaceDetailsTrigger({ place, name, id, visitDate, iconOnly }) {
   const [open, setOpen] = useState(false);
   const [result, setResult] = useState(null);
   const pending = useRef(false);
@@ -97,14 +97,15 @@ function PlaceDetailsTrigger({ place, name, id, visitDate }) {
   const phoneDigits = phone.replace(/[^+\d]/g, '');
 
   return (
-    <div className="business-place-trigger-row">
-      <button type="button" className="business-place-trigger" aria-haspopup="dialog"
+    <div className={iconOnly ? undefined : 'business-place-trigger-row'}>
+      <button type="button" className={iconOnly ? 'itinerary-row-action' : 'business-place-trigger'}
+        aria-label={iconOnly ? '장소 상세' : undefined} title={iconOnly ? '장소 상세' : undefined} aria-haspopup="dialog"
         onClick={event => {
           event.stopPropagation();
           setOpen(true);
           if (!result) void load();
         }}>
-        <Info size={15} aria-hidden="true" />장소 상세
+        <Info size={iconOnly ? 18 : 15} aria-hidden="true" />{!iconOnly && '장소 상세'}
       </button>
       {open && <PlaceDetailsDialog name={name || place.displayName || place.name || '장소'}
         address={place.loc || place.address} onClose={() => setOpen(false)}>

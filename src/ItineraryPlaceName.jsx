@@ -27,7 +27,7 @@ export default function ItineraryPlaceName({ name, lookupID, resolved, maps, onR
 
   return (
     <span ref={titleRef}>
-      {name}
+      <span className="itinerary-place-name-text">{name}</span>
       {resolved && <small className="itinerary-name-attribution" translate="no">Google Maps</small>}
     </span>
   );

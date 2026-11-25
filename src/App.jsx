@@ -13,6 +13,8 @@ import { BRAND_NAME_EN, BRAND_NAME_KO } from './brand';
 import AccountMoreActions from './AccountMoreActions';
 import TravelMemoryPanel from './TravelMemoryPanel';
 import PlaceBusinessDetails from './PlaceBusinessDetails.jsx';
+import { getGooglePlaceID } from './placeBusinessDetails.js';
+import ItineraryRowMenu from './ItineraryRowMenu.jsx';
 import TripRequiredEmptyState from './TripRequiredEmptyState';
 import TripHomeActions from './TripHomeActions';
 import AiItineraryImportDialog from './AiItineraryImportDialog';
@@ -1460,7 +1462,10 @@ function App() {
     }
     setDragOffset(0);
   };
-  const [initialNavigationState] = useState(() => readStoredJson(NAVIGATION_STORAGE_KEY, getDefaultNavigationState()));
+  const [initialNavigationState] = useState(() => {
+    const defaultState = getDefaultNavigationState();
+    return isNativeShell() ? readStoredJson(NAVIGATION_STORAGE_KEY, defaultState) : defaultState;
+  });
   const [viewMode, setViewMode] = useState(() => initialNavigationState?.viewMode || 'trips');
   const [mobileRootTab, setMobileRootTab] = useState(() => initialNavigationState?.rootTab || 'trips');
   const [tabSnapshots, setTabSnapshots] = useState(() => (
@@ -2064,7 +2069,7 @@ function App() {
     const currentKey = JSON.stringify(currentState);
     const normalizedKey = JSON.stringify(normalizedState);
 
-    // This effect reconciles persisted navigation with the currently available trips.
+    // Reconcile navigation with the trips available to the current session.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (normalizedState.rootTab !== mobileRootTab) setMobileRootTab(normalizedState.rootTab);
     if (normalizedState.viewMode !== viewMode) setViewMode(normalizedState.viewMode);
@@ -2072,7 +2077,7 @@ function App() {
     if (JSON.stringify(normalizedState.tabSnapshots) !== JSON.stringify(tabSnapshots)) {
       setTabSnapshots(normalizedState.tabSnapshots);
     }
-    if (currentKey !== normalizedKey || readStoredJson(NAVIGATION_STORAGE_KEY, null) === null) {
+    if (isNativeShell() && (currentKey !== normalizedKey || readStoredJson(NAVIGATION_STORAGE_KEY, null) === null)) {
       writeStoredJson(NAVIGATION_STORAGE_KEY, normalizedState);
     }
   }, [activeTripId, mobileRootTab, readOnlySharedTrip, tabSnapshots, trips, viewMode]);
@@ -4197,6 +4202,50 @@ function App() {
       resolved={resolvedItineraryNames?.get(lookupID)} maps={window.google?.maps} onResolve={rememberItineraryPlaceName} />;
   };
 
+  const focusItineraryPlace = (item, position) => {
+    setSelectedPlace(item);
+    runOrQueueMapCameraAction(mapRef, pendingMapCameraActionRef, (activeMap) => {
+      activeMap.panTo(position);
+      activeMap.setZoom(16);
+    });
+    if (windowSize.width < 768 && sheetMode === 'full') setSheetMode('half');
+  };
+
+  const navigateToItineraryPlace = (item, position, address, placeID) => {
+    const name = itineraryPlaceLabel(item);
+    const isKorea = activeTrip?.country === '대한민국'
+      || ['대한민국', '강원', '경기', '서울', '인천', '부산', '대구', '광주', '대전', '울산', '세종', '충북', '충남', '전북', '전남', '경북', '경남', '제주']
+        .some(region => address.includes(region));
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const isAndroid = /Android/i.test(navigator.userAgent);
+
+    if (position && isKorea) {
+      const { lat, lng } = position;
+      const destinationName = encodeURIComponent(name);
+      const webURL = `https://map.naver.com/index.nhn?elng=${lng}&elat=${lat}&etext=${destinationName}&menu=route&pathType=1`;
+      if (isIOS) {
+        window.location.href = `nmap://route/pubtrans?dlat=${lat}&dlng=${lng}&dname=${destinationName}&appname=worldpro`;
+        setTimeout(() => { window.open(webURL, '_blank'); }, 1500);
+      } else if (isAndroid) {
+        window.location.href = `intent://route/pubtrans?dlat=${lat}&dlng=${lng}&dname=${destinationName}&appname=worldpro#Intent;scheme=nmap;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.nhn.android.nmap;end`;
+      } else {
+        window.open(webURL, '_blank');
+      }
+      return;
+    }
+
+    const url = new URL('https://www.google.com/maps/dir/');
+    url.searchParams.set('api', '1');
+    url.searchParams.set('destination', position ? `${position.lat},${position.lng}` : address || name);
+    if (placeID) url.searchParams.set('destination_place_id', placeID);
+    if (isIOS && position) {
+      window.location.href = `comgooglemaps://?daddr=${position.lat},${position.lng}&directionsmode=walking`;
+      setTimeout(() => { window.open(url.href, '_blank'); }, 500);
+    } else {
+      window.open(url.href, '_blank');
+    }
+  };
+
   const startEditingItineraryItem = (dayNumber, item) => {
     const day = parseDay(dayNumber);
     setEditingTimeItem({
@@ -6104,257 +6153,63 @@ function App() {
                     ))}
                     {getDayConflictWarnings(dayPlan).length > 0 && <div className="itinerary-conflict-warning" role="status" style={{ margin: '12px 24px 0', padding: '10px 12px', borderRadius: '12px', background: '#fff7ed', color: '#c2410c', fontSize: '11px', fontWeight: '800' }}>시간·이동 확인: {getDayConflictWarnings(dayPlan)[0]}{getDayConflictWarnings(dayPlan).length > 1 ? ` 외 ${getDayConflictWarnings(dayPlan).length - 1}건` : ''}</div>}
 
-                    {/* Day Items List */}
-                    <div className="itinerary-day-items" style={{ padding: '24px' }}>
+                    <div className="itinerary-day-items">
                       {(!dayPlan?.items || dayPlan.items.length === 0) ? (
-                        <div style={{ padding: '32px', textAlign: 'center', border: '2px dashed #f3f4f6', borderRadius: '16px' }}>
-                          <p style={{ fontSize: '13px', color: '#d1d5db', fontWeight: '700', margin: 0 }}>이 날의 일정을 추가해 보세요!</p>
-                        </div>
+                        <div className="itinerary-day-empty">이 날의 일정을 추가해 보세요!</div>
                       ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                          {dayPlan.items.map((item, iIdx) => (
-                              <div 
-                                className="itinerary-item-card"
-                                key={item.id} 
-                                style={{ 
-                                  display: 'flex', 
-                                  flexDirection: 'column',
-                                  gap: '12px', 
-                                  padding: '16px', 
-                                  backgroundColor: 'white', 
-                                  border: '1px solid #f3f4f6',
-                                  borderRadius: '20px',
-                                  transition: 'all 0.2s',
-                                  boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-                                }}
-                              >
-                                <div className="itinerary-item-main" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                  {isBulkMoveMode && <input className="itinerary-bulk-checkbox" type="checkbox" checked={selectedItineraryItems.includes(item.id)} onChange={() => toggleItineraryItemSelection(item.id)} onClick={(event) => event.stopPropagation()} aria-label={`${itineraryPlaceLabel(item)} 선택`} style={{ width: '16px', height: '16px', flexShrink: 0 }} />}
-                                  <div
-                                    className="itinerary-item-number"
-                                    aria-label={`${iIdx + 1}번째 일정`}
-                                    style={{
-                                      width: '34px',
-                                      height: '34px',
-                                      borderRadius: '50%',
-                                      backgroundColor: '#3b82f6',
-                                      color: 'white',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      fontSize: '15px',
-                                      fontWeight: '900',
-                                      flexShrink: 0,
-                                    }}
-                                  >
-                                    {iIdx + 1}
-                                  </div>
-                                  <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                                      <div
-                                        aria-label={`${itineraryPlaceLabel(item)} 도착 시간 ${item.time || '09:00'}`}
-                                        style={{
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '4px',
-                                          backgroundColor: '#f1f5f9',
-                                          padding: '4px 10px',
-                                          borderRadius: '8px',
-                                          border: '1px solid #e2e8f0',
-                                          flexShrink: 0,
-                                          fontFamily: 'inherit',
-                                          whiteSpace: 'nowrap',
-                                          textAlign: 'left'
-                                        }}
-                                      >
-                                        <Clock size={11} color="#64748b" />
-                                        <span style={{
-                                          fontSize: '12px',
-                                          fontWeight: '800',
-                                          color: '#475569',
-                                          fontVariantNumeric: 'tabular-nums'
-                                        }}>
-                                          {item.time || '09:00'}
-                                        </span>
-                                      </div>
-                                      <h4 
-                                        onClick={() => {
-                                          if (item.lat && item.lng) {
-                                            const newPos = { lat: Number(item.lat), lng: Number(item.lng) };
-                                            setSelectedPlace(item);
-                                            runOrQueueMapCameraAction(mapRef, pendingMapCameraActionRef, (activeMap) => {
-                                              activeMap.panTo(newPos);
-                                              activeMap.setZoom(16);
-                                            });
-                                            if (windowSize.width < 768 && sheetMode === 'full') {
-                                              setSheetMode('half');
-                                            }
-                                          }
-                                        }}
-                                        style={{ 
-                                          fontSize: '15px',
-                                          fontWeight: '900', 
-                                          color: (item.lat && item.lng) ? '#2563eb' : '#000000',
-                                          textDecoration: (item.lat && item.lng) ? 'underline' : 'none',
-                                          textDecorationColor: (item.lat && item.lng) ? '#93c5fd' : 'transparent',
-                                          margin: 0, 
-                                          whiteSpace: 'normal',
-                                          minWidth: 0,
-                                          flex: '1 1 140px',
-                                          overflow: 'visible',
-                                          overflowWrap: 'anywhere',
-                                          wordBreak: 'keep-all',
-                                          cursor: (item.lat && item.lng) ? 'pointer' : 'default',
-                                          transition: 'all 0.2s ease'
-                                        }}
-                                        title={(item.lat && item.lng) ? "지도에서 위치 보기" : undefined}
-                                      >
-                                        {renderItineraryPlaceName(item)}
-                                      </h4>
-                                      {(isRouteOrderFixed(item) || item.reservationNumber || item.memo || item.reservationUrl) && <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginTop: '5px' }}>
-                                        {isRouteOrderFixed(item) && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '3px 6px', borderRadius: '6px', background: '#eff6ff', color: '#2563eb', fontSize: '9px', fontWeight: '800' }}><Lock size={10} aria-hidden="true" />고정</span>}
-                                        {item.reservationNumber && <span style={{ padding: '3px 6px', borderRadius: '6px', background: '#fef3c7', color: '#92400e', fontSize: '9px', fontWeight: '800' }}>예약 {item.reservationNumber}</span>}
-                                        {item.memo && <span style={{ padding: '3px 6px', borderRadius: '6px', background: '#f1f5f9', color: '#64748b', fontSize: '9px', fontWeight: '800', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>메모 {item.memo}</span>}
-                                        {getSafeExternalUrl(item.reservationUrl) && <a href={getSafeExternalUrl(item.reservationUrl)} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()} style={{ padding: '3px 6px', borderRadius: '6px', background: '#eff6ff', color: '#2563eb', fontSize: '9px', fontWeight: '800' }}>예약 링크</a>}
-                                      </div>}
-                                    </div>
-                                    <PlaceBusinessDetails place={item} name={itineraryPlaceLabel(item)} visitDate={tripDayDate(activeTrip?.startDate, parseDay(dayPlan.day))} />
-                                  </div>
-                                  <div className="itinerary-item-actions" style={{
-                                    display: 'grid', 
-                                    gridTemplateColumns: 'repeat(2, 44px)', 
-                                    gridTemplateRows: 'repeat(2, 44px)',
-                                    gap: '6px',
-                                    alignItems: 'center'
-                                  }}>
-                                    {/* Order Group */}
-                                    <div className="itinerary-order-control" style={{
-                                      display: 'flex', 
-                                      flexDirection: 'column', 
-                                      backgroundColor: '#f8fafc', 
-                                      borderRadius: '12px', 
-                                      overflow: 'hidden',
-                                      border: '1px solid #f1f5f9'
-                                    }}>
-                                      <button 
-                                        type="button"
-                                        aria-label={`${itineraryPlaceLabel(item)} 위로 이동`}
-                                        title="위로 이동"
-                                        onClick={() => moveItineraryItem(dayPlan.day, item.id, 'up')}
-                                        style={{ background: 'none', border: 'none', color: iIdx === 0 ? '#e5e7eb' : '#9ca3af', cursor: iIdx === 0 ? 'default' : 'pointer', padding: '4px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                        disabled={iIdx === 0}
-                                      >
-                                        <ChevronUp size={14} />
-                                      </button>
-                                      <button 
-                                        type="button"
-                                        aria-label={`${itineraryPlaceLabel(item)} 아래로 이동`}
-                                        title="아래로 이동"
-                                        onClick={() => moveItineraryItem(dayPlan.day, item.id, 'down')}
-                                        style={{ background: 'none', border: 'none', color: iIdx === dayPlan.items.length - 1 ? '#e5e7eb' : '#9ca3af', cursor: iIdx === dayPlan.items.length - 1 ? 'default' : 'pointer', padding: '4px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderTop: '1px solid #f1f5f9' }}
-                                        disabled={iIdx === dayPlan.items.length - 1}
-                                      >
-                                        <ChevronDown size={14} />
-                                      </button>
-                                    </div>
-
-                                    {/* Edit Button */}
-                                    <button
-                                      className="itinerary-edit-control"
-                                      type="button"
-                                      aria-label={`${itineraryPlaceLabel(item)} 편집`}
-                                      title="일정 편집: 이름, 시간, 일정 위치 변경"
-                                      onClick={(event) => { event.stopPropagation(); startEditingItineraryItem(dayPlan.day, item); }}
-                                      style={{
-                                        height: '44px', width: '44px',
-                                        color: '#2563eb', backgroundColor: '#eff6ff',
-                                        border: '1px solid #bfdbfe', borderRadius: '12px',
-                                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        transition: 'all 0.2s'
-                                      }}
-                                    >
-                                      <Edit2 size={18} />
-                                    </button>
-
-                                    {/* Navigation Button */}
-                                    <button
-                                      className="itinerary-navigation-control"
-                                      type="button"
-                                      aria-label={`${itineraryPlaceLabel(item)} 길찾기`}
-                                      title="길찾기"
-                                      onClick={(e) => { 
-                                        e.stopPropagation(); 
-                                        const isKoreaTrip = activeTrip?.country === '대한민국';
-                                        const isKoreaAddress = ['대한민국', '강원', '경기', '서울', '인천', '부산', '대구', '광주', '대전', '울산', '세종', '충북', '충남', '전북', '전남', '경북', '경남', '제주'].some(k => item.loc?.includes(k));
-                                        
-                                          if (isKoreaTrip || isKoreaAddress) {
-                                            const destName = encodeURIComponent(item.name);
-                                            const dlat = item.lat;
-                                            const dlng = item.lng;
-                                            const webUrl = `https://map.naver.com/index.nhn?elng=${dlng}&elat=${dlat}&etext=${destName}&menu=route&pathType=1`;
-                                            if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-                                              window.location.href = `nmap://route/pubtrans?dlat=${dlat}&dlng=${dlng}&dname=${destName}&appname=worldpro`;
-                                              setTimeout(() => { window.open(webUrl, '_blank'); }, 1500);
-                                            } else if (/Android/i.test(navigator.userAgent)) {
-                                              window.location.href = `intent://route/pubtrans?dlat=${dlat}&dlng=${dlng}&dname=${destName}&appname=worldpro#Intent;scheme=nmap;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.nhn.android.nmap;end`;
-                                            } else { window.open(webUrl, '_blank'); }
-                                          } else {
-                                          const googleUrl = `https://www.google.com/maps/dir/?api=1&destination=${item.lat},${item.lng}&destination_place_id=${item.placeId || ''}`;
-                                          if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-                                            window.location.href = `comgooglemaps://?daddr=${item.lat},${item.lng}&directionsmode=walking`;
-                                            setTimeout(() => { window.open(googleUrl, '_blank'); }, 500);
-                                          } else { window.open(googleUrl, '_blank'); }
-                                        }
-                                      }}
-                                      style={{ 
-                                        height: '44px', width: '44px',
-                                        color: '#3b82f6', backgroundColor: '#eff6ff', 
-                                        border: '1px solid #dbeafe', borderRadius: '12px', 
-                                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        transition: 'all 0.2s'
-                                      }}
-                                    >
-                                      <Navigation size={18} />
-                                    </button>
-
-                                    {/* Delete Button */}
-                                    <div className="itinerary-delete-control" style={{ position: 'relative', width: '44px', height: '44px' }}>
-                                      <button 
-                                        type="button"
-                                        aria-label={`${itineraryPlaceLabel(item)} 일정 삭제`}
-                                        title={confirmDeleteId === `itin-${item.id}` ? '삭제 확인' : '일정 삭제'}
-                                        onClick={(e) => { e.stopPropagation(); handleInlineDelete(e, `itin-${item.id}`, () => removeFromItinerary(dayPlan.day, item.id)); }}
-                                        style={{ 
-                                          position: confirmDeleteId === `itin-${item.id}` ? 'absolute' : 'relative',
-                                          right: 0,
-                                          top: 0,
-                                          height: '44px', 
-                                          width: confirmDeleteId === `itin-${item.id}` ? '94px' : '44px',
-                                          zIndex: confirmDeleteId === `itin-${item.id}` ? 50 : 1,
-                                          color: confirmDeleteId === `itin-${item.id}` ? 'white' : '#f87171', 
-                                          backgroundColor: confirmDeleteId === `itin-${item.id}` ? '#ef4444' : '#fff5f5', 
-                                          border: `1px solid ${confirmDeleteId === `itin-${item.id}` ? '#dc2626' : '#fee2e2'}`,
-                                          borderRadius: '12px', 
-                                          cursor: 'pointer', 
-                                          display: 'flex', 
-                                          alignItems: 'center', 
-                                          justifyContent: 'center',
-                                          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                                          fontSize: '11px', 
-                                          fontWeight: '900',
-                                          boxShadow: confirmDeleteId === `itin-${item.id}` ? '0 4px 12px rgba(239, 68, 68, 0.3)' : 'none',
-                                          whiteSpace: 'nowrap'
-                                        }}
-                                      >
-                                        {confirmDeleteId === `itin-${item.id}` ? '삭제 확인' : <Trash2 size={18} />}
-                                      </button>
-                                    </div>
-                                  </div>
-                                </div>
-
+                        dayPlan.items.map((item, iIdx) => {
+                          const name = itineraryPlaceLabel(item);
+                          const position = getPlaceCoordinates(item.lat, item.lng);
+                          const placeID = getGooglePlaceID(item);
+                          const address = String(item.loc || item.address || '').trim();
+                          const showAddress = address && address.toLowerCase() !== name.toLowerCase();
+                          const time = item.time || '미정';
+                          const emoji = item.emoji || ITINERARY_ICON_OPTIONS.find(option => option.category === getItineraryItemCategory(item))?.emoji || '📍';
+                          const routeFixed = isRouteOrderFixed(item);
+                          const reservationURL = getSafeExternalUrl(item.reservationUrl);
+                          return (
+                            <div className="itinerary-item-card" key={item.id}>
+                              <div className="itinerary-item-order">
+                                {isBulkMoveMode && <input className="itinerary-bulk-checkbox" type="checkbox"
+                                  checked={selectedItineraryItems.includes(item.id)}
+                                  onChange={() => toggleItineraryItemSelection(item.id)}
+                                  aria-label={`${name} 선택`} />}
+                                <span className="itinerary-item-number" aria-label={`${iIdx + 1}번째 일정`}>{iIdx + 1}</span>
                               </div>
-                          ))}
-                        </div>
+                              <span className={`itinerary-item-time${item.time ? '' : ' is-unscheduled'}`}
+                                aria-label={`${name} 도착 시간 ${time}`}>{time}</span>
+                              <div className="itinerary-item-place">
+                                <span className="itinerary-item-icon" aria-hidden="true">{emoji}</span>
+                                <div className="itinerary-item-place-text">
+                                  <h4 className="itinerary-item-title" title={name}>
+                                    {routeFixed && <Lock size={12} className="itinerary-item-lock" aria-label="거리순 정렬에서 고정됨" />}
+                                    {position ? (
+                                      <button type="button" className="itinerary-item-focus" aria-label={`${name} 지도에서 보기`}
+                                        onClick={() => focusItineraryPlace(item, position)}>{renderItineraryPlaceName(item)}</button>
+                                    ) : renderItineraryPlaceName(item)}
+                                  </h4>
+                                  {showAddress && <p className="itinerary-item-address" title={address}>{address}</p>}
+                                  {(item.reservationNumber || item.memo || reservationURL) && <div className="itinerary-item-notes">
+                                    {item.reservationNumber && <span title={`예약 ${item.reservationNumber}`}>예약 {item.reservationNumber}</span>}
+                                    {item.memo && <span title={item.memo}>{item.memo}</span>}
+                                    {reservationURL && <a href={reservationURL} target="_blank" rel="noreferrer">예약 링크</a>}
+                                  </div>}
+                                </div>
+                              </div>
+                              <div className="itinerary-row-actions">
+                                <PlaceBusinessDetails iconOnly place={item} name={name}
+                                  visitDate={tripDayDate(activeTrip?.startDate, parseDay(dayPlan.day))} />
+                                <ItineraryRowMenu name={name}
+                                  onEdit={isReadOnlyTrip ? undefined : () => startEditingItineraryItem(dayPlan.day, item)}
+                                  onMoveUp={iIdx > 0 ? () => moveItineraryItem(dayPlan.day, item.id, 'up') : undefined}
+                                  onMoveDown={iIdx < dayPlan.items.length - 1 ? () => moveItineraryItem(dayPlan.day, item.id, 'down') : undefined}
+                                  onNavigate={position || placeID || address || item.name || item.displayName
+                                    ? () => navigateToItineraryPlace(item, position, address, placeID) : undefined}
+                                  onDelete={isReadOnlyTrip ? undefined : () => removeFromItinerary(dayPlan.day, item.id)} />
+                              </div>
+                            </div>
+                          );
+                        })
                       )}
                     </div>
                   </div>
