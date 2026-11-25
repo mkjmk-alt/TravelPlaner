@@ -20,6 +20,64 @@ body {
   width: 100%;
 }
 
+.itinerary-edit-dialog {
+  position: fixed;
+  inset: auto;
+  top: calc(var(--edit-viewport-top, 0px) + var(--edit-viewport-height, 100dvh) / 2);
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(440px, calc(100% - 24px));
+  max-height: calc(var(--edit-viewport-height, 100dvh) - max(12px, env(safe-area-inset-top)) - max(12px, env(safe-area-inset-bottom)));
+  margin: 0;
+  border: 0;
+  border-radius: 22px;
+  overflow: hidden;
+  color: #0f172a;
+  background: #fff;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, .22);
+}
+
+.itinerary-edit-dialog::backdrop { background: rgba(15, 23, 42, .42); }
+.itinerary-edit-form { display: flex; flex-direction: column; max-height: inherit; }
+.itinerary-edit-header,
+.itinerary-edit-footer { flex: none; display: flex; gap: 10px; padding: 12px 16px; }
+.itinerary-edit-header { justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; }
+.itinerary-edit-header > div { min-width: 0; }
+.itinerary-edit-header h2 { font-size: 18px; font-weight: 900; }
+.itinerary-edit-header p { margin-top: 3px; color: #475569; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.itinerary-edit-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: grid; gap: 12px; padding: 14px 16px; }
+.itinerary-edit-timing,
+.itinerary-edit-extra-fields { display: grid; gap: 10px; }
+.itinerary-edit-field { display: grid; gap: 5px; color: #475569; font-size: 12px; font-weight: 800; }
+.itinerary-edit-field :is(input, select, textarea) { width: 100%; min-height: 42px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 10px; background: #fff; color: #0f172a; font: inherit; font-size: 16px; }
+.itinerary-edit-field textarea { resize: vertical; }
+.itinerary-edit-lock { display: flex; align-items: center; gap: 8px; min-height: 36px; color: #334155; font-size: 13px; font-weight: 700; }
+.itinerary-edit-lock input { width: 16px; height: 16px; accent-color: #2563eb; }
+.itinerary-edit-time > button,
+.itinerary-edit-close,
+.itinerary-edit-footer button { border: 0; background: #f1f5f9; color: #334155; font: inherit; font-weight: 800; cursor: pointer; }
+.itinerary-edit-close { display: grid; place-items: center; flex-shrink: 0; width: 44px; height: 44px; border-radius: 12px; }
+.itinerary-edit-time > button { min-height: 36px; margin-top: 5px; padding: 4px 9px; border-radius: 8px; font-size: 12px; color: #1d4ed8; }
+.itinerary-edit-time > .itinerary-edit-set-time { min-height: 42px; }
+.itinerary-edit-extras { border: 1px solid #e2e8f0; border-radius: 12px; }
+.itinerary-edit-extras summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 8px 12px; list-style: none; color: #334155; font-size: 13px; font-weight: 800; cursor: pointer; }
+.itinerary-edit-extras summary::-webkit-details-marker { display: none; }
+.itinerary-edit-extras[open] summary svg { transform: rotate(180deg); }
+.itinerary-edit-extra-fields { padding: 0 12px 12px; }
+.itinerary-edit-error { color: #b91c1c; font-size: 13px; font-weight: 700; }
+.itinerary-edit-footer { border-top: 1px solid #e2e8f0; }
+.itinerary-edit-footer button { flex: 1; min-height: 44px; padding: 8px 12px; border-radius: 12px; font-size: 14px; }
+.itinerary-edit-footer button[type="submit"] { flex: 2; color: #fff; background: #2563eb; }
+.itinerary-edit-dialog :focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+.itinerary-name-attribution { display: block; margin-top: 3px; font: 400 12px/1.4 Inter, sans-serif; color: #5e5e5e; white-space: nowrap; }
+
+@media (max-width: 768px) {
+  .itinerary-edit-dialog {
+    top: calc(var(--edit-viewport-top, 0px) + var(--edit-viewport-height, 100dvh) - max(10px, env(safe-area-inset-bottom)));
+    transform: translate(-50%, -100%);
+  }
+}
+
 .ai-itinerary-modal-overlay {
   position: fixed;
   top: var(--ai-dialog-viewport-top, 0px);
@@ -4807,36 +4865,88 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .lodging-form { display: grid; gap: 14px; margin-top: 12px; }
 .lodging-day-summary { margin: 12px 24px 0; padding: 10px 12px; border-radius: 12px; background: #f4f0ff; color: #5b38a0; font-size: 12px; line-height: 1.5; }
 
-.business-place-details {
-  margin-block-start: 6px;
-  font-size: .8125rem;
-  color: #475569;
+.business-place-trigger-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-block-start: 4px;
 }
 
-.business-place-details > summary {
+.business-place-trigger {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 36px;
+  min-height: 44px;
   padding-inline: 8px;
+  border: 0;
   border-radius: 8px;
-  background: #eff6ff;
+  background: transparent;
   color: #1d4ed8;
   cursor: pointer;
+  font: inherit;
+  font-size: 13px;
   font-weight: 700;
-  list-style: none;
 }
 
-.business-place-details > summary::-webkit-details-marker { display: none; }
+.business-place-trigger:hover { background: #eff6ff; }
+.business-place-trigger:focus-visible,
+.business-place-dialog :focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+
+.business-place-dialog {
+  position: fixed;
+  inset: 0;
+  width: min(480px, calc(100% - 24px));
+  max-height: calc(100dvh - max(20px, env(safe-area-inset-top)) - max(20px, env(safe-area-inset-bottom)));
+  margin: auto;
+  overflow: hidden;
+  border: 0;
+  border-radius: 22px;
+  background: #fff;
+  color: #0f172a;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, .22);
+}
+
+.business-place-dialog[open] { display: flex; flex-direction: column; }
+.business-place-dialog::backdrop { background: rgba(15, 23, 42, .42); }
+.business-place-dialog-header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+.business-place-dialog-header h2 { font-size: 18px; font-weight: 900; }
+.business-place-dialog-header button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 12px;
+  background: #f1f5f9;
+  color: #334155;
+  cursor: pointer;
+}
+.business-place-dialog-scroll { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 16px; }
+.business-place-dialog-heading { overflow-wrap: anywhere; }
+.business-place-dialog-heading h3 { font-size: 17px; font-weight: 800; }
+.business-place-dialog-heading p { margin-top: 4px; color: #475569; font-size: 13px; }
+
+@media (max-width: 768px) {
+  .business-place-dialog { margin: auto auto max(10px, env(safe-area-inset-bottom)); }
+}
 
 .business-place-details-body {
   display: grid;
-  gap: 6px;
-  padding: 10px 12px;
-  margin-top: 4px;
+  gap: 9px;
+  padding: 12px;
+  margin-top: 12px;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   background: #f8fafc;
+  color: #334155;
+  font-size: 14px;
   overflow-wrap: anywhere;
 }
 

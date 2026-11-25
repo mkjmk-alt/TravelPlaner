@@ -19,6 +19,12 @@ test('provides stable defaults for optional travel details and journal data', ()
     departure: '',
     arrival: '',
     flightNumber: '',
+    flightDepartureDate: '',
+    flightDepartureTime: '',
+    flightArrivalDate: '',
+    flightArrivalTime: '',
+    flightBoardingDate: '',
+    flightBoardingTime: '',
     stayName: '',
     stayAddress: ''
   });
@@ -28,11 +34,23 @@ test('provides stable defaults for optional travel details and journal data', ()
 
 test('keeps existing travel details while filling missing fields', () => {
   assert.deepEqual(getTravelDetails({
-    travelDetails: { arrival: '인천국제공항', stayName: '호텔' }
+    travelDetails: {
+      arrival: '인천국제공항',
+      flightDepartureDate: '2026-09-10',
+      flightDepartureTime: '08:45',
+      flightBoardingTime: '08:05',
+      stayName: '호텔'
+    }
   }), {
     departure: '',
     arrival: '인천국제공항',
     flightNumber: '',
+    flightDepartureDate: '2026-09-10',
+    flightDepartureTime: '08:45',
+    flightArrivalDate: '',
+    flightArrivalTime: '',
+    flightBoardingDate: '',
+    flightBoardingTime: '08:05',
     stayName: '호텔',
     stayAddress: ''
   });

@@ -13,7 +13,6 @@ import { BRAND_NAME_EN, BRAND_NAME_KO } from './brand';
 import AccountMoreActions from './AccountMoreActions';
 import TravelMemoryPanel from './TravelMemoryPanel';
 import PlaceBusinessDetails from './PlaceBusinessDetails.jsx';
-import { safePlaceLink } from './placeBusinessDetails.js';
 import TripRequiredEmptyState from './TripRequiredEmptyState';
 import TripHomeActions from './TripHomeActions';
 import AiItineraryImportDialog from './AiItineraryImportDialog';
@@ -22,6 +21,9 @@ import { calculateSettlement, createExpensePayerSelection, getNextExpensePayerIn
 import { createCashWallet, getCashWalletCreationCurrency, removeCashWalletState } from './cashWallets';
 import { buildItineraryRouteGroups, normalizeRouteSettings, ROUTE_SETTINGS_STORAGE_KEY } from './itineraryRoutes';
 import { getSavedPlaceEntries } from './savedPlacePresentation.js';
+import ItineraryEditDialog from './ItineraryEditDialog.jsx';
+import ItineraryPlaceName from './ItineraryPlaceName.jsx';
+import { getItineraryDisplayName, getItineraryNameLookupID, getItineraryPlaceLabel } from './itineraryPlaceName.js';
 import useItineraryRoadRoutes from './useItineraryRoadRoutes';
 import ItineraryRouteSettings from './MapRouteSettings';
 import { createNearbyOrderPreview, applyNearbyOrderPreview, sortDayItems, applyEditedDayItems, moveDayItem, isRouteOrderFixed } from './itineraryOrder';
@@ -775,7 +777,7 @@ const PremiumTimeInput = ({ value, onChange, label }) => {
 
 const TIME_PERIOD_OPTIONS = ['AM', 'PM'];
 
-export const ScrollTimeInput = ({ value, onChange, label, compact = false, variant = 'default' }) => {
+export const ScrollTimeInput = ({ value, onChange, label, compact = false, variant = 'default', inline = false }) => {
   const timeValue = value && value.includes(':') ? value : '09:00';
   const [rawHour, rawMinute] = timeValue.split(':').map(Number);
   const hour24 = Number.isFinite(rawHour) ? Math.min(Math.max(rawHour, 0), 23) : 9;
@@ -889,7 +891,7 @@ export const ScrollTimeInput = ({ value, onChange, label, compact = false, varia
       </button>
 
       {isOpen && (
-        <div className="expense-time-picker-popover" role="dialog" aria-label="소비 시간 선택" style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, zIndex: 60, width: '100%', maxWidth: '100%', boxSizing: 'border-box', padding: '8px', border: '1px solid var(--time-picker-popover-border)', borderRadius: '18px', backgroundColor: 'white', boxShadow: 'var(--time-picker-popover-shadow)' }}>
+        <div className="expense-time-picker-popover" role="dialog" aria-label={inline ? "일정 시간 선택" : "소비 시간 선택"} style={{ ...(inline ? { marginTop: '8px' } : { position: 'absolute', top: 'calc(100% + 8px)', left: 0, zIndex: 60 }), width: '100%', maxWidth: '100%', boxSizing: 'border-box', padding: '8px', border: '1px solid var(--time-picker-popover-border)', borderRadius: '18px', backgroundColor: 'white', boxShadow: 'var(--time-picker-popover-shadow)' }}>
           <div className="expense-time-picker-wheels" style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0, padding: '4px', borderRadius: '15px', backgroundColor: 'var(--time-picker-wheel-background)' }}>
             {renderScrollColumn(TIME_PERIOD_OPTIONS, period, periodRef, 'period', item => item === 'AM' ? '오전' : '오후')}
             <span style={{ color: '#94a3b8', fontSize: '18px', fontWeight: '900' }}>·</span>
@@ -1605,7 +1607,7 @@ function App() {
   const [isJoiningTrip, setIsJoiningTrip] = useState(false);
   const [itineraryTime, setItineraryTime] = useState('');
   const [itineraryDisplayName, setItineraryDisplayName] = useState('');
-  const [editingTimeItem, setEditingTimeItem] = useState(null); // { day, id, time, displayName, originalName, reservationNumber, reservationUrl, memo }
+  const [editingTimeItem, setEditingTimeItem] = useState(null);
   const [showCustomModal, setShowCustomModal] = useState(false);
   const [modalConfig, setModalConfig] = useState({ type: 'success', title: '', message: '' });
   const [showPasteModal, setShowPasteModal] = useState(false);
@@ -2520,6 +2522,16 @@ function App() {
     ? readOnlySharedTrip
     : (trips || []).find(t => String(t.id) === String(activeTripId));
   const itinerary = useMemo(() => activeTrip?.itinerary || [], [activeTrip]);
+  const [itineraryNames, setItineraryNames] = useState(null);
+  const resolvedItineraryNames = itineraryNames?.tripId === activeTripId ? itineraryNames?.names : undefined;
+  const rememberItineraryPlaceName = useCallback((id, name) => {
+    setItineraryNames(current => {
+      const names = current?.tripId === activeTripId ? current?.names : undefined;
+      if (names?.get(id) === name) return current;
+      return { tripId: activeTripId, names: new Map(names).set(id, name) };
+    });
+  }, [activeTripId]);
+
   const reserveItems = useMemo(() => activeTrip?.reserveItems || [], [activeTrip]);
   const mapRouteGroups = useMemo(() => buildItineraryRouteGroups({ itinerary, activeDay, showFullRoute }), [itinerary, activeDay, showFullRoute]);
   const mapRoadRoutes = useItineraryRoadRoutes({
@@ -4178,6 +4190,13 @@ function App() {
 
   const isFavorite = (place) => Boolean(findFavorite(place));
 
+  const itineraryPlaceLabel = item => getItineraryPlaceLabel(item, resolvedItineraryNames?.get(getItineraryNameLookupID(item)));
+  const renderItineraryPlaceName = item => {
+    const lookupID = getItineraryNameLookupID(item);
+    return <ItineraryPlaceName name={itineraryPlaceLabel(item)} lookupID={lookupID}
+      resolved={resolvedItineraryNames?.get(lookupID)} maps={window.google?.maps} onResolve={rememberItineraryPlaceName} />;
+  };
+
   const startEditingItineraryItem = (dayNumber, item) => {
     const day = parseDay(dayNumber);
     setEditingTimeItem({
@@ -4185,12 +4204,12 @@ function App() {
       day,
       id: item.id,
       time: item.time || '',
-      displayName: item.displayName || item.name || '',
-      originalName: item.name || '',
-      reservationNumber: item.reservationNumber || '',
-      reservationUrl: item.reservationUrl || '',
+      displayName: getItineraryDisplayName(item),
+      originalPlace: item,
+      reservationNumber: typeof item.reservationNumber === 'string' ? item.reservationNumber : '',
+      reservationUrl: typeof item.reservationUrl === 'string' ? item.reservationUrl : '',
       menuURL: typeof item.menuURL === 'string' ? item.menuURL : '',
-      memo: item.memo || '',
+      memo: typeof item.memo === 'string' ? item.memo : '',
       routeOrderFixed: isRouteOrderFixed(item),
     });
   };
@@ -5965,17 +5984,17 @@ function App() {
                                   style={{ margin: 0, color: item.lat && item.lng ? '#2563eb' : '#111827', textDecoration: item.lat && item.lng ? 'underline' : 'none', textDecorationColor: '#93c5fd', fontSize: '15px', fontWeight: '900', lineHeight: 1.3, whiteSpace: 'normal', overflow: 'visible', overflowWrap: 'anywhere', wordBreak: 'keep-all', cursor: item.lat && item.lng ? 'pointer' : 'default' }}
                                   title={item.lat && item.lng ? '지도에서 위치 보기' : undefined}
                                 >
-                                  {item.displayName || item.name || '장소 이름 정보 없음'}
+                                  {renderItineraryPlaceName(item)}
                                 </h4>
                                 {item.loc && <p style={{ display: 'flex', alignItems: 'center', gap: '3px', margin: '4px 0 0', color: '#94a3b8', fontSize: '10px', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><MapPin size={10} />{item.loc}</p>}
-                                <PlaceBusinessDetails place={item} />
+                                <PlaceBusinessDetails place={item} name={itineraryPlaceLabel(item)} />
                               </div>
                               <div className="read-only-hide" style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: '1 1 230px', justifyContent: 'flex-end' }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', backgroundColor: '#eff6ff', border: '1px solid #dbeafe', borderRadius: '10px', overflow: 'hidden' }}>
                                   <button type="button" aria-label="예비 장소 위로 이동" onClick={() => moveReserveItem(item.id, 'up')} disabled={reserveIndex === 0} style={{ width: '28px', height: '20px', padding: 0, border: 'none', background: 'transparent', color: reserveIndex === 0 ? '#bfdbfe' : '#2563eb', cursor: reserveIndex === 0 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChevronUp size={14} /></button>
                                   <button type="button" aria-label="예비 장소 아래로 이동" onClick={() => moveReserveItem(item.id, 'down')} disabled={reserveIndex === reserveItems.length - 1} style={{ width: '28px', height: '20px', padding: 0, border: 'none', borderTop: '1px solid #dbeafe', background: 'transparent', color: reserveIndex === reserveItems.length - 1 ? '#bfdbfe' : '#2563eb', cursor: reserveIndex === reserveItems.length - 1 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChevronDown size={14} /></button>
                                 </div>
-                                <select value="" aria-label={`${item.displayName || item.name || '예비 장소'} 일차로 이동`} onChange={(event) => moveReserveItemToDay(item.id, event.target.value)} onClick={(event) => event.stopPropagation()} style={{ minWidth: '116px', maxWidth: '140px', padding: '8px 8px', border: '1px solid #bfdbfe', borderRadius: '10px', backgroundColor: '#f8fbff', color: '#1d4ed8', fontSize: '10px', fontWeight: '800', outline: 'none' }}>
+                                <select value="" aria-label={`${itineraryPlaceLabel(item)} 일차로 이동`} onChange={(event) => moveReserveItemToDay(item.id, event.target.value)} onClick={(event) => event.stopPropagation()} style={{ minWidth: '116px', maxWidth: '140px', padding: '8px 8px', border: '1px solid #bfdbfe', borderRadius: '10px', backgroundColor: '#f8fbff', color: '#1d4ed8', fontSize: '10px', fontWeight: '800', outline: 'none' }}>
                                   <option value="">일차로 이동</option>
                                   {itinerary.map(dayPlan => <option key={`reserve-move-${item.id}-${dayPlan.day}`} value={parseDay(dayPlan.day)}>{parseDay(dayPlan.day)}일차</option>)}
                                 </select>
@@ -6110,7 +6129,7 @@ function App() {
                                 }}
                               >
                                 <div className="itinerary-item-main" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                  {isBulkMoveMode && <input className="itinerary-bulk-checkbox" type="checkbox" checked={selectedItineraryItems.includes(item.id)} onChange={() => toggleItineraryItemSelection(item.id)} onClick={(event) => event.stopPropagation()} aria-label={`${item.displayName || item.name || '일정'} 선택`} style={{ width: '16px', height: '16px', flexShrink: 0 }} />}
+                                  {isBulkMoveMode && <input className="itinerary-bulk-checkbox" type="checkbox" checked={selectedItineraryItems.includes(item.id)} onChange={() => toggleItineraryItemSelection(item.id)} onClick={(event) => event.stopPropagation()} aria-label={`${itineraryPlaceLabel(item)} 선택`} style={{ width: '16px', height: '16px', flexShrink: 0 }} />}
                                   <div
                                     className="itinerary-item-number"
                                     aria-label={`${iIdx + 1}번째 일정`}
@@ -6133,7 +6152,7 @@ function App() {
                                   <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                                       <div
-                                        aria-label={`${item.displayName || item.name || '일정'} 도착 시간 ${item.time || '09:00'}`}
+                                        aria-label={`${itineraryPlaceLabel(item)} 도착 시간 ${item.time || '09:00'}`}
                                         style={{
                                           display: 'flex',
                                           alignItems: 'center',
@@ -6190,7 +6209,7 @@ function App() {
                                         }}
                                         title={(item.lat && item.lng) ? "지도에서 위치 보기" : undefined}
                                       >
-                                        {item.displayName || item.name || '장소 이름 정보 없음'}
+                                        {renderItineraryPlaceName(item)}
                                       </h4>
                                       {(isRouteOrderFixed(item) || item.reservationNumber || item.memo || item.reservationUrl) && <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginTop: '5px' }}>
                                         {isRouteOrderFixed(item) && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '3px 6px', borderRadius: '6px', background: '#eff6ff', color: '#2563eb', fontSize: '9px', fontWeight: '800' }}><Lock size={10} aria-hidden="true" />고정</span>}
@@ -6199,7 +6218,7 @@ function App() {
                                         {getSafeExternalUrl(item.reservationUrl) && <a href={getSafeExternalUrl(item.reservationUrl)} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()} style={{ padding: '3px 6px', borderRadius: '6px', background: '#eff6ff', color: '#2563eb', fontSize: '9px', fontWeight: '800' }}>예약 링크</a>}
                                       </div>}
                                     </div>
-                                    <PlaceBusinessDetails place={item} visitDate={tripDayDate(activeTrip?.startDate, parseDay(dayPlan.day))} />
+                                    <PlaceBusinessDetails place={item} name={itineraryPlaceLabel(item)} visitDate={tripDayDate(activeTrip?.startDate, parseDay(dayPlan.day))} />
                                   </div>
                                   <div className="itinerary-item-actions" style={{
                                     display: 'grid', 
@@ -6219,7 +6238,7 @@ function App() {
                                     }}>
                                       <button 
                                         type="button"
-                                        aria-label={`${item.displayName || item.name || '일정'} 위로 이동`}
+                                        aria-label={`${itineraryPlaceLabel(item)} 위로 이동`}
                                         title="위로 이동"
                                         onClick={() => moveItineraryItem(dayPlan.day, item.id, 'up')}
                                         style={{ background: 'none', border: 'none', color: iIdx === 0 ? '#e5e7eb' : '#9ca3af', cursor: iIdx === 0 ? 'default' : 'pointer', padding: '4px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
@@ -6229,7 +6248,7 @@ function App() {
                                       </button>
                                       <button 
                                         type="button"
-                                        aria-label={`${item.displayName || item.name || '일정'} 아래로 이동`}
+                                        aria-label={`${itineraryPlaceLabel(item)} 아래로 이동`}
                                         title="아래로 이동"
                                         onClick={() => moveItineraryItem(dayPlan.day, item.id, 'down')}
                                         style={{ background: 'none', border: 'none', color: iIdx === dayPlan.items.length - 1 ? '#e5e7eb' : '#9ca3af', cursor: iIdx === dayPlan.items.length - 1 ? 'default' : 'pointer', padding: '4px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderTop: '1px solid #f1f5f9' }}
@@ -6243,7 +6262,7 @@ function App() {
                                     <button
                                       className="itinerary-edit-control"
                                       type="button"
-                                      aria-label={`${item.displayName || item.name || '일정'} 편집`}
+                                      aria-label={`${itineraryPlaceLabel(item)} 편집`}
                                       title="일정 편집: 이름, 시간, 일정 위치 변경"
                                       onClick={(event) => { event.stopPropagation(); startEditingItineraryItem(dayPlan.day, item); }}
                                       style={{
@@ -6261,7 +6280,7 @@ function App() {
                                     <button
                                       className="itinerary-navigation-control"
                                       type="button"
-                                      aria-label={`${item.displayName || item.name || '일정'} 길찾기`}
+                                      aria-label={`${itineraryPlaceLabel(item)} 길찾기`}
                                       title="길찾기"
                                       onClick={(e) => { 
                                         e.stopPropagation(); 
@@ -6302,7 +6321,7 @@ function App() {
                                     <div className="itinerary-delete-control" style={{ position: 'relative', width: '44px', height: '44px' }}>
                                       <button 
                                         type="button"
-                                        aria-label={`${item.displayName || item.name || '일정'} 일정 삭제`}
+                                        aria-label={`${itineraryPlaceLabel(item)} 일정 삭제`}
                                         title={confirmDeleteId === `itin-${item.id}` ? '삭제 확인' : '일정 삭제'}
                                         onClick={(e) => { e.stopPropagation(); handleInlineDelete(e, `itin-${item.id}`, () => removeFromItinerary(dayPlan.day, item.id)); }}
                                         style={{ 
@@ -7715,7 +7734,6 @@ function App() {
                     <MapPin size={10} color="#3b82f6" style={{ marginTop: '1px', flexShrink: 0 }} />
                     <span style={{ overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{selectedPlace.loc}</span>
                     </p>
-                    <PlaceBusinessDetails place={selectedPlace} />
                   </div>
                 </div>
                 <div className="mobile-place-add-header-actions">
@@ -7738,6 +7756,8 @@ function App() {
                   </button>
                 </div>
               </div>
+
+              <PlaceBusinessDetails place={selectedPlace} />
 
               {!canAddSelectedPlaceToItinerary && (
                 <TripRequiredEmptyState
@@ -7861,140 +7881,21 @@ function App() {
           <Menu size={16} /> 메뉴 열기
         </button>
       )}
-      {/* Premium Time Edit Modal */}
       {editingTimeItem && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(15, 23, 42, 0.4)',
-          backdropFilter: 'blur(8px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 2000,
-          padding: '20px',
-          animation: 'fadeIn 0.2s ease-out'
-        }}>
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: '32px',
-            width: '100%',
-            maxWidth: '360px',
-            padding: '24px',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-            position: 'relative',
-            animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
-          }}>
-            <button 
-              type="button"
-              aria-label="일정 수정 창 닫기"
-              title="일정 수정 창 닫기"
-              onClick={() => setEditingTimeItem(null)}
-              style={{ position: 'absolute', top: '20px', right: '20px', border: 'none', background: '#f1f5f9', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', cursor: 'pointer' }}
-            >
-              <X size={18} />
-            </button>
-
-            <div style={{ marginBottom: '24px' }}>
-              <div style={{ fontSize: '12px', fontWeight: '900', color: '#3b82f6', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>일정 편집</div>
-              <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#0f172a', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{editingTimeItem.originalName || '일정 수정'}</h3>
-            </div>
-
-            <div style={{ marginBottom: "14px" }}>
-              <label style={{ display: "block", fontSize: "10px", fontWeight: "900", color: "#64748b", marginBottom: "8px" }}>일정 위치</label>
-              <select
-                value={editingTimeItem.day}
-                onChange={(e) => setEditingTimeItem({ ...editingTimeItem, day: e.target.value === 'reserve' ? 'reserve' : Number(e.target.value) })}
-                style={{ width: "100%", boxSizing: "border-box", padding: "12px", borderRadius: "12px", border: "1px solid #e2e8f0", backgroundColor: "white", fontSize: "14px", fontWeight: "700", outline: "none" }}
-              >
-                <option value="reserve">예비 목록</option>
-                {itinerary.map(dayPlan => (
-                  <option key={dayPlan.day} value={parseDay(dayPlan.day)}>{parseDay(dayPlan.day)}일차</option>
-                ))}
-              </select>
-            </div>
-
-            <div style={{ marginBottom: "18px" }}>
-              <label style={{ display: "block", fontSize: "10px", fontWeight: "900", color: "#64748b", marginBottom: "8px" }}>일정 표시 이름</label>
-              <input
-                type="text"
-                value={editingTimeItem.displayName}
-                onChange={(e) => setEditingTimeItem({ ...editingTimeItem, displayName: e.target.value })}
-                placeholder={editingTimeItem.originalName || "장소 이름"}
-                maxLength={80}
-                style={{ width: "100%", boxSizing: "border-box", padding: "12px", borderRadius: "12px", border: "1px solid #e2e8f0", fontSize: "14px", fontWeight: "700", outline: "none" }}
-              />
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
-              <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b' }}>예약번호
-                <input type="text" value={editingTimeItem.reservationNumber || ''} onChange={(e) => setEditingTimeItem({ ...editingTimeItem, reservationNumber: e.target.value })} placeholder="선택" style={{ width: '100%', boxSizing: 'border-box', marginTop: '7px', padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '12px' }} />
-              </label>
-              <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b' }}>예약 링크
-                <input type="url" value={editingTimeItem.reservationUrl || ''} onChange={(e) => setEditingTimeItem({ ...editingTimeItem, reservationUrl: e.target.value })} placeholder="https://" style={{ width: '100%', boxSizing: 'border-box', marginTop: '7px', padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '12px' }} />
-              </label>
-            </div>
-            <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b', marginBottom: '14px' }}>메모
-              <textarea value={editingTimeItem.memo || ''} onChange={(e) => setEditingTimeItem({ ...editingTimeItem, memo: e.target.value })} placeholder="체크인 방법, 준비물 등을 적어두세요." rows={3} style={{ width: '100%', boxSizing: 'border-box', marginTop: '7px', padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '12px', resize: 'vertical' }} />
-            </label>
-
-            <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b', marginBottom: '14px' }}>메뉴 링크 (선택)
-              <input type="url" value={editingTimeItem.menuURL} maxLength={2048} placeholder="https://"
-                onChange={(event) => setEditingTimeItem({ ...editingTimeItem, menuURL: event.target.value, menuError: false })}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '10px', marginTop: '7px', borderRadius: '10px', border: '1px solid #e2e8f0' }} />
-              {editingTimeItem.menuError && <span role="alert">https:// 또는 http://로 시작하는 메뉴 주소를 입력해 주세요.</span>}
-            </label>
-            {editingTimeItem.day !== 'reserve' && <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', fontSize: '13px', fontWeight: '700', color: '#334155' }}>
-              <input type="checkbox" checked={editingTimeItem.routeOrderFixed} onChange={(e) => setEditingTimeItem({ ...editingTimeItem, routeOrderFixed: e.target.checked })} />
-              거리순 정렬에서 순서와 시간 고정
-            </label>}
-
-            {editingTimeItem.time ? <>
-              <ScrollTimeInput
-                value={editingTimeItem.time}
-                onChange={(newTime) => setEditingTimeItem({ ...editingTimeItem, time: newTime })}
-                label="일정 시간 선택"
-              />
-              <button type="button" className="travel-memory-cancel-button" onClick={() => setEditingTimeItem({ ...editingTimeItem, time: '' })}>시간 미정으로 변경</button>
-            </> : <div style={{ marginBottom: 12, color: '#64748b', fontSize: 13 }}>시간 미정 <button type="button" className="travel-memory-cancel-button" onClick={() => setEditingTimeItem({ ...editingTimeItem, time: '09:00' })}>시간 설정</button></div>}
-
-            <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-              <button 
-                onClick={() => setEditingTimeItem(null)}
-                style={{ flex: 1, padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', backgroundColor: 'white', color: '#64748b', fontSize: '15px', fontWeight: '900', cursor: 'pointer' }}
-              >
-                취소
-              </button>
-              <button 
-                onClick={() => {
-                  const menuURL = editingTimeItem.menuURL.trim();
-                  if (menuURL && !safePlaceLink(menuURL)) {
-                    setEditingTimeItem({ ...editingTimeItem, menuError: true });
-                    return;
-                  }
-                  updateItineraryItem(editingTimeItem.sourceDay, editingTimeItem.id, {
-                    day: editingTimeItem.day,
-                    time: editingTimeItem.time,
-                    routeOrderFixed: editingTimeItem.routeOrderFixed,
-                    displayName: editingTimeItem.displayName.trim() || editingTimeItem.originalName,
-                    reservationNumber: editingTimeItem.reservationNumber?.trim() || '',
-                    reservationUrl: editingTimeItem.reservationUrl?.trim() || '',
-                    menuURL,
-                    memo: editingTimeItem.memo?.trim() || ''
-                  });
-                  if (editingTimeItem.day === 'reserve') setActiveDay('reserve');
-                  setEditingTimeItem(null);
-                }}
-                style={{ flex: 2, padding: '16px', borderRadius: '16px', border: 'none', backgroundColor: '#3b82f6', color: 'white', fontSize: '15px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 10px 15px -3px rgba(59, 130, 246, 0.3)' }}
-              >
-                저장
-              </button>
-            </div>
-          </div>
-        </div>
+        <ItineraryEditDialog
+          draft={editingTimeItem}
+          placeLabel={itineraryPlaceLabel(editingTimeItem.originalPlace)}
+          days={itinerary.map(dayPlan => parseDay(dayPlan.day))}
+          timePicker={<ScrollTimeInput value={editingTimeItem.time} label="일정 시간 선택" compact inline
+            onChange={time => setEditingTimeItem(current => ({ ...current, time }))} />}
+          onChange={setEditingTimeItem}
+          onClose={() => setEditingTimeItem(null)}
+          onSave={updates => {
+            updateItineraryItem(editingTimeItem.sourceDay, editingTimeItem.id, updates);
+            if (updates.day === 'reserve') setActiveDay('reserve');
+            setEditingTimeItem(null);
+          }}
+        />
       )}
 
       {editingExpenseId && editingExpense && (

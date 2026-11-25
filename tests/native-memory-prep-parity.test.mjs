@@ -11,8 +11,15 @@ test('native fixture agrees with the existing web view of travel memory', () => 
     departure: '인천',
     arrival: '간사이',
     flightNumber: 'KE001',
+    flightDepartureDate: '',
+    flightDepartureTime: '',
+    flightArrivalDate: '',
+    flightArrivalTime: '',
+    flightBoardingDate: '',
+    flightBoardingTime: '',
     stayName: '난바 호텔',
-    stayAddress: '오사카'
+    stayAddress: '오사카',
+    futureDetail: 'keep'
   });
   assert.deepEqual(
     sortJournalEntriesForTimeline(getJournalEntries(fixture)).map(entry => entry.id),
