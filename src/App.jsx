@@ -41,6 +41,8 @@ import {
 import { convertLegacyUserStateRows, hashLegacySnapshot } from './sync/legacyUserStateImporter.js';
 import { planCollectionChanges, syncRecordsUnchanged } from './sync/collectionChanges.js';
 import SyncMigrationDialog from './components/SyncMigrationDialog.jsx';
+import { EXPENSE_CATEGORIES, expenseCategory, getBudgetLimit, getExpenseDay, getExpenseKRW, getExpenseQuote as getEffectiveExchangeRate, getPreparationLabel } from './expenseOverview.js';
+import ExpenseDialog from './ExpenseDialog.jsx';
 import './index.css';
 
 // --- CONFIGURATION ---
@@ -511,34 +513,9 @@ const PAYMENT_METHODS = [
   { value: 'transfer', label: '계좌이체' }
 ];
 
-const EXPENSE_CATEGORIES = [
-  { value: 'food', label: '식비', emoji: '🍽️' },
-  { value: 'transport', label: '교통', emoji: '🚕' },
-  { value: 'lodging', label: '숙박', emoji: '🛏️' },
-  { value: 'flight', label: '항공', emoji: '✈️' },
-  { value: 'sightseeing', label: '관광', emoji: '🎟️' },
-  { value: 'shopping', label: '쇼핑', emoji: '🛍️' },
-  { value: 'communication', label: '통신', emoji: '📶' },
-  { value: 'insurance', label: '보험', emoji: '🛡️' },
-  { value: 'other', label: '기타', emoji: '🧾' }
-];
-
-
-const getExpenseCategoryLabel = (category) => (
-  EXPENSE_CATEGORIES.find(option => option.value === category)?.label || '기타'
-);
-
-const getExpenseCategoryEmoji = (category) => (
-  EXPENSE_CATEGORIES.find(option => option.value === category)?.emoji || '🧾'
-);
-
-const getEffectiveExchangeRate = (currency, rates = {}, budgetSettings = {}) => {
-  if (!currency || currency === 'KRW') return 1;
-  const manualRate = Number(budgetSettings.exchangeRates?.[currency]?.krwPerUnit ?? budgetSettings.manualRates?.[currency]);
-  if (Number.isFinite(manualRate) && manualRate > 0) return manualRate;
-  const liveRate = Number(rates[currency]);
-  return Number.isFinite(liveRate) && liveRate > 0 ? 1 / liveRate : 0;
-};
+const getExpenseCategoryLabel = category => expenseCategory(category).label;
+const getExpenseCategoryEmoji = category => expenseCategory(category).emoji;
+const formatExpenseKRW = amount => amount === null ? '환율 확인 필요' : `₩${amount.toLocaleString('ko-KR')}`;
 
 const getCashWalletsFromSettings = (budgetSettings = {}) => {
   const normalizeActual = value => value === '' || value === null || value === undefined ? '' : Number(value) || 0;
@@ -938,93 +915,6 @@ const ExpenseChoiceGroup = ({ options, value, onChange, ariaLabel, className = '
   </div>
 );
 
-const ExpenseCurrencyPicker = ({ value, options, onChange, placeholder = '추가 선택', ariaLabel, className = '' }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [menuPosition, setMenuPosition] = useState(null);
-  const triggerRef = useRef(null);
-  const menuRef = useRef(null);
-  const selectedCode = options.includes(value) ? value : '';
-
-  const updateMenuPosition = () => {
-    const trigger = triggerRef.current;
-    if (!trigger) return;
-    const rect = trigger.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - rect.bottom - 16;
-    const openAbove = spaceBelow < 180 && rect.top > 220;
-    setMenuPosition({
-      left: rect.left,
-      width: rect.width,
-      top: openAbove ? undefined : rect.bottom + 8,
-      bottom: openAbove ? window.innerHeight - rect.top + 8 : undefined,
-      maxHeight: Math.max(160, openAbove ? rect.top - 16 : spaceBelow)
-    });
-  };
-
-  useEffect(() => {
-    if (!isOpen) return undefined;
-    updateMenuPosition();
-    const handleOutsidePointer = (event) => {
-      if (!triggerRef.current?.contains(event.target) && !menuRef.current?.contains(event.target)) setIsOpen(false);
-    };
-    const handleViewportChange = () => updateMenuPosition();
-    document.addEventListener('pointerdown', handleOutsidePointer);
-    window.addEventListener('resize', handleViewportChange);
-    window.addEventListener('scroll', handleViewportChange, true);
-    return () => {
-      document.removeEventListener('pointerdown', handleOutsidePointer);
-      window.removeEventListener('resize', handleViewportChange);
-      window.removeEventListener('scroll', handleViewportChange, true);
-    };
-  }, [isOpen]);
-
-  const selectedLabel = selectedCode ? `${getCurrencySymbol(selectedCode)} ${selectedCode}` : placeholder;
-
-  return (
-    <>
-      <div className={`expense-currency-picker${className ? ` ${className}` : ''}${isOpen ? ' is-open' : ''}`}>
-        <button
-          ref={triggerRef}
-          type="button"
-          className="expense-currency-picker-trigger"
-          onClick={() => setIsOpen(open => !open)}
-          aria-label={ariaLabel}
-          aria-expanded={isOpen}
-          aria-haspopup="listbox"
-        >
-          <span>{selectedLabel}</span>
-          <ChevronDown size={15} aria-hidden="true" />
-        </button>
-      </div>
-      {isOpen && menuPosition && createPortal(
-        <div
-          ref={menuRef}
-          className="expense-currency-picker-popover"
-          role="listbox"
-          aria-label={ariaLabel}
-          style={{ left: menuPosition.left, width: menuPosition.width, top: menuPosition.top, bottom: menuPosition.bottom, maxHeight: menuPosition.maxHeight }}
-        >
-          {options.map(code => (
-            <button
-              key={`expense-currency-picker-${code}`}
-              type="button"
-              className={`expense-currency-picker-option${code === selectedCode ? ' is-selected' : ''}`}
-              role="option"
-              aria-selected={code === selectedCode}
-              onClick={() => {
-                onChange(code);
-                setIsOpen(false);
-              }}
-            >
-              {getCurrencySymbol(code)} {code}
-            </button>
-          ))}
-        </div>,
-        document.body
-      )}
-    </>
-  );
-};
-
 export const ExpensePayerSelectMenu = ({
   id,
   labelId,
@@ -1069,6 +959,7 @@ export const ExpensePayerSelect = ({ id, labelId, ariaLabel, options, value, onC
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [menuPosition, setMenuPosition] = useState(null);
+  const [menuPortal, setMenuPortal] = useState(null);
   const triggerRef = useRef(null);
   const menuRef = useRef(null);
   const optionRefs = useRef([]);
@@ -1079,6 +970,7 @@ export const ExpensePayerSelect = ({ id, labelId, ariaLabel, options, value, onC
     const trigger = triggerRef.current;
     if (!trigger || typeof window === 'undefined') return;
     const rect = trigger.getBoundingClientRect();
+    setMenuPortal(trigger.closest('dialog') || document.body);
     const spaceBelow = Math.max(0, window.innerHeight - rect.bottom - 10);
     const spaceAbove = Math.max(0, rect.top - 10);
     const estimatedHeight = Math.min(320, (options.length * 44) + 16);
@@ -1199,7 +1091,7 @@ export const ExpensePayerSelect = ({ id, labelId, ariaLabel, options, value, onC
             style={menuPosition}
           />
         </div>,
-        document.body
+        menuPortal || document.body
       )}
     </>
   );
@@ -1798,8 +1690,13 @@ function App() {
 
   const [exchangeRates, setExchangeRates] = useState({});
   const [exchangeRateInfo, setExchangeRateInfo] = useState({ date: '', source: '자동 환율' });
-  const [expenseInput, setExpenseInput] = useState(() => ({ desc: '', amount: '', currency: '', paymentMethod: '', category: 'other', memo: '', day: 1, time: getCurrentTimeInputValue(), payerId: 'self', participantIds: ['self'] }));
+  const [expenseInput, setExpenseInput] = useState(() => ({ desc: '', amount: '', currency: '', paymentMethod: 'card', category: 'other', memo: '', day: 1, time: getCurrentTimeInputValue(), payerId: 'self', participantIds: ['self'] }));
   const [editingExpenseId, setEditingExpenseId] = useState(null);
+  const [expenseEditInput, setExpenseEditInput] = useState(null);
+  const [addingExpense, setAddingExpense] = useState(false);
+  const [expenseAction, setExpenseAction] = useState(null);
+  const [confirmExpenseRemoval, setConfirmExpenseRemoval] = useState(false);
+  const [compactExpenses, setCompactExpenses] = useState(true);
   const [placeSuggestions, setPlaceSuggestions] = useState([]);
 
   const sharedTripIdsKey = Array.from(new Set(
@@ -2181,7 +2078,13 @@ function App() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setActiveDay(null);
     // Do not carry a previous trip's payer or participants into a new trip.
-    setExpenseInput(current => ({ ...current, payerId: 'self', participantIds: ['self'] }));
+    setExpenseInput(current => ({ ...current, desc: '', amount: '', memo: '', currency: '', paymentMethod: 'card',
+      category: 'other', preparationLabel: '', payerId: 'self', participantIds: ['self'] }));
+    setEditingExpenseId(null);
+    setExpenseEditInput(null);
+    setAddingExpense(false);
+    setExpenseAction(null);
+    setConfirmExpenseRemoval(false);
     setSettlementParticipantName('');
   }, [activeTripId]);
 
@@ -2563,21 +2466,13 @@ function App() {
     return Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
   }, [editTripData.startDate, editTripData.endDate]);
 
-  const getExpenseAmountKRW = (amount, currency, settings = budgetSettings) => {
-    const numericAmount = Number(amount);
-    if (!Number.isFinite(numericAmount)) return 0;
-    if (currency !== 'KRW') {
-      const effectiveRate = getEffectiveExchangeRate(currency, exchangeRates, settings);
-      if (effectiveRate) return Math.round(numericAmount * effectiveRate);
-    }
-    return Math.round(numericAmount);
-  };
+  const getExpenseAmountKRW = (expense, settings = budgetSettings) => getExpenseKRW(expense, exchangeRates, settings);
 
   /* eslint-disable react-hooks/exhaustive-deps */
   const settlementResult = useMemo(() => calculateSettlement(
     expenses,
     settlementParticipants,
-    (amount, currency) => getExpenseAmountKRW(amount, currency)
+    (_amount, _currency, expense) => getExpenseAmountKRW(expense)
   ), [expenses, settlementParticipants, exchangeRates, budgetSettings]);
   /* eslint-enable react-hooks/exhaustive-deps */
 
@@ -2607,10 +2502,8 @@ function App() {
     if (!selection) return;
     setIsMobileHeaderHidden(false);
     setMobileRootTab(selection.rootTab);
-    setExpenseInput(current => ({
-      ...current,
-      day: getTodayExpenseDay(activeTrip),
-      time: editingExpenseId ? current.time : getCurrentTimeInputValue()
+    setExpenseInput(current => current.desc || current.amount ? current : ({
+      ...current, day: getTodayExpenseDay(activeTrip), time: getCurrentTimeInputValue()
     }));
     setViewMode(selection.viewMode);
     updateTabSnapshot(selection.rootTab, { viewMode: selection.viewMode, activeTripId: selection.activeTripId });
@@ -3627,15 +3520,15 @@ function App() {
     if (!trip) return;
     const header = ['일차', '날짜', '지출 내용', '카테고리', '메모', '금액', '통화', '결제 수단', '원화 환산', '소비 시간'].join(',');
     const rows = (trip.expenses || []).map(expense => [
-      expense.day === 0 ? '여행 전 준비' : `${expense.day}일차`,
-      expense.day === 0 ? '' : getActualDateForDay(trip.startDate, expense.day),
+      getExpenseDay(expense) === 0 ? ['여행 전 준비', getPreparationLabel(expense.preTripExpenseLabel)].filter(Boolean).join(' · ') : `${getExpenseDay(expense)}일차`,
+      getExpenseDay(expense) === 0 ? '' : getActualDateForDay(trip.startDate, getExpenseDay(expense)),
       expense.desc,
       getExpenseCategoryLabel(expense.category),
       expense.memo || '',
       expense.amount,
       expense.currency || 'KRW',
       getPaymentMethodLabel(expense.paymentMethod),
-      getExpenseAmountKRW(expense.amount, expense.currency, trip.budgetSettings),
+      getExpenseAmountKRW(expense, trip.budgetSettings ?? {}),
       expense.time || ''
     ].map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(','));
     downloadTextFile(`${(trip.name || 'travel-plan').replace(/[^\w가-힣-]+/g, '_')}-budget.csv`, `\uFEFF${[header, ...rows].join('\r\n')}`, 'text/csv;charset=utf-8');
@@ -4075,44 +3968,53 @@ function App() {
     updateActiveTrip({ reserveItems: reserveItems.filter(item => item.id !== itemId) });
   };
 
-  const addExpense = () => {
-    const numericAmount = Number(expenseInput.amount);
-    if (!activeTripId || !expenseInput.desc.trim() || !expenseInput.paymentMethod || !Number.isFinite(numericAmount) || numericAmount <= 0) return;
-
-    const currentCurrency = expenseInput.currency || budgetSettings.travelCurrency || 'USD';
-    const split = normalizeExpenseParticipants(expenseInput, settlementParticipants);
-
-    const newExpense = {
-      id: makeEntityId(),
-      desc: expenseInput.desc.trim(),
-      amount: numericAmount,
-      currency: currentCurrency,
-      paymentMethod: expenseInput.paymentMethod,
-      category: expenseInput.category || 'other',
-      memo: expenseInput.memo?.trim() || '',
-      amountKRW: getExpenseAmountKRW(expenseInput.amount, currentCurrency),
-      day: parseInt(expenseInput.day, 10) || 0,
-      time: expenseInput.time || '',
-      payerId: split.payerId,
-      participantIds: split.participantIds
+  const expenseFields = (input, original) => {
+    const amount = Number(input.amount);
+    const currency = input.currency || budgetSettings.travelCurrency || 'KRW';
+    const unchanged = original && Number(original.amount) === amount && (original.currency || 'KRW') === currency;
+    const exchangeRate = unchanged ? original.exchangeRate : getEffectiveExchangeRate(currency, exchangeRates, budgetSettings);
+    const draft = unchanged ? original : { amount, currency, exchangeRate };
+    const amountKRW = getExpenseAmountKRW(draft);
+    const day = getExpenseDay(input);
+    const split = normalizeExpenseParticipants(input, settlementParticipants);
+    return {
+      desc: input.desc.trim(), amount, currency, amountKRW,
+      paymentMethod: input.paymentMethod, category: input.category || 'other',
+      memo: (input.memo || '').trim(), day, time: input.time || '',
+      preTripExpenseLabel: day === 0 ? getPreparationLabel(input.preparationLabel) || null : null,
+      exchangeRate: exchangeRate ?? null,
+      payerId: split.payerId, participantIds: split.participantIds
     };
+  };
 
-    saveExpenses([...expenses, newExpense]);
-    setExpenseInput({ ...expenseInput, desc: '', amount: '', memo: '', time: getCurrentTimeInputValue() });
+  const isValidExpense = (input, original) => {
+    const amount = Number(input?.amount);
+    const knownPayment = PAYMENT_METHODS.some(method => method.value === input?.paymentMethod);
+    return Boolean(activeTripId && !isReadOnlyTrip && input?.desc.trim() && Number.isFinite(amount) &&
+      amount > 0 && (knownPayment || (original && input.paymentMethod === (original.paymentMethod || ''))));
+  };
+
+  const addExpense = () => {
+    if (!isValidExpense(expenseInput)) return;
+    saveExpenses([...expenses, { id: makeEntityId(), ...expenseFields(expenseInput) }]);
+    setExpenseInput(current => ({ ...current, desc: '', amount: '', memo: '', time: getCurrentTimeInputValue() }));
+    setAddingExpense(false);
   };
 
   const startEditingExpense = (expense) => {
-    setEditingExpenseId(expense.id);
+    if (isReadOnlyTrip) return;
     const split = normalizeExpenseParticipants(expense, settlementParticipants);
-    setExpenseInput({
+    setEditingExpenseId(expense.id);
+    setExpenseEditInput({
       desc: expense.desc || '',
       amount: String(expense.amount ?? ''),
-      currency: expense.currency || budgetSettings.travelCurrency || 'USD',
+      currency: expense.currency || 'KRW',
       paymentMethod: expense.paymentMethod || '',
-      category: expense.category || 'other',
+      category: expense.category === 'stay' ? 'lodging' : expense.category || 'other',
       memo: expense.memo || '',
-      day: expense.day ?? 1,
+      day: getExpenseDay(expense),
       time: expense.time || '',
+      preparationLabel: expense.preTripExpenseLabel || '',
       payerId: split.payerId,
       participantIds: split.participantIds
     });
@@ -4120,30 +4022,13 @@ function App() {
 
   const cancelEditingExpense = () => {
     setEditingExpenseId(null);
-    setExpenseInput(current => ({ ...current, desc: '', amount: '', memo: '', time: getCurrentTimeInputValue() }));
+    setExpenseEditInput(null);
   };
 
   const saveExpenseEdit = () => {
-    if (!activeTripId || !editingExpenseId || !expenseInput.desc.trim() || !expenseInput.paymentMethod || !expenseInput.amount) return;
-
-    const currentCurrency = expenseInput.currency || budgetSettings.travelCurrency || 'USD';
-    const split = normalizeExpenseParticipants(expenseInput, settlementParticipants);
-    const nextExpenses = expenses.map(expense => expense.id === editingExpenseId ? {
-      ...expense,
-      desc: expenseInput.desc.trim(),
-      amount: Number(expenseInput.amount),
-      currency: currentCurrency,
-      paymentMethod: expenseInput.paymentMethod,
-      category: expenseInput.category || 'other',
-      memo: expenseInput.memo?.trim() || '',
-      amountKRW: getExpenseAmountKRW(expenseInput.amount, currentCurrency),
-      day: parseInt(expenseInput.day, 10) || 0,
-      time: expenseInput.time || '',
-      payerId: split.payerId,
-      participantIds: split.participantIds
-    } : expense);
-
-    saveExpenses(nextExpenses);
+    if (!editingExpense || !isValidExpense(expenseEditInput, editingExpense)) return;
+    const nextFields = expenseFields(expenseEditInput, editingExpense);
+    saveExpenses(expenses.map(expense => expense.id === editingExpenseId ? { ...expense, ...nextFields } : expense));
     cancelEditingExpense();
   };
 
@@ -4152,7 +4037,7 @@ function App() {
     if (!targetExpense) return;
 
     const sameDayIndices = expenses
-      .map((expense, index) => parseDay(expense.day) === parseDay(targetExpense.day) ? index : -1)
+      .map((expense, index) => getExpenseDay(expense) === getExpenseDay(targetExpense) ? index : -1)
       .filter(index => index !== -1);
     const currentPosition = sameDayIndices.indexOf(expenses.findIndex(expense => expense.id === id));
     const targetPosition = currentPosition + direction;
@@ -4616,7 +4501,10 @@ function App() {
   };
 
   const totalSpots = (itinerary || []).reduce((acc, day) => acc + (day.items || []).length, 0);
-  const totalSpentKRW = (expenses || []).reduce((acc, curr) => acc + getExpenseAmountKRW(curr.amount, curr.currency), 0);
+  const unconvertedExpenses = expenses.filter(expense => getExpenseAmountKRW(expense) === null).length;
+  const confirmedExpenseCount = expenses.length - unconvertedExpenses;
+  const expenseConversionNotice = unconvertedExpenses > 0 ? `환율 미확인 ${unconvertedExpenses}건은 원화 합계와 함께 정산에서 제외돼요.` : '';
+  const totalSpentKRW = (expenses || []).reduce((acc, curr) => acc + (getExpenseAmountKRW(curr) ?? 0), 0);
   const expenseTotalsByCurrency = useMemo(() => (expenses || []).reduce((totals, expense) => {
     const currency = expense.currency || 'KRW';
     const amount = Number(expense.amount) || 0;
@@ -4627,8 +4515,7 @@ function App() {
   /* eslint-disable react-hooks/exhaustive-deps */
   const expenseKRWTotalsByCurrency = useMemo(() => (expenses || []).reduce((totals, expense) => {
     const currency = expense.currency || 'KRW';
-    const numericAmount = Number(expense.amount) || 0;
-    const amountKRW = getExpenseAmountKRW(numericAmount, currency);
+    const amountKRW = getExpenseAmountKRW(expense) ?? 0;
     totals[currency] = (totals[currency] || 0) + amountKRW;
     return totals;
   }, {}), [expenses, exchangeRates, budgetSettings]);
@@ -4732,37 +4619,62 @@ function App() {
     });
     setCashWalletId(nextState.activeWalletId);
   };
-  const editingExpense = (expenses || []).find(expense => expense.id === editingExpenseId);
-  const budgetProgress = budgetSettings.limitKRW > 0 ? Math.min((totalSpentKRW / budgetSettings.limitKRW) * 100, 100) : 0;
+  const editingExpense = expenses.find(expense => expense.id === editingExpenseId);
+  const actionExpense = expenses.find(expense => expense.id === expenseAction);
+  const expenseGroups = Array.from(expenses.reduce((groups, expense) => {
+    const day = getExpenseDay(expense);
+    if (!groups.has(day)) groups.set(day, []);
+    groups.get(day).push(expense);
+    return groups;
+  }, new Map()), ([day, rows]) => ({ day, rows })).sort((first, second) => first.day - second.day);
+  const actionDayExpenses = actionExpense ? expenseGroups.find(group => group.day === getExpenseDay(actionExpense)).rows : [];
+  const actionExpensePosition = actionDayExpenses.indexOf(actionExpense);
+  const closeExpenseActions = () => { setExpenseAction(null); setConfirmExpenseRemoval(false); };
+  const runExpenseAction = action => { closeExpenseActions(); action(); };
+  const budgetLimitKRW = getBudgetLimit(budgetSettings);
+  const fixedBudgetRates = budgetSettings.budgetExchangeRates;
+  const budgetSpentKRW = fixedBudgetRates
+    ? expenses.reduce((sum, expense) => sum + (getExpenseKRW(expense, exchangeRates, budgetSettings, { useBudgetRate: true }) ?? 0), 0)
+    : totalSpentKRW;
+  const budgetBalanceKRW = budgetLimitKRW - budgetSpentKRW;
+  const budgetProgress = budgetLimitKRW > 0 ? (budgetSpentKRW / budgetLimitKRW) * 100 : 0;
+  const budgetBalanceLabel = budgetLimitKRW > 0
+    ? `${budgetBalanceKRW >= 0 ? '남은 예산' : '예산 초과'} ${formatExpenseKRW(Math.abs(budgetBalanceKRW))}`
+    : '예산 한도 없음';
+  const budgetCurrency = budgetSettings.travelCurrency || 'KRW';
+  const budgetCurrencyRate = Number(fixedBudgetRates?.rates?.[budgetCurrency]) || getEffectiveExchangeRate(budgetCurrency, exchangeRates, budgetSettings);
+  const localBudgetBalance = budgetLimitKRW > 0 && budgetCurrency !== 'KRW' && budgetCurrencyRate > 0
+    ? `약 ${getCurrencySymbol(budgetCurrency)}${Math.round(Math.abs(budgetBalanceKRW) / budgetCurrencyRate).toLocaleString('ko-KR')} ${budgetCurrency}`
+    : '';
   // getExpenseAmountKRW is intentionally scoped to the active trip's settings.
   /* eslint-disable react-hooks/exhaustive-deps */
   const categoryTotalsKRW = useMemo(() => (expenses || []).reduce((totals, expense) => {
-    const category = expense.category || 'other';
-    totals[category] = (totals[category] || 0) + getExpenseAmountKRW(expense.amount, expense.currency);
+    const category = expenseCategory(expense.category).value;
+    totals[category] = (totals[category] || 0) + (getExpenseAmountKRW(expense) ?? 0);
     return totals;
   }, {}), [expenses, exchangeRates, budgetSettings]);
   /* eslint-enable react-hooks/exhaustive-deps */
   const categoryBudgetEntries = EXPENSE_CATEGORIES.map(category => ({
     ...category,
     spent: categoryTotalsKRW[category.value] || 0,
-    budget: Number(budgetSettings.categoryBudgets?.[category.value]) || 0
+    budget: Number(budgetSettings.categoryBudgets?.[category.value] ?? (category.value === 'lodging' ? budgetSettings.categoryBudgets?.stay : undefined)) || 0
   }));
   /* eslint-disable react-hooks/exhaustive-deps */
   const paymentTotalsKRW = useMemo(() => (expenses || []).reduce((totals, expense) => {
-    const paymentMethod = expense.paymentMethod || 'unassigned';
-    totals[paymentMethod] = (totals[paymentMethod] || 0) + getExpenseAmountKRW(expense.amount, expense.currency);
+    const paymentMethod = PAYMENT_METHODS.some(method => method.value === expense.paymentMethod) ? expense.paymentMethod : 'unassigned';
+    totals[paymentMethod] = (totals[paymentMethod] || 0) + (getExpenseAmountKRW(expense) ?? 0);
     return totals;
   }, {}), [expenses, exchangeRates, budgetSettings]);
   const dailyExpenseTotalsKRW = useMemo(() => (expenses || []).reduce((totals, expense) => {
-    const day = parseDay(expense.day);
-    totals[day] = (totals[day] || 0) + getExpenseAmountKRW(expense.amount, expense.currency);
+    const day = getExpenseDay(expense);
+    totals[day] = (totals[day] || 0) + (getExpenseAmountKRW(expense) ?? 0);
     return totals;
   }, {}), [expenses, exchangeRates, budgetSettings]);
   /* eslint-enable react-hooks/exhaustive-deps */
   const averageDailySpendKRW = itinerary.length > 0 ? Math.round(totalSpentKRW / itinerary.length) : 0;
   const budgetPanelItems = [
     { key: 'exchange', label: '통화 설정', activeColor: '#1d4ed8', activeBackground: '#dbeafe' },
-    { key: 'category', label: '카테고리별 예산', activeColor: '#92400e', activeBackground: '#fef3c7' },
+    { key: 'category', label: '예산 설정', activeColor: '#92400e', activeBackground: '#fef3c7' },
     { key: 'cash', label: '현금 정산', activeColor: '#92400e', activeBackground: '#fef3c7' },
     { key: 'settlement', label: '함께 정산', activeColor: '#0f766e', activeBackground: '#ccfbf1' },
     { key: 'stats', label: '통계', activeColor: '#7c3aed', activeBackground: '#ede9fe' }
@@ -4804,28 +4716,9 @@ function App() {
     return warnings;
   };
   const expenseCurrencyCode = expenseInput.currency || budgetSettings.travelCurrency || 'KRW';
-  const expenseCurrencySymbol = getCurrencySymbol(expenseCurrencyCode);
-  const expenseAmountValue = Number(expenseInput.amount);
-  const expenseFormIsValid = Boolean(
-    activeTripId
-    && expenseInput.desc.trim()
-    && expenseInput.paymentMethod
-    && Number.isFinite(expenseAmountValue)
-    && expenseAmountValue > 0
-  );
-  const expenseFormHint = !expenseInput.desc.trim()
-    ? '지출 내용을 입력하면 추가할 수 있어요.'
-    : !expenseInput.paymentMethod
-      ? '현금, 카드 또는 계좌이체를 선택해 주세요.'
-    : !Number.isFinite(expenseAmountValue) || expenseAmountValue <= 0
-      ? '0보다 큰 금액을 입력하면 추가할 수 있어요.'
-      : `${getCurrencyNameKO(expenseCurrencyCode)} 기준 금액으로 저장하고 한화로 자동 환산합니다.`;
   const expenseCurrencyChoices = Array.from(new Set([
-    expenseInput.currency,
-    budgetSettings.travelCurrency,
-    ...(favoriteCurrencies || []),
-    'USD',
-    'KRW'
+    budgetSettings.travelCurrency, ...(favoriteCurrencies || []), ...expenses.map(expense => expense.currency),
+    expenseInput.currency, 'USD', 'KRW'
   ].filter(Boolean)));
   const expenseDayChoices = [
     { value: 0, label: '여행 전 준비' },
@@ -4835,20 +4728,17 @@ function App() {
       return { value: dayNumber, label: `${dayNumber}일차${actualDate ? ` · ${actualDate}` : ''}` };
     })
   ];
-  const useExpenseDayChoices = expenseDayChoices.length <= 8;
   const expenseQuickCurrencyCodes = Array.from(new Set([
-    budgetSettings.travelCurrency,
-    'KRW'
-  ].filter(code => code && expenseCurrencyChoices.includes(code))));
+    budgetSettings.travelCurrency, 'KRW', ...(favoriteCurrencies || []).slice(0, 3)
+  ].filter(Boolean)));
   const expenseCurrencyQuickOptions = expenseQuickCurrencyCodes.map(code => ({
-    value: code,
-    label: `${getCurrencySymbol(code)} ${code}`,
-    title: `${getCurrencyNameKO(code)} (${code})`
+    value: code, label: `${getCurrencySymbol(code)} ${code}`, title: `${getCurrencyNameKO(code)} (${code})`
   }));
-  const expenseCurrencyAdditionalChoices = expenseCurrencyChoices.filter(code => !expenseQuickCurrencyCodes.includes(code));
-  const selectedExpenseCurrency = expenseInput.currency || budgetSettings.travelCurrency || expenseCurrencyChoices[0] || 'KRW';
-  const expenseCurrencyQuickValue = expenseQuickCurrencyCodes.includes(selectedExpenseCurrency) ? selectedExpenseCurrency : '';
-  const expenseCurrencyAdditionalValue = expenseCurrencyAdditionalChoices.includes(selectedExpenseCurrency) ? selectedExpenseCurrency : '';
+  const preparationLabels = Array.from(new Set([
+    '항공비', '숙박비',
+    ...(Array.isArray(budgetSettings.preTripExpenseLabels) ? budgetSettings.preTripExpenseLabels : []),
+    ...expenses.filter(expense => getExpenseDay(expense) === 0).map(expense => expense.preTripExpenseLabel)
+  ].map(getPreparationLabel).filter(Boolean)));
   const useFloatingPlacePanel = true;
   const canAddSelectedPlaceToItinerary = Boolean(activeTripId && !isReadOnlyTrip);
 
@@ -4932,7 +4822,52 @@ function App() {
           </div>
           <span className="settlement-panel-total">총 {formatSettlementAmount(settlementResult.totalKRW)}</span>
         </div>
+        {expenseConversionNotice && <p className="expense-conversion-notice">{expenseConversionNotice}</p>}
 
+        <div className="settlement-summary-grid">
+          <div><span>정산 지출</span><strong>{settlementResult.expenseCount}건</strong></div>
+          <div><span>참여자</span><strong>{settlementParticipants.length}명</strong></div>
+          <div><span>총 부담액</span><strong>{formatSettlementAmount(settlementResult.totalKRW)}</strong></div>
+        </div>
+
+        {expenses.length === 0 ? (
+          <p className="settlement-empty">지출을 추가하면 사람별 정산 금액이 표시됩니다.</p>
+        ) : (
+          <>
+            <div className="settlement-transfer-list">
+              <div className="settlement-section-heading"><strong>정산 방법</strong><span>누구에게 얼마를 보내면 되는지 안내합니다.</span></div>
+              {settlementResult.transfers.length === 0 ? (
+                <p className="settlement-empty">현재 정산할 금액이 없습니다.</p>
+              ) : settlementResult.transfers.map(transfer => (
+                <div className="settlement-transfer-row" key={`settlement-transfer-${transfer.fromId}-${transfer.toId}`}>
+                  <span>{participantNames[transfer.fromId] || '참여자'} → {participantNames[transfer.toId] || '참여자'}</span>
+                  <strong>{formatSettlementAmount(transfer.amountKRW)}</strong>
+                </div>
+              ))}
+            </div>
+            <div className="settlement-people-list" aria-label="사람별 정산 결과">
+              <div className="settlement-section-heading"><strong>사람별 정산</strong><span>결제한 금액과 실제 부담액의 차이입니다.</span></div>
+              {settlementResult.people.map(person => {
+                const balanceLabel = person.balanceKRW > 0
+                  ? `받을 금액 +${formatSettlementAmount(person.balanceKRW)}`
+                  : person.balanceKRW < 0
+                    ? `낼 금액 ${formatSettlementAmount(Math.abs(person.balanceKRW))}`
+                    : '정산 완료';
+                return (
+                  <div className="settlement-person-row" key={`settlement-result-${person.id}`}>
+                    <div>
+                      <strong>{person.name}</strong>
+                      <span>결제 {formatSettlementAmount(person.paidKRW)} · 부담 {formatSettlementAmount(person.shareKRW)}</span>
+                    </div>
+                    <b className={person.balanceKRW > 0 ? 'is-credit' : person.balanceKRW < 0 ? 'is-debit' : 'is-even'}>{balanceLabel}</b>
+                  </div>
+                );
+              })}
+            </div>
+
+
+          </>
+        )}
         <div className="settlement-participant-manager">
           <div className="settlement-section-heading">
             <strong>정산 참여자</strong>
@@ -4963,51 +4898,122 @@ function App() {
           </div>
         </div>
 
-        <div className="settlement-summary-grid">
-          <div><span>정산 지출</span><strong>{settlementResult.expenseCount}건</strong></div>
-          <div><span>참여자</span><strong>{settlementParticipants.length}명</strong></div>
-          <div><span>총 부담액</span><strong>{formatSettlementAmount(settlementResult.totalKRW)}</strong></div>
-        </div>
-
-        {expenses.length === 0 ? (
-          <p className="settlement-empty">지출을 추가하면 사람별 정산 금액이 표시됩니다.</p>
-        ) : (
-          <>
-            <div className="settlement-people-list" aria-label="사람별 정산 결과">
-              <div className="settlement-section-heading"><strong>사람별 정산</strong><span>결제한 금액과 실제 부담액의 차이입니다.</span></div>
-              {settlementResult.people.map(person => {
-                const balanceLabel = person.balanceKRW > 0
-                  ? `받을 금액 +${formatSettlementAmount(person.balanceKRW)}`
-                  : person.balanceKRW < 0
-                    ? `낼 금액 ${formatSettlementAmount(Math.abs(person.balanceKRW))}`
-                    : '정산 완료';
-                return (
-                  <div className="settlement-person-row" key={`settlement-result-${person.id}`}>
-                    <div>
-                      <strong>{person.name}</strong>
-                      <span>결제 {formatSettlementAmount(person.paidKRW)} · 부담 {formatSettlementAmount(person.shareKRW)}</span>
-                    </div>
-                    <b className={person.balanceKRW > 0 ? 'is-credit' : person.balanceKRW < 0 ? 'is-debit' : 'is-even'}>{balanceLabel}</b>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="settlement-transfer-list">
-              <div className="settlement-section-heading"><strong>정산 방법</strong><span>누구에게 얼마를 보내면 되는지 안내합니다.</span></div>
-              {settlementResult.transfers.length === 0 ? (
-                <p className="settlement-empty">현재 정산할 금액이 없습니다.</p>
-              ) : settlementResult.transfers.map(transfer => (
-                <div className="settlement-transfer-row" key={`settlement-transfer-${transfer.fromId}-${transfer.toId}`}>
-                  <span>{participantNames[transfer.fromId] || '참여자'} → {participantNames[transfer.toId] || '참여자'}</span>
-                  <strong>{formatSettlementAmount(transfer.amountKRW)}</strong>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
         <p className="settlement-panel-note">공동 지출은 선택한 사람 수로 1/n 계산하며, 기존 지출은 ‘나’의 개인 지출로 처리합니다.</p>
       </div>
+    );
+  };
+
+  const renderExpenseFields = (input, setInput, { id = 'expense', original } = {}) => {
+    const update = fields => setInput(current => ({ ...current, ...fields }));
+    const currency = input.currency || budgetSettings.travelCurrency || 'KRW';
+    const currencySymbol = getCurrencySymbol(currency);
+    const amount = Number(input.amount);
+    const originalAmount = original && Number(original.amount) === amount && (original.currency || 'KRW') === currency;
+    const quote = (originalAmount && Number(original.exchangeRate) > 0 ? Number(original.exchangeRate) : null)
+      ?? getEffectiveExchangeRate(currency, exchangeRates, budgetSettings);
+    const amountKRW = amount > 0 ? getExpenseAmountKRW(originalAmount ? original : { amount, currency }) : null;
+    const extraCurrencies = Array.from(new Set([currency, ...expenseCurrencyChoices, ...SUPPORTED_CURRENCY_CODES]))
+      .filter(code => !expenseQuickCurrencyCodes.includes(code));
+    const categoryChoices = input.category && !EXPENSE_CATEGORIES.some(option => option.value === input.category)
+      ? [...EXPENSE_CATEGORIES, { value: input.category, label: '기존 분류' }]
+      : EXPENSE_CATEGORIES;
+    const paymentChoices = original && !PAYMENT_METHODS.some(method => method.value === original.paymentMethod)
+      ? [{ value: original.paymentMethod || '', label: getPaymentMethodLabel(original.paymentMethod) }, ...PAYMENT_METHODS]
+      : PAYMENT_METHODS;
+    const dayChoices = expenseDayChoices.some(option => option.value === input.day)
+      ? expenseDayChoices
+      : [...expenseDayChoices, { value: input.day, label: `${input.day}일차` }];
+    return (
+      <div className="expense-editor-fields">
+        <section className="expense-editor-section">
+          <label className="expense-form-label" htmlFor={`${id}-description-input`}>지출 내용</label>
+          <input id={`${id}-description-input`} className="expense-form-control" placeholder="예: 저녁 식사, 택시비"
+            value={input.desc} onChange={event => update({ desc: event.target.value })} maxLength={120} required />
+          <div className="expense-form-row expense-editor-date-time">
+            <div className="expense-form-field">
+              <label className="expense-form-label" htmlFor={`${id}-day-select`}>지출 날짜</label>
+              <select id={`${id}-day-select`} className="expense-form-control" value={input.day}
+                onChange={event => update({ day: Number(event.target.value) })}>
+                {dayChoices.map(day => <option key={day.value} value={day.value}>{day.label}</option>)}
+              </select>
+            </div>
+            <div className="expense-form-field">
+              <div className="expense-form-label">소비 시간</div>
+              <ScrollTimeInput value={input.time} onChange={time => update({ time })} label="소비 시간" variant="expense" compact />
+            </div>
+          </div>
+          {getExpenseDay(input) === 0 && <div>
+            <label className="expense-form-label" htmlFor={`${id}-preparation`}>여행 전 준비 항목 (선택)</label>
+            <input id={`${id}-preparation`} className="expense-form-control" list={`${id}-preparations`}
+              maxLength={32} value={input.preparationLabel || ''} placeholder="예: 항공비, 숙박비"
+              onChange={event => update({ preparationLabel: event.target.value })} />
+            <datalist id={`${id}-preparations`}>{preparationLabels.map(label => <option key={label} value={label} />)}</datalist>
+          </div>}
+        </section>
+        <section className="expense-editor-section">
+          <label className="expense-form-label" htmlFor={`${id}-amount-input`}>금액 · {currencySymbol} {currency}</label>
+          <div className="expense-form-amount-control">
+            <span aria-hidden="true">{currencySymbol}</span>
+            <input id={`${id}-amount-input`} type="number" min="0" step="any" inputMode="decimal" placeholder="0" required
+              aria-label={`지출 금액(${currency})`} value={input.amount} onChange={event => update({ amount: event.target.value })} />
+          </div>
+          <div className="expense-editor-options">
+            <div className="expense-form-label">사용 통화</div>
+            <div className="expense-currency-choice-row has-additional">
+              <ExpenseChoiceGroup options={expenseCurrencyQuickOptions} value={currency} onChange={code => update({ currency: code })}
+                ariaLabel="빠른 지출 입력 통화" className="expense-currency-choice-group" />
+              <select className="expense-form-control expense-editor-currency-select" aria-label="전체 통화 선택"
+                value={extraCurrencies.includes(currency) ? currency : ''}
+                onChange={event => { if (event.target.value) update({ currency: event.target.value }); }}>
+                <option value="" disabled>통화 추가</option>
+                {extraCurrencies.map(code => <option key={code} value={code}>{code} · {getCurrencyNameKO(code)}</option>)}
+              </select>
+            </div>
+          </div>
+          <div>
+            <div className="expense-form-label">결제 수단</div>
+            <ExpenseChoiceGroup options={paymentChoices} value={input.paymentMethod}
+              onChange={paymentMethod => update({ paymentMethod })} ariaLabel="지출 결제 수단" className="expense-payment-choice-group" />
+          </div>
+          {currency !== 'KRW' && <div className="expense-editor-conversion" aria-live="polite">
+            <div><span>원화 환산</span><strong>{amount > 0 ? formatExpenseKRW(amountKRW) : '—'}</strong></div>
+            <small>{originalAmount && amountKRW !== null && original.amountKRW != null
+              ? '저장된 원화 금액'
+              : quote ? `1 ${currency} = ₩${quote.toLocaleString('ko-KR', { maximumFractionDigits: 6 })}`
+              : '현재 환율을 확인할 수 없어요. 원래 통화로 저장할 수 있어요.'}</small>
+          </div>}
+        </section>
+        <section className="expense-editor-section">
+          <div className="expense-form-label">카테고리</div>
+          <ExpenseChoiceGroup options={categoryChoices} value={input.category} onChange={category => update({ category })}
+            ariaLabel="지출 카테고리" className="expense-category-choice-group" />
+          <label className="expense-form-label" htmlFor={`${id}-memo`}>메모 (선택)</label>
+          <textarea id={`${id}-memo`} className="expense-form-control" rows={2} maxLength={500}
+            value={input.memo} onChange={event => update({ memo: event.target.value })} />
+        </section>
+        <details className="expense-editor-section">
+          <summary>함께 정산 · {input.participantIds.length}명</summary>
+          <ExpenseSplitFields participants={settlementParticipants} payerId={input.payerId} participantIds={input.participantIds}
+            onChange={update} compact={id !== 'expense'} />
+        </details>
+      </div>
+    );
+  };
+
+  const renderExpenseEditor = (editing) => {
+    const input = editing ? expenseEditInput : expenseInput;
+    const original = editing ? editingExpense : undefined;
+    const onClose = editing ? cancelEditingExpense : () => setAddingExpense(false);
+    const submit = editing ? saveExpenseEdit : addExpense;
+    return (
+      <ExpenseDialog title={editing ? '지출 수정' : '지출 추가'} onClose={onClose}
+        footer={<><button type="button" className="expense-secondary-button" onClick={onClose}>취소</button>
+          <button type="submit" className="expense-primary-button" form="expense-dialog-form"
+            disabled={!isValidExpense(input, original)}>{editing ? '변경사항 저장' : '지출 저장'}</button></>}>
+        <form id="expense-dialog-form" onSubmit={event => { event.preventDefault(); submit(); }}>
+          {renderExpenseFields(input, editing ? setExpenseEditInput : setExpenseInput, { id: 'expense-dialog', original })}
+        </form>
+      </ExpenseDialog>
     );
   };
 
@@ -5081,19 +5087,21 @@ function App() {
     drawText(formatKRW(totalSpentKRW), 74, 270, 42, '#ffffff', 900);
     drawText(`일평균 ${formatKRW(averageDailySpendKRW)}`, 76, 310, 14, '#ede9fe', 800);
     drawText('예산 사용률', 1124, 215, 13, '#ddd6fe', 800, 'right');
-    drawText(`${budgetProgress.toFixed(1)}%`, 1124, 264, 30, '#ffffff', 900, 'right');
-    drawText(`예산 한도 ${formatKRW(budgetSettings.limitKRW)}`, 1124, 300, 13, '#ede9fe', 700, 'right');
+    drawText(budgetLimitKRW > 0 ? `${budgetProgress.toFixed(1)}%` : '미설정', 1124, 264, 30, '#ffffff', 900, 'right');
+    drawText(`예산 한도 ${formatKRW(budgetLimitKRW)}`, 1124, 300, 13, '#ede9fe', 700, 'right');
     roundedRect(74, 344, 1052, 10, 5);
     ctx.fillStyle = 'rgba(255,255,255,0.25)';
     ctx.fill();
-    roundedRect(74, 344, Math.max(10, 1052 * Math.min(budgetProgress, 100) / 100), 10, 5);
-    ctx.fillStyle = '#fef08a';
-    ctx.fill();
-    drawText(budgetSettings.limitKRW - totalSpentKRW >= 0 ? `남은 예산 ${formatKRW(budgetSettings.limitKRW - totalSpentKRW)}` : `예산 초과 ${formatKRW(Math.abs(budgetSettings.limitKRW - totalSpentKRW))}`, 1124, 378, 12, '#fef9c3', 800, 'right');
+    if (budgetProgress > 0) {
+      roundedRect(74, 344, Math.max(10, 1052 * Math.min(budgetProgress, 100) / 100), 10, 5);
+      ctx.fillStyle = '#fef08a';
+      ctx.fill();
+    }
+    drawText(budgetBalanceLabel, 1124, 378, 12, '#fef9c3', 800, 'right');
 
     const kpiItems = [
       ['기록된 지출', `${expenses.length}건`],
-      ['평균 지출', formatKRW(expenses.length ? totalSpentKRW / expenses.length : 0)],
+      ['평균 지출', formatKRW(confirmedExpenseCount ? totalSpentKRW / confirmedExpenseCount : 0)],
       ['가장 큰 카테고리', categoryStats.length ? `${categoryStats.slice().sort((a, b) => b.spent - a.spent)[0].emoji} ${truncate(categoryStats.slice().sort((a, b) => b.spent - a.spent)[0].label, 13)}` : '기록 없음']
     ];
     kpiItems.forEach(([label, value], index) => {
@@ -5178,7 +5186,7 @@ function App() {
       drawText(formatKRW(amount), 1132, y, 11, '#6d28d9', 900, 'right');
     });
     if (dailyStats.length === 0) drawText('아직 기록된 지출이 없습니다.', 600, dailyPanelY + 85, 12, '#94a3b8', 800, 'center');
-    drawText(`${BRAND_NAME_KO} · 모든 금액은 저장된 환율 기준으로 원화 환산되었습니다.`, 600, footerY, 11, '#94a3b8', 700, 'center');
+    drawText(`${BRAND_NAME_KO} · ${expenseConversionNotice || "저장된 원화 금액을 우선 표시합니다."}`, 600, footerY, 11, '#94a3b8', 700, 'center');
 
     const saveImage = (blob) => {
       if (!blob) return;
@@ -5217,12 +5225,12 @@ function App() {
       </div>
       <div className="budget-stats-hero">
         <div><span className="budget-stats-hero-label">총 지출 · 한화 환산</span><strong className="budget-stats-hero-total">₩{totalSpentKRW.toLocaleString()}</strong><span className="budget-stats-hero-label">일평균 ₩{averageDailySpendKRW.toLocaleString()}</span></div>
-        <div className="budget-stats-hero-budget"><span className="budget-stats-hero-label">예산 사용률</span><strong>{budgetProgress.toFixed(1)}%</strong><span className="budget-stats-hero-label">한도 ₩{Number(budgetSettings.limitKRW || 0).toLocaleString()}</span></div>
-        <div className="budget-stats-progress"><span style={{ width: `${budgetProgress}%` }} /></div>
+        <div className="budget-stats-hero-budget"><span className="budget-stats-hero-label">예산 사용률</span><strong>{budgetLimitKRW > 0 ? `${budgetProgress.toFixed(1)}%` : '미설정'}</strong><span className="budget-stats-hero-label">{budgetBalanceLabel}</span></div>
+        {budgetLimitKRW > 0 && <div className="budget-stats-progress"><span style={{ width: `${Math.min(100, budgetProgress)}%` }} /></div>}
       </div>
       <div className="budget-stats-kpi-grid">
         <div className="budget-stats-kpi"><span>기록된 지출</span><strong>{expenses.length}건</strong></div>
-        <div className="budget-stats-kpi"><span>평균 지출</span><strong>₩{Math.round(expenses.length ? totalSpentKRW / expenses.length : 0).toLocaleString()}</strong></div>
+        <div className="budget-stats-kpi"><span>평균 지출</span><strong>₩{Math.round(confirmedExpenseCount ? totalSpentKRW / confirmedExpenseCount : 0).toLocaleString()}</strong></div>
         <div className="budget-stats-kpi"><span>가장 큰 카테고리</span><strong>{topCategory ? `${topCategory.emoji} ${topCategory.label}` : '기록 없음'}</strong></div>
       </div>
       <div className="budget-stats-chart-grid">
@@ -5231,7 +5239,7 @@ function App() {
           <div className="budget-stats-category-layout">
             <div className="budget-stats-donut" data-center={`${categoryStats.length}개`} role="img" aria-label={categoryTotalKRW > 0 ? `카테고리별 지출 비중, 총 ${categoryTotalKRW.toLocaleString()}원` : '기록된 카테고리별 지출 없음'} style={{ background: categoryGradient }} />
             <div className="budget-stats-legend">
-              {categoryStats.length === 0 ? <div className="budget-stats-empty">아직 기록된 지출이 없습니다.</div> : categoryStats.map((category, index) => <div className="budget-stats-legend-row" key={`category-stat-${category.value}`}><span className="budget-stats-legend-dot" style={{ background: categoryColors[index % categoryColors.length] }} /><span>{category.emoji} {category.label}</span><strong>{((category.spent / categoryTotalKRW) * 100).toFixed(1)}%</strong></div>)}
+              {categoryStats.length === 0 ? <div className="budget-stats-empty">아직 기록된 지출이 없습니다.</div> : categoryStats.map((category, index) => <div className="budget-stats-legend-row" key={`category-stat-${category.value}`}><span className="budget-stats-legend-dot" style={{ background: categoryColors[index % categoryColors.length] }} /><span>{category.emoji} {category.label}</span><strong>{((category.spent / categoryTotalKRW) * 100).toFixed(1)}% <small>{formatExpenseKRW(category.spent)}</small></strong></div>)}
             </div>
           </div>
         </div>
@@ -5248,7 +5256,7 @@ function App() {
           {dailyStats.length === 0 ? <div className="budget-stats-empty">아직 기록된 지출이 없습니다.</div> : dailyStats.map(([day, amount]) => <div className="budget-stats-daily-row" key={`day-stat-${day}`}><span>{Number(day) === 0 ? '여행 전 준비' : `${day}일차`}</span><div className="budget-stats-bar"><span style={{ width: `${Math.max(2, (amount / maxDailyAmount) * 100)}%`, background: '#8b5cf6' }} /></div><strong>₩{amount.toLocaleString()}</strong></div>)}
         </div>
       </div>
-      <p style={{ margin: '12px 2px 0', color: '#8b7bb5', fontSize: '9px', fontWeight: '700' }}>모든 금액은 저장된 환율 기준으로 원화 환산되어 표시됩니다.</p>
+      <p style={{ margin: '12px 2px 0', color: '#8b7bb5', fontSize: '9px', fontWeight: '700' }}>{expenseConversionNotice || '저장된 원화 금액을 우선 표시해요.'}</p>
     </div>;
   };
 
@@ -5783,7 +5791,7 @@ function App() {
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
                               <Wallet size={13} color="#9ca3af" /> 
-                              <span style={{ color: '#111827' }}>총 지출 ₩ {(trip.expenses || []).reduce((sum, e) => sum + getExpenseAmountKRW(e.amount, e.currency, trip.budgetSettings), 0).toLocaleString()}</span>
+                              <span style={{ color: '#111827' }}>총 지출 ₩ {(trip.expenses || []).reduce((sum, e) => sum + (getExpenseAmountKRW(e, trip.budgetSettings ?? {}) ?? 0), 0).toLocaleString()}</span>
                             </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', marginTop: '18px', paddingTop: '14px', borderTop: '1px solid #f1f5f9' }}>
@@ -6197,16 +6205,7 @@ function App() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
                       <div style={{ textAlign: 'right' }}>
                         <p style={{ fontSize: '10px', fontWeight: '800', color: '#34d399', textTransform: 'uppercase', margin: '0 0 4px 0' }}>예산 한도</p>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', borderBottom: '2px solid #a7f3d0' }}>
-                          <span style={{ fontSize: '14px', fontWeight: '900', color: '#064e3b' }}>₩</span>
-                          <input
-                            type="number"
-                            value={budgetSettings.limitKRW}
-                            onChange={(e) => saveBudgetSettings({ ...budgetSettings, limitKRW: Number(e.target.value) })}
-                            aria-label="예산 한도(원화)"
-                            style={{ fontSize: '14px', fontWeight: '800', color: '#064e3b', backgroundColor: 'transparent', border: 'none', width: '92px', textAlign: 'right', outline: 'none' }}
-                          />
-                        </div>
+                        <strong style={{ fontSize: 14, color: '#064e3b' }}>{budgetLimitKRW ? formatExpenseKRW(budgetLimitKRW) : '미설정'}</strong>
                       </div>
                     </div>
                   </div>
@@ -6230,18 +6229,20 @@ function App() {
                       </div>
                     )}
                   </div>
-                  <div style={{ width: '100%', height: '8px', backgroundColor: '#d1fae5', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div style={{ width: `${budgetProgress}%`, height: '100%', backgroundColor: budgetProgress > 90 ? '#ef4444' : '#10b981', transition: 'width 0.3s ease' }}></div>
-                  </div>
-                  <p style={{ fontSize: '10px', fontWeight: '800', color: budgetProgress > 90 ? '#ef4444' : '#059669', marginTop: '8px', textAlign: 'right' }}>
-                    {budgetProgress.toFixed(1)}% 사용됨
-                    <span style={{ marginLeft: '4px', opacity: 0.8 }}>
-                      {budgetSettings.limitKRW - totalSpentKRW >= 0 
-                        ? `(남은 예산: ₩${(budgetSettings.limitKRW - totalSpentKRW).toLocaleString()})`
-                        : `(예산 초과: ₩${Math.abs(budgetSettings.limitKRW - totalSpentKRW).toLocaleString()})`}
-                    </span>
+                  {budgetLimitKRW > 0 && <div className="expense-budget-progress" role="progressbar" aria-label="예산 사용률"
+                    aria-valuenow={Math.min(100, budgetProgress)} aria-valuetext={`${budgetProgress.toFixed(1)}% 사용`}>
+                    <span style={{ width: `${Math.min(100, budgetProgress)}%`, background: budgetProgress > 100 ? '#dc2626' : undefined }} />
+                  </div>}
+                  <p className="expense-budget-balance">
+                    {budgetLimitKRW > 0 && `${budgetProgress.toFixed(1)}% 사용 · `}{budgetBalanceLabel}
+                    {localBudgetBalance && ` · ${localBudgetBalance}`}
                   </p>
+                  {fixedBudgetRates?.date && budgetLimitKRW > 0 && <p className="expense-conversion-notice">남은 예산은 예산 기준 환율 · {fixedBudgetRates.date} 기준이에요.</p>}
+                  {expenseConversionNotice && <p className="expense-conversion-notice">{expenseConversionNotice}</p>}
                 </div>
+
+                {!isReadOnlyTrip && <button type="button" className="expense-primary-button expense-add-cta"
+                  onClick={() => setAddingExpense(true)}><Plus size={18} aria-hidden="true" />지출 추가</button>}
 
                 <div role="tablist" aria-label="예산 및 지출 설정 메뉴" style={{ display: 'flex', gap: '7px', flexWrap: 'wrap', marginBottom: '18px' }}>
                   {budgetPanelItems.map(panel => {
@@ -6254,7 +6255,7 @@ function App() {
                 {budgetPanel === 'exchange' && (
                   <div className="budget-settings-panel" style={{ padding: '14px 16px', marginBottom: '18px', border: '1px solid #bfdbfe', borderRadius: '16px', background: '#f8fbff' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'center', marginBottom: '10px' }}><strong style={{ color: '#1d4ed8', fontSize: '13px' }}>환율 기준일·수동 환율</strong><span style={{ color: '#64748b', fontSize: '10px', fontWeight: '700' }}>{budgetSettings.exchangeRateSource || exchangeRateInfo.source} · {budgetSettings.exchangeRateReferenceDate || exchangeRateInfo.date || '오늘'}</span></div>
-                    <p style={{ margin: '0 0 10px', color: '#64748b', fontSize: '10px', lineHeight: 1.5 }}>1 외화가 몇 원인지 입력하면 자동 환율보다 우선해 정산합니다. 실제 환전 영수증 기준으로 조정할 때 사용하세요.</p>
+                    <p style={{ margin: '0 0 10px', color: '#64748b', fontSize: '10px', lineHeight: 1.5 }}>1 외화가 몇 원인지 입력하면 새 지출과 저장된 환산값이 없는 지출에 우선 적용돼요.</p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       {expenseCurrencyChoices.filter(code => code !== 'KRW').map(code => {
                         const manualValue = budgetSettings.exchangeRates?.[code]?.krwPerUnit ?? '';
@@ -6266,9 +6267,22 @@ function App() {
 
                 {budgetPanel === 'category' && (
                   <div className="budget-settings-panel" style={{ padding: '14px 16px', marginBottom: '18px', border: '1px solid #fde68a', borderRadius: '16px', background: '#fffbeb' }}>
+                    <strong style={{ color: '#92400e', fontSize: '13px' }}>예산 설정</strong>
+                    <fieldset className="expense-budget-settings" disabled={isReadOnlyTrip}>
+                      <legend>전체 예산 한도</legend>
+                      <ExpenseChoiceGroup options={[{ value: 'direct', label: '직접 설정' }, { value: 'categories', label: '카테고리 합산' }]}
+                        value={budgetSettings.budgetLimitMode === 'categories' ? 'categories' : 'direct'}
+                        onChange={budgetLimitMode => saveBudgetSettings({ ...budgetSettings, budgetLimitMode })}
+                        ariaLabel="예산 한도 설정 방식" />
+                      {budgetSettings.budgetLimitMode === 'categories'
+                        ? <strong>{formatExpenseKRW(budgetLimitKRW)}</strong>
+                        : <label>예산 한도 (원)<input type="number" min="0" step="1" inputMode="numeric"
+                          value={budgetSettings.limitKRW || ''} placeholder="한도 없음"
+                          onChange={event => saveBudgetSettings({ ...budgetSettings, limitKRW: Number(event.target.value) || 0 })} /></label>}
+                    </fieldset>
                     <strong style={{ color: '#92400e', fontSize: '13px' }}>카테고리별 예산</strong>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
-                      {categoryBudgetEntries.map(category => <label key={`category-budget-${category.value}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#334155', fontSize: '11px', fontWeight: '800' }}><span style={{ flex: 1 }}>{category.emoji} {category.label} <small style={{ color: '#94a3b8' }}>사용 ₩{category.spent.toLocaleString()}</small></span><span>₩</span><input type="number" min="0" step="1000" value={category.budget || ''} onChange={(event) => saveBudgetSettings({ ...budgetSettings, categoryBudgets: { ...(budgetSettings.categoryBudgets || {}), [category.value]: event.target.value === '' ? 0 : Number(event.target.value) } })} placeholder="한도 없음" style={{ width: '104px', padding: '8px 9px', border: '1px solid #fde68a', borderRadius: '9px', background: 'white' }} /></label>)}
+                      {categoryBudgetEntries.map(category => <label key={`category-budget-${category.value}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#334155', fontSize: '11px', fontWeight: '800' }}><span style={{ flex: 1 }}>{category.emoji} {category.label} <small style={{ color: '#94a3b8' }}>사용 ₩{category.spent.toLocaleString()}</small></span><span>₩</span><input type="number" min="0" step="1" disabled={isReadOnlyTrip} value={category.budget || ''} onChange={(event) => saveBudgetSettings({ ...budgetSettings, categoryBudgets: { ...(budgetSettings.categoryBudgets || {}), [category.value]: event.target.value === '' ? 0 : Number(event.target.value) } })} placeholder="한도 없음" style={{ width: '104px', padding: '8px 9px', border: '1px solid #fde68a', borderRadius: '9px', background: 'white' }} /></label>)}
                     </div>
                   </div>
                 )}
@@ -6278,154 +6292,12 @@ function App() {
                 {budgetPanel === 'exchange' && renderCurrencyManagerPanel()}
                 {budgetPanel === 'stats' && renderBudgetStatisticsPanel()}
 
-                {/* Add Expense Form */}
-                <div className="expense-form-card" style={{ padding: '16px', backgroundColor: '#f9fafb', border: '1px solid #f3f4f6', borderRadius: '16px', marginBottom: '24px' }}>
-                  <div className="expense-form-heading" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '14px' }}>
-                    <div>
-                      <h3 style={{ margin: 0, color: '#0f172a', fontSize: '15px', fontWeight: '900' }}>지출 추가</h3>
-                      <p style={{ margin: '4px 0 0', color: '#94a3b8', fontSize: '10px', fontWeight: '700' }}>여행 일차와 통화를 확인한 뒤 내용을 입력하세요.</p>
-                    </div>
-                    <span className="expense-form-required" style={{ flexShrink: 0, padding: '5px 8px', borderRadius: '8px', backgroundColor: '#ecfdf5', color: '#059669', fontSize: '10px', fontWeight: '900' }}>내용 · 결제수단 · 금액 필수</span>
-                  </div>
-
-                  <div className="expense-form-row expense-form-day-time">
-                    <div className="expense-form-field" style={{ flex: '1 1 0' }}>
-                      <label className="expense-form-label">사용 일차</label>
-                      {useExpenseDayChoices ? (
-                        <ExpenseChoiceGroup
-                          options={expenseDayChoices}
-                          value={expenseInput.day}
-                          onChange={(day) => setExpenseInput(current => ({ ...current, day }))}
-                          ariaLabel="지출 사용 일차"
-                          className="expense-day-choice-group"
-                          scrollable
-                        />
-                      ) : (
-                        <div className="expense-day-native-select-wrap">
-                          <select
-                            id="expense-day-select"
-                            className="expense-form-control expense-day-native-select"
-                            value={expenseInput.day}
-                            onChange={e => setExpenseInput({ ...expenseInput, day: e.target.value })}
-                            aria-label="지출 사용 일차"
-                          >
-                            {expenseDayChoices.map(day => <option key={`opt-day-${day.value}`} value={day.value}>{day.label}</option>)}
-                          </select>
-                          <ChevronDown className="expense-day-native-select-arrow" size={16} aria-hidden="true" />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="expense-form-row expense-form-description-time">
-                    <div className="expense-form-field expense-form-description-field" style={{ flex: '1 1 0' }}>
-                      <label className="expense-form-label" htmlFor="expense-description-input">지출 내용</label>
-                      <input
-                        id="expense-description-input"
-                        className="expense-form-control"
-                        type="text"
-                        placeholder="예: 저녁 식사, 택시비"
-                        value={expenseInput.desc}
-                        onChange={e => setExpenseInput({ ...expenseInput, desc: e.target.value })}
-                        aria-label="지출 내용"
-                        maxLength={120}
-                      />
-                    </div>
-                    <div className="expense-form-field expense-form-time-field" style={{ flex: '1 1 0' }}>
-                      <ScrollTimeInput
-                        value={expenseInput.time}
-                        onChange={(newTime) => setExpenseInput(current => ({ ...current, time: newTime }))}
-                        label="소비 시간"
-                        compact
-                        variant="expense"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="expense-form-row">
-                    <div className="expense-form-field" style={{ flex: '1 1 100%' }}>
-                      <label className="expense-form-label">지출 카테고리</label>
-                      <ExpenseChoiceGroup
-                        options={EXPENSE_CATEGORIES}
-                        value={expenseInput.category || 'other'}
-                        onChange={(category) => setExpenseInput(current => ({ ...current, category }))}
-                        ariaLabel="지출 카테고리"
-                        className="expense-category-choice-group"
-                      />
-                    </div>
-                  </div>
-
-                  <ExpenseSplitFields
-                    participants={settlementParticipants}
-                    payerId={expenseInput.payerId}
-                    participantIds={expenseInput.participantIds}
-                    onChange={split => setExpenseInput(current => ({ ...current, ...split }))}
-                  />
-
-                  <div className="expense-form-row expense-form-currency-payment-amount">
-                    <div className="expense-form-field expense-form-currency-field">
-                      <label className="expense-form-label">사용 통화</label>
-                      <div className={`expense-currency-choice-row${expenseCurrencyAdditionalChoices.length > 0 ? ' has-additional' : ''}`}>
-                        <ExpenseChoiceGroup
-                          options={expenseCurrencyQuickOptions}
-                          value={expenseCurrencyQuickValue}
-                          onChange={(currency) => setExpenseInput(current => ({ ...current, currency }))}
-                          ariaLabel="빠른 지출 입력 통화"
-                          className="expense-currency-choice-group"
-                        />
-                        {expenseCurrencyAdditionalChoices.length > 0 && (
-                          <ExpenseCurrencyPicker
-                            value={expenseCurrencyAdditionalValue}
-                            options={expenseCurrencyAdditionalChoices}
-                            onChange={currency => setExpenseInput(current => ({ ...current, currency }))}
-                            placeholder="추가 선택"
-                            ariaLabel="추가 통화에서 지출 입력 통화 선택"
-                            className="expense-currency-more-picker"
-                          />
-                        )}
-                      </div>
-                    </div>
-                    <div className="expense-form-field">
-                      <label className="expense-form-label">결제 수단</label>
-                      <ExpenseChoiceGroup
-                        options={PAYMENT_METHODS}
-                        value={expenseInput.paymentMethod}
-                        onChange={(paymentMethod) => setExpenseInput(current => ({ ...current, paymentMethod }))}
-                        ariaLabel="지출 결제 수단"
-                        className="expense-payment-choice-group"
-                      />
-                    </div>
-                    <div className="expense-form-field expense-form-amount-field">
-                      <label className="expense-form-label" htmlFor="expense-amount-input">금액 · {expenseCurrencySymbol} {expenseCurrencyCode}</label>
-                      <div className="expense-form-amount-control">
-                        <span aria-hidden="true">{expenseCurrencySymbol}</span>
-                        <input
-                          id="expense-amount-input"
-                          type="number"
-                          min="0"
-                          step="any"
-                          inputMode="decimal"
-                          placeholder="0"
-                          value={expenseInput.amount}
-                          onChange={e => setExpenseInput({ ...expenseInput, amount: e.target.value })}
-                          aria-label={`지출 금액(${expenseCurrencyCode})`}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <p className={`expense-form-hint${expenseFormIsValid ? ' expense-form-hint-valid' : ''}`} role="status" aria-live="polite">{expenseFormHint}</p>
-                  <button
-                    type="button"
-                    onClick={addExpense}
-                    disabled={!expenseFormIsValid}
-                    aria-disabled={!expenseFormIsValid}
-                    style={{ width: '100%', padding: '12px', backgroundColor: expenseFormIsValid ? '#10b981' : '#cbd5e1', color: 'white', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '900', cursor: expenseFormIsValid ? 'pointer' : 'not-allowed', boxShadow: expenseFormIsValid ? '0 4px 10px rgba(16, 185, 129, 0.2)' : 'none', transition: 'all 0.2s' }}
-                  >
-                    + 지출 추가
-                  </button>
+                <div className="expense-list-header">
+                  <h3>지출 내역</h3>
+                  <ExpenseChoiceGroup options={[{ value: 'standard', label: '기본' }, { value: 'compact', label: '압축' }]}
+                    value={compactExpenses ? 'compact' : 'standard'} onChange={value => setCompactExpenses(value === 'compact')}
+                    ariaLabel="지출 목록 보기" />
                 </div>
-
                 {/* Expenses List */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {expenses.length === 0 ? (
@@ -6433,10 +6305,8 @@ function App() {
                       <p style={{ fontSize: '11px', color: '#d1d5db', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>기록된 지출이 없습니다</p>
                     </div>
                   ) : (
-                    [0, ...itinerary.map(d=>d.day)].map(dayNum => {
-                      const dayExpenses = expenses.filter(e => e.day === dayNum);
-                      if (dayExpenses.length === 0) return null;
-                      const daySubtotalKRW = dayExpenses.reduce((sum, expense) => sum + getExpenseAmountKRW(expense.amount, expense.currency), 0);
+                    expenseGroups.map(({ day: dayNum, rows: dayExpenses }) => {
+                      const daySubtotalKRW = dayExpenses.reduce((sum, expense) => sum + (getExpenseAmountKRW(expense) ?? 0), 0);
                       const dayCurrencyTotals = dayExpenses.reduce((totals, expense) => {
                         const currency = expense.currency || 'KRW';
                         const amount = Number(expense.amount) || 0;
@@ -6468,10 +6338,10 @@ function App() {
                               )}
                             </div>
                           </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            {dayExpenses.map((exp, expenseIndex) => {
+                          <div className={`expense-records${compactExpenses ? ' is-compact' : ''}`}>
+                            {dayExpenses.map(exp => {
                               const localAmount = Number(exp.amount) || 0;
-                              const amountKRW = getExpenseAmountKRW(exp.amount, exp.currency);
+                              const amountKRW = getExpenseAmountKRW(exp);
                               const expenseCurrency = exp.currency || 'KRW';
                               const expenseSplit = normalizeExpenseParticipants(exp, settlementParticipants);
                               const payerName = settlementParticipants.find(person => person.id === expenseSplit.payerId)?.name || '나';
@@ -6479,79 +6349,25 @@ function App() {
                                 .map(participantId => settlementParticipants.find(person => person.id === participantId)?.name)
                                 .filter(Boolean);
 
+                              const prep = dayNum === 0 ? getPreparationLabel(exp.preTripExpenseLabel) : '';
                               return (
-                              <div key={exp.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '12px 16px', backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-                                <div style={{ minWidth: 0, flex: 1 }}>
-                                  {exp.time && (
-                                    <div className="expense-item-time">
-                                      <Clock size={10} aria-hidden="true" />
-                                      소비 시간 {exp.time}
-                                    </div>
-                                  )}
-                                  <h5 style={{ fontSize: '13px', fontWeight: '800', color: '#111827', margin: '0 0 4px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{exp.desc}</h5>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                    <span style={{ fontSize: '10px', fontWeight: '800', color: '#475569', whiteSpace: 'nowrap' }}>{getExpenseCategoryEmoji(exp.category)} {getExpenseCategoryLabel(exp.category)}</span>
-                                    <span className={`expense-payment-badge${exp.paymentMethod ? ` is-${exp.paymentMethod}` : ' is-unassigned'}`}>
-                                      {getPaymentMethodLabel(exp.paymentMethod)}
-                                    </span>
-                                    <span className="expense-participant-summary">지출자 {payerName} · 함께 사용 {sharedParticipantNames.join(', ')}</span>
-                                    {expenseCurrency !== 'KRW' && (
-                                      <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', whiteSpace: 'nowrap' }}>
-                                        현지 {getCurrencySymbol(expenseCurrency)}{localAmount.toLocaleString()} ({expenseCurrency})
-                                      </span>
-                                    )}
-                                    {exp.memo && <span style={{ fontSize: '10px', color: '#94a3b8', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>메모: {exp.memo}</span>}
+                                <article key={exp.id} className="expense-record">
+                                  <div className="expense-record-text">
+                                    <h5 title={exp.desc}>{getExpenseCategoryEmoji(exp.category)} {exp.desc || getExpenseCategoryLabel(exp.category)}</h5>
+                                    <p className="expense-record-meta">
+                                      {[getExpenseCategoryLabel(exp.category), prep, exp.time, getPaymentMethodLabel(exp.paymentMethod)].filter(Boolean).join(' · ')}
+                                    </p>
+                                    {!compactExpenses && <p className="expense-participant-summary">지출자 {payerName} · 함께 사용 {sharedParticipantNames.join(', ')}</p>}
+                                    {!compactExpenses && exp.memo && <p className="expense-record-meta">{exp.memo}</p>}
                                   </div>
-                                </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '7px', flexShrink: 0 }}>
-                                  <span style={{ fontSize: '13px', fontWeight: '900', color: '#059669', whiteSpace: 'nowrap' }}>
-                                    <span style={{ fontSize: '9px', marginRight: '3px', color: '#10b981' }}>한화</span>
-                                    ₩{amountKRW.toLocaleString()}
-                                  </span>
-                                  <div className="expense-item-actions" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', width: '32px', height: '40px', padding: '2px', boxSizing: 'border-box', border: '1px solid #f1f5f9', borderRadius: '10px', backgroundColor: '#f8fafc' }}>
-                                      <button
-                                        type="button"
-                                        onClick={() => moveExpense(exp.id, -1)}
-                                        disabled={expenseIndex === 0}
-                                        aria-label={`${exp.desc} 위로 이동`}
-                                        title="위로 이동"
-                                        style={{ width: '26px', height: '17px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, border: 'none', borderRadius: '5px', backgroundColor: 'transparent', color: expenseIndex === 0 ? '#d1d5db' : '#64748b', cursor: expenseIndex === 0 ? 'default' : 'pointer' }}
-                                      >
-                                        <ChevronUp size={13} />
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => moveExpense(exp.id, 1)}
-                                        disabled={expenseIndex === dayExpenses.length - 1}
-                                        aria-label={`${exp.desc} 아래로 이동`}
-                                        title="아래로 이동"
-                                        style={{ width: '26px', height: '17px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, border: 'none', borderTop: '1px solid #e5e7eb', borderRadius: '0 0 5px 5px', backgroundColor: 'transparent', color: expenseIndex === dayExpenses.length - 1 ? '#d1d5db' : '#64748b', cursor: expenseIndex === dayExpenses.length - 1 ? 'default' : 'pointer' }}
-                                      >
-                                        <ChevronDown size={13} />
-                                      </button>
-                                    </div>
-                                    <button
-                                      type="button"
-                                      onClick={() => startEditingExpense(exp)}
-                                      aria-label={`${exp.desc} 지출 수정`}
-                                      title="지출 수정"
-                                      style={{ width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, border: '1px solid #bfdbfe', borderRadius: '10px', backgroundColor: '#eff6ff', color: '#2563eb', cursor: 'pointer', transition: 'all 0.2s' }}
-                                    >
-                                      <Edit2 size={17} />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={(e) => handleInlineDelete(e, `exp-${exp.id}`, () => deleteExpense(exp.id))}
-                                      aria-label={`${exp.desc} 지출 삭제`}
-                                      title="지출 삭제"
-                                      style={{ minWidth: confirmDeleteId === `exp-${exp.id}` ? '40px' : '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: confirmDeleteId === `exp-${exp.id}` ? '6px 8px' : '6px', backgroundColor: confirmDeleteId === `exp-${exp.id}` ? '#ef4444' : '#fef2f2', color: confirmDeleteId === `exp-${exp.id}` ? 'white' : '#ef4444', border: '1px solid #fee2e2', borderRadius: '10px', cursor: 'pointer', fontSize: '11px', fontWeight: '800' }}
-                                    >
-                                      {confirmDeleteId === `exp-${exp.id}` ? '확인' : <Trash2 size={16} />}
-                                    </button>
+                                  <div className="expense-record-amount">
+                                    <strong>{expenseCurrency === 'KRW' ? formatExpenseKRW(amountKRW) : `${localAmount.toLocaleString('ko-KR')} ${expenseCurrency}`}</strong>
+                                    {expenseCurrency !== 'KRW' && <span>{formatExpenseKRW(amountKRW)}</span>}
                                   </div>
-                                </div>
-                              </div>
+                                  {!isReadOnlyTrip && <button type="button" className="expense-record-menu"
+                                    aria-label={`${exp.desc} 지출 작업`} aria-haspopup="dialog"
+                                    onClick={() => setExpenseAction(exp.id)}>…</button>}
+                                </article>
                               );
                             })}
                           </div>
@@ -7697,150 +7513,25 @@ function App() {
         />
       )}
 
-      {editingExpenseId && editingExpense && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '20px', animation: 'fadeIn 0.2s ease-out' }}>
-          <div style={{ backgroundColor: 'white', borderRadius: '32px', width: '100%', maxWidth: '420px', maxHeight: 'calc(100vh - 40px)', overflowY: 'auto', padding: '24px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', position: 'relative', animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}>
-            <button
-              type="button"
-              onClick={cancelEditingExpense}
-              aria-label="지출 수정 창 닫기"
-              style={{ position: 'absolute', top: '20px', right: '20px', border: 'none', background: '#f1f5f9', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', cursor: 'pointer' }}
-            >
-              <X size={18} />
-            </button>
-
-            <div style={{ marginBottom: '22px', paddingRight: '42px' }}>
-              <div style={{ fontSize: '12px', fontWeight: '900', color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>지출 수정</div>
-              <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#0f172a', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{editingExpense.desc || '지출 내역 수정'}</h3>
-            </div>
-
-            <div style={{ marginBottom: '14px' }}>
-              <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b', marginBottom: '8px' }}>소비 일자</label>
-              {useExpenseDayChoices ? (
-                <ExpenseChoiceGroup
-                  options={expenseDayChoices}
-                  value={expenseInput.day}
-                  onChange={(day) => setExpenseInput(current => ({ ...current, day }))}
-                  ariaLabel="지출 수정 소비 일자"
-                  className="expense-day-choice-group"
-                  scrollable
-                />
-              ) : (
-                <select
-                  value={expenseInput.day}
-                  onChange={(e) => setExpenseInput(current => ({ ...current, day: e.target.value }))}
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', backgroundColor: 'white', fontSize: '14px', fontWeight: '700', outline: 'none' }}
-                >
-                  {expenseDayChoices.map(day => <option key={`expense-edit-day-${day.value}`} value={day.value}>{day.label}</option>)}
-                </select>
-              )}
-            </div>
-
-            <div style={{ marginBottom: '14px' }}>
-              <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b', marginBottom: '8px' }}>지출 내용</label>
-              <input
-                type="text"
-                value={expenseInput.desc}
-                onChange={(e) => setExpenseInput(current => ({ ...current, desc: e.target.value }))}
-                placeholder="지출 내용"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '14px', fontWeight: '700', outline: 'none' }}
-              />
-            </div>
-
-            <div style={{ marginBottom: '14px' }}>
-              <div style={{ minWidth: 0 }}>
-                <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b', marginBottom: '8px' }}>카테고리</label>
-                <ExpenseChoiceGroup
-                  options={EXPENSE_CATEGORIES}
-                  value={expenseInput.category || 'other'}
-                  onChange={(category) => setExpenseInput(current => ({ ...current, category }))}
-                  ariaLabel="지출 수정 카테고리"
-                  className="expense-category-choice-group"
-                />
-              </div>
-            </div>
-
-            <ExpenseSplitFields
-              participants={settlementParticipants}
-              payerId={expenseInput.payerId}
-              participantIds={expenseInput.participantIds}
-              onChange={split => setExpenseInput(current => ({ ...current, ...split }))}
-              compact
-            />
-
-            <div className="expense-edit-currency-payment-amount" style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.9fr 0.9fr', gap: '10px', marginBottom: '14px' }}>
-              <div style={{ minWidth: 0 }}>
-                <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b', marginBottom: '8px' }}>사용 통화</label>
-                <ExpenseChoiceGroup
-                  options={expenseCurrencyQuickOptions}
-                  value={expenseCurrencyQuickValue}
-                  onChange={(currency) => setExpenseInput(current => ({ ...current, currency }))}
-                  ariaLabel="빠른 지출 수정 통화"
-                  className="expense-currency-choice-group"
-                />
-                {expenseCurrencyAdditionalChoices.length > 0 && (
-                  <ExpenseCurrencyPicker
-                    value={expenseCurrencyAdditionalValue}
-                    options={expenseCurrencyAdditionalChoices}
-                    onChange={currency => setExpenseInput(current => ({ ...current, currency }))}
-                    placeholder="전체 통화"
-                    ariaLabel="전체 통화에서 지출 수정 통화 선택"
-                    className="expense-currency-more-picker"
-                  />
-                )}
-              </div>
-              <div style={{ minWidth: 0 }}>
-                <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b', marginBottom: '8px' }}>결제 수단</label>
-                <ExpenseChoiceGroup
-                  options={PAYMENT_METHODS}
-                  value={expenseInput.paymentMethod}
-                  onChange={(paymentMethod) => setExpenseInput(current => ({ ...current, paymentMethod }))}
-                  aria-label="지출 수정 결제 수단"
-                  className="expense-payment-choice-group"
-                />
-              </div>
-              <div className="expense-edit-amount-field" style={{ minWidth: 0 }}>
-                <label style={{ display: 'block', fontSize: '10px', fontWeight: '900', color: '#64748b', marginBottom: '8px' }}>금액 · {expenseCurrencySymbol} {expenseCurrencyCode}</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', width: '100%', boxSizing: 'border-box', padding: '0 12px', borderRadius: '12px', border: '1px solid #e2e8f0', backgroundColor: 'white' }}>
-                  <span aria-hidden="true" style={{ flexShrink: 0, fontSize: '15px', fontWeight: '900', color: '#64748b' }}>{expenseCurrencySymbol}</span>
-                  <input
-                    type="number"
-                    value={expenseInput.amount}
-                    onChange={(e) => setExpenseInput(current => ({ ...current, amount: e.target.value }))}
-                    aria-label={`지출 금액(${expenseCurrencyCode})`}
-                    style={{ flex: 1, minWidth: 0, boxSizing: 'border-box', padding: '12px 0', border: 'none', backgroundColor: 'transparent', fontSize: '14px', fontWeight: '700', outline: 'none' }}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <ScrollTimeInput
-              value={expenseInput.time}
-              onChange={(newTime) => setExpenseInput(current => ({ ...current, time: newTime }))}
-              label="소비 시간"
-              variant="expense"
-            />
-
-            <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-              <button
-                type="button"
-                onClick={cancelEditingExpense}
-                style={{ flex: 1, padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', backgroundColor: 'white', color: '#64748b', fontSize: '15px', fontWeight: '900', cursor: 'pointer' }}
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                onClick={saveExpenseEdit}
-                disabled={!expenseFormIsValid}
-                style={{ flex: 2, padding: '16px', borderRadius: '16px', border: 'none', backgroundColor: expenseFormIsValid ? '#10b981' : '#cbd5e1', color: 'white', fontSize: '15px', fontWeight: '900', cursor: expenseFormIsValid ? 'pointer' : 'not-allowed', boxShadow: expenseFormIsValid ? '0 10px 15px -3px rgba(16, 185, 129, 0.3)' : 'none' }}
-              >
-                저장
-              </button>
-            </div>
+      {viewMode === 'budget' && !isReadOnlyTrip && actionExpense && (
+        <ExpenseDialog title={confirmExpenseRemoval ? '지출 삭제' : '지출 작업'} onClose={closeExpenseActions} variant="actions">
+          <p className="expense-action-title">{actionExpense.desc}</p>
+          <div className="expense-action-list">
+            {confirmExpenseRemoval ? <>
+              <p>삭제하면 정산과 현금 지갑 잔액에 반영돼요.</p>
+              <button type="button" className="is-destructive" onClick={() => runExpenseAction(() => deleteExpense(actionExpense.id))}>삭제 확인</button>
+              <button type="button" onClick={() => setConfirmExpenseRemoval(false)}>취소</button>
+            </> : <>
+              <button type="button" onClick={() => runExpenseAction(() => startEditingExpense(actionExpense))}><Edit2 size={16} />지출 수정</button>
+              <button type="button" disabled={actionExpensePosition === 0} onClick={() => runExpenseAction(() => moveExpense(actionExpense.id, -1))}><ChevronUp size={16} />위로 이동</button>
+              <button type="button" disabled={actionExpensePosition === actionDayExpenses.length - 1} onClick={() => runExpenseAction(() => moveExpense(actionExpense.id, 1))}><ChevronDown size={16} />아래로 이동</button>
+              <button type="button" className="is-destructive" onClick={() => setConfirmExpenseRemoval(true)}><Trash2 size={16} />지출 삭제</button>
+            </>}
           </div>
-        </div>
+        </ExpenseDialog>
       )}
+      {viewMode === 'budget' && !isReadOnlyTrip && addingExpense && renderExpenseEditor(false)}
+      {viewMode === 'budget' && !isReadOnlyTrip && editingExpense && expenseEditInput && renderExpenseEditor(true)}
 
       <style>{`
         @keyframes fadeIn {

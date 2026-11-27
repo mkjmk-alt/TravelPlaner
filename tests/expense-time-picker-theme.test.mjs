@@ -62,8 +62,8 @@ test('applies the expense theme only to expense time pickers, not itinerary edit
   const expenseInputs = inputs.filter(input => jsxStringValue(jsxAttribute(input, 'label')) === '소비 시간');
   const itineraryInput = inputs.find(input => jsxStringValue(jsxAttribute(input, 'label')) === '일정 시간 선택');
 
-  assert.equal(expenseInputs.length, 2, 'expense add and edit each have a time picker');
-  assert.deepEqual(expenseInputs.map(input => jsxStringValue(jsxAttribute(input, 'variant'))), ['expense', 'expense']);
+  assert.equal(expenseInputs.length, 1, 'expense add and edit share a time picker');
+  assert.deepEqual(expenseInputs.map(input => jsxStringValue(jsxAttribute(input, 'variant'))), ['expense']);
   assert.ok(itineraryInput, 'itinerary editing keeps its own time picker');
   assert.equal(jsxStringValue(jsxAttribute(itineraryInput, 'variant')), null);
 });
