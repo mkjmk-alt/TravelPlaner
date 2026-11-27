@@ -1,0 +1,110 @@
+.trip-management-panel,
+.travel-memory-management[open] {
+  display: grid;
+  gap: 10px;
+}
+
+.travel-memory-management > summary,
+.travel-memory-panel > .travel-memory-management-link {
+  width: fit-content;
+  min-height: 36px;
+  margin: 0;
+  padding: 8px 11px;
+  border-radius: 10px;
+  background: #f0f9ff;
+  color: #0369a1;
+  font-size: 11px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.travel-memory-management > summary {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  list-style: none;
+}
+
+.travel-memory-management > summary::-webkit-details-marker {
+  display: none;
+}
+
+.travel-memory-management[open] > summary svg {
+  transform: rotate(90deg);
+}
+
+.trip-management-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.trip-management-actions > button {
+  margin: 0;
+}
+
+.trip-management-panel button:disabled,
+.travel-memory-panel button:disabled {
+  opacity: .55;
+  cursor: default;
+}
+
+.travel-memory-album-heading {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.travel-memory-album-heading h3 {
+  margin: 0;
+}
+
+.travel-memory-album-heading button {
+  margin-left: auto;
+}
+
+.travel-memory-journal-fields,
+.travel-memory-journal-body {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.travel-memory-journal-body > span {
+  color: #475569;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.travel-memory-album {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  align-items: start;
+  gap: 10px;
+}
+
+.travel-memory-album .travel-memory-entry-card {
+  display: block;
+}
+
+.travel-memory-album .travel-memory-entry-image {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  aspect-ratio: 4 / 3;
+}
+
+.travel-memory-album .travel-memory-entry-card h4,
+.travel-memory-album .travel-memory-entry-card p {
+  display: block;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.travel-memory-album .travel-memory-entry-meta button {
+  width: 32px;
+  height: 32px;
+}

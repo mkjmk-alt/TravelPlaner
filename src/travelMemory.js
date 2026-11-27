@@ -30,6 +30,7 @@ export const getTravelDetails = (trip = {}) => {
 };
 
 const normalizeCoordinate = (value) => {
+  if (typeof value !== 'number' && (typeof value !== 'string' || !value.trim())) return null;
   const coordinate = Number(value);
   return Number.isFinite(coordinate) ? coordinate : null;
 };
@@ -44,6 +45,7 @@ const normalizeJournalPlace = (place) => {
   if (!id && !name) return null;
 
   return {
+    ...place,
     key: String(place.key || `${normalizedDay || 'unknown'}:${id || name}`),
     day: normalizedDay,
     id,
@@ -82,22 +84,25 @@ export const getItineraryPlaceOptions = (trip = {}) => {
   });
 };
 
+export const normalizeJournalEntry = (entry) => {
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return null;
+  const { place, ...metadata } = entry;
+  const normalizedPlace = normalizeJournalPlace(place);
+  return {
+    ...metadata,
+    id: Number.isFinite(entry.id) ? entry.id : String(entry.id || ''),
+    date: String(entry.date || ''),
+    title: String(entry.title || ''),
+    body: String(entry.body || ''),
+    imageDataUrl: String(entry.imageDataUrl || ''),
+    ...(normalizedPlace ? { place: normalizedPlace } : {}),
+    createdAt: Number(entry.createdAt) || 0,
+    updatedAt: Number(entry.updatedAt) || Number(entry.createdAt) || 0
+  };
+};
+
 export const getJournalEntries = (trip = {}) => (
-  Array.isArray(trip?.journalEntries)
-    ? trip.journalEntries.filter(entry => entry && typeof entry === 'object').map(entry => {
-      const place = normalizeJournalPlace(entry.place);
-      return {
-        id: String(entry.id || ''),
-        date: String(entry.date || ''),
-        title: String(entry.title || ''),
-        body: String(entry.body || ''),
-        imageDataUrl: String(entry.imageDataUrl || ''),
-        ...(place ? { place } : {}),
-        createdAt: Number(entry.createdAt) || 0,
-        updatedAt: Number(entry.updatedAt) || Number(entry.createdAt) || 0
-      };
-    })
-    : []
+  Array.isArray(trip?.journalEntries) ? trip.journalEntries.map(normalizeJournalEntry).filter(Boolean) : []
 );
 
 const parseDateOnly = (value) => {
@@ -119,6 +124,29 @@ const parseDateOnly = (value) => {
 const getCalendarDayDifference = (fromDate, toDate) => (
   Math.round((toDate.getTime() - fromDate.getTime()) / 86400000)
 );
+
+const formatDateKey = (date) => (
+  `${String(date.getFullYear()).padStart(4, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+);
+
+export const getJournalDateKey = (value) => {
+  const date = parseDateOnly(value);
+  return date ? formatDateKey(date) : '';
+};
+
+export const getJournalAlbumDates = (trip, entries = getJournalEntries(trip)) => {
+  const dates = new Set(entries.map(entry => getJournalDateKey(entry.date)).filter(Boolean));
+  const date = parseDateOnly(trip?.startDate);
+  const end = parseDateOnly(trip?.endDate) || date;
+  // TripPlot supports up to 100 planned days. Record dates from imports are included separately.
+  for (let day = 0; date && date <= end && day < 100; day += 1) {
+    dates.add(formatDateKey(date));
+    date.setDate(date.getDate() + 1);
+  }
+  const options = [...dates].sort();
+  if (entries.some(entry => !getJournalDateKey(entry.date))) options.push('');
+  return options;
+};
 
 export const getTripDayOptions = (trip = {}) => {
   const itinerary = Array.isArray(trip?.itinerary) ? trip.itinerary : [];

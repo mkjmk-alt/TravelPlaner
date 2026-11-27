@@ -1,0 +1,117 @@
+.expense-comparison {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: clamp(12px, 3vw, 20px);
+  border: 1px solid #dbe7e8;
+  border-radius: 16px;
+  background: #fff;
+  color: #0f172a;
+}
+
+.expense-comparison > h3 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.expense-comparison > p {
+  margin: 0;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.expense-comparison > .expense-comparison__notice {
+  color: #92400e;
+}
+
+.expense-comparison__pickers {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.expense-comparison__picker {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.expense-comparison__picker select {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 6px 8px;
+  border: 1px solid #94a3b8;
+  border-radius: 10px;
+  background: #fff;
+  color: #0f172a;
+  font: inherit;
+  font-size: 16px;
+  text-overflow: ellipsis;
+}
+
+.expense-comparison__picker select:focus-visible {
+  outline: 2px solid #0f766e;
+  outline-offset: 2px;
+}
+
+.expense-comparison__table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 13px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.expense-comparison__label-column {
+  width: 31%;
+}
+
+.expense-comparison__table th,
+.expense-comparison__table td {
+  padding: 8px min(2vw, 12px);
+  border-bottom: 1px solid #e2e8f0;
+  text-align: end;
+  vertical-align: middle;
+}
+
+.expense-comparison__table th:first-child {
+  text-align: start;
+}
+
+.expense-comparison__table thead {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.expense-comparison__table thead small {
+  display: block;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.expense-comparison__table td {
+  font-variant-numeric: tabular-nums;
+}
+
+.expense-comparison__summary {
+  background: #f0fdfa;
+  color: #115e59;
+  font-weight: 750;
+}
+
+.expense-comparison__summary tr:first-child td {
+  font-size: 15px;
+}
+
+.expense-comparison__group th {
+  background: #f8fafc;
+  color: #334155;
+}

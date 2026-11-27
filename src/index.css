@@ -5112,3 +5112,154 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .expense-dialog { inset: auto 0 0; margin: 0 auto; width: 100%; max-width: 100%; max-height: calc(100dvh - 16px); border-radius: 20px 20px 0 0; }
   .expense-dialog-scroll { padding-inline: 12px; }
 }
+
+.trip-status-group {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.trip-status-group > h3 {
+  margin: 0;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 900;
+}
+.trip-status-group.is-upcoming > h3 { color: #6d28d9; }
+.trip-status-group.is-upcoming > h3 + div {
+  border-color: #ddd6fe !important;
+  box-shadow: 0 2px 12px #7c3aed14 !important;
+}
+.trip-status-group.is-ongoing > h3 { color: #047857; }
+
+.itinerary-view-filters {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  overflow-x: auto;
+  margin: 0 0 12px;
+  padding: 2px 1px 5px;
+}
+.itinerary-view-filters button {
+  flex: 0 0 auto;
+  padding: 8px 11px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #475569;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.itinerary-view-filters button[aria-pressed="true"] {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.map-pin-placement-button {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 16px;
+  background: #fff;
+  color: #2563eb;
+  box-shadow: 0 10px 25px #0000001a;
+  cursor: pointer;
+}
+.map-pin-placement-button[aria-pressed="true"] { color: white; background: #2563eb; }
+.map-pin-placement-hint {
+  position: absolute;
+  inset: auto auto 24px 50%;
+  z-index: 2;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 80%;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: #1d4ed8;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  pointer-events: none;
+}
+
+.trip-editor-currency {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 800;
+}
+.trip-editor-currency span { display: flex; align-items: center; gap: 6px; }
+.trip-editor-currency strong { color: #6d28d9; }
+
+.expense-manual-conversion {
+  border: 1px solid #dbe7e7;
+  border-radius: 12px;
+  padding: 9px 11px;
+}
+.expense-manual-conversion summary { color: #0f766e; cursor: pointer; font-size: 12px; font-weight: 800; }
+.expense-manual-conversion .expense-form-field { margin-top: 10px; }
+.expense-budget-rate p { margin: 0; font-size: 12px; }
+.expense-budget-rate small { color: #64748b; font-size: 11px; line-height: 1.45; }
+.expense-budget-rate-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.expense-budget-rate-actions button {
+  padding: 7px 9px;
+  border: 1px solid #fde68a;
+  border-radius: 10px;
+  background: #fff;
+  color: #92400e;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.expense-budget-rate-actions button:disabled { opacity: .55; cursor: default; }
+
+.travel-checklist-card {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid #bbf7d0;
+  border-radius: 16px;
+  background: #f0fdf4;
+}
+.travel-checklist-card header,
+.travel-checklist-card form,
+.travel-checklist-card label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.travel-checklist-card header { justify-content: space-between; color: #166534; }
+.travel-checklist-card h3 { margin: 0; font-size: 13px; }
+.travel-checklist-card header span { font-size: 11px; font-weight: 800; }
+.travel-checklist-card label { color: #334155; font-size: 13px; cursor: pointer; }
+.travel-checklist-card label input { width: 17px; height: 17px; accent-color: #15803d; }
+.travel-checklist-card label:has(input:checked) span { text-decoration: line-through; }
+.travel-checklist-card form { margin-top: 4px; }
+.travel-checklist-card form input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid #bbf7d0;
+  border-radius: 9px;
+  background: white;
+  font: inherit;
+}
+.travel-checklist-card form button {
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 9px;
+  background: #15803d;
+  color: white;
+  font-weight: 800;
+  cursor: pointer;
+}
+.travel-checklist-card form button:disabled { opacity: .55; cursor: default; }
+.expense-comparison-toggle { margin: 0 0 12px; }

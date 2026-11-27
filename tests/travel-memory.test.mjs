@@ -13,6 +13,7 @@ import {
   getTripDurationLabel,
   sortJournalEntriesForTimeline
 } from '../src/travelMemory.js';
+import * as travelMemory from '../src/travelMemory.js';
 
 test('provides stable defaults for optional travel details and journal data', () => {
   assert.deepEqual(getDefaultTravelDetails(), {
@@ -198,4 +199,40 @@ test('sorts journal entries chronologically without mutating the source array', 
 
   assert.deepEqual(sorted.map(entry => entry.id), ['old', 'new', 'undated']);
   assert.deepEqual(entries.map(entry => entry.id), ['new', 'undated', 'old']);
+});
+
+test('builds album filters from calendar dates and keeps old records discoverable', () => {
+  const trip = {
+    startDate: '2026-09-10',
+    endDate: '2026-09-12',
+    itinerary: [{ day: 1 }],
+    journalEntries: [
+      { date: '2026-09-10', place: { day: 3, name: '시장' } },
+      { date: '2026-09-15T23:00:00Z' },
+      { date: '2026-02-30' },
+      { title: '예전 기록' }
+    ]
+  };
+  assert.equal(travelMemory.getJournalDateKey(trip.journalEntries[0].date), '2026-09-10');
+  assert.deepEqual(travelMemory.getJournalAlbumDates(trip), [
+    '2026-09-10', '2026-09-11', '2026-09-12', '2026-09-15', ''
+  ]);
+  assert.deepEqual(travelMemory.getJournalAlbumDates({ journalEntries: [{ date: '2026-09-15' }] }), ['2026-09-15']);
+});
+
+test('keeps journal metadata and inline photos when reading a trip backup', () => {
+  const row = {
+    id: 'saved',
+    imageDataUrl: 'data:image/png;base64,abc',
+    operationId: 'sync-operation',
+    futureEntry: { keep: true },
+    place: { name: '공원', lat: null, lng: null, futurePlace: ['keep'] }
+  };
+  const [entry] = getJournalEntries({ journalEntries: [row] });
+  assert.equal(entry.imageDataUrl, row.imageDataUrl);
+  assert.equal(entry.operationId, row.operationId);
+  assert.deepEqual(entry.futureEntry, row.futureEntry);
+  assert.deepEqual(entry.place.futurePlace, row.place.futurePlace);
+  assert.equal(entry.place.lat, null);
+  assert.equal(entry.place.lng, null);
 });

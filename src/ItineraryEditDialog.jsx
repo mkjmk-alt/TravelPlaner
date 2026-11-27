@@ -3,7 +3,10 @@ import { createPortal } from 'react-dom';
 import { ChevronDown, X } from 'lucide-react';
 import { safePlaceLink } from './placeBusinessDetails.js';
 
-export default function ItineraryEditDialog({ draft, placeLabel, days, timePicker, onChange, onClose, onSave }) {
+export default function ItineraryEditDialog({
+  draft, placeLabel, placeAddress, title = '일정 편집', submitLabel = '저장',
+  trips, days, timePicker, onChange, onClose, onSave
+}) {
   const dialogRef = useRef(null);
   const titleId = useId();
   const [menuError, setMenuError] = useState(false);
@@ -55,15 +58,28 @@ export default function ItineraryEditDialog({ draft, placeLabel, days, timePicke
       <form className="itinerary-edit-form" noValidate onSubmit={save}>
         <header className="itinerary-edit-header">
           <div>
-            <h2 id={titleId}>일정 편집</h2>
+            <h2 id={titleId}>{title}</h2>
             <p title={placeLabel}>{placeLabel}</p>
+            {placeAddress && <p title={placeAddress}>{placeAddress}</p>}
           </div>
-          <button type="button" autoFocus className="itinerary-edit-close" aria-label="일정 수정 창 닫기" onClick={onClose}>
+          <button type="button" autoFocus className="itinerary-edit-close" aria-label={`${title} 창 닫기`} onClick={onClose}>
             <X size={20} aria-hidden="true" />
           </button>
         </header>
 
         <div className="itinerary-edit-body">
+          {trips && <label className="itinerary-edit-field">
+            대상 여행
+            <select value={draft.tripId} onChange={event => {
+              const trip = trips.find(candidate => String(candidate.id) === event.target.value);
+              if (!trip) return;
+              const days = (trip.itinerary || []).map(plan => Number(plan.day)).filter(day => day > 0);
+              onChange(current => ({ ...current, tripId: trip.id, day: current.day === 'reserve' || days.includes(current.day)
+                ? current.day : days[0] || 'reserve' }));
+            }}>
+              {trips.map(trip => <option key={trip.id} value={trip.id}>{trip.name || '제목 없는 여행'}</option>)}
+            </select>
+          </label>}
           <label className="itinerary-edit-field">
             일정 표시 이름
             <input value={draft.displayName} maxLength={80} placeholder={placeLabel}
@@ -119,7 +135,7 @@ export default function ItineraryEditDialog({ draft, placeLabel, days, timePicke
 
         <footer className="itinerary-edit-footer">
           <button type="button" onClick={onClose}>취소</button>
-          <button type="submit">저장</button>
+          <button type="submit">{submitLabel}</button>
         </footer>
       </form>
     </dialog>,

@@ -95,8 +95,8 @@ const mapOptions = {
 
 export default function MapPane({ mapData = {}, mapView = {}, actions = {}, formComponents = {} }) {
   const { savedPlaceEntries = [], userLocation, activeDay, itinerary = [], reserveItems = [], searchResult, dayColors = [] } = mapData;
-  const { showFullRoute = false, selectedPlace, useFloatingPlacePanel = false, windowWidth = 1024, sidebarOpen = true, activeTripId, isReadOnlyTrip = false, itineraryDisplayName = '', itineraryEmoji = '📍', itineraryTime = '' } = mapView;
-  const { onMapLoad, onMapUnmount, onMapClick, onSelectedPlaceChange, onMyLocation, onOpenSidebar, onToggleFavorite, isFavorite, onActiveDayChange, onItineraryDisplayNameChange, onItineraryEmojiChange, onItineraryTimeChange, onAddToItinerary } = actions;
+  const { showFullRoute = false, showAllItineraryMarkers = false, pinPlacementEnabled = false, selectedPlace, useFloatingPlacePanel = false, windowWidth = 1024, sidebarOpen = true, activeTripId, isReadOnlyTrip = false, itineraryDisplayName = '', itineraryEmoji = '📍', itineraryTime = '' } = mapView;
+  const { onMapLoad, onMapUnmount, onMapClick, onTogglePinPlacement, onSelectedPlaceChange, onEditItineraryPlace, onMyLocation, onOpenSidebar, onToggleFavorite, isFavorite, onActiveDayChange, onItineraryDisplayNameChange, onItineraryEmojiChange, onItineraryTimeChange, onAddToItinerary } = actions;
   const { ItineraryEmojiPicker, PremiumTimeInput } = formComponents;
   const parseDay = (day) => parseInt(String(day).replace(/[^0-9]/g, '')) || 0;
   const runtimeConfig = typeof window !== 'undefined' ? window.__TRAVELPLANER_CONFIG__ || {} : {};
@@ -110,11 +110,16 @@ export default function MapPane({ mapData = {}, mapView = {}, actions = {}, form
   });
   const mapAvailability = getMapAvailability({ apiKey, isLoaded, loadError });
   const routeSettings = normalizeRouteSettings(mapView.routeSettings);
+  const showAllMarkers = showFullRoute || showAllItineraryMarkers;
   const routeGroups = useMemo(() => buildItineraryRouteGroups({ itinerary, activeDay, showFullRoute }), [itinerary, activeDay, showFullRoute]);
   const roadRoutes = mapView.roadRoutes || { segments: [], status: 'idle' };
   const displayedRoutes = routeSettings.mode === 'road'
     ? roadRoutes.segments
     : routeGroups.filter(group => group.points.length > 1).map(group => ({ ...group, path: group.points }));
+  const selectItineraryPlace = (day, item) => {
+    if (onEditItineraryPlace) onEditItineraryPlace(day, item);
+    else onSelectedPlaceChange(item);
+  };
   const routeColor = group => group.kind === 'bridge' ? '#94a3b8' : showFullRoute ? dayColors[group.colorIndex % dayColors.length] || '#3b82f6' : '#3b82f6';
   const snapshotMapRef = useRef(null);
   const hasSnapshotPlaces = routeGroups.some(group => group.points.length > 0)
@@ -133,6 +138,12 @@ export default function MapPane({ mapData = {}, mapView = {}, actions = {}, form
             routeLabel={showFullRoute ? '전체 일정' : activeDay === 'reserve' ? '예비 목록' : `${parseDay(activeDay)}일차`}
             onSave={actions.onSaveMapImage}
           />
+          {onTogglePinPlacement && (
+            <button type="button" className="map-pin-placement-button" aria-pressed={pinPlacementEnabled}
+              aria-label="지도에 핀 놓기" title="지도에 핀 놓기" onClick={onTogglePinPlacement}>
+              <MapPin size={23} aria-hidden="true" />
+            </button>
+          )}
           {/* My Location Button */}
           <button
             onClick={onMyLocation}
@@ -158,6 +169,8 @@ export default function MapPane({ mapData = {}, mapView = {}, actions = {}, form
             </button>
           </div>
         )}
+
+        {pinPlacementEnabled && <div className="map-pin-placement-hint" role="status">추가할 지점을 지도에서 눌러주세요.</div>}
 
         <GoogleMap
           mapContainerStyle={{ width: '100%', height: '100%' }}
@@ -254,19 +267,19 @@ export default function MapPane({ mapData = {}, mapView = {}, actions = {}, form
           ))}
 
           {/* Itinerary Markers */}
-          {!showFullRoute && (
+          {!showAllMarkers && (
             <React.Fragment key={`markers-daily-${activeDay}`}>
               {(() => {
                 const targetDay = parseDay(activeDay);
                 const dayPlan = (itinerary || []).find(d => parseDay(d.day) === targetDay);
                 return (dayPlan?.items || [])
-                  .filter(item => getRoutePoint(item))
-                  .map((item, idx) => (
+                  .map((item, idx) => ({ item, idx })).filter(({ item }) => getRoutePoint(item))
+                  .map(({ item, idx }) => (
                   <CustomMapMarker
                     key={`itin-mark-${activeDay}-${item.id}`}
                     position={{ lat: Number(item.lat), lng: Number(item.lng) }}
                     label={{ text: `${idx + 1}`, color: 'white', fontSize: '14px', fontWeight: '900' }}
-                    onClick={() => onSelectedPlaceChange(item)}
+                    onClick={() => selectItineraryPlace(dayPlan.day, item)}
                     icon={{
                       url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
                         <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -285,8 +298,8 @@ export default function MapPane({ mapData = {}, mapView = {}, actions = {}, form
           {!showFullRoute && activeDay === 'reserve' && (
             <React.Fragment key="markers-reserve">
               {reserveItems
-                .filter(item => item.lat && item.lng)
-                .map((item, idx) => (
+                .map((item, idx) => ({ item, idx })).filter(({ item }) => getRoutePoint(item))
+                .map(({ item, idx }) => (
                   <CustomMapMarker
                     key={`reserve-mark-${item.id}`}
                     position={{ lat: Number(item.lat), lng: Number(item.lng) }}
@@ -305,16 +318,16 @@ export default function MapPane({ mapData = {}, mapView = {}, actions = {}, form
             </React.Fragment>
           )}
 
-          {showFullRoute && itinerary.map((day, dIdx) => (
+          {showAllMarkers && itinerary.map((day, dIdx) => (
             <React.Fragment key={`markers-full-${dIdx}`}>
               {(day.items || [])
-                .filter(item => item.lat && item.lng)
-                .map((item, idx) => (
+                .map((item, idx) => ({ item, idx })).filter(({ item }) => getRoutePoint(item))
+                .map(({ item, idx }) => (
                   <CustomMapMarker
                     key={`full-itin-mark-${dIdx}-${item.id}`}
                     position={{ lat: Number(item.lat), lng: Number(item.lng) }}
                     label={{ text: `${day.day}-${idx + 1}`, color: 'white', fontSize: '11px', fontWeight: '800' }}
-                    onClick={() => onSelectedPlaceChange(item)}
+                    onClick={() => selectItineraryPlace(day.day, item)}
                     icon={{
                       url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
                         <svg width="34" height="34" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -329,17 +342,17 @@ export default function MapPane({ mapData = {}, mapView = {}, actions = {}, form
           ))}
 
           {/* Dynamic Search Result Marker */}
-          {searchResult && ['search', 'geocoded-search'].includes(searchResult.type) && (
+          {searchResult && ['search', 'geocoded-search', 'pin'].includes(searchResult.type) && (
              <CustomMapMarker
                 position={{ lat: searchResult.lat, lng: searchResult.lng }}
                 onClick={() => onSelectedPlaceChange(searchResult)}
-                ariaLabel={`검색한 장소 ${searchResult.name}`}
+                ariaLabel={searchResult.type === 'pin' ? searchResult.name : `검색한 장소 ${searchResult.name}`}
                 icon={{
                   url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
                     <svg width="40" height="48" viewBox="0 0 40 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M20 46C20 46 5 31.2 5 20C5 11.7 11.7 5 20 5C28.3 5 35 11.7 35 20C35 31.2 20 46 20 46Z" fill="%23006ADC" stroke="white" stroke-width="3" stroke-linejoin="round"/>
+                      <path d="M20 46C20 46 5 31.2 5 20C5 11.7 11.7 5 20 5C28.3 5 35 11.7 35 20C35 31.2 20 46 20 46Z" fill="#006ADC" stroke="white" stroke-width="3" stroke-linejoin="round"/>
                       <circle cx="20" cy="20" r="8" fill="white"/>
-                      <circle cx="20" cy="20" r="4" fill="%23006ADC"/>
+                      <circle cx="20" cy="20" r="4" fill="#006ADC"/>
                     </svg>
                   `)}`,
                   scaledSize: new window.google.maps.Size(40, 48),

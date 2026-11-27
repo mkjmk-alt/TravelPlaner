@@ -1,46 +1,20 @@
-import React, { useMemo, useState } from 'react';
-import LodgingManager from './LodgingManager';
-import { Calendar, Camera, Check, ChevronRight, Edit2, FileText, MapPin, Plane, PlusCircle, Save, Trash2, X } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Camera, ChevronRight, Edit2, FileText, MapPin, PlusCircle, Trash2, X } from 'lucide-react';
+import TripManagementPanel from './TripManagementPanel';
 import {
   createJournalEntry,
   getItineraryPlaceOptions,
-  getJournalEntryDay,
-  getJournalEntries,
-  getTravelDetails,
+  getJournalAlbumDates,
+  getJournalDateKey,
   getTripCountdownLabel,
-  getTripDayOptions,
-  getTripDurationLabel,
+  normalizeJournalEntry,
   sortJournalEntriesForTimeline
 } from './travelMemory';
 
 const MAX_IMAGE_BYTES = 2.5 * 1024 * 1024;
-
-const getTodayInputValue = () => {
-  const today = new Date();
-  const month = String(today.getMonth() + 1).padStart(2, '0');
-  const day = String(today.getDate()).padStart(2, '0');
-  return `${today.getFullYear()}-${month}-${day}`;
-};
-
-const formatJournalDate = (value) => {
-  if (!value) return '날짜 미정';
-  const [year, month, day] = String(value).split('-').map(Number);
-  const date = new Date(year, month - 1, day);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat('ko-KR', {
-    month: 'short',
-    day: 'numeric',
-    weekday: 'short'
-  }).format(date);
-};
-
-const getInitialDraft = (trip) => ({
-  date: trip?.startDate || getTodayInputValue(),
-  title: '',
-  body: '',
-  imageDataUrl: '',
-  placeKey: ''
-});
+const EMPTY_JOURNAL = [];
+const dateFormatter = new Intl.DateTimeFormat('ko-KR', { month: 'short', day: 'numeric', weekday: 'short' });
+const formatJournalDate = (date) => date ? dateFormatter.format(new Date(`${date}T00:00:00`)) : '날짜 미정';
 
 export default function TravelMemoryPanel({
   trip,
@@ -48,368 +22,331 @@ export default function TravelMemoryPanel({
   savedPlaces = [],
   onUpdateTrip,
   onOpenItinerary,
-  onOpenPlace
+  onOpenPlace,
+  onOpenManagement,
+  managementActions
 }) {
-  const travelDetails = useMemo(() => getTravelDetails(trip), [trip]);
-  const journalEntries = useMemo(() => sortJournalEntriesForTimeline(getJournalEntries(trip)), [trip]);
+  const malformedJournal = trip?.journalEntries != null && !Array.isArray(trip.journalEntries);
+  const rows = Array.isArray(trip?.journalEntries) ? trip.journalEntries : EMPTY_JOURNAL;
+  const canEdit = !readOnly && !malformedJournal && typeof onUpdateTrip === 'function';
+  const journalEntries = useMemo(() => sortJournalEntriesForTimeline(rows.flatMap((row, sourceIndex) => {
+    const entry = normalizeJournalEntry(row);
+    return entry ? [{ ...entry, sourceIndex, dateKey: getJournalDateKey(entry.date) }] : [];
+  })), [rows]);
   const itineraryPlaceOptions = useMemo(() => {
-    const itineraryOptions = getItineraryPlaceOptions(trip);
-    const optionKeys = new Set(itineraryOptions.map(option => option.key));
-    const savedPlaceOptions = journalEntries
-      .map(entry => entry.place)
-      .filter(place => place && !optionKeys.has(place.key));
-    return [...itineraryOptions, ...savedPlaceOptions];
+    const options = new Map(getItineraryPlaceOptions(trip).map(place => [place.key, place]));
+    for (const { place } of journalEntries) {
+      if (place && !options.has(place.key)) options.set(place.key, place);
+    }
+    return [...options.values()];
   }, [trip, journalEntries]);
-  const [detailsDraft, setDetailsDraft] = useState(travelDetails);
-  const [journalDraft, setJournalDraft] = useState(() => getInitialDraft(trip));
-  const [editingJournalId, setEditingJournalId] = useState(null);
+  const [dateFilter, setDateFilter] = useState(null);
+  const [journalDraft, setJournalDraft] = useState(null);
+  const [editing, setEditing] = useState(null);
   const [journalError, setJournalError] = useState('');
-  const [detailsSaved, setDetailsSaved] = useState(false);
-  const [journalDayFilter, setJournalDayFilter] = useState('all');
-  const journalDayOptions = useMemo(() => getTripDayOptions(trip), [trip]);
-  const selectedJournalDay = journalDayFilter === 'all' ? null : Number(journalDayFilter);
-  const visibleJournalEntries = useMemo(() => (
-    selectedJournalDay === null || !journalDayOptions.includes(selectedJournalDay)
-      ? journalEntries
-      : journalEntries.filter(entry => getJournalEntryDay(entry, trip) === selectedJournalDay)
-  ), [journalEntries, journalDayOptions, selectedJournalDay, trip]);
+  const [readingPhoto, setReadingPhoto] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const imageReader = useRef(null);
+  const journalForm = useRef(null);
 
-  const updateDetailsField = (field, value) => {
-    setDetailsSaved(false);
-    setDetailsDraft(current => ({ ...current, [field]: value }));
+  const dateOptions = getJournalAlbumDates(trip, journalEntries);
+  if (dateFilter !== null && !dateOptions.includes(dateFilter)) dateOptions.push(dateFilter);
+  const visibleEntries = dateFilter === null ? journalEntries : journalEntries.filter(entry => entry.dateKey === dateFilter);
+  const editorOpen = canEdit && journalDraft !== null;
+
+  useEffect(() => () => imageReader.current?.abort(), []);
+  useEffect(() => {
+    if (editorOpen) {
+      journalForm.current?.scrollIntoView({ block: 'nearest' });
+      journalForm.current?.elements.namedItem('journal-title')?.focus({ preventScroll: true });
+    }
+  }, [editorOpen, editing]);
+
+  const stopReadingPhoto = () => {
+    imageReader.current?.abort();
+    imageReader.current = null;
+    setReadingPhoto(false);
   };
 
-  const saveTravelDetails = () => {
-    if (readOnly || !onUpdateTrip) return;
-    onUpdateTrip({ travelDetails: detailsDraft });
-    setDetailsSaved(true);
+  const showEditor = (entry) => {
+    stopReadingPhoto();
+    setEditing(entry ? { index: entry.sourceIndex, source: rows[entry.sourceIndex], placeKey: entry.place?.key || '' } : null);
+    setJournalDraft({
+      date: entry ? entry.date : dateFilter ?? (getJournalDateKey(trip?.startDate) || getJournalDateKey(new Date())),
+      title: entry?.title || '',
+      body: entry?.body || '',
+      imageDataUrl: entry?.imageDataUrl || '',
+      placeKey: entry?.place?.key || ''
+    });
+    setJournalError('');
+  };
+
+  const closeEditor = () => {
+    stopReadingPhoto();
+    setJournalDraft(null);
+    setEditing(null);
+    setJournalError('');
+  };
+
+  const updateDraft = (field, value) => {
+    setJournalDraft(current => current ? { ...current, [field]: value } : current);
   };
 
   const handleImageChange = (event) => {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
+    stopReadingPhoto();
     if (file.size > MAX_IMAGE_BYTES) {
       setJournalError('사진은 2.5MB 이하만 추가할 수 있습니다.');
       return;
     }
+    if (!file.type.startsWith('image/')) {
+      setJournalError('이미지 파일을 선택해주세요.');
+      return;
+    }
 
     const reader = new FileReader();
+    imageReader.current = reader;
+    setReadingPhoto(true);
+    setJournalError('');
     reader.onload = () => {
-      setJournalError('');
-      setJournalDraft(current => ({ ...current, imageDataUrl: String(reader.result || '') }));
+      if (imageReader.current !== reader) return;
+      imageReader.current = null;
+      setReadingPhoto(false);
+      updateDraft('imageDataUrl', String(reader.result || ''));
     };
-    reader.onerror = () => setJournalError('사진을 읽지 못했습니다. 다시 선택해주세요.');
+    reader.onerror = () => {
+      if (imageReader.current !== reader) return;
+      imageReader.current = null;
+      setReadingPhoto(false);
+      setJournalError('사진을 읽지 못했습니다. 다시 선택해주세요.');
+    };
     reader.readAsDataURL(file);
   };
 
-  const resetJournalDraft = () => {
-    setJournalDraft(getInitialDraft(trip));
-    setEditingJournalId(null);
+  const persistJournal = async (nextRows, onSaved, errorMessage) => {
+    setSaving(true);
     setJournalError('');
+    try {
+      await onUpdateTrip({ journalEntries: nextRows });
+      onSaved?.();
+    } catch {
+      setJournalError(errorMessage);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const saveJournalEntry = (event) => {
     event.preventDefault();
-    if (readOnly || !onUpdateTrip) return;
-    const title = journalDraft.title.trim();
-    const body = journalDraft.body.trim();
-    if (!title && !body && !journalDraft.imageDataUrl) {
+    if (!canEdit || !journalDraft || saving || readingPhoto) return;
+    const original = editing && rows[editing.index];
+    if (editing && original !== editing.source && JSON.stringify(original) !== JSON.stringify(editing.source)) {
+      setJournalError('기록이 변경되었습니다. 닫고 다시 열어주세요.');
+      return;
+    }
+
+    const { date, title, body, imageDataUrl, placeKey } = journalDraft;
+    if (!title.trim() && !body.trim() && !imageDataUrl && !original?.imageFileName) {
       setJournalError('제목, 내용 또는 사진 중 하나는 입력해주세요.');
       return;
     }
 
-    const now = Date.now();
     const nextEntry = createJournalEntry({
-      id: editingJournalId || undefined,
-      date: journalDraft.date,
+      date,
       title,
       body,
-      imageDataUrl: journalDraft.imageDataUrl,
-      place: itineraryPlaceOptions.find(place => place.key === journalDraft.placeKey),
-      now
+      imageDataUrl,
+      place: itineraryPlaceOptions.find(place => place.key === placeKey)
     });
-    const nextEntries = editingJournalId
-      ? journalEntries.map(entry => entry.id === editingJournalId
-        ? { ...nextEntry, createdAt: entry.createdAt || now }
-        : entry)
-      : [nextEntry, ...journalEntries];
+    let nextRows = [nextEntry, ...rows];
+    if (editing) {
+      const edited = {
+        ...original,
+        ...(date !== String(original.date || '') ? { date: nextEntry.date } : {}),
+        title: nextEntry.title,
+        body: nextEntry.body,
+        imageDataUrl: nextEntry.imageDataUrl,
+        updatedAt: Math.max(nextEntry.updatedAt, (Number(original.updatedAt) || 0) + 1)
+      };
+      if (placeKey !== editing.placeKey) {
+        if (nextEntry.place) edited.place = nextEntry.place;
+        else delete edited.place;
+      }
+      nextRows = rows.map((row, index) => index === editing.index ? edited : row);
+    }
 
-    onUpdateTrip({ journalEntries: nextEntries });
-    resetJournalDraft();
+    void persistJournal(nextRows, () => {
+      if (dateFilter !== null) setDateFilter(getJournalDateKey(date));
+      closeEditor();
+    }, '기록을 저장하지 못했습니다. 다시 시도해주세요.');
   };
 
-  const editJournalEntry = (entry) => {
-    setEditingJournalId(entry.id);
-    setJournalDraft({
-      date: entry.date || getTodayInputValue(),
-      title: entry.title || '',
-      body: entry.body || '',
-      imageDataUrl: entry.imageDataUrl || '',
-      placeKey: entry.place?.key || ''
-    });
-    setJournalError('');
+  const deleteJournalEntry = (sourceIndex) => {
+    if (!canEdit || editorOpen || saving) return;
+    void persistJournal(
+      rows.filter((_, index) => index !== sourceIndex),
+      null,
+      '기록을 삭제하지 못했습니다. 다시 시도해주세요.'
+    );
   };
-
-  const deleteJournalEntry = (entryId) => {
-    if (readOnly || !onUpdateTrip) return;
-    onUpdateTrip({ journalEntries: journalEntries.filter(entry => entry.id !== entryId) });
-    if (editingJournalId === entryId) resetJournalDraft();
-  };
-
-  const daySummaries = (trip?.itinerary || []).map((dayPlan, index) => ({
-    day: Number(dayPlan?.day) || index + 1,
-    count: Array.isArray(dayPlan?.items) ? dayPlan.items.length : 0
-  }));
 
   return (
     <div className="travel-memory-panel">
-      <section className="travel-memory-hero">
+      <header className="travel-memory-hero">
         <div>
-          <span className="travel-memory-eyebrow">TRIP MEMORY</span>
           <h2 className="menu-section-title">여행 기록</h2>
           <p>{trip?.name || '여행'}</p>
+          {onOpenItinerary && (
+            <button type="button" className="travel-memory-link-button" onClick={() => onOpenItinerary()}>
+              일정 전체 보기 <ChevronRight size={14} aria-hidden="true" />
+            </button>
+          )}
         </div>
-        <div className="travel-memory-status-chip">
-          {getTripCountdownLabel(trip)}
-        </div>
-      </section>
+        <span className="travel-memory-status-chip">{getTripCountdownLabel(trip ?? {})}</span>
+      </header>
 
-      <section className="travel-memory-summary-card">
-        <div className="travel-memory-summary-heading">
-          <div>
-            <strong>{trip?.country || '여행지 미정'}</strong>
-            <span>{getTripDurationLabel(trip)} · {journalEntries.length}개 기록</span>
-          </div>
-          <Plane size={22} aria-hidden="true" />
-        </div>
-        <div className="travel-memory-summary-meta">
-          <span><Calendar size={13} aria-hidden="true" />{trip?.startDate || '날짜 미정'} ~ {trip?.endDate || trip?.startDate || '날짜 미정'}</span>
-          <span><MapPin size={13} aria-hidden="true" />{daySummaries.reduce((total, day) => total + day.count, 0)}개 일정 장소</span>
-        </div>
-        <div className="travel-memory-day-strip" aria-label="날짜별 일정 요약">
-          {daySummaries.length > 0 ? daySummaries.map(day => (
-            <span key={`memory-day-${day.day}`} className={day.count > 0 ? 'has-places' : ''}>
-              {day.day}일차 <b>{day.count}</b>
-            </span>
-          )) : <span>아직 일정이 없습니다.</span>}
-        </div>
-        {onOpenItinerary && (
-          <button type="button" className="travel-memory-link-button" onClick={() => onOpenItinerary()}>
-            일정 전체 보기 <ChevronRight size={14} aria-hidden="true" />
-          </button>
-        )}
-      </section>
+      {onOpenManagement ? (
+        <button type="button" className="travel-memory-secondary-button travel-memory-management-link" onClick={() => onOpenManagement()}>
+          여행 관리 <ChevronRight size={14} aria-hidden="true" />
+        </button>
+      ) : (
+        <details className="travel-memory-management">
+          <summary>여행 관리 <ChevronRight size={14} aria-hidden="true" /></summary>
+          <TripManagementPanel {...managementActions} trip={trip} readOnly={readOnly} savedPlaces={savedPlaces} onUpdateTrip={onUpdateTrip} />
+        </details>
+      )}
 
-      <section className="travel-memory-card">
-        <div className="travel-memory-card-heading">
-          <div>
-            <span className="travel-memory-card-kicker">TRAVEL DETAILS</span>
-            <h3>항공·숙소 정보</h3>
-          </div>
-          <Plane size={18} aria-hidden="true" />
+      <section className="travel-memory-entry-list" aria-label="사진과 메모 앨범">
+        <div className="travel-memory-timeline-heading travel-memory-album-heading">
+          <h3>사진과 메모</h3>
+          <span className="travel-memory-timeline-count">{visibleEntries.length}개 기록</span>
+          {canEdit && !editorOpen && (
+            <button type="button" className="travel-memory-primary-button" disabled={saving} onClick={() => showEditor()}>
+              <PlusCircle size={15} aria-hidden="true" /> 기록 추가
+            </button>
+          )}
         </div>
-        <div className="travel-memory-form-grid">
-          <label>
-            <span>출발지</span>
-            <input disabled={readOnly} value={detailsDraft.departure} onChange={event => updateDetailsField('departure', event.target.value)} placeholder="예: 인천공항" />
-          </label>
-          <label>
-            <span>도착지</span>
-            <input disabled={readOnly} value={detailsDraft.arrival} onChange={event => updateDetailsField('arrival', event.target.value)} placeholder="예: 나리타공항" />
-          </label>
-          <label>
-            <span>항공편</span>
-            <input disabled={readOnly} value={detailsDraft.flightNumber} onChange={event => updateDetailsField('flightNumber', event.target.value)} placeholder="예: KE703" />
-          </label>
-          <label>
-            <span>출발일 (현지)</span>
-            <input type="date" disabled={readOnly} value={detailsDraft.flightDepartureDate} onChange={event => updateDetailsField('flightDepartureDate', event.target.value)} />
-          </label>
-          <label>
-            <span>출발 시간 (현지)</span>
-            <input type="time" disabled={readOnly} value={detailsDraft.flightDepartureTime} onChange={event => updateDetailsField('flightDepartureTime', event.target.value)} />
-          </label>
-          <label>
-            <span>도착일 (현지)</span>
-            <input type="date" disabled={readOnly} value={detailsDraft.flightArrivalDate} onChange={event => updateDetailsField('flightArrivalDate', event.target.value)} />
-          </label>
-          <label>
-            <span>도착 시간 (현지)</span>
-            <input type="time" disabled={readOnly} value={detailsDraft.flightArrivalTime} onChange={event => updateDetailsField('flightArrivalTime', event.target.value)} />
-          </label>
-          <label>
-            <span>탑승일 (확인된 경우)</span>
-            <input type="date" disabled={readOnly} value={detailsDraft.flightBoardingDate} onChange={event => updateDetailsField('flightBoardingDate', event.target.value)} />
-          </label>
-          <label>
-            <span>탑승 시간 (확인된 경우)</span>
-            <input type="time" disabled={readOnly} value={detailsDraft.flightBoardingTime} onChange={event => updateDetailsField('flightBoardingTime', event.target.value)} />
-          </label>
-          <label>
-            <span>기존 숙소 (날짜 미지정)</span>
-            <input disabled={readOnly} value={detailsDraft.stayName} onChange={event => updateDetailsField('stayName', event.target.value)} placeholder="예: 도쿄 호텔" />
-          </label>
-          <label className="travel-memory-form-grid-wide">
-            <span>숙소 주소</span>
-            <input disabled={readOnly} value={detailsDraft.stayAddress} onChange={event => updateDetailsField('stayAddress', event.target.value)} placeholder="예: 도쿄도 신주쿠구" />
-          </label>
-        </div>
-        {!readOnly && (
-          <button type="button" className="travel-memory-secondary-button" onClick={saveTravelDetails}>
-            {detailsSaved ? <Check size={14} aria-hidden="true" /> : <Save size={14} aria-hidden="true" />}
-            {detailsSaved ? '저장됨' : '여행 정보 저장'}
-          </button>
-        )}
-      </section>
 
-      <LodgingManager trip={trip} readOnly={readOnly} savedPlaces={savedPlaces} legacyDetails={travelDetails} onUpdateTrip={onUpdateTrip} />
-
-      <section className="travel-memory-card travel-memory-journal-card">
-        <div className="travel-memory-card-heading">
-          <div>
-            <span className="travel-memory-card-kicker">PHOTO JOURNAL</span>
-            <h3>{editingJournalId ? '여행 기록 수정' : '여행 기록 남기기'}</h3>
-          </div>
-          <Camera size={18} aria-hidden="true" />
+        <div className="travel-memory-timeline-filter" role="group" aria-label="여행 기록 날짜 필터">
+          {[null, ...dateOptions].map(date => (
+            <button
+              key={date ?? 'all'}
+              type="button"
+              title={date || undefined}
+              className={dateFilter === date ? 'is-active' : ''}
+              aria-pressed={dateFilter === date}
+              onClick={() => setDateFilter(date)}
+            >{date === null ? '전체 기록' : formatJournalDate(date)}</button>
+          ))}
         </div>
-        {!readOnly ? (
-          <form onSubmit={saveJournalEntry} className="travel-memory-journal-form">
-            <div className="travel-memory-form-grid">
-              <label>
-                <span>기록 날짜</span>
-                <input type="date" value={journalDraft.date} onChange={event => setJournalDraft(current => ({ ...current, date: event.target.value }))} />
-              </label>
-              <label>
-                <span>제목</span>
-                <input value={journalDraft.title} onChange={event => setJournalDraft(current => ({ ...current, title: event.target.value }))} placeholder="예: 첫날의 저녁" maxLength={80} />
-              </label>
-              <label className="travel-memory-form-grid-wide">
-                <span>장소 연결 (선택)</span>
-                <select
-                  value={journalDraft.placeKey}
-                  onChange={event => setJournalDraft(current => ({ ...current, placeKey: event.target.value }))}
-                >
-                  <option value="">장소를 연결하지 않음</option>
-                  {itineraryPlaceOptions.map(place => (
-                    <option key={place.key} value={place.key}>
-                      {place.day}일차 · {place.name}{place.address ? ` · ${place.address}` : ''}
-                    </option>
-                  ))}
-                </select>
-                {itineraryPlaceOptions.length === 0 && <small>일정에 장소를 추가하면 기록과 연결할 수 있어요.</small>}
-              </label>
+
+        {readOnly && <p className="travel-memory-readonly-note">공유된 일정에서는 기록을 확인만 할 수 있습니다.</p>}
+        {malformedJournal && <p className="travel-memory-form-error" role="alert">저장된 기록 형식을 읽을 수 없습니다.</p>}
+        {journalError && !editorOpen && canEdit && <p className="travel-memory-form-error" role="alert">{journalError}</p>}
+
+        {editorOpen && (
+          <section className="travel-memory-card travel-memory-journal-card">
+            <div className="travel-memory-card-heading">
+              <h3>{editing ? '여행 기록 수정' : '여행 기록 남기기'}</h3>
+              <Camera size={18} aria-hidden="true" />
             </div>
-            <label>
-              <span>내용</span>
-              <textarea value={journalDraft.body} onChange={event => setJournalDraft(current => ({ ...current, body: event.target.value }))} placeholder="오늘의 여행을 기록해보세요." maxLength={2000} rows={4} />
-            </label>
-            <div className="travel-memory-photo-row">
-              <label className="travel-memory-photo-picker">
-                <Camera size={15} aria-hidden="true" /> 사진 추가
-                <input type="file" accept="image/*" onChange={handleImageChange} />
-              </label>
-              {journalDraft.imageDataUrl && (
-                <div className="travel-memory-photo-preview">
-                  <img src={journalDraft.imageDataUrl} alt="새 여행 기록 미리보기" />
-                  <button type="button" onClick={() => setJournalDraft(current => ({ ...current, imageDataUrl: '' }))} aria-label="선택한 사진 제거"><X size={13} /></button>
+            <form ref={journalForm} onSubmit={saveJournalEntry} className="travel-memory-journal-form">
+              <fieldset className="travel-memory-journal-fields" disabled={saving}>
+                <div className="travel-memory-form-grid">
+                  <label>
+                    <span>기록 날짜</span>
+                    <input type="date" value={getJournalDateKey(journalDraft.date)} onChange={event => updateDraft('date', event.target.value)} />
+                  </label>
+                  <label>
+                    <span>제목</span>
+                    <input name="journal-title" value={journalDraft.title} onChange={event => updateDraft('title', event.target.value)} placeholder="예: 첫날의 저녁" maxLength={80} />
+                  </label>
+                  <label className="travel-memory-form-grid-wide">
+                    <span>장소 연결 (선택)</span>
+                    <select value={journalDraft.placeKey} onChange={event => updateDraft('placeKey', event.target.value)}>
+                      <option value="">장소를 연결하지 않음</option>
+                      {itineraryPlaceOptions.map(place => (
+                        <option key={place.key} value={place.key}>
+                          {place.day ? `${place.day}일차 · ` : ''}{place.name || place.id}{place.address ? ` · ${place.address}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                 </div>
-              )}
-            </div>
-            {journalError && <p className="travel-memory-form-error" role="alert">{journalError}</p>}
-            <div className="travel-memory-form-actions">
-              {editingJournalId && <button type="button" className="travel-memory-cancel-button" onClick={resetJournalDraft}>취소</button>}
-              <button type="submit" className="travel-memory-primary-button"><PlusCircle size={15} />{editingJournalId ? '기록 수정' : '기록 저장'}</button>
-            </div>
-          </form>
-        ) : (
-          <p className="travel-memory-readonly-note">공유된 일정에서는 기록을 확인만 할 수 있습니다.</p>
-        )}
-      </section>
-
-      <section className="travel-memory-entry-list" aria-label="저장된 여행 기록">
-        <div className="travel-memory-timeline-heading">
-          <div>
-            <span className="travel-memory-card-kicker">TIMELINE</span>
-            <h3>날짜별 여행 기록</h3>
-          </div>
-          <span className="travel-memory-timeline-count">{visibleJournalEntries.length} / {journalEntries.length}</span>
-        </div>
-        {journalEntries.length === 0 ? (
-          <div className="travel-memory-empty-state">
-            <FileText size={28} aria-hidden="true" />
-            <strong>아직 여행 기록이 없습니다.</strong>
-            <span>사진과 짧은 메모로 여행의 순간을 남겨보세요.</span>
-          </div>
-        ) : (
-          <>
-            <div className="travel-memory-timeline-filter" role="group" aria-label="여행 기록 일차 필터">
-              <button
-                type="button"
-                className={journalDayFilter === 'all' ? 'is-active' : ''}
-                aria-pressed={journalDayFilter === 'all'}
-                onClick={() => setJournalDayFilter('all')}
-              >전체 기록</button>
-              {journalDayOptions.map(day => (
-                <button
-                  key={`journal-day-filter-${day}`}
-                  type="button"
-                  className={selectedJournalDay === day ? 'is-active' : ''}
-                  aria-pressed={selectedJournalDay === day}
-                  onClick={() => setJournalDayFilter(String(day))}
-                >{day}일차</button>
-              ))}
-            </div>
-            {visibleJournalEntries.length === 0 ? (
-              <div className="travel-memory-empty-state">
-                <FileText size={28} aria-hidden="true" />
-                <strong>선택한 일차에 기록이 없습니다.</strong>
-                <span>다른 일차를 선택하거나 전체 기록을 확인해보세요.</span>
-              </div>
-            ) : visibleJournalEntries.map(entry => {
-              const entryDay = getJournalEntryDay(entry, trip);
-              return (
-                <article key={entry.id} className="travel-memory-entry-card">
-                  <div className="travel-memory-entry-timeline-marker" aria-hidden="true">
-                    <span>{entryDay ? `${entryDay}일차` : '기록'}</span>
-                  </div>
-                  {entry.imageDataUrl && <img className="travel-memory-entry-image" src={entry.imageDataUrl} alt="" />}
-                  <div className="travel-memory-entry-content">
-                    <div className="travel-memory-entry-meta">
-                      <span>{formatJournalDate(entry.date)}</span>
-                      {!readOnly && (
-                        <div>
-                          <button type="button" onClick={() => editJournalEntry(entry)} aria-label="여행 기록 수정"><Edit2 size={13} /></button>
-                          <button type="button" onClick={() => deleteJournalEntry(entry.id)} aria-label="여행 기록 삭제"><Trash2 size={13} /></button>
-                        </div>
-                      )}
+                <label className="travel-memory-journal-body">
+                  <span>내용</span>
+                  <textarea value={journalDraft.body} onChange={event => updateDraft('body', event.target.value)} maxLength={2000} rows={4} />
+                </label>
+                <div className="travel-memory-photo-row">
+                  <label className="travel-memory-photo-picker">
+                    <Camera size={15} aria-hidden="true" /> {journalDraft.imageDataUrl ? '사진 변경' : '사진 추가'}
+                    <input type="file" accept="image/*" onChange={handleImageChange} />
+                  </label>
+                  {journalDraft.imageDataUrl && (
+                    <div className="travel-memory-photo-preview">
+                      <img src={journalDraft.imageDataUrl} alt="여행 기록 사진 미리보기" />
+                      <button type="button" onClick={() => { stopReadingPhoto(); updateDraft('imageDataUrl', ''); }} aria-label="선택한 사진 제거"><X size={13} /></button>
                     </div>
-                    {entry.title && <h4>{entry.title}</h4>}
-                    {entry.body && <p>{entry.body}</p>}
-                    {entry.place && (
-                      Number.isFinite(entry.place.lat) && Number.isFinite(entry.place.lng) && onOpenPlace ? (
-                        <button
-                          type="button"
-                          className="travel-memory-entry-place"
-                          onClick={() => onOpenPlace(entry.place)}
-                          title="지도에서 장소 보기"
-                        >
-                          <MapPin size={13} aria-hidden="true" />
-                          <span>{entry.place.day ? `${entry.place.day}일차 · ` : ''}{entry.place.name}</span>
-                          <span className="travel-memory-entry-place-action">지도에서 장소 보기</span>
-                        </button>
-                      ) : (
-                        <span className="travel-memory-entry-place is-static">
-                          <MapPin size={13} aria-hidden="true" />
-                          {entry.place.day ? `${entry.place.day}일차 · ` : ''}{entry.place.name}
-                        </span>
-                      )
+                  )}
+                  {readingPhoto && <span role="status">사진을 읽고 있습니다.</span>}
+                </div>
+              </fieldset>
+              {journalError && <p className="travel-memory-form-error" role="alert">{journalError}</p>}
+              <div className="travel-memory-form-actions">
+                <button type="button" className="travel-memory-cancel-button" onClick={closeEditor} disabled={saving}>취소</button>
+                <button type="submit" className="travel-memory-primary-button" disabled={saving || readingPhoto}>{saving ? '저장 중' : editing ? '수정 저장' : '기록 저장'}</button>
+              </div>
+            </form>
+          </section>
+        )}
+
+        {visibleEntries.length === 0 ? (
+          <div className="travel-memory-empty-state" role="status">
+            <FileText size={28} aria-hidden="true" />
+            <strong>{dateFilter === null ? '아직 여행 기록이 없습니다.' : '선택한 날짜에 기록이 없습니다.'}</strong>
+            {dateFilter !== null && (
+              <button type="button" className="travel-memory-link-button" onClick={() => setDateFilter(null)}>전체 기록 보기</button>
+            )}
+          </div>
+        ) : (
+          <div className="travel-memory-album">
+            {visibleEntries.map(entry => (
+              <article key={entry.sourceIndex} className="travel-memory-entry-card">
+                {entry.imageDataUrl && <img className="travel-memory-entry-image" src={entry.imageDataUrl} alt={entry.title || '여행 기록 사진'} loading="lazy" />}
+                <div className="travel-memory-entry-content">
+                  <div className="travel-memory-entry-meta">
+                    {entry.dateKey
+                      ? <time dateTime={entry.dateKey}>{formatJournalDate(entry.dateKey)}</time>
+                      : <span>날짜 미정</span>}
+                    {canEdit && (
+                      <div>
+                        <button type="button" disabled={editorOpen || saving} onClick={() => showEditor(entry)} aria-label="여행 기록 수정"><Edit2 size={13} /></button>
+                        <button type="button" disabled={editorOpen || saving} onClick={() => deleteJournalEntry(entry.sourceIndex)} aria-label="여행 기록 삭제"><Trash2 size={13} /></button>
+                      </div>
                     )}
                   </div>
-                </article>
-              );
-            })}
-          </>
+                  {entry.title && <h4>{entry.title}</h4>}
+                  {entry.body && <p>{entry.body}</p>}
+                  {entry.place && (
+                    Number.isFinite(entry.place.lat) && Number.isFinite(entry.place.lng) && onOpenPlace ? (
+                      <button type="button" className="travel-memory-entry-place" onClick={() => onOpenPlace(entry.place)} title="지도에서 장소 보기">
+                        <MapPin size={13} aria-hidden="true" />
+                        <span>{entry.place.name || entry.place.id}</span>
+                        <span className="travel-memory-entry-place-action">지도에서 장소 보기</span>
+                      </button>
+                    ) : (
+                      <span className="travel-memory-entry-place is-static">
+                        <MapPin size={13} aria-hidden="true" />
+                        <span>{entry.place.name || entry.place.id}</span>
+                      </span>
+                    )
+                  )}
+                </div>
+              </article>
+            ))}
+          </div>
         )}
       </section>
     </div>
