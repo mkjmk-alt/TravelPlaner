@@ -5018,7 +5018,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .expense-secondary-button { padding: 10px 14px; background: #f1f5f9; color: #334155; }
 .expense-add-cta { width: 100%; margin: 0 0 14px; }
 .expense-list-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 10px; }
-.expense-list-header h3 { margin: 0; color: #0f172a; font-size: 16px; }
+.expense-list-header h3 { flex: none; margin: 0; color: #0f172a; font-size: 16px; white-space: nowrap; }
+.expense-list-header .expense-choice-group { flex: none; width: auto; flex-wrap: nowrap; }
 .expense-budget-progress { height: 8px; margin-top: 12px; border-radius: 999px; background: #ccfbf1; overflow: hidden; }
 .expense-budget-progress span { display: block; height: 100%; border-radius: inherit; background: #0f766e; }
 .expense-budget-balance { margin: 8px 0 0; color: #115e59; font-size: 13px; font-weight: 700; }
