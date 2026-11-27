@@ -5093,6 +5093,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .expense-editor-section textarea { resize: vertical; }
 .expense-editor-section .expense-form-label { margin-bottom: 4px; font-size: 12px; }
 .expense-editor-date-time { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.expense-editor-date-time .expense-form-label { margin-bottom: 6px; }
 .expense-editor-options .expense-currency-choice-row { display: flex; flex-wrap: wrap; gap: 6px; }
 .expense-editor-options .expense-currency-choice-group { display: flex; flex: 1 1 auto; }
 .expense-editor-options .expense-currency-choice-group .expense-choice-button { flex: 1 1 auto; width: auto; }

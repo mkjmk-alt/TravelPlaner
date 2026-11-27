@@ -4938,7 +4938,6 @@ function App() {
               </select>
             </div>
             <div className="expense-form-field">
-              <div className="expense-form-label">소비 시간</div>
               <ScrollTimeInput value={input.time} onChange={time => update({ time })} label="소비 시간" variant="expense" compact />
             </div>
           </div>
